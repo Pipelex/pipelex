@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
+from pipelex.cogt.doc_gen.table_fill import TableFill
 
 #: The start of every URL that names a file of a document's method tree: the job's `base_url`, and every URL an engine
 #: joins to it, such as a stylesheet's and the URLs it holds. Its host is in the `.invalid` domain, which RFC 2606
@@ -51,6 +52,13 @@ class RenderJob(BaseModel):
     `base_url` is set only for HTML, when its template belongs to a method tree: an engine joins every relative URL of
     the document to it, and reads what it joined through `RenderResources.load`. Without it, a relative URL in the
     document names no file.
+
+    `table_fill` says how the template file's Tables are filled, and is `replace` for every other source. A fill other
+    than `replace` reaches only an engine whose model declares it (`TableFill.engine_capability`).
+
+    The template file's bytes are the method's file or a file the run supplied as one of its inputs, which the engine
+    cannot tell apart and need not: `template_name` names it for messages either way, the file as the method names it,
+    such as `invoice.xlsx`, or the input, such as `the input 'workbook'`, and never the name of a file the run supplied.
     """
 
     model_config = ConfigDict(extra="forbid", ser_json_bytes="base64", val_json_bytes="base64")
@@ -62,7 +70,15 @@ class RenderJob(BaseModel):
     layout: LayoutDocument | None = Field(default=None, description="The auto-layout of the step's inputs")
     html: str | None = Field(default=None, description="The step's HTML template, rendered against its inputs")
     template: bytes | None = Field(default=None, description="The template file's bytes")
-    template_name: str | None = Field(default=None, description="The template file as the method names it, for messages")
+    template_name: str | None = Field(
+        default=None,
+        description="The template file as the method names it, or the input that supplies it as `the input 'workbook'`, for messages",
+    )
+    table_fill: TableFill = Field(
+        default=TableFill.REPLACE,
+        strict=False,
+        description="How the template file's Tables are filled: `replace` their rows, or `append` after them",
+    )
     data: dict[str, Any] = Field(
         default_factory=dict,
         description="The step's inputs as plain data, by input name: what a template file is filled with",
@@ -93,6 +109,9 @@ class RenderJob(BaseModel):
         extra_payloads = [str(source) for source, is_set in payloads.items() if is_set and source != self.source]
         if extra_payloads:
             msg = f"A render job {self.source.desc} carries only its own payload, not the {', '.join(extra_payloads)} one."
+            raise ValueError(msg)
+        if not self.table_fill.is_replace and not self.source.fills_template_file:
+            msg = f"A render job {self.source.desc} fills no Table of a template file, so it cannot {self.table_fill.desc}."
             raise ValueError(msg)
         if self.base_url is not None:
             if not self.source.is_html:

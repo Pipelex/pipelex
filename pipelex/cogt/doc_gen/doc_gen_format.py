@@ -70,6 +70,18 @@ class DocGenFormat(StrEnum):
                 return False
 
     @property
+    def has_table_fills(self) -> bool:
+        """Whether a step in this format may fill its template's Tables other than by replacing their rows, as `append` does.
+
+        Only an Excel workbook's Tables can be appended to so far: Word and PowerPoint tables are replaced.
+        """
+        match self:
+            case DocGenFormat.XLSX:
+                return True
+            case DocGenFormat.PDF | DocGenFormat.DOCX | DocGenFormat.PPTX:
+                return False
+
+    @property
     def has_auto_layout(self) -> bool:
         """Whether a step in this format may have no template and print the auto-layout of its inputs.
 
@@ -117,6 +129,15 @@ class DocGenSource(StrEnum):
             case DocGenSource.HTML:
                 return True
             case DocGenSource.LAYOUT | DocGenSource.TEMPLATE_FILE:
+                return False
+
+    @property
+    def fills_template_file(self) -> bool:
+        """Whether the engine fills an office template file, whose Tables a step's `table_fill` applies to."""
+        match self:
+            case DocGenSource.TEMPLATE_FILE:
+                return True
+            case DocGenSource.LAYOUT | DocGenSource.HTML:
                 return False
 
     @classmethod

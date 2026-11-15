@@ -23,6 +23,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.tools.tabular.exceptions import CsvError
+from tests.helpers.xlsx_workbooks import single_table_workbook
 
 if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -84,14 +85,40 @@ class TestCsvInputDetection:
             WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         assert "local" in str(exc_info.value).lower()
 
-    def test_xlsx_input_routes_to_tabular_seam(self, load_test_library: Callable[[list[Path]], None]) -> None:
+    def test_xlsx_input_reads_the_workbook_table(self, tmp_path: Path, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
-        # A .xlsx url is detected as tabular and routed through the hook to the format seam, which
-        # raises a clear "needs pipelex[tabular]" CsvError (the Excel backend isn't built in v1).
-        inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": "people.xlsx"}}}
+        # A .xlsx url is detected as tabular and read from the workbook's only Table, one item per data row.
+        workbook_path = tmp_path / "people.xlsx"
+        workbook_path.write_bytes(
+            single_table_workbook(
+                header=["Name", "Job", "Country", "Birth year", "Death year"],
+                rows=[["Ada Lovelace", "Mathematician", "UK", 1815, 1852], ["Grace Hopper", "Computer scientist", "USA", 1906, None]],
+            )
+        )
+        inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": str(workbook_path)}}}
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
+
+        content = working_memory.get_stuff("people").content
+        assert isinstance(content, ListContent)
+        records = [item.model_dump() for item in cast("ListContent[StuffContent]", content).items]
+        assert records[0] == {"name": "Ada Lovelace", "job": "Mathematician", "country": "UK", "birth_year": 1815, "death_year": 1852}
+        assert records[1]["death_year"] is None
+
+    def test_xlsx_input_with_unmatched_column_refused(self, tmp_path: Path, load_test_library: Callable[[list[Path]], None]) -> None:
+        load_test_library([BUNDLE_DIR])
+        # A run input keeps its own rule: every column must match a field, in a workbook as in a CSV file.
+        workbook_path = tmp_path / "people.xlsx"
+        workbook_path.write_bytes(
+            single_table_workbook(
+                header=["name", "job", "country", "birth_year", "nickname"],
+                rows=[["Ada Lovelace", "Mathematician", "UK", 1815, "Ada"]],
+            )
+        )
+        inputs: PipelineInputs = {"people": {"concept": "csv_demo.Person", "content": {"url": str(workbook_path)}}}
         with pytest.raises(CsvError) as exc_info:
             WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
-        assert "pipelex[tabular]" in str(exc_info.value)
+        # A header is the file's own text, which no message quotes: the column is named by its position.
+        assert "Column(s) 5" in str(exc_info.value)
 
     def test_unparseable_url_rejected_without_leak(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])

@@ -33,6 +33,7 @@ from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
@@ -109,10 +110,12 @@ def _stub_the_document_engine(mocker: MockerFixture) -> list[bytes]:
     """
     read_templates: list[bytes] = []
 
-    async def _record_template_check(*, render_assignment: RenderDocumentAssignment) -> None:
+    async def _record_template_check(*, render_assignment: RenderDocumentAssignment, storage_provider: StorageProviderAbstract) -> None:  # noqa: ARG001
         template_file = render_assignment.composition.template_file
         assert template_file is not None
-        read_templates.append(await read_method_file(file_ref=template_file.file, read_scope=render_assignment.job_metadata.run_metadata.read_scope))
+        method_file = template_file.method_file
+        assert method_file is not None
+        read_templates.append(await read_method_file(file_ref=method_file, read_scope=render_assignment.job_metadata.run_metadata.read_scope))
 
     mocker.patch.object(PipeDocGen, "resolve_engine", return_value=DocGenSetting(model="stub-docx"))
     mocker.patch(f"{_PRINT_STAGE_NS}._check_template_file", side_effect=_record_template_check)

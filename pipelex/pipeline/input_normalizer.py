@@ -94,6 +94,8 @@ class IdentifiedFileInput(BaseModel):
     kind: FileInputKind
     uri_kind: UriKind
     mime_type: str | None
+    file_name: str | None = None
+    """The file's original name, which a step reading a table judges a CSV file by when its type names no table format."""
 
     @property
     def display_path(self) -> str:
@@ -240,6 +242,7 @@ def _collect_value(*, value: Any, path: FileInputPath, file_inputs: list[Identif
                 kind=FileInputKind.IMAGE if isinstance(value, ImageContent) else FileInputKind.DOCUMENT,
                 uri_kind=resolve_uri(value.url).kind,
                 mime_type=value.mime_type,
+                file_name=value.filename,
             )
         )
     elif isinstance(value, StructuredContent):

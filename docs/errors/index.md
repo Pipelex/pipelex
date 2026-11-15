@@ -7,7 +7,7 @@ description: "Every Pipelex error code, with its title, domain, retry verdict an
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.101.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.102.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -139,6 +139,7 @@ The document engines that print a PipeDocGen step's documents.
 | [`pipelex.docgen.content_unprintable`](pipelex/docgen/content_unprintable.md) | The document's content cannot be printed | `input` | `no` | `422` |
 | [`pipelex.docgen.print_timeout`](pipelex/docgen/print_timeout.md) | Printing the document took too long | `runtime` | `yes` | `504` |
 | [`pipelex.docgen.template_warning`](pipelex/docgen/template_warning.md) | The document template may be faulty | `method` | `no` | none (warning) |
+| [`pipelex.docgen.template_input_unfit`](pipelex/docgen/template_input_unfit.md) | The template a run supplied does not fit the step | `input` | `no` | `422` |
 
 ## pipelex.sandbox { #pipelex-sandbox }
 

@@ -1,10 +1,12 @@
 from typing import Any
 
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ErrorCodeSet, InheritsCause
+from pipelex.errors.problem import make_location
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
@@ -91,3 +93,30 @@ class PipeDocGenTemplateFileUncheckedError(PipelexError):
     """
 
     error_code = CoreCode.RUNTIME_UNSUPPORTED
+
+
+class PipeDocGenTemplateInputUnfitError(PipelexError):
+    """Raised when the engine's check of a template a run input supplies to a ``PipeDocGen`` step reports errors.
+
+    A step with ``template_input`` fills a file the caller gives, so its template is unknown when the method loads and
+    is checked once a run supplies it: at run setup for a run input, before any step starts, and at the step's print for
+    a template an earlier step produced. The file is the caller's, so the fault is the caller's, and the code says so,
+    unlike ``PipeDocGenTemplateCheckError``, which is about the method's own template file. The message names the input
+    and lists the checker's findings, which name the step's inputs and the file's own Tables, sheets and names, never
+    the file's name or URL.
+    """
+
+    error_code = PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT
+
+    def __init__(self, message: str, *, input_name: str, finding: str):
+        super().__init__(message)
+        self.input_name = input_name
+        self.finding = finding
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name, "finding": self.finding}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name)

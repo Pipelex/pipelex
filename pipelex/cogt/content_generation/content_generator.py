@@ -13,6 +13,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     RenderDocumentAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
+    TableReadAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
@@ -27,6 +28,7 @@ from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen
 from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
 from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured_object
+from pipelex.cogt.content_generation.table_read_generate import read_table_of_document
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
@@ -47,6 +49,7 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.tabular.table_records import TableRecords
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -278,6 +281,34 @@ class ContentGenerator(ContentGeneratorProtocol):
             input_name=input_name,
         )
         return await readable_pdf_of_document(conversion_assignment=conversion_assignment)
+
+    @override
+    @update_job_metadata
+    async def read_table(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        source_uri: str,
+        mime_type: str | None,
+        file_name: str | None,
+        input_name: str | None,
+        field_names: list[str],
+        row_field: str | None,
+        table_name: str | None,
+    ) -> TableRecords:
+        table_read_assignment = TableReadAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            source_uri=source_uri,
+            mime_type=mime_type,
+            file_name=file_name,
+            input_name=input_name,
+            field_names=field_names,
+            row_field=row_field,
+            table_name=table_name,
+        )
+        return await read_table_of_document(table_read_assignment=table_read_assignment)
 
     @override
     @update_job_metadata

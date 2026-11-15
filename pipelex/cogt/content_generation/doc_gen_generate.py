@@ -14,6 +14,13 @@ step's data by the interpreter's template file stage (``pipelex.cogt.doc_gen.tem
 included, so a value the template reads that does not exist fails the dry run as it fails a live one; an office
 template file is handed to its engine, and at a dry print to its engine's template checker.
 
+A step with `template_input` takes its office template from one of its inputs: the composition names the input's
+document by its URL, and the leaf reads it under the run's read scope as it reads any file the run names
+(`pipelex.cogt.content_generation.doc_gen_template_input`), refusing a file that is not of the step's format. A dry
+print cannot read it, since the run supplies it, so it reports an advisory warning that the template is checked when a
+run supplies it; a live print hands it to the engine's template checker before it prints, which checks a template an
+earlier step produced, and run setup has already checked one the run's caller gave.
+
 A relative URL of an HTML document, such as an image beside its template, names a file of the template's method tree
 (`pipelex.cogt.doc_gen.method_file_urls`): the engine joins it to the job's base URL and reads it through the
 `RenderResources` of the print, which resolves it in the tree's listing and reads the file through the method file
@@ -31,23 +38,26 @@ import asyncio
 import contextvars
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
+from pipelex.cogt.content_generation.doc_gen_template_input import read_template_input
 from pipelex.cogt.content_generation.dry_mock import dry_render_document
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads, authorize_method_uri_read
 from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, require_doc_gen_engine_installed
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
+from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
-from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError, TemplateUrlRefusedError
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_relative_url, template_asset_refusal
 from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderJob, RenderResources, is_method_file_url
-from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
+from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding, TemplateFindingSeverity
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.core.method_trees.method_files import TreeListing, read_listed_file, read_method_file, read_tree_listing
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -189,10 +199,12 @@ async def render_document_and_store(
         DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
             no installed plugin registers it.
         DocGenRenderError: the engine could not print it, or failed in a way it did not report.
+        DocGenTemplateInputFormatError: a template a run input supplies is not of the step's format.
+        PipeDocGenTemplateInputUnfitError: the engine's checker found errors in a template a run input supplies.
     """
     if render_assignment.cogt_run_params.run_mode.is_dry:
         authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
-        await _check_template_file(render_assignment=render_assignment)
+        await _check_template_file(render_assignment=render_assignment, storage_provider=generated_content_factory.storage_provider)
         return dry_render_document(render_assignment)
     rendered = await _print_document(render_assignment=render_assignment, storage_provider=generated_content_factory.storage_provider)
     composition = render_assignment.composition
@@ -211,18 +223,39 @@ class TemplateFileForPrint(NamedTuple):
     template: bytes | None
 
 
-async def read_template_file(*, render_assignment: RenderDocumentAssignment) -> TemplateFileForPrint:
-    """Read the step's template file through the method file store, and render it when it is an HTML template.
+async def read_template_file(*, render_assignment: RenderDocumentAssignment, storage_provider: StorageProviderAbstract) -> TemplateFileForPrint:
+    """Read the step's template file, and render it when it is an HTML template.
+
+    A file of the step's method tree is read through the method file store; a file a run input supplies is read from
+    its document's URL, and refused when it is not of the step's format. Both are read under the run's read scope.
 
     Raises:
-        MethodFileUnavailableError: the file cannot be read through the method file store for this run.
+        MethodFileUnavailableError: the method's file cannot be read through the method file store for this run.
         DocGenRenderError: an HTML template file is not UTF-8 text.
+        UriReadRefusedError: the run's read scope does not allow the template input's URL.
+        DocGenTemplateInputFormatError: the template input's file is not of the step's format.
     """
     composition = render_assignment.composition
     template_file = composition.template_file
     if template_file is None:
         return TemplateFileForPrint(html=None, template=None)
-    data = await read_method_file(file_ref=template_file.file, read_scope=render_assignment.job_metadata.run_metadata.read_scope)
+    read_scope = render_assignment.job_metadata.run_metadata.read_scope
+    input_file = template_file.input_file
+    if input_file is not None:
+        data = await read_template_input(
+            input_file=input_file,
+            doc_gen_format=composition.format,
+            pipe_code=render_assignment.job_metadata.pipe_code,
+            engine=render_assignment.doc_gen_setting.model,
+            read_scope=read_scope,
+            storage_provider=storage_provider,
+        )
+        return TemplateFileForPrint(html=None, template=data)
+    method_file = template_file.method_file
+    if method_file is None:
+        msg = f"The template of '{composition.filename}' is neither a file of its method nor a run input's."
+        raise PipelexUnexpectedError(msg)
+    data = await read_method_file(file_ref=method_file, read_scope=read_scope)
     if template_file.render_context is None:
         return TemplateFileForPrint(html=None, template=data)
     try:
@@ -238,12 +271,24 @@ async def read_template_file(*, render_assignment: RenderDocumentAssignment) -> 
     return TemplateFileForPrint(html=html, template=None)
 
 
-async def _check_template_file(*, render_assignment: RenderDocumentAssignment) -> None:
+# The advisory a dry print reports for a template a run input supplies, which it cannot read.
+_TEMPLATE_INPUT_UNCHECKED_FINDING = TemplateFinding(
+    severity=TemplateFindingSeverity.WARNING,
+    message=(
+        "The template comes from a run input, so it is checked against the step's inputs when a run supplies it, "
+        "before any step starts, and not by this validation."
+    ),
+)
+
+
+async def _check_template_file(*, render_assignment: RenderDocumentAssignment, storage_provider: StorageProviderAbstract) -> None:
     """At a dry print, read the step's template file and check it against the step's mock inputs.
 
     An HTML template file is rendered with them, so a value it reads that does not exist fails the step. An office one
     is handed to its engine's template checker, when the engine has one, and the interpreter's template file stage
     reports what it found: an error fails the step, and a warning joins the validation verdict's warnings, or the log.
+    A template a run input supplies cannot be read, since the dry run's inputs are mocks, so the stage reports that it
+    is checked when a run supplies it, as an advisory warning.
 
     Raises:
         MethodFileUnavailableError: the file cannot be read through the method file store for this run.
@@ -253,7 +298,10 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment) -
     template_file = composition.template_file
     if template_file is None:
         return
-    read_template = await read_template_file(render_assignment=render_assignment)
+    if template_file.input_file is not None:
+        get_template_file_stage().report_template_findings(template_file=template_file, findings=[_TEMPLATE_INPUT_UNCHECKED_FINDING])
+        return
+    read_template = await read_template_file(render_assignment=render_assignment, storage_provider=storage_provider)
     if read_template.template is None:
         return
     inference_model = get_doc_gen_inference_model(
@@ -262,16 +310,79 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment) -
         source=composition.source,
         pipe_code=render_assignment.job_metadata.pipe_code,
     )
-    worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-    request = TemplateCheckRequest(
-        format=composition.format,
+    await check_office_template(
+        worker=DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate()),
+        template_file=template_file,
         template=read_template.template,
-        template_name=template_file.name,
-        inputs=template_file.input_shapes,
+        doc_gen_format=composition.format,
         data=composition.data,
     )
-    findings = await asyncio.to_thread(worker.check_template, request=request)
+
+
+async def check_office_template(
+    *,
+    worker: DocGenWorkerAbstract,
+    template_file: ComposedTemplateFile,
+    template: bytes,
+    doc_gen_format: DocGenFormat,
+    data: dict[str, Any] | None,
+) -> None:
+    """Hand an office template's bytes to its engine's template checker, and have the template file stage report the findings.
+
+    The checker is the engine's code, so anything it raises beyond a Pipelex error is a check that failed on this
+    template, reported as the template's refusal: a run input's file is the caller's to replace, and a method's file the
+    method's to fix.
+
+    Args:
+        worker: The step's engine's worker, which the print builds once for the check and the fill.
+        template_file: The template as the compose stage named it, with the shapes of the step's inputs.
+        template: The template's bytes.
+        doc_gen_format: The step's format.
+        data: The step's inputs as plain data, for a checker that fills the template in memory; None to compare structure alone.
+
+    Raises:
+        PipeDocGenTemplateCheckError: the checker reported errors in the method's template file (raised by the stage).
+        PipeDocGenTemplateInputUnfitError: the checker reported errors in a template a run input supplies (raised by the stage).
+        DocGenRenderError: the checker itself failed on the template, coded as the template's refusal.
+    """
+    request = TemplateCheckRequest(
+        format=doc_gen_format,
+        template=template,
+        template_name=template_file.name,
+        inputs=template_file.input_shapes,
+        data=data,
+    )
+    try:
+        findings = await asyncio.to_thread(worker.check_template, request=request)
+    except PipelexError:
+        # Already classified, such as a refusal the checker raised on purpose.
+        raise
+    except Exception as exc:
+        # Dynamic plugin dispatch: a checker is plugin code whose exceptions cannot be enumerated, and anything else it
+        # raises is a check that failed on this template.
+        raise _template_check_failure(template_file=template_file, engine=worker.inference_model.name, exc=exc) from exc
     get_template_file_stage().report_template_findings(template_file=template_file, findings=findings)
+
+
+# What a failed check says of the template, to a caller who never sees the engine's own words.
+_CHECK_FAILED_FINDING = "the engine's template check failed on the file"
+
+
+def _template_check_failure(*, template_file: ComposedTemplateFile, engine: str, exc: Exception) -> DocGenRenderError:
+    """The refusal of a template whose engine's checker failed on it: the caller's when a run input supplies it, else the method's."""
+    msg = f"The template check of the engine '{engine}' failed on {template_file.desc}: {exc}"
+    input_file = template_file.input_file
+    if input_file is not None:
+        return (
+            DocGenRenderError(msg)
+            .with_error_code(PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT)
+            .with_params(input=input_file.input_name, finding=_CHECK_FAILED_FINDING)
+        )
+    return (
+        DocGenRenderError(msg)
+        .with_error_code(PipelexErrorCode.DOCGEN_TEMPLATE_INVALID)
+        .with_params(template=template_file.name, reason="check_failed", finding=_CHECK_FAILED_FINDING)
+    )
 
 
 def _render_job_of(*, composition: DocumentComposition, read_template: TemplateFileForPrint) -> RenderJob:
@@ -298,6 +409,8 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
         DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
             no installed plugin registers it.
         DocGenRenderError: the engine could not print it, or failed in a way it did not report.
+        DocGenTemplateInputFormatError: a template a run input supplies is not of the step's format.
+        PipeDocGenTemplateInputUnfitError: the engine's checker found errors in a template a run input supplies.
     """
     composition = render_assignment.composition
     model_handle = render_assignment.doc_gen_setting.model
@@ -326,7 +439,18 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
         )
         engine_name = inference_model.name
         worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-        render_job = _render_job_of(composition=composition, read_template=await read_template_file(render_assignment=render_assignment))
+        read_template = await read_template_file(render_assignment=render_assignment, storage_provider=storage_provider)
+        if composition.template_file is not None and composition.template_file.input_file is not None and read_template.template is not None:
+            # A template a run input supplies is the run's, unknown when the method loaded: it is checked before it is
+            # filled, which catches one an earlier step produced, as run setup caught one the caller gave.
+            await check_office_template(
+                worker=worker,
+                template_file=composition.template_file,
+                template=read_template.template,
+                doc_gen_format=composition.format,
+                data=composition.data,
+            )
+        render_job = _render_job_of(composition=composition, read_template=read_template)
         resources = RunRenderResources(
             storage_provider=storage_provider,
             read_scope=render_assignment.job_metadata.run_metadata.read_scope,

@@ -47,7 +47,7 @@ class TestPipeStructureBlueprint:
             )
 
     def test_rejects_zero_inputs(self):
-        with pytest.raises(ValueError, match="exactly one Text-compatible input"):
+        with pytest.raises(ValueError, match="requires exactly one input"):
             PipeStructureBlueprint(
                 description="Bad",
                 inputs=None,
@@ -55,7 +55,7 @@ class TestPipeStructureBlueprint:
             )
 
     def test_rejects_multiple_inputs(self):
-        with pytest.raises(ValueError, match="exactly one Text-compatible input"):
+        with pytest.raises(ValueError, match="requires exactly one input"):
             PipeStructureBlueprint(
                 description="Bad",
                 inputs={"a": "native.Text", "b": "native.Text"},

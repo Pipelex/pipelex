@@ -24,8 +24,9 @@ from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.unsupported_reasons import REMOTE_TABLE_UNSUPPORTED_REASON
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
-from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
+from pipelex.tools.tabular.csv_codec import is_tabular_path
 from pipelex.tools.tabular.exceptions import CsvError
+from pipelex.tools.tabular.table_reader import list_content_from_table_file
 from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input, validation_error_locations
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
@@ -221,7 +222,10 @@ class StuffFactory:
         name: str | None,
         read_scope: str | None,
     ) -> ListContent[StuffContent] | None:
-        """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
+        """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` or ``{"url": "...xlsx"}`` input reference.
+
+        A ``.xlsx`` workbook is read from its only Excel Table, through the reader a ``PipeStructure`` step reads one
+        with, which needs the optional ``tabular`` extra (``pipelex.tools.tabular.table_reader``).
 
         Detection is gated to the explicit wrapper shape — ``content`` must be *exactly*
         ``{"url": <tabular path>}`` — under a non-native structured concept. Each data row then
@@ -319,7 +323,7 @@ class StuffFactory:
             input_name=name,
         )
         try:
-            return list_content_from_csv(Path(resolved.path), row_model=row_model, input_name=name)
+            return list_content_from_table_file(path=Path(resolved.path), row_model=row_model, input_name=name)
         except CsvError as exc:
             # The codec names the file by the input it was given as, and the problem names and locates it as well: the input,
             # and, for a code naming the field at fault, the input itself when the codec located the fault nowhere inside it.

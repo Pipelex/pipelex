@@ -1,4 +1,6 @@
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal
+from urllib.parse import urlparse
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, PrivateAttr
@@ -8,21 +10,30 @@ from pipelex import log
 from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_declared, resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
-from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateRenderContext
+from pipelex.cogt.doc_gen.document_composition import (
+    ComposedTemplateFile,
+    DocumentComposition,
+    TemplateInputFile,
+    TemplateRenderContext,
+    template_input_name,
+)
 from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.plain_data import plain_data
+from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.method_trees.tree_bundle import MethodFileRef, TreeBundleRef
 from pipelex.core.method_trees.tree_file_reads import TreeFileRead, TreeFileUse
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.interpreter_hub import get_current_library, get_library_manager
+from pipelex.interpreter_hub import get_concept_library, get_current_library, get_library_manager, get_native_concept
 from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
@@ -39,6 +50,8 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.storage.storage_file_name import path_safe_file_name
 from pipelex.tools.templating.templating_style import TemplatingStyle
+from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath, ResolvedPipelexStorage
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff import Stuff
@@ -65,6 +78,14 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     A relative URL in an HTML template, such as the `src` of a logo beside it, names a file of the template's method
     tree, resolved against the template file, or against the bundle of an inline template: the composition says where
     the template sits in its tree, and the print stage reads each file the engine asks for from the tree.
+
+    A step with `template_input` takes its office template from one of its inputs: the compose stage names the input's
+    document by its URL, the print stage reads it under the run's read scope, and its engine fills a copy, stored as a
+    new file, the input's own file being left as it was. The template is unknown when the method loads, so run setup
+    checks one the run's caller gives (`pipelex.pipeline.doc_gen_template_inputs`), and the print checks it again before
+    it fills it, which covers one an earlier step produced. That input is the template, not data: it is left out of the
+    data and of the input shapes the engine fills the template with. `table_fill` says how the template's Tables are
+    filled, and an engine that does not declare the fill is refused when the method loads.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
@@ -86,6 +107,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         default=False,
         description="Whether the inline template's bundle was named alone, so its method tree holds no file beside it",
     )
+    template_input: str | None = Field(default=None, description="The input whose file is the office template, when a run supplies it")
+    table_fill: TableFill = Field(default=TableFill.REPLACE, strict=False, description="How the template file's Tables are filled")
     filename: str | None = None
 
     # The text of an HTML template file, read when the step was built in a method tree this process holds, for the checks
@@ -135,7 +158,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
     @property
     def source(self) -> DocGenSource:
-        return DocGenSource.for_step(doc_gen_format=self.doc_gen_format, has_template=self.template is not None or self.template_file is not None)
+        has_template = self.template is not None or self.template_file is not None or self.template_input is not None
+        return DocGenSource.for_step(doc_gen_format=self.doc_gen_format, has_template=has_template)
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -158,7 +182,11 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     def resolve_engine(self) -> DocGenSetting:
         """The engine this step prints on, resolved in the model deck and checked to print its format from its source here."""
         return resolve_doc_gen_setting(
-            doc_gen_choice=self.doc_gen_choice, doc_gen_format=self.doc_gen_format, source=self.source, pipe_code=self.code
+            doc_gen_choice=self.doc_gen_choice,
+            doc_gen_format=self.doc_gen_format,
+            source=self.source,
+            pipe_code=self.code,
+            table_fill=self.table_fill,
         )
 
     @override
@@ -199,6 +227,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
     @override
     def validate_inputs_with_library(self):
+        # The template input's file is filled as the step's template, so its concept must be a document.
+        if self.template_input is not None:
+            self._validate_template_input_concept(template_input=self.template_input)
         # A step built from a crate by digest alone holds no text of its HTML template file, so no check of it ran: the
         # validation refuses rather than reach a verdict the template could contradict. A load that skips validation,
         # such as a worker's load of the crate a validated library made, never gets here.
@@ -229,6 +260,23 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 inputs=self.inputs,
             )
 
+    def _validate_template_input_concept(self, *, template_input: str) -> None:
+        """Refuse a template input whose concept does not refine `Document`, since its file is the template filled."""
+        stuff_spec = self.inputs.root[template_input]
+        document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
+        if get_concept_library().is_compatible(tested_concept=stuff_spec.concept, wanted_concept=document_concept, strict=True):
+            return
+        msg = (
+            f"PipeDocGen '{self.code}' takes its template from the input '{template_input}', declared as "
+            f"'{stuff_spec.concept.concept_ref}', which is not a Document. Declare it as {document_concept.concept_ref}, "
+            "or as a concept that refines it."
+        )
+        raise (
+            PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
+            .with_error_code(CoreCode.METHOD_INPUT_CONCEPT_MISMATCH)
+            .with_params(input=template_input, declared=stuff_spec.concept.concept_ref, expected=[document_concept.concept_ref])
+        )
+
     @override
     def validate_output_static(self):
         pass
@@ -242,9 +290,14 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     ####################################################################################################################
 
     def _named_contents(self, working_memory: WorkingMemory) -> list[tuple[str, StuffContent]]:
-        """The declared inputs present in memory, in declared order; an absent optional input is skipped."""
+        """The declared inputs present in memory, in declared order; an absent optional input is skipped.
+
+        The template input is the step's template, not data it fills the template with, so it is left out.
+        """
         named_contents: list[tuple[str, StuffContent]] = []
         for input_name in self.inputs.variables:
+            if input_name == self.template_input:
+                continue
             stuff = working_memory.get_optional_stuff(input_name)
             if stuff is not None:
                 named_contents.append((input_name, stuff.content))
@@ -285,7 +338,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         renders it with, an office one with the step's data as plain data and the shapes of its inputs.
         """
         context = build_compose_context(memory=working_memory, runtime_params=pipe_run_params.params)
-        rendered_filename = self.code
+        template_input_file = self._template_input_file(working_memory=working_memory) if self.template_input is not None else None
+        # Without a filename, the output is named after the step, or after the template input's file, which it is a copy of.
+        rendered_filename = (template_input_file.filename if template_input_file is not None else None) or self.code
         if self.filename is not None:
             # A `$name` sigil in the filename expands to the `format` filter, which prints under the render's templating style.
             rendered_filename = await self._render(
@@ -328,29 +383,41 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                         html=html,
                         url_base=self._inline_template_url_base(),
                     )
-                template_file = self._composed_template_file(
+                html_template_file = self._composed_template_file(
                     render_context=self._render_context(working_memory=working_memory, pipe_run_params=pipe_run_params)
                 )
+                html_file_ref = self._required_template_file_ref()
+                return DocumentComposition(
+                    format=self.doc_gen_format,
+                    source=source,
+                    filename=filename,
+                    title=title,
+                    template_file=html_template_file,
+                    url_base=RelativeUrlBase(
+                        tree_digest=html_file_ref.tree_digest,
+                        holder=html_file_ref.tree_path,
+                        template_label=f"the template file '{html_file_ref.tree_path}'",
+                    ),
+                )
+            case DocGenSource.TEMPLATE_FILE:
+                template_file: ComposedTemplateFile
+                if template_input_file is not None:
+                    template_file = ComposedTemplateFile(
+                        file=template_input_file,
+                        name=template_input_name(input_name=template_input_file.input_name),
+                        pipe_ref=self.pipe_ref,
+                        input_shapes=self.input_shapes(),
+                    )
+                else:
+                    template_file = self._composed_template_file(input_shapes=self.input_shapes())
                 return DocumentComposition(
                     format=self.doc_gen_format,
                     source=source,
                     filename=filename,
                     title=title,
                     template_file=template_file,
-                    url_base=RelativeUrlBase(
-                        tree_digest=template_file.file.tree_digest,
-                        holder=template_file.file.tree_path,
-                        template_label=f"the template file '{template_file.file.tree_path}'",
-                    ),
-                )
-            case DocGenSource.TEMPLATE_FILE:
-                return DocumentComposition(
-                    format=self.doc_gen_format,
-                    source=source,
-                    filename=filename,
-                    title=title,
-                    template_file=self._composed_template_file(input_shapes=self._input_shapes()),
                     data={name: plain_data(content) for name, content in named_contents},
+                    table_fill=self.table_fill,
                 )
 
     def _inline_template_url_base(self) -> RelativeUrlBase | None:
@@ -377,15 +444,48 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         Raises:
             PipeDocGenRunError: The step names no template file in its method tree.
         """
-        if self.template_file is None or self.template_file_ref is None:
+        if self.template_file is None:
             msg = f"PipeDocGen '{self.code}' prints from a template file but names none in its method tree."
             raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         return ComposedTemplateFile(
-            file=self.template_file_ref,
+            file=self._required_template_file_ref(),
             name=self.template_file,
             pipe_ref=self.pipe_ref,
             render_context=render_context,
             input_shapes=input_shapes or {},
+        )
+
+    def _required_template_file_ref(self) -> MethodFileRef:
+        """The step's template file in its method tree.
+
+        Raises:
+            PipeDocGenRunError: The step names no template file in its method tree.
+        """
+        if self.template_file_ref is None:
+            msg = f"PipeDocGen '{self.code}' prints from a template file but names none in its method tree."
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+        return self.template_file_ref
+
+    def _template_input_file(self, *, working_memory: WorkingMemory) -> TemplateInputFile:
+        """The document of the step's template input, named by its URL for the print stage to read.
+
+        Raises:
+            PipeDocGenRunError: The template input is absent from memory, or does not hold a document.
+        """
+        template_input = self.template_input
+        stuff = working_memory.get_optional_stuff(template_input) if template_input is not None else None
+        if template_input is None or stuff is None:
+            msg = f"PipeDocGen '{self.code}' takes its template from the input '{template_input}', which is not in its working memory."
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+        document = stuff.content
+        if not isinstance(document, DocumentContent):
+            msg = f"PipeDocGen '{self.code}' takes its template from the input '{template_input}', which holds no document."
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+        return TemplateInputFile(
+            input_name=template_input,
+            url=document.url,
+            mime_type=document.mime_type,
+            filename=_document_file_name(document=document),
         )
 
     def _render_context(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> TemplateRenderContext:
@@ -414,9 +514,15 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             runtime_params=dict(pipe_run_params.params),
         )
 
-    def _input_shapes(self) -> dict[str, InputShape]:
+    def input_shapes(self) -> dict[str, InputShape]:
+        """The step's declared inputs by name, as the shape of their plain data, which an office template is checked against.
+
+        The template input is the template itself, not data filled into it, so it is left out.
+        """
         shapes: dict[str, InputShape] = {}
         for input_name, stuff_spec in self.inputs.root.items():
+            if input_name == self.template_input:
+                continue
             content_class: type[StuffContent] | None = None
             if stuff_spec.concept.declares_a_structure_class:
                 content_class = get_class_registry().get_required_subclass(name=stuff_spec.concept.structure_class_name, base_class=StuffContent)
@@ -445,6 +551,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             execution_data={
                 "format": self.doc_gen_format,
                 "source": self.source,
+                "template_input": self.template_input,
+                "table_fill": self.table_fill,
                 "resolved_model": doc_gen_setting.model,
                 "filename": document.filename,
                 "url": document.url,
@@ -508,3 +616,21 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
+
+
+def _document_file_name(*, document: DocumentContent) -> str | None:
+    """The file name of a document: the one it carries, or the last segment of its URL's path, None for a data URL."""
+    if document.filename:
+        return document.filename
+    resolved = resolve_uri(document.url)
+    path: str
+    match resolved:
+        case ResolvedPipelexStorage():
+            path = resolved.storage_uri
+        case ResolvedHttpUrl():
+            path = urlparse(resolved.url).path
+        case ResolvedLocalPath():
+            path = resolved.path
+        case ResolvedBase64DataUrl():
+            return None
+    return PurePosixPath(path).name or None

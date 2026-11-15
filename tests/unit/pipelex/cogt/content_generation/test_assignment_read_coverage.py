@@ -28,12 +28,13 @@ from pipelex.cogt.content_generation.assignment_models import (
     RenderPageViewsAssignment,
     SearchAssignment,
     SearchObjectAssignment,
+    TableReadAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
-from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition
+from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateInputFile
 from pipelex.cogt.doc_gen.layout_tree import ImageBlock, LayoutDocument, SectionBlock
 from pipelex.cogt.document.prompt_document import PromptDocumentUri
 from pipelex.cogt.extract.extract_input import ExtractInput
@@ -64,9 +65,10 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     ExtractAssignment: {"extract_input.image_uri", "extract_input.document_uri"},
     RenderPageViewsAssignment: {"document_uri"},
     DocumentConversionAssignment: {"source_uri"},
+    TableReadAssignment: {"source_uri"},
     # A section's blocks hold blocks again: the walk names the images inside one section and stops where a section would enclose itself.
     # A template file is a method file, named by its tree's digest and read through the method file store, never by a URI.
-    RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url"},
+    RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url", "composition.template_file.file.url"},
     SearchAssignment: set(),
     SearchObjectAssignment: set(),
     JudgmentAssignment: {"prompt.images.uri", "prompt.documents.uri"},
@@ -190,6 +192,15 @@ URL_BEARING_SAMPLES: dict[type[BaseModel], tuple[_DeclaresReads, set[str]]] = {
         ),
         {"pipelex-storage://s/report.docx"},
     ),
+    TableReadAssignment: (
+        TableReadAssignment(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            source_uri="pipelex-storage://s/expenses.xlsx",
+            field_names=["merchant", "amount"],
+        ),
+        {"pipelex-storage://s/expenses.xlsx"},
+    ),
     RenderDocumentAssignment: (
         RenderDocumentAssignment(
             job_metadata=_job_metadata(),
@@ -269,6 +280,30 @@ class TestAssignmentReadCoverage:
         )
 
         assert assignment.referenced_uris() == []
+
+    def test_a_document_printed_from_a_template_a_run_input_supplies_declares_its_url(self) -> None:
+        """A template a run input supplies is read from its document's URL, which the print authorizes like any other."""
+        assignment = RenderDocumentAssignment(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            composition=DocumentComposition(
+                format=DocGenFormat.XLSX,
+                source=DocGenSource.TEMPLATE_FILE,
+                filename="expenses.xlsx",
+                title="Expenses",
+                template_file=ComposedTemplateFile(
+                    file=TemplateInputFile(input_name="workbook", url="pipelex-storage://s/expenses.xlsx"),
+                    name="the input 'workbook'",
+                    pipe_ref="expenses.append_rows",
+                ),
+            ),
+            doc_gen_setting=DocGenSetting(model="pipelex-xlsx"),
+        )
+
+        (uri_reference,) = assignment.referenced_uris()
+
+        assert uri_reference.uri == "pipelex-storage://s/expenses.xlsx"
+        assert uri_reference.position == "the template the input 'workbook' supplies"
 
     def test_the_extract_input_declares_an_image_too(self) -> None:
         referenced_uris = ExtractInput(image_uri="pipelex-storage://s/scan.png").referenced_uris()

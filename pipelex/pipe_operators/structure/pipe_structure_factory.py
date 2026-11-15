@@ -26,7 +26,7 @@ class PipeStructureFactory(PipeFactoryProtocol[PipeStructureBlueprint, PipeStruc
         blueprint: PipeStructureBlueprint,
     ) -> PipeStructure:
         # `PipeStructureBlueprint.validate_inputs` already enforces exactly one input.
-        text_input_name = blueprint.input_names[0]
+        source_input_name = blueprint.input_names[0]
 
         output_parse_result = parse_concept_with_multiplicity(blueprint.output)
         output_multiplicity = make_variable_multiplicity(
@@ -41,6 +41,8 @@ class PipeStructureFactory(PipeFactoryProtocol[PipeStructureBlueprint, PipeStruc
             inputs=inputs,
             output=output,
             llm_choice=blueprint.model,
-            text_input_name=text_input_name,
+            source_input_name=source_input_name,
+            table_name=blueprint.table,
+            row_field=blueprint.row_field,
             output_multiplicity=output_multiplicity,
         )

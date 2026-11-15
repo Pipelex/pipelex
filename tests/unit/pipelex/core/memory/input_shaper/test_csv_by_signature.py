@@ -186,7 +186,7 @@ class TestInputShaperCsvBySignature:
         """A row refused as a whole, which pydantic locates nowhere, is the input's own fault, as a table refused whole is."""
         input_specs = build_input_specs([("people", "shaper_test.ShaperPerson", True)])
         mocker.patch(
-            "pipelex.core.stuffs.stuff_factory.list_content_from_csv",
+            "pipelex.core.stuffs.stuff_factory.list_content_from_table_file",
             side_effect=CsvCoercionError("Could not coerce row 2 of the CSV file").with_params(field=None),
         )
 

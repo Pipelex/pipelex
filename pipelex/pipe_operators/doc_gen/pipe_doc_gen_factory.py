@@ -6,6 +6,7 @@ from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
+from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.method_trees.building_bundle import get_building_tree_bundle
 from pipelex.core.method_trees.file_references import reference_refusal_reason, resolve_bundle_file_reference, resolve_crate_file_reference
@@ -126,6 +127,8 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             template_file_ref=template_file_ref,
             template_bundle_ref=template_bundle_ref,
             template_tree_is_one_file=template_tree_is_one_file,
+            template_input=blueprint.template_input,
+            table_fill=blueprint.table_fill or TableFill.REPLACE,
             filename=blueprint.filename,
         )
         if template_file_text is not None:

@@ -66,7 +66,9 @@ DocGenChoiceKeyError | pipelex.config.invalid
 DocGenEngineMissingError | pipelex.docgen.engine_unavailable
 DocGenHandleNotFoundError | pipelex.config.invalid
 DocGenModelCapabilityError | model.capability_unsupported
-DocGenRenderError | one of runtime.unexpected, pipelex.docgen.content_unprintable, pipelex.docgen.print_timeout, pipelex.docgen.resource_refused, pipelex.docgen.template_invalid, security.method_url_refused
+DocGenRenderError | one of runtime.unexpected, pipelex.docgen.content_unprintable, pipelex.docgen.print_timeout, pipelex.docgen.resource_refused, pipelex.docgen.template_invalid, pipelex.docgen.template_input_unfit, security.method_url_refused
+DocGenTemplateInputFormatError | input.file_type_unsupported
+DocGenTemplateInputTooLargeError | input.too_large
 DocumentConversionError | abstract
 DocumentConverterAnswerError | runtime.unexpected
 DocumentConverterMisconfiguredError | runtime.misconfigured
@@ -274,6 +276,7 @@ PipeDocGenFactoryError | one of method.template_invalid, method.output_concept_m
 PipeDocGenRunError | inherits cause, else pipe.template_render_failed; or chosen: runtime.unexpected, method.template_invalid
 PipeDocGenTemplateCheckError | pipelex.docgen.template_invalid
 PipeDocGenTemplateFileUncheckedError | runtime.unsupported
+PipeDocGenTemplateInputUnfitError | pipelex.docgen.template_input_unfit
 PipeDocGenUndefinedValueError | pipe.template_render_failed
 PipeExecutionError | one of runtime.unexpected, request.pipe_unspecified, input.invalid
 PipeExtractFactoryError | method.schema_violation
@@ -297,7 +300,7 @@ PipeOperatorModelAvailabilityError | inherits cause, else model.unavailable
 PipeOperatorModelChoiceError | inherits cause, else model.unknown
 PipeParallelFactoryError | method.schema_violation
 PipeRouterError | inherits cause, else runtime.unexpected
-PipeRunError | inherits cause, else runtime.unexpected; or chosen: model.output_schema_mismatch, pipe.condition_unmatched, pipe.condition_refused, pipe.input_unresolved, method.function_invalid, method.template_invalid, method.pipe_unresolved, method.schema_violation, method.wiring_invalid, method.name_conflict, method.optional_unhandled
+PipeRunError | inherits cause, else runtime.unexpected; or chosen: model.output_schema_mismatch, pipe.condition_unmatched, pipe.condition_refused, pipe.input_unresolved, method.function_invalid, method.template_invalid, method.pipe_unresolved, method.schema_violation, method.wiring_invalid, method.name_conflict, method.optional_unhandled, method.output_multiplicity_mismatch
 PipeRunInputsError | one of pipe.input_unresolved, input.missing, input.reference_not_found, method.wiring_invalid
 PipeRunParamsError | method.schema_violation
 PipeSequenceValueError | method.wiring_invalid
@@ -379,6 +382,10 @@ StuffContentValidationError | method.wiring_invalid
 StuffError | abstract
 StuffFactoryError | one of input.invalid, input.wrong_concept, pipe.output_invalid, pipe.output_multiplicity
 StuffSpecFactoryError | method.schema_violation
+TableFileTypeUnsupportedError | input.file_type_unsupported
+TableReaderMisconfiguredError | runtime.misconfigured
+TableSelectionError | input.invalid
+TableTooLargeError | input.too_large
 TelemetryApiKeyMissingError | pipelex.config.variable_missing
 TelemetryConfigError | abstract
 TelemetryConfigValidationError | pipelex.config.invalid

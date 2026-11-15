@@ -1589,6 +1589,29 @@
       "default": "{hash}.{extension}",
       "open_node": false
     },
+    "runtime.table_reading": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.table_reading.max_table_cells": {
+      "value_type": "int",
+      "required": true,
+      "default": 2000000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
+    "runtime.table_reading.max_workbook_uncompressed_bytes": {
+      "value_type": "int",
+      "required": true,
+      "default": 100000000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
     "runtime.tracing": {
       "value_type": "table",
       "required": true,

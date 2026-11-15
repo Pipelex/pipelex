@@ -103,7 +103,24 @@ if TYPE_CHECKING:
 # to its worker, whose log lines then carry it, as a run's worker binds the request id its run's metadata carries
 # (``BundleValidatorProtocol``). A validator written against v9 would be called with a keyword it does not accept on its
 # first validation; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 10
+#
+# v11 made two changes, both in the same release.
+#
+# It changed the document engine contract: a render job carries ``table_fill`` (``TableFill`` in
+# ``pipelex.cogt.doc_gen.table_fill``), how the template file's Tables are filled, ``replace`` as engines always did or
+# ``append`` after a Table's last row, and its template file may be one a run input supplies, which ``template_name``
+# then names as ``the input 'workbook'``. An engine declares a fill other than ``replace`` among its model's ``inputs``,
+# ``table_append`` for ``append``, and a step asking for a fill its engine does not declare is refused when the method
+# loads. An engine written against v10 would read an ``append`` job, ignore the field it does not know and replace the
+# Table's rows, losing the rows the user's workbook held; the bump turns that into a discovery-time mismatch naming the
+# plugin, which re-declares v11 once it reads the field.
+#
+# It also added a leaf to the content generator an orchestrator plugin provides: ``ContentGeneratorProtocol.read_table``,
+# which a ``PipeStructure`` step reading a spreadsheet ``Document`` calls to read one table of the file into records,
+# returned as plain data (``TableRecords`` in ``pipelex.tools.tabular.table_records``). A content generator written against
+# v10 would fall through to the protocol's default body and fail the step with a deployment fault; the bump turns that
+# into a discovery-time mismatch naming the plugin, so a host dispatches the leaf before it serves such a step.
+PLUGIN_API_VERSION: int = 11
 
 
 @runtime_checkable
