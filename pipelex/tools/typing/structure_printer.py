@@ -5,6 +5,7 @@ from typing import Any, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.misc.python_literals import class_docstring
 
 
 def _build_type_hints_namespace() -> dict[str, Any]:
@@ -216,38 +217,11 @@ class StructurePrinter:
             if type_args:
                 base_class_name = f"{base_class_name}[{', '.join(arg.__name__ for arg in type_args)}]"
 
-            # Class definition with docstring
+            # Class definition with docstring, rendered so that no quote or backslash in it can close it early
             output.append(f"class {class_name}({base_class_name}):")
             if doc:
-                # Split docstring into lines and format each line
-                doc_lines = [line.rstrip() for line in doc.split("\n")]
-
-                # Remove empty lines from start and end
-                while doc_lines and not doc_lines[0].strip():
-                    doc_lines.pop(0)
-                while doc_lines and not doc_lines[-1].strip():
-                    doc_lines.pop()
-
-                if len(doc_lines) == 1:
-                    # Single line docstring
-                    output.append(f'    """{doc_lines[0]}"""')
-                else:
-                    # Multi-line docstring
-                    output.append(f'    """{doc_lines[0]}')
-
-                    # Add empty line after first line if there's content
-                    if doc_lines[1].strip():
-                        output.append("")
-
-                    # Add remaining lines with proper indentation
-                    for line in doc_lines[1:]:
-                        if line.strip():
-                            output.append(f"    {line.strip()}")
-                        else:
-                            output.append("")
-
-                    # Close the docstring
-                    output.append('    """')
+                output.extend(class_docstring(doc).split("\n"))
+            class_header_length = len(output)
 
             # Handle empty classes or classes that only inherit fields
             try:
@@ -331,7 +305,7 @@ class StructurePrinter:
                         continue
 
                 # If no fields were output, show inheritance comment
-                if len(output) == (2 if doc else 1):
+                if len(output) == class_header_length:
                     output.append("    # No additional fields")
             except (TypeError, AttributeError):
                 # If we can't get type hints, show inheritance comment
@@ -345,8 +319,7 @@ class StructurePrinter:
             # Add enum docstring if available, but skip Python's default "An enumeration." docstring
             # This ensures we only include meaningful custom docstrings
             if enum_type.__doc__ and enum_type.__doc__.strip() != "An enumeration.":
-                doc = enum_type.__doc__.strip()
-                output.append(f'    """{doc}"""')
+                output.extend(class_docstring(enum_type.__doc__).split("\n"))
             output += [f'    {member.name} = "{member.value}"' for member in enum_type]
 
         return output

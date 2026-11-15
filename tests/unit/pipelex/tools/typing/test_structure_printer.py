@@ -1,3 +1,4 @@
+import ast
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
@@ -8,6 +9,7 @@ from pipelex import pretty_print
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.tools.misc.python_literals import normalized_docstring_text
 from pipelex.tools.typing.structure_printer import StructurePrinter
 
 
@@ -119,6 +121,21 @@ class Milestone(StructuredContent):
 class GanttChart(StructuredContent):
     tasks: list[GanttTaskDetails] | None = None
     milestones: list[Milestone] | None = None
+
+
+class QuotedGenre(StrEnum):
+    JAZZ = "jazz"
+
+
+# Assigned after the class is built so that the test source itself holds no docstring of this shape.
+QuotedGenre.__doc__ = 'A genre list naming """ quotes and ending in a backslash \\'
+
+
+class QuotedContent(StructuredContent):
+    genre: QuotedGenre = Field(description="The genre")
+
+
+QuotedContent.__doc__ = 'Says """hello""" in a list:\n  - with an indented line\nand ends with a backslash \\'
 
 
 class TestStructurePrinter:
@@ -320,3 +337,13 @@ class TestStructurePrinter:
             "    date: datetime | None = None",
         ]
         assert result == expected
+
+    def test_docstrings_with_triple_quotes_render_verbatim(self):
+        """A class or enum docstring containing triple quotes or a trailing backslash prints as a docstring that reads back as authored."""
+        result = StructurePrinter().get_type_structure(QuotedContent)
+
+        module = ast.parse("\n".join(result))
+        class_defs = {node.name: node for node in module.body if isinstance(node, ast.ClassDef)}
+        assert set(class_defs) == {"QuotedContent", "QuotedGenre"}
+        assert ast.get_docstring(class_defs["QuotedContent"]) == normalized_docstring_text(QuotedContent.__doc__ or "")
+        assert ast.get_docstring(class_defs["QuotedGenre"]) == normalized_docstring_text(QuotedGenre.__doc__ or "")
