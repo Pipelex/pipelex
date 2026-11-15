@@ -68,7 +68,7 @@ class TestTableReadGenerate:
         table_records = await read_table_of_document(table_read_assignment=_assignment(key=key, mime_type="application/octet-stream", file_name=None))
 
         assert table_records.table_format == TableFormat.XLSX
-        assert [record.values for record in table_records.records] == [{"item": "Paper", "amount": 2.5}, {"item": "Ink", "amount": 3}]
+        assert [record.plain_values() for record in table_records.records] == [{"item": "Paper", "amount": 2.5}, {"item": "Ink", "amount": 3}]
         assert [record.position for record in table_records.records] == [1, 2]
 
     async def test_a_csv_file_in_storage_is_read_by_its_declared_type(self, mocker: MockerFixture) -> None:
@@ -78,7 +78,7 @@ class TestTableReadGenerate:
         table_records = await read_table_of_document(table_read_assignment=_assignment(key=key, mime_type="text/csv", file_name=None))
 
         assert table_records.table_format == TableFormat.CSV
-        assert table_records.records[0].values == {"item": "Paper", "amount": "2.5"}
+        assert table_records.records[0].plain_values() == {"item": "Paper", "amount": "2.5"}
 
     @pytest.mark.parametrize("mime_type", ["application/octet-stream", "application/vnd.ms-excel", "text/plain", "text/x-csv"])
     async def test_a_csv_file_declared_with_a_type_naming_no_table_format_is_read_by_its_name(self, mocker: MockerFixture, mime_type: str) -> None:
@@ -88,7 +88,7 @@ class TestTableReadGenerate:
         table_records = await read_table_of_document(table_read_assignment=_assignment(key=key, mime_type=mime_type, file_name="data.csv"))
 
         assert table_records.table_format == TableFormat.CSV
-        assert table_records.records[0].values == {"item": "Paper", "amount": "2.5"}
+        assert table_records.records[0].plain_values() == {"item": "Paper", "amount": "2.5"}
 
     async def test_the_file_is_read_off_the_event_loop_thread(self, mocker: MockerFixture) -> None:
         """Parsing a workbook is CPU-bound, so it runs on a worker thread and never blocks the event loop."""

@@ -11,7 +11,9 @@ A table file is read in two steps, whatever its format:
    validation, so a row concept that reads a `.csv` reads a `.xlsx`.
 
 The records between the two steps (`TableRecords`) are plain data, so a host runtime can read the file in one process,
-an activity, and bind the records to the row concept in another, the step's.
+an activity, and bind the records to the row concept in another, the step's. Each cell is tagged with the kind of value
+it holds (`TableCell`), so the records survive any serialization exactly: a text that looks like a number or a date stays
+a text, whatever converter carries them.
 
 Two bindings exist (`TableBinding`), since a table reaches a run two ways:
 
@@ -28,7 +30,7 @@ import re
 import types
 from datetime import date, datetime, time
 from enum import Enum, StrEnum
-from typing import Any, Final, Literal, NamedTuple, TypeAlias, Union, get_args, get_origin
+from typing import Annotated, Any, Final, Literal, NamedTuple, TypeAlias, Union, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -99,6 +101,86 @@ class RawTable(NamedTuple):
     """The 0-based indexes of the columns holding a formula with no cached value in some row, which read as empty."""
 
 
+class CellKind(StrEnum):
+    """The kinds of value a flat row field holds, which decide how a cell converts to it."""
+
+    TEXT = "text"
+    INTEGER = "integer"
+    NUMBER = "number"
+    BOOLEAN = "boolean"
+    DATE = "date"
+    DATETIME = "datetime"
+
+    @property
+    def is_text(self) -> bool:
+        match self:
+            case CellKind.TEXT:
+                return True
+            case CellKind.INTEGER | CellKind.NUMBER | CellKind.BOOLEAN | CellKind.DATE | CellKind.DATETIME:
+                return False
+
+
+class _TableCellBase(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TextCell(_TableCellBase):
+    kind: Literal[CellKind.TEXT] = CellKind.TEXT
+    value: str
+
+
+class IntegerCell(_TableCellBase):
+    kind: Literal[CellKind.INTEGER] = CellKind.INTEGER
+    value: int
+
+
+class NumberCell(_TableCellBase):
+    kind: Literal[CellKind.NUMBER] = CellKind.NUMBER
+    value: float
+
+
+class BooleanCell(_TableCellBase):
+    kind: Literal[CellKind.BOOLEAN] = CellKind.BOOLEAN
+    value: bool
+
+
+class DateCell(_TableCellBase):
+    kind: Literal[CellKind.DATE] = CellKind.DATE
+    value: date
+
+
+class DatetimeCell(_TableCellBase):
+    kind: Literal[CellKind.DATETIME] = CellKind.DATETIME
+    value: datetime
+
+
+# A non-empty cell of a record, tagged with the kind of value it holds. The tag is what keeps a cell exact across any
+# serialization: a bare union would let a JSON validator read the text "00012" or "1700000000" as a datetime, and a host
+# runtime's payload converter carries records between processes as JSON.
+TableCell: TypeAlias = Annotated[
+    TextCell | IntegerCell | NumberCell | BooleanCell | DateCell | DatetimeCell,
+    Field(discriminator="kind"),
+]
+
+
+def table_cell_of(*, value: TableCellValue) -> TableCell | None:
+    """A codec's cell value as a record's tagged cell, None for an empty cell."""
+    # `bool` before `int`, which it subclasses, and `datetime` before `date`, which it subclasses.
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return BooleanCell(value=value)
+    if isinstance(value, int):
+        return IntegerCell(value=value)
+    if isinstance(value, float):
+        return NumberCell(value=value)
+    if isinstance(value, datetime):
+        return DatetimeCell(value=value)
+    if isinstance(value, date):
+        return DateCell(value=value)
+    return TextCell(value=value)
+
+
 class TableRecord(BaseModel):
     """One data row of a table, its values keyed by the field its column matched."""
 
@@ -106,7 +188,13 @@ class TableRecord(BaseModel):
 
     label: str = Field(description="How a message names the row, as the author finds it in the file")
     position: int = Field(description="The row's position among the table's data rows, counted from one")
-    values: dict[str, TableCellValue] = Field(default_factory=dict, description="The row's values, by the field its column matched")
+    cells: dict[str, TableCell | None] = Field(
+        default_factory=dict, description="The row's cells, by the field its column matched, each tagged with its kind; None when empty"
+    )
+
+    def plain_values(self) -> dict[str, TableCellValue]:
+        """The row's values, by the field its column matched, untagged: None for an empty cell."""
+        return {field_name: cell.value if cell is not None else None for field_name, cell in self.cells.items()}
 
 
 class TableRecords(BaseModel):
@@ -174,11 +262,11 @@ def build_table_records(
 
     records: list[TableRecord] = []
     for position, raw_row in enumerate(raw_table.rows, start=1):
-        values: dict[str, TableCellValue] = {}
+        cells: dict[str, TableCell | None] = {}
         for column_index, field_name in field_by_column.items():
             cell = raw_row.cells[column_index] if column_index < len(raw_row.cells) else None
-            values[field_name] = None if cell == "" else cell
-        records.append(TableRecord(label=raw_row.label, position=position, values=values))
+            cells[field_name] = table_cell_of(value=None if cell == "" else cell)
+        records.append(TableRecord(label=raw_row.label, position=position, cells=cells))
 
     matched_fields = [field_by_column[column_index] for column_index in sorted(field_by_column)]
     uncached_formula_fields = [
@@ -239,7 +327,7 @@ def list_content_from_table_records(
         row_data: dict[str, Any] = {}
         for field_name in nulled_fields - present_fields:
             row_data[field_name] = None
-        for field_name, value in record.values.items():
+        for field_name, value in record.plain_values().items():
             if value is None:
                 if field_name in nulled_fields:
                     row_data[field_name] = None
@@ -274,25 +362,6 @@ def list_content_from_table_records(
             raise CsvCoercionError(msg).with_params(field=located_errors[0].location if located_errors else None) from exc
         items.append(item)
     return ListContent(items=items)
-
-
-class CellKind(StrEnum):
-    """The kinds of value a flat row field holds, which decide how a cell converts to it."""
-
-    TEXT = "text"
-    INTEGER = "integer"
-    NUMBER = "number"
-    BOOLEAN = "boolean"
-    DATE = "date"
-    DATETIME = "datetime"
-
-    @property
-    def is_text(self) -> bool:
-        match self:
-            case CellKind.TEXT:
-                return True
-            case CellKind.INTEGER | CellKind.NUMBER | CellKind.BOOLEAN | CellKind.DATE | CellKind.DATETIME:
-                return False
 
 
 class CellConversion(NamedTuple):

@@ -10,7 +10,7 @@
 
 ### Changed
 
-- **A content generator reads tables, plugin API version 11 (Breaking)**: `ContentGeneratorProtocol` gains the leaf `read_table`, which reads one table of a spreadsheet `Document` into `TableRecords`, plain data a host runtime dispatches as it dispatches every other leaf; a content generator that does not implement it inherits a default that refuses as `runtime.misconfigured`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
+- **A content generator reads tables, plugin API version 11 (Breaking)**: `ContentGeneratorProtocol` gains the leaf `read_table`, which reads one table of a spreadsheet `Document` into `TableRecords`, plain data a host runtime dispatches as it dispatches every other leaf, each record's cells tagged with the kind of value they hold so that any JSON payload converter carries them exactly; a content generator that does not implement it inherits a default that refuses as `runtime.misconfigured`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
 - **CSV input headers match fields loosely**: a CSV file given as a list input now matches each header to a field ignoring case, spaces, dots and underscores, where the header had to spell the field exactly, so a `Birth year` column fills `birth_year`; a header matching several fields, or several headers matching one field, is refused, and a column matching no field is still refused on that path.
 - **`PipeStructure.source_input_name` (Breaking)**: the attribute naming the step's single input, `text_input_name`, is renamed `source_input_name`, since the input may now be a `Document`.
 

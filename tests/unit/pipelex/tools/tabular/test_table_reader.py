@@ -68,7 +68,7 @@ class TestTableReader:
         assert table_records.matched_fields == ["item", "amount"]
         assert [record.position for record in table_records.records] == [1, 2, 3]
         assert [record.label for record in table_records.records] == ["row 2", "row 4", "row 5"]
-        assert [record.values for record in table_records.records] == [
+        assert [record.plain_values() for record in table_records.records] == [
             {"item": "Paper", "amount": "2"},
             {"item": None, "amount": None},
             {"item": "Ink", "amount": None},
@@ -91,4 +91,4 @@ class TestTableReader:
         )
 
         assert table_records.table_format == TableFormat.XLSX
-        assert table_records.records[0].values == {"item": "Paper", "amount": 2.5}
+        assert table_records.records[0].plain_values() == {"item": "Paper", "amount": 2.5}

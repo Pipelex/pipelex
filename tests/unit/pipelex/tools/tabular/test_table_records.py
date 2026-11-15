@@ -75,7 +75,7 @@ class TestTableRecords:
         table_records = _step_records(header=["Item", "Comment", "AMOUNT", "Due date"], rows=[["Paper", "ignored", 12.5, None]])
 
         assert table_records.matched_fields == ["item", "amount"]
-        assert table_records.records[0].values == {"item": "Paper", "amount": 12.5}
+        assert table_records.records[0].plain_values() == {"item": "Paper", "amount": 12.5}
         assert table_records.records[0].position == 1
 
     def test_run_input_refuses_an_unmatched_column_by_its_position(self) -> None:
@@ -151,10 +151,37 @@ class TestTableRecords:
 
         assert table_records.uncached_formula_fields == ["amount"]
 
-    def test_records_round_trip_as_plain_data(self) -> None:
-        table_records = _step_records(header=["item", "due"], rows=[["Paper", datetime(2026, 1, 2)]])
+    @pytest.mark.parametrize(
+        "cell_value",
+        [
+            pytest.param("00012", id="text-with-leading-zeros"),
+            pytest.param("1700000000", id="text-like-an-epoch"),
+            pytest.param("2026-03-04", id="text-like-a-date"),
+            pytest.param("2026-03-04T05:06:07", id="text-like-a-datetime"),
+            pytest.param("true", id="text-like-a-boolean"),
+            pytest.param("12.5", id="text-like-a-number"),
+            pytest.param(12, id="integer"),
+            pytest.param(12.0, id="whole-number"),
+            pytest.param(0.1, id="number"),
+            pytest.param(True, id="boolean"),
+            pytest.param(date(2026, 3, 4), id="date"),
+            pytest.param(datetime(2026, 3, 4, 5, 6, 7), id="datetime"),
+            pytest.param(datetime(2026, 3, 4), id="datetime-at-midnight"),
+            pytest.param(None, id="empty"),
+        ],
+    )
+    def test_records_round_trip_exactly_through_json(self, cell_value: TableCellValue) -> None:
+        """A host runtime carries records between processes as JSON: every cell comes back with its own value and type."""
+        table_records = _step_records(header=["item", "due"], rows=[["Paper", cell_value]])
 
-        assert TableRecords.model_validate_json(table_records.model_dump_json()) == table_records
+        from_json = TableRecords.model_validate_json(table_records.model_dump_json())
+        from_json_python = TableRecords.model_validate(table_records.model_dump(mode="json"))
+
+        for round_tripped in (from_json, from_json_python):
+            assert round_tripped == table_records
+            round_tripped_value = round_tripped.records[0].plain_values()["due"]
+            assert round_tripped_value == cell_value
+            assert type(round_tripped_value) is type(cell_value)
 
     @pytest.mark.parametrize(
         ("value", "kind", "expected"),
