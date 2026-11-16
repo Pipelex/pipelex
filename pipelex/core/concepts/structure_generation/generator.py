@@ -519,14 +519,10 @@ class StructureGenerator:
 
         exec(python_code, exec_namespace)
 
-        # Verify the expected class was created
-        if expected_class_name not in exec_namespace:
-            msg = f"Expected class '{expected_class_name}' not found in generated code"
-            raise ConceptStructureValidationError(msg)
-
+        # The shape check guarantees the module ends with the definition of the expected class, so the name is bound.
         the_class = exec_namespace[expected_class_name]
 
-        # Verify it's actually a class
+        # What a class statement binds is up to its bases' metaclass, so it is still checked to be a class.
         if not isinstance(the_class, type):
             msg = f"'{expected_class_name}' is not a class"
             raise ConceptStructureValidationError(msg)

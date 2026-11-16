@@ -41,6 +41,9 @@ _MODULE_HEAD = (
     "from pydantic import Field\n\n\n"
 )
 
+# A class of the shape the generator emits, for the shape-check tests to place in a module.
+_SHAPED_CLASS = 'class Shaped(StructuredContent):\n    """A shaped class"""\n'
+
 
 @pytest.fixture(autouse=True)
 def _clear_statements_run() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]
@@ -791,6 +794,21 @@ class TestStructureGeneratorModuleShapeCheck:
         the_class = StructureGenerator().validate_generated_code(python_code=python_code, expected_class_name="Shaped")
 
         assert the_class.__name__ == "Shaped"
+
+    @pytest.mark.parametrize(
+        "python_code",
+        [
+            pytest.param(f"from pipelex.core.stuffs.structured_content import StructuredContent\n\n\n{_SHAPED_CLASS}", id="no-header-docstring"),
+            pytest.param(f"{_RUN_STATEMENT}\n\n\n{_SHAPED_CLASS}", id="statement-in-place-of-the-header"),
+            pytest.param('"""A header and nothing else."""\n', id="header-without-a-class"),
+        ],
+    )
+    def test_module_without_its_header_and_class_is_refused_before_it_runs(self, python_code: str):
+        """A module that does not open with its header docstring followed by its class is refused, and none of it runs."""
+        with pytest.raises(ConceptStructureValidationError, match="does not open with its header docstring followed by its class"):
+            StructureGenerator().validate_generated_code(python_code=python_code, expected_class_name="Shaped")
+
+        assert STATEMENTS_RUN == []
 
     @pytest.mark.parametrize(
         "python_code",
