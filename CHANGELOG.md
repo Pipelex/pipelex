@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.104.0] - 2026-11-16
 
 ### Added
 
@@ -11,6 +11,10 @@
 
 - **`Text`, `Markdown`, `Html` and `JSON` hold their value or a URL to it, MTHDS standard 9.0.0 (Breaking)**: `text`, `inner_html` and `json_obj` are optional, and each class gains `url`, `size`, `mime_type` and `preview`, the stored form; a content holds exactly one of its value and `url`, and `size`, `mime_type` and `preview` only beside `url`, any other combination being refused as invalid. A content dumps only the fields of the form it holds, so an inline text still dumps as `{"text": "..."}`. The pinned native set follows the standard's set pinned at 9.0.0, so every crate fingerprint changes. Code reading `content.text`, `content.inner_html` or `content.json_obj` now gets `None` for a stored value and reads `require_text()`, `require_inner_html()` or `require_json_obj()` instead, and assigning one of those fields on a stored value makes the content inline, its `url`, `size`, `mime_type` and `preview` cleared.
 - **`mthds` and `pipelex-sdk` versions, MTHDS standard 9.0.0 (Breaking)**: the pins move to `mthds==0.28.0`, the release following the MTHDS standard's `v9.0.0`, and `pipelex-sdk==0.68.0`, the release built on it, whose own breaking changes since `0.60.0`, such as `get_method` returning `MethodDetail | PublicMethodDetail`, an optional `MethodVersionSummary.published_by` and `labels` on `MethodCategory`, reach anyone importing `pipelex_sdk` beside pipelex. A crate pipelex normalizes is stamped `mthds_version` `9.0.0` and materializes the native set pinned at `9.0.0`, and a `METHODS.toml` declaring `^8.0.0`, `8.*` or an exact `8.x` now warns that the engine does not satisfy it while `>=9.0.0` does not; the core error codes did not change and `protocol_version` stays `2.0.1`. Everyone downstream inherits those exact versions.
+
+### Fixed
+
+- **Concept descriptions render exactly as authored in generated structure classes**: the docstring of the structure class generated for a concept, its JSON schema description and the structure prompt now hold the description exactly as written, whatever quotes, backslashes, control characters, line breaks or indentation it holds, where a description holding triple quotes or ending in a quote or a backslash was misrendered or failed to load, and a long one gained line breaks. Class docstrings are rendered by `class_docstring` from `pipelex.tools.misc.python_literals`, shared with the codegen emitters, and the runtime structure generator refuses, with `ConceptStructureValidationError`, a generated module of any shape other than its header docstring, `from` imports and one class of annotated fields. The structure printer prints enum and `Literal` values as Python literals and every line of a field description as a comment.
 
 ## [v0.103.1] - 2026-11-15
 
