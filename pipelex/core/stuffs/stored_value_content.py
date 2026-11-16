@@ -269,6 +269,20 @@ class StoredValueContent(StuffContent):
         super().__setattr__("preview", preview)
         self._loaded_value = value
 
+    def hold_value_inline(self) -> None:
+        """Turn this content into its inline form, holding its value, inline or loaded, and dropping any reference.
+
+        For a process handing the content to one that reaches no storage, such as a host dispatching a PipeFunc call to a
+        sandbox: a dump of it is then the value itself.
+
+        Raises:
+            StoredValueNotLoadedError: The content holds a reference to its value that was never loaded.
+        """
+        if self.url is None:
+            return
+        # Assigning the value clears the reference and its metadata (`__setattr__`).
+        setattr(self, self.value_field_name, self.require_value())
+
     def accept_loaded_text(self, *, text: str) -> None:
         """Keep the value read from storage, given as the text it was stored as, so the content can be read synchronously.
 

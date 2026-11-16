@@ -4,7 +4,8 @@ The print stage, a kernel-layer leaf, reads the template file through the method
 needs the method itself (`pipelex.cogt.doc_gen.template_file_stage`):
 
 - an HTML template file is rendered with the step's data as the compose stage of a `PipeCompose` renders an HTML
-  template, with the whole stack, its filters included: the stuffs the step's inputs name are typed again by the
+  template, with the whole stack, its filters included, once the stored values its data holds are loaded under the
+  run's read scope: the stuffs the step's inputs name are typed again by the
   concepts of the run's library crate, in the run's own library when this process holds it, such as in a local run, and
   otherwise, such as in an activity on a worker, in a library loaded from those concepts alone, which this process keeps
   for the prints that follow (`pipelex.libraries.concepts_libraries`);
@@ -23,6 +24,8 @@ from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile
 from pipelex.cogt.doc_gen.template_check import TemplateFinding
 from pipelex.cogt.doc_gen.template_file_stage import TemplateFileStageProtocol
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.stored_value_loader import load_stored_values
+from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.libraries.concepts_libraries import typed_by_run_concepts
@@ -31,6 +34,7 @@ from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDo
 from pipelex.pipe_run.dry_run_warning_collector import report_dry_run_warning
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.validation_error_types import TemplateCheckErrorType
 
 
@@ -44,7 +48,14 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
     """Renders an HTML template file with its step's data, and reports the findings of an office template's check."""
 
     @override
-    async def render_html_template_file(self, *, template_file: ComposedTemplateFile, template_source: str) -> str:
+    async def render_html_template_file(
+        self,
+        *,
+        template_file: ComposedTemplateFile,
+        template_source: str,
+        read_scope: str | None,
+        storage_provider: StorageProviderAbstract,
+    ) -> str:
         _domain_code, pipe_code = _step_codes(template_file=template_file)
         render_context = template_file.render_context
         if render_context is None:
@@ -52,6 +63,12 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
             raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         with typed_by_run_concepts(crate_fingerprint=render_context.crate_fingerprint, concepts_crate=render_context.concepts_crate):
             working_memory = hydrate_working_memory(render_context.working_memory_raw)
+            # The step's data crossed with its large texts as references, which the render reads synchronously.
+            await load_stored_values(
+                stored_values=find_unloaded_stored_values(roots={stuff_name: stuff.content for stuff_name, stuff in working_memory.root.items()}),
+                read_scope=read_scope,
+                storage_provider=storage_provider,
+            )
             context = build_compose_context(memory=working_memory, runtime_params=render_context.runtime_params)
             return await render_doc_gen_template(
                 pipe_code=pipe_code,

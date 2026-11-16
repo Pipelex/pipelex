@@ -1,7 +1,9 @@
 import hashlib
 
 import pytest
+from pytest_mock import MockerFixture
 
+from pipelex.cogt.content_generation import generated_content_factory
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.core.stuffs.markdown_content import MarkdownContent
@@ -62,13 +64,17 @@ class TestGeneratedTextStorage:
         assert text_content.require_text() == GENERATED_TEXT, topic
         assert storage.root == {}, topic
 
-    async def test_each_extracted_page_s_text_is_stored(self):
+    async def test_each_extracted_page_s_text_is_stored(self, mocker: MockerFixture):
+        """Every page's text is stored, the writes of all pages overlapping in one bounded pass rather than one after another."""
         storage = InMemoryStorageProvider()
         factory = GeneratedContentFactory(storage_provider=storage)
         page_texts = [f"Page {index_page}. {GENERATED_TEXT}" for index_page in range(3)]
         extract_output = ExtractOutput(pages={index_page: Page(text=page_text) for index_page, page_text in enumerate(page_texts)})
+        store_spy = mocker.spy(generated_content_factory, "store_large_values")
 
         page_contents = await factory.make_page_contents(STORAGE_SCOPE, extract_output=extract_output)
+
+        store_spy.assert_awaited_once()
 
         stored_pages: list[TextContent] = []
         for page_content in page_contents:

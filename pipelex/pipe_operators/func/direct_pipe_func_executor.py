@@ -100,8 +100,9 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         The function reads its memory synchronously, so every stored `Text`, `Markdown`, `Html` or `JSON` value the
         memory holds is loaded before it runs, under the run's read scope; and every inline one it returns past the inline
         threshold is stored under `{storage_scope}/generated/` once it has, so a large output travels as its reference.
-        Both need the run's storage, which a sandbox does not reach: there, `is_storage_reachable` is false, a stored
-        value stays unloaded and the output stays inline.
+        Both need the run's storage, which a sandbox does not reach: there, `is_storage_reachable` is false, and the host
+        that dispatched the call did both on its side (`inline_stored_values_for_sandbox`,
+        `store_large_values_of_sandbox_response` in `pipe_func_execution_transport`).
         """
         if is_storage_reachable:
             await self._load_stored_values(job_metadata=job_metadata, working_memory=working_memory)
@@ -195,7 +196,9 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
 
         `is_storage_reachable` says whether this process reaches the run's storage, as a process reading the method file
         store does: the stored values the memory holds are then loaded before the function runs, and the large values it
-        returns stored. A sandbox reaches no storage, so it leaves it false, the default.
+        returns stored. A sandbox reaches no storage, so it leaves it false, the default: its host inlines the stored values
+        before the call (`inline_stored_values_for_sandbox`) and stores the large output after it
+        (`store_large_values_of_sandbox_response`).
 
         Raises:
             PipeFuncExecutionError: The call's files cannot be read back as a tree, or the function runs past its timeout.

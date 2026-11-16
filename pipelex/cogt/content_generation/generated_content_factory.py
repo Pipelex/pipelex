@@ -12,7 +12,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.stored_value_storer import store_value_if_large
+from pipelex.core.stuffs.stored_value_storer import store_large_values, store_value_if_large
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.storage_scope import GENERATED_CONTENT_LEAF
@@ -308,19 +308,22 @@ class GeneratedContentFactory:
                     raw_details=extracted_image,
                 )
                 page_images.append(image_content)
-            page_text: TextContent | None = None
-            if page.text:
-                # A page past the inline threshold is stored, so a long document's pages travel as references.
-                page_text = await self.make_text_content(
-                    storage_scope=storage_scope, text=page.text, output_mime_type=TextContent.stored_mime_type, is_dry=False
-                )
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
-                        text=page_text,
+                        text=TextContent(text=page.text) if page.text else None,
                         images=page_images,
                         raw_html=page.raw_html,
                     ),
                 )
             )
+        # A page past the inline threshold is stored, so a long document's pages travel as references: all the pages at
+        # once, their writes overlapping a bounded number at a time. The dry branch never reaches here
+        # (`extract_generate`), and a dry run's storage scope stores nothing anyway.
+        await store_large_values(
+            roots={f"page_{page_index}": page_content for page_index, page_content in enumerate(page_contents)},
+            storage_provider=self.storage_provider,
+            storage_scope=storage_scope,
+            leaf=GENERATED_CONTENT_LEAF,
+        )
         return page_contents

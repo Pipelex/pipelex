@@ -15,6 +15,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
@@ -106,8 +107,12 @@ class TestPipeDocGenRenderContext:
         load_spy = mocker.spy(get_library_manager(), "load_from_crate")
         stage = DocGenTemplateFileStage()
 
-        first = await stage.render_html_template_file(template_file=template_file, template_source=_TEMPLATE)
-        second = await stage.render_html_template_file(template_file=template_file, template_source=_TEMPLATE)
+        first = await stage.render_html_template_file(
+            template_file=template_file, template_source=_TEMPLATE, read_scope=None, storage_provider=get_storage_provider()
+        )
+        second = await stage.render_html_template_file(
+            template_file=template_file, template_source=_TEMPLATE, read_scope=None, storage_provider=get_storage_provider()
+        )
 
         assert first == second == "<h1>INV-2026-0142</h1>"
         load_spy.assert_called_once()

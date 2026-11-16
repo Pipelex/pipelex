@@ -3,8 +3,13 @@ from packaging.version import InvalidVersion, Version
 from pydantic import ValidationError
 
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.stored_value_loader import load_stored_values
+from pipelex.core.stuffs.stored_value_storer import store_large_values
+from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.errors.problem import DiagnosticCause, PipelexProblem, ProblemDiagnostics, ProblemView, cap_problem_text, make_problem
 from pipelex.interpreter_hub import get_current_library, get_library_manager
+from pipelex.libraries.concepts_libraries import typed_by_crate_concepts
 from pipelex.pipe_operators.func.exceptions import PipeFuncRaisedError, PipeFuncTransportError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
@@ -15,7 +20,9 @@ from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.storage_scope import GENERATED_CONTENT_LEAF
 
 # The transport DTOs (``PipeFuncExecutionRequest`` / ``PipeFuncExecutionResponse``) live in the leaf
 # ``pipe_func_execution_dtos`` module so the executor protocol can reference them without a hub cycle;
@@ -91,6 +98,78 @@ def pipe_func_execution_result_from_response(response: PipeFuncExecutionResponse
         function_module=response.function_module,
         function_qualname=response.function_qualname,
     )
+
+
+async def inline_stored_values_for_sandbox(*, request: PipeFuncExecutionRequest) -> PipeFuncExecutionRequest:
+    """The request with every stored value its memory holds read from the run's storage and held inline: what a sandbox can read.
+
+    A sandbox reaches no storage, so a stored `Text`, `Markdown`, `Html` or `JSON` value would reach the function there as
+    a reference it cannot read. A host dispatching a call to a sandbox calls this where it reaches the run's storage, in
+    the activity running the call on a host runtime, before handing the request over, and
+    `store_large_values_of_sandbox_response` on the response once the sandbox returns it. The function receives its
+    whole memory, so every stored value of it is loaded, under the run's read scope, a bounded number at a time. The
+    inline request goes to the sandbox by upload, never through a workflow's history.
+
+    The memory is typed by the run's own library when this process holds it, such as in a local run, and otherwise by
+    a library loaded from the crate's concepts (`typed_by_crate_concepts`).
+
+    Args:
+        request: The call's request, as `build_pipe_func_execution_request` built it.
+
+    Returns:
+        A copy of the request whose memory holds every value inline; the request itself when it holds no stored value.
+
+    Raises:
+        UriReadRefusedError: A stored value's URL is outside the run's read scope.
+        UriTextTooLargeError: A stored value is past `[runtime.network] max_fetch_bytes`.
+        UriTextNotUtf8Error: The stored bytes of a value are not UTF-8.
+        StoredValueUnreadableError: A stored text is not a value of its content's kind.
+    """
+    with typed_by_crate_concepts(crate=request.crate):
+        working_memory = hydrate_working_memory(request.working_memory_raw)
+        stored_values = find_unloaded_stored_values(roots={stuff_name: stuff.content for stuff_name, stuff in working_memory.root.items()})
+        if not stored_values:
+            return request
+        await load_stored_values(
+            stored_values=stored_values,
+            read_scope=request.job_metadata.run_metadata.read_scope,
+            storage_provider=get_storage_provider(),
+        )
+        for stored_value in stored_values:
+            stored_value.content.hold_value_inline()
+        return request.model_copy(update={"working_memory_raw": working_memory.dump_for_transport()})
+
+
+async def store_large_values_of_sandbox_response(
+    *, request: PipeFuncExecutionRequest, response: PipeFuncExecutionResponse
+) -> PipeFuncExecutionResponse:
+    """The sandbox's response with its output alone, each of its large values stored under the run's storage scope.
+
+    The counterpart of `inline_stored_values_for_sandbox`, called by the host once the sandbox returned: the sandbox
+    reaches no storage, so a large value the function returned comes back inline. It is stored here under
+    `{storage_scope}/generated/`, as a function run in this process would have it, so the output crosses into a
+    workflow's history as its reference. The response keeps the output alone, the memory's main stuff, which is all its
+    reader takes (`pipe_func_execution_result_from_response`), since the rest is the memory the sandbox received, inline.
+    A dry run's storage scope stores nothing.
+
+    Args:
+        request: The request the call was made with, whose crate types the output and whose run's scope stores it.
+        response: The response the sandbox returned.
+
+    Returns:
+        The response whose output memory holds the output alone, its large values as references.
+    """
+    with typed_by_crate_concepts(crate=request.crate):
+        output_stuff = hydrate_working_memory(response.output_memory_raw).get_main_stuff()
+        await store_large_values(
+            roots={"output": output_stuff.content},
+            storage_provider=get_storage_provider(),
+            storage_scope=request.job_metadata.run_metadata.storage_scope,
+            leaf=GENERATED_CONTENT_LEAF,
+        )
+        output_memory = WorkingMemoryFactory.make_empty()
+        output_memory.set_new_main_stuff(stuff=output_stuff)
+        return response.model_copy(update={"output_memory_raw": output_memory.dump_for_transport()})
 
 
 def pipe_func_raised_report(*, error: PipeFuncRaisedError) -> PipeFuncRaisedReport:
