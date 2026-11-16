@@ -649,7 +649,7 @@ small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 
 ```toml
 [extract.waterfalls]
-document_extractor = ["mistral-document-ai-2505", "pypdfium2-extract-pdf"]
+document_extractor = ["mistral-ocr", "pypdfium2-extract-pdf"]
 ```
 
 When using waterfalls in `.mthds` files, prefix them with `~`:

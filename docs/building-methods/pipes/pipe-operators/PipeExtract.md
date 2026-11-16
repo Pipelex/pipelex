@@ -62,7 +62,7 @@ Extraction presets are defined in your model deck configuration and can include 
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
 | `render_js`                 | boolean | For web-page extraction: if `true`, the extraction backend renders JavaScript before fetching the page content. Defaults to `false`. *Note: Only honored by backends that support headless rendering.* | No       |
 | `include_raw_html`          | boolean | For web-page extraction: if `true`, the extracted `Page` populates its `raw_html` field with the fetched page's HTML. Defaults to `false`. | No       |
-| `model`                       | string  | The Extract model choice by name, setting, or preset to use (e.g., `"mistral-document-ai-2505"`, `"@default-extract-document"`). Defaults to the model specified in the global config. | No       |
+| `model`                       | string  | The Extract model choice by name, setting, or preset to use (e.g., `"mistral-ocr"`, `"@default-extract-document"`). Defaults to the model specified in the global config. | No       |
 
 ### Page views need a PDF
 
