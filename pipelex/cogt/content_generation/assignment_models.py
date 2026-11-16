@@ -18,6 +18,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.search.search_setting import SearchSetting
+from pipelex.core.stuffs.stored_value_content import generation_schema
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -105,9 +106,13 @@ class ObjectAssignment(BaseModel):
         llm_assignment: LLMAssignment,
         nb_items: int | None = None,
     ) -> "ObjectAssignment":
+        # The schema a model generates from, and a leaf with no class in hand rebuilds the class from: a stored-value
+        # content's value alone, never its reference (`generation_schema`).
+        with generation_schema():
+            object_class_schema = object_class.model_json_schema()
         return ObjectAssignment(
             object_class_name=object_class.__name__,
-            object_class_schema=object_class.model_json_schema(),
+            object_class_schema=object_class_schema,
             llm_assignment_for_object=llm_assignment,
             nb_items=nb_items,
         )
@@ -282,9 +287,11 @@ class SearchObjectAssignment(BaseModel):
         *,
         search_assignment: SearchAssignment,
     ) -> "SearchObjectAssignment":
+        with generation_schema():
+            output_class_schema = output_class.model_json_schema()
         return SearchObjectAssignment(
             output_class_name=output_class.__name__,
-            output_class_schema=output_class.model_json_schema(),
+            output_class_schema=output_class_schema,
             search_assignment=search_assignment,
         )
 
