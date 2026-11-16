@@ -54,7 +54,7 @@ from typing import Any, Literal
 class Animal(StructuredContent):
     """Generated Animal class"""
 
-    animal_type: str = Field(..., description="The species or type of animal (e.g., \\"fox\\", \\"penguin\\", \\"octopus\\")")
+    animal_type: str = Field(..., description='The species or type of animal (e.g., "fox", "penguin", "octopus")')
 '''
 
         assert generated_code == expected_code
@@ -144,7 +144,7 @@ from typing import Any, Literal
 class Message(StructuredContent):
     """Generated Message class"""
 
-    message: str = Field(..., description="He said \\"it\'s working!\\" with excitement")
+    message: str = Field(..., description='He said "it\\'s working!" with excitement')
 '''
 
         assert generated_code == expected_code
@@ -371,7 +371,7 @@ from typing import Any, Literal
 class WithDefault(StructuredContent):
     """Generated WithDefault class"""
 
-    field_with_default: str = Field(default="Example: \\"quoted text\\"", description="A field with quoted default")
+    field_with_default: str = Field(default='Example: "quoted text"', description="A field with quoted default")
 '''
 
         assert generated_code == expected_code
@@ -516,9 +516,9 @@ class LongDesc(StructuredContent):
     """Generated LongDesc class"""
 
     long_field: str = Field(..., description=(
-        "This is a very long description that contains many words and also has some \\"quoted sections\\" that need to be properly "
-        "escaped. It goes on and on with more details about the field, including examples like \\"example1\\", \\"example2\\", and "
-        "\\"example3\\". The description continues with even more information to test the robustness of the escaping mechanism."
+        'This is a very long description that contains many words and also has some "quoted sections" that need to be properly '
+        'escaped. It goes on and on with more details about the field, including examples like "example1", "example2", and '
+        '"example3". The description continues with even more information to test the robustness of the escaping mechanism.'
     ))
 '''
 
@@ -668,10 +668,10 @@ from typing import Any, Literal
 class AnimalRecord(StructuredContent):
     """Generated AnimalRecord class"""
 
-    animal_type: str = Field(..., description="The species or type of animal (e.g., \\"fox\\", \\"penguin\\", \\"octopus\\")")
+    animal_type: str = Field(..., description='The species or type of animal (e.g., "fox", "penguin", "octopus")')
     owner_name: str | None = Field(default=None, description="The owner\'s full name")
     file_path: str = Field(default="C:\\\\default\\\\path", description="Location on disk (e.g., C:\\\\Animals\\\\data.txt)")
-    notes: str | None = Field(default=None, description="Notes with \\"quotes\\" and\\nnewlines")
+    notes: str | None = Field(default=None, description='Notes with "quotes" and\\nnewlines')
 '''
 
         assert generated_code == expected_code

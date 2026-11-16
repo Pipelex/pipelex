@@ -12,7 +12,6 @@ Modern typing throughout: builtin generics (`list` / `dict`), `X | None` for opt
 from pipelex.codegen.emitters.naming import python_class_name
 from pipelex.codegen.emitters.python_common import (
     any_annotation,
-    class_docstring,
     field_line,
     literal_annotation,
     order_by_base,
@@ -22,6 +21,7 @@ from pipelex.codegen.emitters.python_common import (
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
+from pipelex.tools.misc.python_literals import class_docstring
 
 _FILENAME = "models.py"
 
