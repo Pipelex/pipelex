@@ -1,8 +1,8 @@
-"""How authored text is rendered as Python source: string literals and class docstrings.
+"""`class_docstring`: authored text rendered as a class docstring that reads back as authored.
 
-The class-docstring contract is `inspect.getdoc(cls) == normalized_docstring_text(description)`, and
-`normalized_docstring_text` is `inspect.cleandoc` over the text with each line's trailing spaces and tabs
-removed. These tests pin both halves against known values, not only against each other.
+The contract is `inspect.getdoc(cls) == normalized_docstring_text(description)`, and `normalized_docstring_text` is
+`inspect.cleandoc` over the text with each line's trailing spaces and tabs removed. These tests pin the rendering
+against known values, not only against the contract.
 """
 
 import ast
@@ -11,34 +11,8 @@ import random
 
 import pytest
 
-from pipelex.tools.misc.python_literals import class_docstring, escape_py_string, normalized_docstring_text
-
-# Characters `str.splitlines` treats as line breaks although `inspect.cleandoc` does not.
-_SPLITLINES_ONLY_BREAKS = ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "]
-
-# The alphabet the randomized round-trip draws from: quotes, backslashes, control characters, NUL, line
-# separators, spaces and tabs for indentation, and ordinary letters.
-_RANDOM_ALPHABET = [
-    *_SPLITLINES_ONLY_BREAKS,
-    "a",
-    "b",
-    " ",
-    " ",
-    "  ",
-    "\t",
-    "\n",
-    "\n",
-    "\r",
-    "\r\n",
-    '"',
-    "'",
-    '"""',
-    "'''",
-    "\\",
-    "\x00",
-    "\x07",
-    "\x1b",
-]
+from pipelex.tools.misc.python_literals import class_docstring, normalized_docstring_text
+from tests.unit.pipelex.tools.misc.test_data import PythonLiteralsTestData
 
 
 def _class_source(description: str) -> str:
@@ -56,27 +30,6 @@ def _rendered_docstring(description: str) -> str | None:
     namespace: dict[str, object] = {}
     exec(compile(module, "<rendered>", "exec"), namespace)
     return inspect.getdoc(namespace["Described"])
-
-
-class TestNormalizedDocstringText:
-    def test_relative_indentation_after_a_blank_first_line_is_kept(self):
-        description = "\n  Intro:\n    - item one\n    - item two"
-
-        assert normalized_docstring_text(description) == "Intro:\n  - item one\n  - item two"
-        assert normalized_docstring_text(description) == inspect.cleandoc(description)
-
-    def test_trailing_spaces_and_tabs_are_removed_from_each_line(self):
-        assert normalized_docstring_text("Summary  \n  body\t\n") == "Summary\nbody"
-
-    @pytest.mark.parametrize("line_break", ["\r\n", "\r"])
-    def test_carriage_return_line_breaks_become_newlines(self, line_break: str):
-        assert normalized_docstring_text(f"first{line_break}second") == "first\nsecond"
-
-    @pytest.mark.parametrize("character", _SPLITLINES_ONLY_BREAKS)
-    def test_characters_other_than_newline_do_not_break_lines(self, character: str):
-        description = f"before{character}after"
-
-        assert normalized_docstring_text(description) == description
 
 
 class TestClassDocstring:
@@ -136,7 +89,7 @@ class TestClassDocstring:
         assert class_docstring(description) == expected
         assert _rendered_docstring(description) == description
 
-    @pytest.mark.parametrize("character", _SPLITLINES_ONLY_BREAKS)
+    @pytest.mark.parametrize("character", PythonLiteralsTestData.SPLITLINES_ONLY_BREAKS)
     def test_characters_other_than_newline_read_back_unchanged(self, character: str):
         description = f"before{character}after\nsecond line{character}"
 
@@ -145,28 +98,5 @@ class TestClassDocstring:
     def test_randomized_descriptions_render_as_a_lone_docstring_that_reads_back(self):
         generator = random.Random(20261116)
         for _ in range(3000):
-            description = "".join(generator.choice(_RANDOM_ALPHABET) for _ in range(generator.randint(0, 24)))
+            description = "".join(generator.choice(PythonLiteralsTestData.RANDOM_ALPHABET) for _ in range(generator.randint(0, 24)))
             assert _rendered_docstring(description) == normalized_docstring_text(description), repr(description)
-
-
-class TestEscapePyString:
-    @pytest.mark.parametrize(
-        ("value", "expected"),
-        [
-            pytest.param("plain", '"plain"', id="plain"),
-            pytest.param("it's", '"it\'s"', id="single-quote"),
-            pytest.param('say "hi"', "'say \"hi\"'", id="double-quotes"),
-            pytest.param("'a' \"b\"", '"\'a\' \\"b\\""', id="tied-quotes"),
-            pytest.param("back\\slash\nnewline", '"back\\\\slash\\nnewline"', id="backslash-and-newline"),
-        ],
-    )
-    def test_escapes_as_ruff_leaves_it(self, value: str, expected: str):
-        assert escape_py_string(value) == expected
-
-    def test_randomized_values_evaluate_back_to_themselves(self):
-        generator = random.Random(20261116)
-        for _ in range(3000):
-            value = "".join(generator.choice(_RANDOM_ALPHABET) for _ in range(generator.randint(0, 24)))
-            literal = escape_py_string(value)
-            assert ast.literal_eval(literal) == value, repr(value)
-            assert literal[0] == ("'" if value.count("'") < value.count('"') else '"')
