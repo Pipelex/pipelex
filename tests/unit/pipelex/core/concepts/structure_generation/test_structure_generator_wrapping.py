@@ -140,6 +140,30 @@ class TestStructureGeneratorWrapping:
         ]:
             assert fragment in code
 
+    @pytest.mark.parametrize(
+        "long_description",
+        [
+            pytest.param(
+                "First paragraph of a long field description that runs past the wrapping width on its own line.\n\n"
+                "Second paragraph:\n\t- a tabbed item   with a run of spaces\n  - an indented item\n" + "trailing words " * 12 + "  ",
+                id="newlines-tabs-and-space-runs",
+            ),
+            pytest.param("x" * 200 + " " + "y" * 200, id="words-longer-than-the-width"),
+            pytest.param(" " * 130 + "leading spaces then words " * 6, id="leading-spaces"),
+            pytest.param('A "quoted" word, a \\ backslash and an apostrophe\'s mark. ' * 4, id="quotes-and-backslashes"),
+        ],
+    )
+    def test_long_field_description_reads_back_exactly(self, long_description: str):
+        """However the generator splits a long field description into literals, their concatenation is the authored text."""
+        blueprint = {
+            "notes": ConceptStructureBlueprint(description=long_description, type=ConceptStructureBlueprintFieldType.TEXT, required=True),
+        }
+        code, generated_class = StructureGenerator().generate_from_structure_blueprint(class_name="Annotated", structure_blueprint=blueprint)
+
+        assert generated_class.model_fields["notes"].description == long_description  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        assert generated_class.model_json_schema()["properties"]["notes"]["description"] == long_description  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        assert _max_line_length(code.replace("x" * 200, "").replace("y" * 200, "")) <= _LINE_LIMIT
+
     def test_long_field_description_survives_ruff_format(self, tmp_path: Path):
         """Generated multi-line description blocks must survive `ruff format` without
         the chunks being collapsed back into a single line. Un-indented chunks under a

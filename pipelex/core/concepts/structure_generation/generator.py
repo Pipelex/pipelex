@@ -1,6 +1,6 @@
 import ast
 import builtins
-import textwrap
+import re
 from datetime import date, datetime, time
 from typing import Any, cast
 
@@ -18,9 +18,14 @@ from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.tools.misc.python_literals import class_docstring, escape_py_string
 
 # The width past which a field description is split into an implicit concatenation, which keeps each emitted line under
-# the project's ruff line length (150) with headroom for indentation and syntax overhead. The class docstring is never
-# split: it is the model's JSON schema description, so a line break added to it would change the text it describes.
+# the project's ruff line length (150) with headroom for indentation and syntax overhead. The split never changes the
+# text: the literals concatenate back to the authored description, character for character. The class docstring is
+# never split: it is the model's JSON schema description, so a line break added to it would change the text it describes.
 _WRAP_WIDTH = 120
+
+# A word with the whitespace that follows it, or a run of whitespace opening the text: the pieces a long field description
+# is split between, which together cover every character of it.
+_DESCRIPTION_PIECE = re.compile(r"\S+\s*|\s+")
 
 # The annotation of an open field that never holds nothing, imported by name in the generated code.
 _NON_NULL_ANY_MODULE = non_null_any.__name__
@@ -297,26 +302,38 @@ class StructureGenerator:
         return repr(value)
 
     def _format_field_description(self, description: str) -> str:
-        """Render the `description=` argument for a Field call. For short values, emit a
-        single-line `description="..."`. For long values, emit a parenthesized
-        implicit-string-concatenation block so each emitted line stays under the line limit.
+        """Render the `description=` argument for a Field call.
+
+        A short value is a single-line `description="..."`. A long one is a parenthesized implicit concatenation of
+        literals, each holding whole words with the whitespace that follows them, so each emitted line stays under the
+        line limit and the literals concatenate back to the description exactly: no newline, tab or run of spaces is
+        changed or dropped.
         """
         escaped = escape_py_string(description)
         if len(escaped) <= _WRAP_WIDTH:
             return f"description={escaped}"
-        chunks = textwrap.wrap(description, width=_WRAP_WIDTH, break_long_words=False, break_on_hyphens=False)
+        chunks = self._description_chunks(description=description)
         if len(chunks) <= 1:
             return f"description={escaped}"
-        # Join trailing space on each chunk except the last so the concatenation reads
-        # naturally; textwrap dropped the original spaces.
         # Indent chunk literals (and the closing paren) so `ruff format` preserves the
         # implicit-string-concat — un-indented chunks get collapsed back to a single line.
-        chunk_literals: list[str] = []
-        for index, chunk in enumerate(chunks):
-            content = chunk if index == len(chunks) - 1 else f"{chunk} "
-            chunk_literals.append(f"        {escape_py_string(content)}")
-        body = "\n".join(chunk_literals)
+        body = "\n".join(f"        {escape_py_string(chunk)}" for chunk in chunks)
         return f"description=(\n{body}\n    )"
+
+    @classmethod
+    def _description_chunks(cls, *, description: str) -> list[str]:
+        """Split a description into consecutive pieces whose literals fit the wrap width, a piece longer than it standing alone."""
+        chunks: list[str] = []
+        current = ""
+        for piece in _DESCRIPTION_PIECE.findall(description):
+            if current and len(escape_py_string(current + piece)) > _WRAP_WIDTH:
+                chunks.append(current)
+                current = piece
+            else:
+                current += piece
+        if current:
+            chunks.append(current)
+        return chunks
 
     def _generate_class_source_code_from_blueprint(
         self,
