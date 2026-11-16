@@ -54,7 +54,7 @@ class MockFormat(StrEnum):
     DICT_SINGLE_EXTRACT_INPUT = "dict_single_extract_input"
 
 
-# The native content classes whose value may be stored, the ones a class rebuilt from a JSON schema is matched against by name.
+# The native content classes whose value may be stored, whose value fields a class rebuilt from a JSON schema is matched against.
 _STORED_VALUE_CONTENT_CLASSES: tuple[type[StoredValueContent], ...] = (TextContent, MarkdownContent, HtmlContent, JSONContent)
 
 
@@ -164,17 +164,21 @@ class DryRunFactory:
     def _is_stored_value_class(cls, *, object_class: type[BaseModel]) -> bool:
         """Whether a class holds a value that may be stored, or is a copy of such a class rebuilt from a JSON schema.
 
-        A rebuilt copy keeps no validator and no base class, so it is told as `_is_file_class` tells a file: by the name
-        of the native content class it copies, which the schema carries as the definition's title, and by that class's
-        value and reference fields. A user's structure that merely names its fields `url`, `size`, `mime_type` and
-        `preview` is none of them, and keeps the values polyfactory gives it.
+        A rebuilt copy keeps no validator and no base class, and its name is the one the schema carries as the
+        definition's title: a concept refining `Text` is rebuilt under the concept's own name, never `TextContent`. So a
+        copy is told by its shape, the one every stored-value class and every refinement of one shares: the value field
+        of a stored-value class and the reference's fields beside it, all of them optional, since such a content holds
+        its value or a URL to it. Pinning the reference's fields to None is then valid for any class that shape matches.
+        A user's structure that merely names its fields `url`, `size`, `mime_type` and `preview`, with no such value
+        field beside them or with any of them required, is none of them, and keeps the values polyfactory gives it.
         """
         if issubclass(object_class, StoredValueContent):
             return True
-        field_names = set(object_class.model_fields)
+        model_fields = object_class.model_fields
         for stored_value_class in _STORED_VALUE_CONTENT_CLASSES:
-            if object_class.__name__ == stored_value_class.__name__:
-                return {stored_value_class.value_field_name, *STORED_VALUE_REFERENCE_FIELDS} <= field_names
+            shape_field_names = (stored_value_class.value_field_name, *STORED_VALUE_REFERENCE_FIELDS)
+            if all(field_name in model_fields and not model_fields[field_name].is_required() for field_name in shape_field_names):
+                return True
         return False
 
     @classmethod
