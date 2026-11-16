@@ -124,3 +124,28 @@ class TestInputNormalizerStoredTexts:
 
         with pytest.raises(PipelineInputUrlMissingError):
             await prepare_file_inputs(working_memory, storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, is_relocation_enabled=True)
+
+    async def test_a_caller_s_large_input_is_left_untouched_and_each_run_stores_it_under_its_own_scope(self, mocker: MockerFixture):
+        """The content a caller passes is never changed: each run stores a copy, under its own scope, so a second run reads its own key."""
+        storage = _patch_storage(mocker)
+        callers_text = TextContent(text=LONG_TEXT)
+        second_storage_scope = "org_xyz/mt_2/run_2"
+
+        first_memory = _memory_with(concept_code=NativeConceptCode.TEXT, content=callers_text)
+        await prepare_file_inputs(first_memory, storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, is_relocation_enabled=True)
+        second_memory = _memory_with(concept_code=NativeConceptCode.TEXT, content=callers_text)
+        await prepare_file_inputs(second_memory, storage_scope=second_storage_scope, read_scope="org_xyz", is_relocation_enabled=True)
+
+        assert callers_text.text == LONG_TEXT
+        assert not callers_text.is_stored
+        first_notes = _notes_content(first_memory)
+        second_notes = _notes_content(second_memory)
+        assert first_notes is not callers_text
+        assert second_notes is not callers_text
+        assert first_notes.url is not None
+        assert second_notes.url is not None
+        assert first_notes.url.startswith(f"pipelex-storage://{STORAGE_SCOPE}/assets/")
+        assert second_notes.url.startswith(f"pipelex-storage://{second_storage_scope}/assets/")
+        assert first_notes.stored_text() == LONG_TEXT
+        assert second_notes.stored_text() == LONG_TEXT
+        assert sorted(storage.root) == sorted(url.removeprefix("pipelex-storage://") for url in (first_notes.url, second_notes.url))

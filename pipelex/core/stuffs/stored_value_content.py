@@ -313,11 +313,18 @@ class StoredValueContent(StuffContent):
         require_rich_for_rendering()
         from rich.text import Text
 
-        url_desc = describe_uri(self.url) if self.url is not None else "nowhere"
-        described = Text(f"{self._stored_short_desc().capitalize()}, stored at {url_desc}, not loaded.")
+        described = Text(self.reference_summary())
         if self.preview:
             described.append(f"\nIt starts: {self.preview}")
         return described
+
+    def reference_summary(self) -> str:
+        """One sentence describing a stored value never loaded, from its reference alone: its kind, size and location.
+
+        What a render for a person shows in place of the value when it cannot be loaded, beside the `preview`.
+        """
+        url_desc = describe_uri(self.url) if self.url is not None else "nowhere"
+        return f"{self._stored_short_desc().capitalize()}, stored at {url_desc}, not loaded."
 
     def _make_not_loaded_error(self) -> StoredValueNotLoadedError:
         url_desc = describe_uri(self.url) if self.url is not None else "nowhere"

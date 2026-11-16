@@ -294,8 +294,8 @@ async def _prepare_value(*, value: Any, path: FileInputPath, context: _Preparati
         return prepared, prepared is not value
 
     if isinstance(value, StoredValueContent):
-        await _prepare_stored_value_content(content=value, path=path, context=context)
-        return value, False
+        prepared_value = await _prepare_stored_value_content(content=value, path=path, context=context)
+        return prepared_value, prepared_value is not value
 
     if isinstance(value, StructuredContent):
         return await _prepare_structured_content(structured_content=value, path=path, context=context)
@@ -441,14 +441,18 @@ async def _prepare_url_content(
                 return await _prepare_local_path(content=content, resolved_uri=resolved_uri, path=path, context=context)
 
 
-async def _prepare_stored_value_content(*, content: StoredValueContent, path: FileInputPath, context: _PreparationContext) -> None:
+async def _prepare_stored_value_content(*, content: StoredValueContent, path: FileInputPath, context: _PreparationContext) -> StoredValueContent:
     """Prepare one `Text`, `Markdown`, `Html` or `JSON` input: authorize the URL a caller gave, or store a large inline value.
 
     A caller may give such a value as its `url` rather than inline. The URL is authorized here, as a file input's is,
     so a storage key outside the run's read scope, or a local path on a scoped run, is refused naming the input before
     the run starts; the value itself is loaded later, where a step reads it. An inline value past the inline threshold is
-    stored under `{storage_scope}/assets/` when the run relocates its inputs, and the content becomes its reference, in
-    place, with the value kept loaded.
+    stored under `{storage_scope}/assets/` when the run relocates its inputs, and a copy of the content becomes its
+    reference, with the value kept loaded. The caller's own content is never changed: a library caller passing one
+    content to several runs keeps reading its value, and each run stores it under its own scope.
+
+    Returns:
+        The content the run reads: the caller's own when nothing was stored, else the stored copy.
 
     Raises:
         PipelineInputUrlMissingError: The URL the caller gave is blank.
@@ -465,11 +469,15 @@ async def _prepare_stored_value_content(*, content: StoredValueContent, path: Fi
             position=f"the value given for input '{format_file_input_path(path)}'",
             **_refused_file_input(path=path),
         )
-        return
+        return content
     if not context.is_relocation_enabled or context.is_dry_run:
-        return
+        return content
+    stored_copy = content.model_copy()
     async with context.semaphore:
-        await store_value_if_large(content, storage_provider=context.storage, storage_scope=context.storage_scope, leaf=INPUT_ASSETS_LEAF)
+        is_stored = await store_value_if_large(
+            stored_copy, storage_provider=context.storage, storage_scope=context.storage_scope, leaf=INPUT_ASSETS_LEAF
+        )
+    return stored_copy if is_stored else content
 
 
 def _prepare_http_url(

@@ -53,7 +53,7 @@ async def load_text_from_any_uri(
         RemoteFileTooLargeError: The http(s) URL serves more than that cap.
         UriTextNotUtf8Error: The bytes are not UTF-8.
     """
-    authorize_uri_read(uri=uri, read_scope=read_scope, position=position)
+    authorize_uri_read(uri=uri, read_scope=read_scope, position=position, input_name=input_name)
     max_bytes = fetch_max_bytes()
     size = await _text_size(uri=uri, storage_provider=storage_provider)
     if size is not None and size > max_bytes:

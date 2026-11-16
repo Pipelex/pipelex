@@ -34,7 +34,7 @@ Runs a pipe by code from your project's pipe library.
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
 - `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
-- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read
+- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read (see [Stored values in the main output](#stored-values-in-the-main-output))
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
@@ -97,7 +97,7 @@ The run prints the digest of the tree it read with its recap, listed once, befor
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
 - `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
-- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read
+- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read (see [Stored values in the main output](#stored-values-in-the-main-output))
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
@@ -152,7 +152,7 @@ Runs a pipeline from a method package: an installed one, one in a local director
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
 - `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
-- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read
+- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read (see [Stored values in the main output](#stored-values-in-the-main-output))
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
@@ -298,6 +298,10 @@ Beside `graphspec.json`, and gated by the same `graphspec_json` flag, the run wr
 - `output_form.json` - each pipe's output-form descriptor
 
 They are the same artifacts a validation report returns under those names, keyed by namespaced `pipe_ref` for every pipe in the library the run executed against, and they are what a graph viewer needs to show a data node's value rather than only the concept's structure: the VS Code extension reads them from the graphspec's own directory. A run with `--no-graph` writes none of them. See [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md#outputs).
+
+### Stored values in the main output
+
+A main output may hold a `Text`, `Markdown`, `Html` or `JSON` value that lives in storage, a large text a step produced or a text input given as a URL and copied into the output unread (see [Large texts](../../features/cloud-storage.md#large-texts)). Before it prints the output or saves it with `--save-main-stuff`, with or without `--no-pretty-print`, a local run loads every such value under the run's read scope, so it prints and saves the values themselves; a structure's `main_stuff.json` keeps each stored value as its reference, `{url, size, mime_type, preview}`, as a delivery's result files do. A value it cannot load, such as a local file that is gone or a URL that no longer answers, never fails a run that succeeded: it prints as its kind, size, location and start, `main_stuff.json` keeps its reference, `main_stuff.md`, `main_stuff.html` and `main_stuff_viewer.html` describe it the same way, and the command warns that the output holds values it could not load. `pipelex-agent run` loads and renders the output the same way.
 
 ### Absent main output
 
