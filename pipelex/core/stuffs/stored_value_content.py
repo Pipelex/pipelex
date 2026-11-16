@@ -21,12 +21,21 @@ the loader lives in its own module, imported only by code that loads.
 Each class declares its own fields, its value first, so its schema reads in the order the standard pins; this base
 declares the reference's fields for the type checkers only, and holds the rule, the loaded value and the reading they
 share. A class whose stored text is not its value as it is overrides `_decode_loaded_text` (`JSONContent` parses it).
+
+A model generating a content never generates a reference: it writes the value. So the JSON schema a structured
+generation hands the model, or carries to a leaf that rebuilds the class from it, is written under
+`generation_schema()`, where a stored-value content's schema leaves out `url`, `size`, `mime_type` and `preview` and
+requires its value. Anywhere else, such as a pipe's input contract, the schema keeps both forms, as the standard pins.
 """
 
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 
-from pydantic import PrivateAttr, SerializerFunctionWrapHandler, model_serializer, model_validator
+from pydantic import GetJsonSchemaHandler, PrivateAttr, SerializerFunctionWrapHandler, model_serializer, model_validator
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import StoredValueNotLoadedError
@@ -42,6 +51,25 @@ STORED_VALUE_REFERENCE_FIELDS: tuple[str, ...] = ("url", *REFERENCE_METADATA_FIE
 
 # The value read from storage: a text, or the object a JSON content parses its text into.
 StoredValue = str | dict[str, Any]
+
+# Whether the JSON schema being written is one a model generates from, set by `generation_schema()`.
+_IS_GENERATION_SCHEMA: ContextVar[bool] = ContextVar("is_generation_schema", default=False)
+
+
+@contextmanager
+def generation_schema() -> Generator[None, None, None]:
+    """Write the JSON schemas of the block as a model generates from them: a stored-value content as its value alone.
+
+    A structured generation's schema, the one a provider shows the model and the one an object assignment carries to a
+    leaf that rebuilds the class from it, is written under it, so the model is never asked for a `url`, and a class
+    rebuilt from the schema, which loses the rule that a content holds its value or a URL, never both, has no `url` for a
+    dry run's mock to fill beside the value.
+    """
+    token = _IS_GENERATION_SCHEMA.set(True)
+    try:
+        yield
+    finally:
+        _IS_GENERATION_SCHEMA.reset(token)
 
 
 class StoredValueContent(StuffContent):
@@ -63,6 +91,38 @@ class StoredValueContent(StuffContent):
 
     # The value read from storage for a referenced content, never serialized.
     _loaded_value: StoredValue | None = PrivateAttr(default=None)
+
+    # The JSON schema hook below changes the schema only under `generation_schema()`, so a schema comparison, which runs
+    # outside it, may treat the class as one that keeps pydantic's own schema (`SCHEMA_NEUTRAL_HOOKS_ATTRIBUTE`).
+    __schema_neutral_hooks__: ClassVar[tuple[str, ...]] = ("__get_pydantic_json_schema__",)
+
+    @classmethod
+    @override
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
+        """The class's JSON schema; under `generation_schema()`, its value alone, required, without the reference's fields."""
+        json_schema = super().__get_pydantic_json_schema__(core_schema, handler)
+        if not _IS_GENERATION_SCHEMA.get():
+            return json_schema
+        model_schema = handler.resolve_ref_schema(json_schema)
+        properties: dict[str, Any] = model_schema.get("properties", {})
+        for field_name in STORED_VALUE_REFERENCE_FIELDS:
+            properties.pop(field_name, None)
+        value_schema: dict[str, Any] | None = properties.get(cls.value_field_name)
+        if value_schema is not None:
+            value_schema.pop("default", None)
+            any_of: list[dict[str, Any]] | None = value_schema.get("anyOf")
+            if any_of is not None:
+                non_null_schemas = [branch_schema for branch_schema in any_of if branch_schema.get("type") != "null"]
+                if len(non_null_schemas) == 1:
+                    del value_schema["anyOf"]
+                    value_schema.update(non_null_schemas[0])
+                else:
+                    value_schema["anyOf"] = non_null_schemas
+        required: list[str] = [field_name for field_name in model_schema.get("required", []) if field_name not in STORED_VALUE_REFERENCE_FIELDS]
+        if cls.value_field_name in properties and cls.value_field_name not in required:
+            required.insert(0, cls.value_field_name)
+        model_schema["required"] = required
+        return json_schema
 
     @model_validator(mode="after")
     def _validate_value_or_reference(self) -> Self:

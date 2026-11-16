@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:dd156f74342ea9d21fe0ae7fd5749f9b624b9a9f92177335bb31ac8edf2592bf"
+digest = "sha256:e459ffa4b86e569e4cad88d983e3ff14bfa917b89c8059a2db56845458017240"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-10T21:20:52Z"
-rationale = "real-catch: runtime_hub.py gains get_optional_document_converter, the document converter [runtime.document_conversion] names; docs/contribute/hub-layering.md now lists it in the runtime_hub table. It imports only pipelex.tools.document_conversion, a kernel-layer package, so no import crosses the boundary."
+reviewed_at = "2026-11-16T01:48:19Z"
+rationale = "real-catch: runtime_hub gains the memory transport slot (get_memory_transport, in-process default, interpreter implementation installed by Pipelex.setup); hub-layering.md lists the accessor and describes the seam, and names the cogt to kernel inversion"
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:8572e31eafdfa9eb5ecde01326ef51a971f86b2e"
-"pipelex/runtime_hub.py" = "blob:f372d155eb8e3be6a0268c457f0ce658326bbdee"
+"pipelex/runtime_hub.py" = "blob:2c902fe1928ffa808ed3874fc9e522e2f3115e83"

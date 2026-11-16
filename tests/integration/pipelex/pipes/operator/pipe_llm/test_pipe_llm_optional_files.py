@@ -3,9 +3,9 @@
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.cogt.content_generation import content_generator as content_generator_module
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.kernel import llm_ops
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -30,7 +30,8 @@ A claim note: $note
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLMOptionalFiles:
     async def test_absent_optional_files_are_left_out_of_the_prompt(self, mocker: MockerFixture) -> None:
-        assembly_spy = mocker.spy(llm_ops, "assemble_llm_prompt")
+        # The prompt renders in the content-generation leaf, which is where the rendered prompt is read back.
+        assembly_spy = mocker.spy(content_generator_module, "render_llm_prompt")
 
         response = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY).execute(
             mthds_contents=[_BUNDLE],

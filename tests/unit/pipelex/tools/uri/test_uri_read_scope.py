@@ -1,6 +1,7 @@
 """The read scope's check: a scoped run reads only its own storage prefix, and never the local disk."""
 
 import pytest
+from kajson import kajson
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain, SecurityInputUrlRefusedTargetClass, SecurityMethodUrlRefusedTargetClass
 
 from pipelex.errors.error_codes import error_code_spec
@@ -164,3 +165,13 @@ class TestAuthorizeUriRead:
 
     def test_the_list_form_reads_nothing_from_an_empty_list(self) -> None:
         authorize_uri_reads(uri_references=[], read_scope=READ_SCOPE)
+
+    def test_a_reference_crosses_a_host_boundary_as_it_was(self) -> None:
+        """A host runtime carries the references into the leaf that loads them: kajson and plain JSON give them back equal."""
+        references = [UriReference(uri="pipelex-storage://org_abc/run_1/note.txt", position="the stored value at note.text")]
+
+        decoded_by_kajson = kajson.loads(kajson.dumps(references))
+        decoded_from_json = [UriReference.model_validate_json(reference.model_dump_json()) for reference in references]
+
+        assert decoded_by_kajson == references
+        assert decoded_from_json == references

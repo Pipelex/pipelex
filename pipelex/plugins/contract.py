@@ -128,7 +128,19 @@ if TYPE_CHECKING:
 # and every job and request it does receive is one it already reads, the new fields left unset. The capability gate v11
 # introduced already stands between an old engine and the new fill, so a bump would only make every plugin re-declare
 # ``targets_api`` for nothing.
-PLUGIN_API_VERSION: int = 11
+#
+# v12 changed the content generator an orchestrator plugin provides, now that an LLM prompt renders in its leaf, where a
+# stored text may be read. ``make_llm_text``, ``make_object`` and ``make_object_list`` take ``unrendered_prompt``, an
+# ``UnrenderedLLMPrompt`` (``pipelex.cogt.llm.unrendered_llm_prompt``), where they took a rendered ``LLMPrompt``, and the
+# leaf renders it with ``render_llm_prompt``; they return ``LLMTextGeneration``, ``LLMObjectGeneration`` and
+# ``LLMObjectListGeneration`` (``pipelex.cogt.llm.llm_generation``), the generated value beside an ``LLMPromptTrace`` of the
+# prompt rendered, where they returned the value alone; and ``load_stored_texts``, the leaf that reads the stored texts a
+# reader in workflow code needs, is required. A content generator written against v11 would be called with a keyword it
+# does not accept and hand back a value the operator no longer reads, on its first LLM step; the bump turns that into a
+# discovery-time mismatch naming the plugin. The prompt's memory crosses as a ``TransportedMemory`` and an object
+# generation as plain data, so a host passes both across its activity boundary untouched, and ``UriReference`` became a
+# frozen model for the same reason.
+PLUGIN_API_VERSION: int = 12
 
 
 @runtime_checkable

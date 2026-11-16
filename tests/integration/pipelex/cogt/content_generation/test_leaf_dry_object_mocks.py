@@ -31,9 +31,11 @@ from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_
 from pipelex.cogt.content_generation.search_generate import search_gen_structured
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.cogt.content_generation.test_data import ConstrainedName
@@ -119,15 +121,18 @@ class TestLeafDryObjectMocks:
 
     async def test_generator_dry_object_list_keeps_fixed_length(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol) -> None:
         """End-to-end through ContentGenerator: a fixed nb_items survives down to the dry leaf (D11 regression)."""
-        result = await content_generator.make_object_list(
+        object_list_generation = await content_generator.make_object_list(
             job_metadata=job_metadata,
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
             object_class=RepresentativeInvoiceLine,
             llm_setting_for_object_list=LLMSetting(model="gpt-4o", temperature=0.5),
-            llm_prompt_for_object_list=LLMPrompt(user_text="make invoice lines"),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text="make invoice lines", templating_style=resolve_templating_style(authored=None)
+            ),
             nb_items=3,
         )
 
+        result = object_list_generation.generated_objects
         assert len(result) == 3
         assert all(isinstance(item, RepresentativeInvoiceLine) for item in result)
 

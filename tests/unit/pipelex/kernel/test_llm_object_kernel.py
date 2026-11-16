@@ -60,7 +60,7 @@ class TestLlmObjectKernel:
             result=RESULT_NAME,
         )
 
-        user_text = result.rendered_prompt.user_text
+        user_text = result.rendered_prompt.traced_user_text
         assert user_text is not None
         assert user_text.startswith(USER_PROMPT)
         assert FIELD_ONLY_THE_DERIVATION_NAMES in user_text, (
@@ -87,8 +87,8 @@ class TestLlmObjectKernel:
             result=RESULT_NAME,
         )
 
-        assert result.rendered_prompt.user_text == USER_PROMPT + structure_prompt
-        assert FIELD_ONLY_THE_DERIVATION_NAMES not in (result.rendered_prompt.user_text or "")
+        assert result.rendered_prompt.traced_user_text == USER_PROMPT + structure_prompt
+        assert FIELD_ONLY_THE_DERIVATION_NAMES not in (result.rendered_prompt.traced_user_text or "")
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_the_produced_content_lands_in_the_returned_memory(self) -> None:

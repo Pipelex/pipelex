@@ -50,7 +50,7 @@ from pipelex.tools.typing.pydantic_utils import format_validation_error_without_
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_prompt import LLMPrompt
+    from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
     from pipelex.kernel.llm_results import StructuringPath
 
 
@@ -309,7 +309,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             base_class=StuffContent,
         )
         prompt_content = self.llm_prompt_spec.to_prompt_content()
-        rendered_llm_prompt: LLMPrompt
+        rendered_llm_prompt: LLMPromptTrace
         structuring_path: StructuringPath
 
         # The library-backed text-vs-object dispatch stays here: the kernel's two entry points are
@@ -403,8 +403,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             "resolved_model": concrete_llm_model_handle(llm_setting_main.model),
             "resolved_model_for_object": concrete_llm_model_handle(llm_setting_for_object.model),
             "is_multiple_output": is_multiple_output,
-            "rendered_system_prompt": rendered_llm_prompt.system_text,
-            "rendered_user_prompt": rendered_llm_prompt.user_text,
+            # As the leaf handed the prompt back: a text past the trace's bound is its preview, with its size and hash.
+            "rendered_system_prompt": rendered_llm_prompt.traced_system_text,
+            "rendered_user_prompt": rendered_llm_prompt.traced_user_text,
             "structuring_path": structuring_path,
         }
 

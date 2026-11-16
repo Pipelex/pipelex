@@ -17,14 +17,15 @@ Two seams are deliberately *not* here, because they are the caller's job by cons
 """
 
 from functools import partial
-from typing import Any
+from typing import Any, NamedTuple
 
 from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError, ModelChoiceNotFoundError, ModelNotFoundError
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import resolve_deck_choice
@@ -36,7 +37,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.kernel.document_conversion_ops import readable_prompt_documents
-from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt
+from pipelex.kernel.llm_prompt_content import LlmPromptContent, prepare_llm_prompt
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult, StructuringPath
 from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_inference_backend_registry, get_model_deck
@@ -237,17 +238,24 @@ async def derive_structure_prompt(*, output_class: type[StuffContent], templatin
     )
 
 
+class GeneratedObjectContent(NamedTuple):
+    """The object a step generated, and the trace of the prompt its leaf rendered to generate it."""
+
+    content: StuffContent
+    rendered_prompt: LLMPromptTrace
+
+
 async def generate_object_content(
     *,
     job_metadata: JobMetadata,
     cogt_run_params: CogtRunParams,
-    llm_prompt: LLMPrompt,
+    unrendered_prompt: UnrenderedLLMPrompt,
     llm_setting: LLMSetting,
     output_class: type[StuffContent],
     is_multiple_output: bool = False,
     fixed_nb_output: int | None = None,
-) -> StuffContent:
-    """Generate one object, or a `ListContent` of them when several were asked for.
+) -> GeneratedObjectContent:
+    """Generate one object, or a `ListContent` of them when several were asked for, from a prompt its leaf renders.
 
     Takes the concrete class rather than a name: it is threaded straight through to the content
     generator, so nothing rebuilds a class from a schema when the class already exists. The schema
@@ -256,23 +264,27 @@ async def generate_object_content(
     with job_metadata.log_context():
         content_generator = get_content_generator()
         if is_multiple_output:
-            generated_objects = await content_generator.make_object_list(
+            object_list_generation = await content_generator.make_object_list(
                 job_metadata=job_metadata,
                 cogt_run_params=cogt_run_params,
                 object_class=output_class,
-                llm_prompt_for_object_list=llm_prompt,
+                unrendered_prompt=unrendered_prompt,
                 llm_setting_for_object_list=llm_setting,
                 nb_items=fixed_nb_output,
             )
-            return ListContent(items=generated_objects)
+            return GeneratedObjectContent(
+                content=ListContent(items=object_list_generation.generated_objects),
+                rendered_prompt=object_list_generation.rendered_prompt,
+            )
 
-        return await content_generator.make_object(
+        object_generation = await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             object_class=output_class,
-            llm_prompt_for_object=llm_prompt,
+            unrendered_prompt=unrendered_prompt,
             llm_setting_for_object=llm_setting,
         )
+        return GeneratedObjectContent(content=object_generation.generated_object, rendered_prompt=object_generation.rendered_prompt)
 
 
 async def run_llm_text(
@@ -293,24 +305,28 @@ async def run_llm_text(
 
     `templating_style` is an argument because the style is an authoring decision the caller holds —
     what the step declared, resolved against the runtime default — not something derivable here.
+
+    The prompt is prepared here and rendered in the content-generation leaf, which loads the stored
+    values it reads: the rendered prompt in the result is the one the leaf returned.
     """
     with job_metadata.log_context():
-        llm_prompt = await assemble_llm_prompt(
+        unrendered_prompt = prepare_llm_prompt(
             prompt_content=prompt_content,
-            context_provider=memory,
+            memory=memory,
             output_structure_prompt=None,
             extra_params=extra_params,
             templating_style=templating_style,
         )
-        llm_prompt = await _with_readable_documents(
-            llm_prompt=llm_prompt, llm_setting=llm_setting, job_metadata=job_metadata, cogt_run_params=cogt_run_params
+        unrendered_prompt = await _with_readable_documents(
+            unrendered_prompt=unrendered_prompt, llm_setting=llm_setting, job_metadata=job_metadata, cogt_run_params=cogt_run_params
         )
-        generated_text = await get_content_generator().make_llm_text(
+        text_generation = await get_content_generator().make_llm_text(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
-            llm_prompt_for_text=llm_prompt,
+            unrendered_prompt=unrendered_prompt,
             llm_setting_main=llm_setting,
         )
+        generated_text = text_generation.text
         # `model_validate` rather than `output_class(text=...)`: the class arrives typed as
         # `type[StuffContent]`, whose declared fields do not include `text` — the subclasses that a
         # Text-compatible concept resolves to are what carry it. Validation, and the `ValidationError`
@@ -319,7 +335,7 @@ async def run_llm_text(
         return LlmTextResult(
             memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
             text=generated_text,
-            rendered_prompt=llm_prompt,
+            rendered_prompt=text_generation.rendered_prompt,
             llm_setting=llm_setting,
             structuring_path=StructuringPath.TEXT,
         )
@@ -355,49 +371,51 @@ async def run_llm_object(
             if structure_prompt is not None
             else await derive_structure_prompt(output_class=output_class, templating_style=templating_style)
         )
-        llm_prompt = await assemble_llm_prompt(
+        unrendered_prompt = prepare_llm_prompt(
             prompt_content=prompt_content,
-            context_provider=memory,
+            memory=memory,
             output_structure_prompt=output_structure_prompt,
             extra_params=extra_params,
             templating_style=templating_style,
         )
-        llm_prompt = await _with_readable_documents(
-            llm_prompt=llm_prompt, llm_setting=llm_setting, job_metadata=job_metadata, cogt_run_params=cogt_run_params
+        unrendered_prompt = await _with_readable_documents(
+            unrendered_prompt=unrendered_prompt, llm_setting=llm_setting, job_metadata=job_metadata, cogt_run_params=cogt_run_params
         )
-        content = await generate_object_content(
+        generated = await generate_object_content(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
-            llm_prompt=llm_prompt,
+            unrendered_prompt=unrendered_prompt,
             llm_setting=llm_setting,
             output_class=output_class,
             is_multiple_output=is_multiple_output,
             fixed_nb_output=fixed_nb_output,
         )
         return LlmObjectResult(
-            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-            content=content,
-            rendered_prompt=llm_prompt,
+            memory=store_result(memory=memory, concept=concept, content=generated.content, result_name=result_name, result_code=result_code),
+            content=generated.content,
+            rendered_prompt=generated.rendered_prompt,
             llm_setting=llm_setting,
             structuring_path=StructuringPath.OBJECT_LIST if is_multiple_output else StructuringPath.OBJECT_DIRECT,
         )
 
 
 async def _with_readable_documents(
-    *, llm_prompt: LLMPrompt, llm_setting: LLMSetting, job_metadata: JobMetadata, cogt_run_params: CogtRunParams
-) -> LLMPrompt:
+    *, unrendered_prompt: UnrenderedLLMPrompt, llm_setting: LLMSetting, job_metadata: JobMetadata, cogt_run_params: CogtRunParams
+) -> UnrenderedLLMPrompt:
     """The prompt with each Office file a model that may serve it cannot read replaced by the file's PDF.
 
     Every document keeps its place and its token; only what the model input carries changes, never the working memory.
+    It runs before the prompt is handed to its leaf, since the conversion is a leaf of its own.
     """
     with job_metadata.log_context():
-        if not llm_prompt.user_documents:
-            return llm_prompt
+        registered_documents = list(unrendered_prompt.files.documents.values())
+        if not registered_documents:
+            return unrendered_prompt
         readable_documents = await readable_prompt_documents(
-            documents=llm_prompt.user_documents,
+            documents=registered_documents,
             model_reference=llm_setting.model,
             model_type=ModelType.LLM,
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
         )
-        return llm_prompt.model_copy(update={"user_documents": readable_documents})
+        return unrendered_prompt.model_copy(update={"files": unrendered_prompt.files.with_documents(documents=readable_documents)})

@@ -26,6 +26,8 @@ from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, Dry
 from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.cogt.content_generation.test_data import ConstrainedName, PlainName
@@ -76,7 +78,9 @@ class TestDryRunObjectFidelity:
                 job_metadata=job_metadata,
                 cogt_run_params=self._dry_cogt_run_params(),
                 object_class=ConstrainedName,
-                llm_prompt_for_object=LLMPrompt(user_text="make a prefixed name"),
+                unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                    user_text="make a prefixed name", templating_style=resolve_templating_style(authored=None)
+                ),
                 llm_setting_for_object=LLMSetting(model="gpt-4o", temperature=0.5),
             )
         assert ConstrainedName.__name__ in str(exc_info.value)
@@ -91,7 +95,9 @@ class TestDryRunObjectFidelity:
                 job_metadata=job_metadata,
                 cogt_run_params=self._dry_cogt_run_params(),
                 object_class=ConstrainedName,
-                llm_prompt_for_object_list=LLMPrompt(user_text="make prefixed names"),
+                unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                    user_text="make prefixed names", templating_style=resolve_templating_style(authored=None)
+                ),
                 llm_setting_for_object_list=LLMSetting(model="gpt-4o", temperature=0.5),
             )
 
@@ -99,12 +105,15 @@ class TestDryRunObjectFidelity:
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
     ) -> None:
         """A class whose constraints survive the round-trip mocks and re-validates without any guard firing."""
-        result = await content_generator.make_object(
+        object_generation = await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=self._dry_cogt_run_params(),
             object_class=PlainName,
-            llm_prompt_for_object=LLMPrompt(user_text="make a plain name"),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text="make a plain name", templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting_for_object=LLMSetting(model="gpt-4o", temperature=0.5),
         )
+        result = object_generation.generated_object
         assert isinstance(result, PlainName)
         assert isinstance(result.name, str)

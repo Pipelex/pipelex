@@ -23,6 +23,12 @@ class WorkingMemoryConsistencyError(WorkingMemoryError):
     error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
+class MemoryTransportError(WorkingMemoryError):
+    """A working memory handed to a leaf could not be typed again where the leaf runs."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
 class WorkingMemoryVariableError(WorkingMemoryError, ContextProviderError):
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 

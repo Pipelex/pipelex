@@ -39,6 +39,7 @@ from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerPr
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
+from pipelex.core.memory.memory_transport import IN_PROCESS_MEMORY_TRANSPORT, MemoryTransportProtocol
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, MethodFileStoreProtocol
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -120,6 +121,8 @@ class RuntimeHub:
         self._method_file_store: MethodFileStoreProtocol = LOCAL_METHOD_FILES
         # What the print stage of a PipeDocGen step needs a loaded method for, installed by the interpreter's boot.
         self._template_file_stage: TemplateFileStageProtocol | None = None
+        # How a leaf's working memory crosses into it and is typed again: in-process until the interpreter's boot installs its own.
+        self._memory_transport: MemoryTransportProtocol = IN_PROCESS_MEMORY_TRANSPORT
         self._telemetry_manager: TelemetryManagerAbstract | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
@@ -236,6 +239,7 @@ class RuntimeHub:
         self._boot_orchestrator = None
         self._method_file_store = LOCAL_METHOD_FILES
         self._template_file_stage = None
+        self._memory_transport = IN_PROCESS_MEMORY_TRANSPORT
         self._isolated_execution_probe = _never_in_isolated_execution
         if self._pretty_print_mode_before_boot is not None:
             PrettyPrinter.mode = self._pretty_print_mode_before_boot
@@ -286,6 +290,9 @@ class RuntimeHub:
 
     def set_template_file_stage(self, *, template_file_stage: "TemplateFileStageProtocol | None") -> None:
         self._template_file_stage = template_file_stage
+
+    def set_memory_transport(self, *, memory_transport: MemoryTransportProtocol) -> None:
+        self._memory_transport = memory_transport
 
     def set_telemetry_manager(self, telemetry_manager: TelemetryManagerAbstract):
         self._telemetry_manager = telemetry_manager
@@ -411,6 +418,9 @@ class RuntimeHub:
             msg = "The template file stage is not installed: a process booted with the kernel layer alone prints no template file"
             raise RuntimeError(msg)
         return self._template_file_stage
+
+    def get_memory_transport(self) -> MemoryTransportProtocol:
+        return self._memory_transport
 
     def get_telemetry_manager(self) -> TelemetryManagerAbstract:
         if self._telemetry_manager is None:
@@ -542,6 +552,11 @@ def get_template_file_stage() -> "TemplateFileStageProtocol":
     return get_runtime_hub().get_template_file_stage()
 
 
+def get_memory_transport() -> MemoryTransportProtocol:
+    """How a leaf's working memory crosses into it and is typed again (`pipelex.core.memory.memory_transport`)."""
+    return get_runtime_hub().get_memory_transport()
+
+
 def get_class_registry() -> ClassRegistryAbstract:
     """Return the active class registry, respecting per-workflow library scoping.
 
@@ -655,7 +670,7 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
     ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process run (e.g. the
     dry-run/validation activity body) wraps itself in this scope with an inline generator so its
     leaves never dispatch — the DRY mock lives at the cogt leaf, so the inline generator's leaves
-    mock without dispatching and without storage IO. ContextVar-scoped like
+    mock without dispatching and read storage only to load a stored text a prompt or a condition reads. ContextVar-scoped like
     :func:`pipelex.interpreter_hub.scoped_pipe_router`, so concurrent runs don't cross-contaminate.
     """
     prev = _content_generator_override.get()

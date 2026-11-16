@@ -47,6 +47,7 @@ from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffe
 from pipelex.plugins.registrar import HubSlot
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_boot import PACKAGE_VERSION, RuntimeBoot
+from pipelex.runtime_bridge.primitives.memory_transport import LibraryMemoryTransport
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.runtime import IntegrationMode
@@ -191,6 +192,11 @@ class Pipelex(RuntimeBoot):
         # loaded method for what it does with it: rendering an HTML one with the step's data, reporting what the
         # engine's check of an office one found. A kernel-only boot installs none, and prints no template file.
         self.runtime_hub.set_template_file_stage(template_file_stage=DocGenTemplateFileStage())
+
+        # --- Memory transport ------------------------------------------------------------------
+        # A leaf's working memory, such as the context an LLM prompt renders against, crosses into it with the run's
+        # concepts and is typed again by them where the leaf runs. A kernel-only boot keeps the in-process transport.
+        self.runtime_hub.set_memory_transport(memory_transport=LibraryMemoryTransport())
 
         # Two manifests, one registry: core's value model (registered by the runtime setup above) and
         # the pipe kinds. They are disjoint by construction and pinned as such by

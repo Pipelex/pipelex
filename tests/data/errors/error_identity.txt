@@ -208,6 +208,7 @@ LogSinkHeaderValueError | pipelex.config.invalid
 LogSinkVariableError | pipelex.config.variable_missing
 MarkdownFormattingBudgetError | input.too_large
 MarkdownParserDependencyError | pipelex.config.dependency_missing
+MemoryTransportError | runtime.unexpected
 MethodDependencyFetchError | method.dependency_missing
 MethodDependencyNotShippedError | method.dependency_missing
 MethodEntryError | one of request.pipe_unspecified, method.ref_ambiguous, request.pipe_ambiguous, request.pipe_not_found, method.pipe_unresolved, method.package_invalid, method.syntax, method.invalid
