@@ -1,4 +1,3 @@
-from functools import cached_property
 from typing import Any
 
 from pydantic import BaseModel
@@ -29,12 +28,13 @@ class LLMPromptBlueprint(BaseModel):
     system_image_references: list[ImageReference] | None = None
     system_document_references: list[DocumentReference] | None = None
 
-    @cached_property
+    @property
     def template_read_paths(self) -> frozenset[str]:
-        """The dotted paths through which the two templates read their inputs, parsed once for the pipe's lifetime.
+        """The dotted paths through which the two templates read their inputs, each template parsed once per process.
 
         Their roots are the variables the prompt requires, and the paths themselves tell each step's leaf which stored
-        values to load (`LlmPromptContent.read_paths`).
+        values to load (`LlmPromptContent.read_paths`). The parse is cached by template source
+        (`parse_jinja2_read_paths`), never on this blueprint, which crosses a host boundary inside its pipe.
         """
         return templates_read_paths(templates=[self.system_prompt_blueprint, self.prompt_blueprint])
 

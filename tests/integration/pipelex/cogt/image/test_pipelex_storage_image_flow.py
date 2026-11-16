@@ -128,18 +128,21 @@ class TestPipelexStorageImageFlow:
         assert isinstance(resolved, ResolvedPipelexStorage)
         assert resolved.storage_uri == storage_uri
 
-    async def test_prompt_image_uri_caches_resolved(
+    async def test_prompt_image_uri_resolves_without_holding_the_resolution(
         self,
         storage_provider_with_test_image: tuple[InMemoryStorageProvider, str],
     ) -> None:
-        """Test that PromptImageUri.resolved property caches the ResolvedUri."""
+        """PromptImageUri.resolved resolves the same URI on each read and keeps nothing on the instance, which a host's
+        data converter encodes from its `__dict__`.
+        """
         _, storage_uri = storage_provider_with_test_image
 
         prompt_image = PromptImageUri(uri=storage_uri)
 
-        # Access .resolved twice and verify it's the same instance (cached)
         resolved1 = prompt_image.resolved
         resolved2 = prompt_image.resolved
 
         assert isinstance(resolved1, ResolvedPipelexStorage)
-        assert resolved1 is resolved2  # Same instance due to caching
+        assert resolved1 == resolved2
+        assert resolved1.storage_uri == storage_uri
+        assert "resolved" not in vars(prompt_image)

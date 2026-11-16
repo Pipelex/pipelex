@@ -6,6 +6,7 @@ reported as the input of that name everywhere else, such as after an `if` whose 
 """
 
 from dataclasses import field
+from functools import lru_cache
 
 from jinja2 import nodes
 from jinja2.exceptions import (
@@ -157,6 +158,26 @@ def detect_jinja2_read_paths(
 
     walk_template_reads(template=parsed_ast, global_names=set(jinja2_env.globals), handle_read=collect_read_path)
     return paths
+
+
+# How many distinct templates keep their parsed read paths in one process: every template of the methods a long-running
+# worker serves, bounded so that the cache never grows with them.
+_READ_PATHS_CACHE_SIZE = 4096
+
+
+@lru_cache(maxsize=_READ_PATHS_CACHE_SIZE)
+def parse_jinja2_read_paths(*, template_category: TemplateCategory, template_source: str) -> frozenset[str]:
+    """The read paths of `detect_jinja2_read_paths`, parsed once per template source and category in a process.
+
+    A pipe reads the paths of its templates at validation and again at every step it runs, so they are parsed once and
+    shared. The cache is keyed on the template category and source and held outside every model: a path set cached on a pydantic
+    instance would sit in its `__dict__`, which a host runtime's data converter (kajson) encodes the model from. A
+    template that does not parse caches nothing, so each call raises again.
+
+    Raises:
+        Jinja2DetectVariablesError: If there is an error parsing the template
+    """
+    return frozenset(detect_jinja2_read_paths(template_category=template_category, template_source=template_source))
 
 
 def _extract_filters_and_variable(node: nodes.Node) -> tuple[list[str], nodes.Node | None]:
