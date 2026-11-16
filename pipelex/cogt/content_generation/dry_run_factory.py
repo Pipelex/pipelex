@@ -54,7 +54,7 @@ class MockFormat(StrEnum):
     DICT_SINGLE_EXTRACT_INPUT = "dict_single_extract_input"
 
 
-# The native content classes whose value may be stored, whose value fields a class rebuilt from a JSON schema is matched against.
+# The native content classes whose value may be stored, whose field declarations a class rebuilt from a JSON schema is matched against.
 _STORED_VALUE_CONTENT_CLASSES: tuple[type[StoredValueContent], ...] = (TextContent, MarkdownContent, HtmlContent, JSONContent)
 
 
@@ -165,21 +165,33 @@ class DryRunFactory:
         """Whether a class holds a value that may be stored, or is a copy of such a class rebuilt from a JSON schema.
 
         A rebuilt copy keeps no validator and no base class, and its name is the one the schema carries as the
-        definition's title: a concept refining `Text` is rebuilt under the concept's own name, never `TextContent`. So a
-        copy is told by its shape, the one every stored-value class and every refinement of one shares: the value field
-        of a stored-value class and the reference's fields beside it, all of them optional, since such a content holds
-        its value or a URL to it. Pinning the reference's fields to None is then valid for any class that shape matches.
-        A user's structure that merely names its fields `url`, `size`, `mime_type` and `preview`, with no such value
-        field beside them or with any of them required, is none of them, and keeps the values polyfactory gives it.
+        definition's title: a concept refining `Text` is rebuilt under the concept's own name, never `TextContent`. What
+        it keeps is its fields as the native class declares them, the description of each included, which the standard
+        pins with the native concept and the schema carries verbatim. So a copy, of a native class or of a refinement of
+        one at any depth, is told by declaring the value field of a stored-value class and the reference's fields beside
+        it as that class does: under the same descriptions, each admitting None, so pinning the reference's fields to
+        None is valid for the copy. A user's structure that merely names its fields `text`, `url`, `size`, `mime_type`
+        and `preview` describes them as its own, and keeps the values polyfactory gives it. Only a structure copying the
+        native declarations, descriptions included, is mocked inline, its reference's fields None, which it accepts.
         """
         if issubclass(object_class, StoredValueContent):
             return True
         model_fields = object_class.model_fields
         for stored_value_class in _STORED_VALUE_CONTENT_CLASSES:
-            shape_field_names = (stored_value_class.value_field_name, *STORED_VALUE_REFERENCE_FIELDS)
-            if all(field_name in model_fields and not model_fields[field_name].is_required() for field_name in shape_field_names):
+            native_fields = stored_value_class.model_fields
+            if all(
+                field_name in model_fields
+                and model_fields[field_name].description == native_fields[field_name].description
+                and cls._admits_none(field_info=model_fields[field_name])
+                for field_name in (stored_value_class.value_field_name, *STORED_VALUE_REFERENCE_FIELDS)
+            ):
                 return True
         return False
+
+    @classmethod
+    def _admits_none(cls, *, field_info: FieldInfo) -> bool:
+        """Whether a field's annotation admits None, as `X | None` or `Optional[X]` does."""
+        return type(None) in get_args(field_info.annotation)
 
     @classmethod
     def _is_file_class(cls, *, object_class: type[BaseModel], file_class: type[BaseModel]) -> bool:
