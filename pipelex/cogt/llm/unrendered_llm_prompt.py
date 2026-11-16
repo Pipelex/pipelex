@@ -4,14 +4,18 @@ A prompt is rendered in its leaf, never in the operator. A text past the inline 
 travels as a reference (`pipelex.core.stuffs.stored_value_content`), and on a host runtime the operator runs in workflow
 code, which may not read storage. So the operator registers the prompt's images and documents, which needs only their
 URLs, and hands the leaf this: the templates, the working memory they read with its stored values still references, the
-parameters, and the registrations. The leaf loads every stored value the memory holds, renders the templates through
-the shared prompt assembly (`pipelex.kernel.llm_prompt_content.render_llm_prompt`), and returns the rendered prompt
-with what it generated, which is what the trace records.
+paths through which they read it, the parameters, and the registrations. The leaf loads the stored values those paths
+read, renders the templates through the shared prompt assembly (`pipelex.kernel.llm_prompt_content.render_llm_prompt`),
+and returns the rendered prompt with what it generated, which is what the trace records.
 
-What crosses the boundary into the leaf is therefore small: the stored values cross as their references, and the memory
-carries only the stuffs the templates read. What crosses back is kept small too: the rendered prompt holds the loaded
-texts in full, so the leaf hands it back as an `LLMPromptTrace` (`pipelex.cogt.llm.llm_prompt_trace`), each text past
-its bound cut to a preview with its size and hash. A Jinja2 filter applied to a stored text (`truncate`, `upper`) acts
+The memory crosses as a `TransportedMemory` (`pipelex.core.memory.memory_transport`): dumped for transport, with the
+concepts of the run's crate when a stuff needs them, so a leaf on a worker that never loaded the run's method types a
+stuff of a concept the method's bundle declares again, as it types a pipe's output. What crosses the boundary into the
+leaf is small: the stored values cross as their references, and the memory carries only the stuffs the templates read.
+
+What crosses back is kept small too: the rendered prompt holds the loaded texts in full, so the leaf hands it back as an
+`LLMPromptTrace` (`pipelex.cogt.llm.llm_prompt_trace`), each text past its bound cut to a preview with its size and
+hash. A Jinja2 filter applied to a stored text (`truncate`, `upper`) acts
 on the real text, since the text is loaded before anything renders.
 """
 
@@ -21,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.templating.prompt_file_registrations import PromptFileRegistrations
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.memory_transport import TransportedMemory
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -34,7 +38,8 @@ class UnrenderedLLMPrompt(BaseModel):
         system_template: The system prompt's template, if any. It renders before the user prompt's.
         user_template: The user prompt's template, if any.
         templating_style: The style the templates render under, unless a template declares its own.
-        context: The working memory the templates read, holding only the stuffs they name, its stored values unloaded.
+        context: The working memory the templates read, holding only the stuffs they name, its stored values unloaded,
+            in its transport form, with the run's concepts when a stuff needs them to be typed again.
         read_paths: The dotted paths through which the templates read the context, so the leaf loads only the stored
             values they read. ``None`` loads every stored value the context holds.
         extra_params: The run's parameters the templates may read beside the memory (`_nb_output`, ...).
@@ -54,7 +59,7 @@ class UnrenderedLLMPrompt(BaseModel):
     system_template: TemplateBlueprint | None = None
     user_template: TemplateBlueprint | None = None
     templating_style: TemplatingStyle = Field(strict=False)
-    context: WorkingMemory = Field(default_factory=WorkingMemory)
+    context: TransportedMemory = Field(default_factory=TransportedMemory)
     read_paths: list[str] | None = None
     extra_params: dict[str, Any] = Field(default_factory=dict)
     output_structure_prompt: str | None = None

@@ -9,10 +9,11 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
+from pipelex.libraries.concepts_libraries import CONCEPTS_LIBRARIES, ConceptsLibraryCache
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
-from pipelex.pipe_operators.doc_gen.template_file_stage import RENDER_LIBRARIES, DocGenTemplateFileStage, RenderLibraryCache
+from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
@@ -63,7 +64,7 @@ async def _composed_template_file() -> AsyncGenerator[tuple[ComposedTemplateFile
 @pytest.fixture
 def released_render_libraries() -> Generator[None, None, None]:
     yield
-    RENDER_LIBRARIES.release_idle()
+    CONCEPTS_LIBRARIES.release_idle()
 
 
 def _concepts_crate(*, mthds_content: str) -> LibraryCrate:
@@ -110,11 +111,11 @@ class TestPipeDocGenRenderContext:
 
         assert first == second == "<h1>INV-2026-0142</h1>"
         load_spy.assert_called_once()
-        assert len(RENDER_LIBRARIES.held_library_ids()) == 1
+        assert len(CONCEPTS_LIBRARIES.held_library_ids()) == 1
 
     async def test_libraries_no_print_uses_are_torn_down_beyond_the_capacity_and_one_torn_down_elsewhere_is_loaded_again(self) -> None:
         library_manager = get_library_manager()
-        cache = RenderLibraryCache(capacity=1)
+        cache = ConceptsLibraryCache(capacity=1)
         invoice_concepts = _concepts_crate(mthds_content=PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate = "<h1></h1>"'))
         receipt_concepts = _concepts_crate(mthds_content=_OTHER_CONCEPTS_MTHDS)
         try:

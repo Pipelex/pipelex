@@ -35,6 +35,7 @@ from pipelex.core.stuffs.stored_value_loader import load_stored_values
 from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.kernel.prompt_assembly import PromptFiles
 from pipelex.kernel.prompt_references import DocumentReference, ImageReference
+from pipelex.runtime_hub import get_memory_transport
 from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
@@ -117,7 +118,7 @@ def prepare_llm_prompt(
         system_template=prompt_content.system_template,
         user_template=prompt_content.user_template,
         templating_style=templating_style,
-        context=_memory_read_by_prompt(prompt_content=prompt_content, memory=memory),
+        context=get_memory_transport().pack(working_memory=_memory_read_by_prompt(prompt_content=prompt_content, memory=memory)),
         read_paths=sorted(prompt_content.read_paths),
         extra_params=dict(extra_params) if extra_params else {},
         output_structure_prompt=output_structure_prompt,
@@ -148,29 +149,31 @@ async def render_llm_prompt(
         StorageNotConfiguredError: A stored value is a storage URI and no storage provider is given.
         Jinja2TemplateInvalidError: A template cannot render as written, located on its prompt field.
     """
-    memory = unrendered_prompt.context
-    # Keyed by the names the templates read the stuffs by, an alias included, so a read path through an alias matches.
-    read_contents: dict[str, Any] = {stuff_name: stuff.content for stuff_name, stuff in memory.root.items()}
-    for alias, target in memory.aliases.items():
-        if target in memory.root:
-            read_contents[alias] = memory.root[target].content
-    await load_stored_values(
-        stored_values=find_unloaded_stored_values(roots=read_contents, read_paths=unrendered_prompt.read_paths),
-        read_scope=read_scope,
-        storage_provider=storage_provider,
-    )
-    return await _render_llm_prompt(
-        prompt_files=PromptFiles.make_from_registrations(registrations=unrendered_prompt.files),
-        system_template=unrendered_prompt.system_template,
-        user_template=unrendered_prompt.user_template,
-        context_provider=memory,
-        output_structure_prompt=unrendered_prompt.output_structure_prompt,
-        extra_params=unrendered_prompt.extra_params,
-        templating_style=unrendered_prompt.templating_style,
-        system_template_field=unrendered_prompt.system_template_field,
-        user_template_field=unrendered_prompt.user_template_field,
-        template_owner=unrendered_prompt.template_owner,
-    )
+    # The memory is typed again where the leaf runs: the operator's own in-process, and otherwise from its transport form,
+    # in a library holding the run's concepts, current while the templates render.
+    with get_memory_transport().unpacked(transported_memory=unrendered_prompt.context) as memory:
+        # Keyed by the names the templates read the stuffs by, an alias included, so a read path through an alias matches.
+        read_contents: dict[str, Any] = {stuff_name: stuff.content for stuff_name, stuff in memory.root.items()}
+        for alias, target in memory.aliases.items():
+            if target in memory.root:
+                read_contents[alias] = memory.root[target].content
+        await load_stored_values(
+            stored_values=find_unloaded_stored_values(roots=read_contents, read_paths=unrendered_prompt.read_paths),
+            read_scope=read_scope,
+            storage_provider=storage_provider,
+        )
+        return await _render_llm_prompt(
+            prompt_files=PromptFiles.make_from_registrations(registrations=unrendered_prompt.files),
+            system_template=unrendered_prompt.system_template,
+            user_template=unrendered_prompt.user_template,
+            context_provider=memory,
+            output_structure_prompt=unrendered_prompt.output_structure_prompt,
+            extra_params=unrendered_prompt.extra_params,
+            templating_style=unrendered_prompt.templating_style,
+            system_template_field=unrendered_prompt.system_template_field,
+            user_template_field=unrendered_prompt.user_template_field,
+            template_owner=unrendered_prompt.template_owner,
+        )
 
 
 async def assemble_llm_prompt(

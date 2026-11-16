@@ -162,8 +162,13 @@ class TestLlmPromptRenderInLeaf:
         """The memory handed to the leaf keeps the stuffs the templates and references name, an alias with its target."""
         unrendered_prompt = prepare_llm_prompt(prompt_content=_every_kind_of_reference(), memory=_every_kind_of_file(), templating_style=_STYLE)
 
-        assert set(unrendered_prompt.context.root) == {"note", "photo", "album", "page", "claim", "annexes"}
-        assert unrendered_prompt.context.aliases == {"remark": "note"}
+        # What crosses is the transport form, which names the same stuffs and aliases as the typed memory it was packed from.
+        context_memory = unrendered_prompt.context.in_process_memory
+        assert context_memory is not None
+        assert set(context_memory.root) == {"note", "photo", "album", "page", "claim", "annexes"}
+        assert context_memory.aliases == {"remark": "note"}
+        assert set(unrendered_prompt.context.working_memory_raw["root"]) == set(context_memory.root)
+        assert unrendered_prompt.context.working_memory_raw["aliases"] == {"remark": "note"}
 
     async def test_only_the_stored_values_the_templates_read_are_loaded(self) -> None:
         """`{{ doc.a.b }}` loads `doc.a.b` and never reads `doc.a.c`, a stored value beside it outside the read scope."""

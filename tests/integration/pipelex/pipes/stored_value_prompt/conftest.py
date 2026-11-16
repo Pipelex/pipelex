@@ -41,15 +41,17 @@ class RecordingContentGenerator(ContentGenerator):
         self.crossed_prompts: list[CrossedPrompt] = []
 
     def _record(self, *, entry_point: str, unrendered_prompt: UnrenderedLLMPrompt) -> None:
-        stuff_contents = {stuff_name: stuff.content for stuff_name, stuff in unrendered_prompt.context.root.items()}
+        context_memory = unrendered_prompt.context.in_process_memory
+        assert context_memory is not None, "the in-process generator receives the memory packed in its own process"
+        stuff_contents = {stuff_name: stuff.content for stuff_name, stuff in context_memory.root.items()}
         nb_stored_values = sum(
-            1 for stuff in unrendered_prompt.context.root.values() if isinstance(stuff.content, StoredValueContent) and stuff.content.is_stored
+            1 for stuff in context_memory.root.values() if isinstance(stuff.content, StoredValueContent) and stuff.content.is_stored
         )
         self.crossed_prompts.append(
             CrossedPrompt(
                 entry_point=entry_point,
                 wire_dump=unrendered_prompt.model_dump_json(serialize_as_any=True),
-                context_names=set(unrendered_prompt.context.root),
+                context_names=set(unrendered_prompt.context.working_memory_raw["root"]),
                 nb_unloaded_stored_values=len(find_unloaded_stored_values(roots=stuff_contents)),
                 nb_stored_values=nb_stored_values,
             )

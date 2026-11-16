@@ -30,7 +30,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.runtime_hub import get_class_registry, get_content_generator
+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_memory_transport
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
@@ -419,8 +419,11 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             )
         source_stuff = working_memory.get_stuff(name=self.source_input_name)
         # The source as a text, refused here when it is none. Its value is not read here: it may be stored, and the
-        # leaf that renders the structuring prompt loads it.
-        source_text_stuff = source_stuff.model_copy(update={"content": source_stuff.as_text})
+        # leaf that renders the structuring prompt loads it. It is a native `Text` stuff whatever the source's concept, so
+        # the leaf types it again with no library, the content and its concept agreeing.
+        source_text_stuff = source_stuff.model_copy(
+            update={"concept": get_native_concept(native_concept=NativeConceptCode.TEXT), "content": source_stuff.as_text}
+        )
 
         # Resolve list-vs-single from base + override.
         multiplicity_resolution = output_multiplicity_to_apply(
@@ -454,7 +457,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         unrendered_prompt = UnrenderedLLMPrompt(
             user_template=TemplateBlueprint(template=structuring_template, category=TemplateCategory.LLM_PROMPT),
             templating_style=templating_style,
-            context=WorkingMemory(root={STRUCTURING_PROMPT_SOURCE_NAME: source_text_stuff}),
+            context=get_memory_transport().pack(working_memory=WorkingMemory(root={STRUCTURING_PROMPT_SOURCE_NAME: source_text_stuff})),
             output_structure_prompt=output_structure_prompt,
             # Pipelex's own template, written in no field of the pipe: its failure is ours, and is located on no field.
             system_template_field=None,

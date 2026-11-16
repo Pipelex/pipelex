@@ -17,6 +17,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ValidationError
 
 from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
+from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -103,3 +104,37 @@ def revalidate_leaf_data(
         if is_mock_built:
             raise DryRunObjectFidelityError.for_object_class(object_class.__name__) from exc
         raise
+
+
+def revalidate_object_generation(
+    *,
+    generation: LLMObjectGeneration[Any],
+    object_class: type[BaseModelTypeVar],
+    is_mock_built: bool,
+    dump_mode: Literal["json", "python"] = "python",
+) -> LLMObjectGeneration[BaseModelTypeVar]:
+    """An LLM leaf's object generation with its object converted into ``object_class``, as :func:`revalidate_leaf_object` does.
+
+    A generation that crossed a host runtime's activity boundary decodes with its object as `GeneratedObjectData`, its
+    fields as data, since the bare generation class names no class for it: the caller, which holds ``object_class``,
+    validates it here, with ``dump_mode="json"``. The trace of the rendered prompt is kept as it came back.
+    """
+    generated_object = revalidate_leaf_object(
+        generation.generated_object, object_class=object_class, is_mock_built=is_mock_built, dump_mode=dump_mode
+    )
+    return LLMObjectGeneration(generated_object=generated_object, rendered_prompt=generation.rendered_prompt)
+
+
+def revalidate_object_list_generation(
+    *,
+    generation: LLMObjectListGeneration[Any],
+    object_class: type[BaseModelTypeVar],
+    is_mock_built: bool,
+    dump_mode: Literal["json", "python"] = "python",
+) -> LLMObjectListGeneration[BaseModelTypeVar]:
+    """An LLM leaf's object list generation with each object converted into ``object_class``, as :func:`revalidate_object_generation` does."""
+    generated_objects = [
+        revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=is_mock_built, dump_mode=dump_mode)
+        for raw_obj in generation.generated_objects
+    ]
+    return LLMObjectListGeneration(generated_objects=generated_objects, rendered_prompt=generation.rendered_prompt)
