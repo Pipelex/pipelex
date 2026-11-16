@@ -271,7 +271,7 @@ class StructureGenerator:
         return name
 
     def _format_default_value(self, value: Any) -> str:
-        """Format default value for Python code, ensuring strings use double quotes."""
+        """Format a default value as Python source; a string takes the quote `ruff format` keeps, the one needing fewer escapes."""
         if isinstance(value, str):
             return escape_py_string(value)
         # `repr()` module-qualifies temporal values ("datetime.datetime(...)"/"datetime.date(...)"),
