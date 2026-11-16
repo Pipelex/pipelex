@@ -247,3 +247,32 @@ class TestJinja2RenderOwner:
     )
     def test_the_unknown_names_a_template_uses_are_found(self, template_source: str, expected_names: list[str]) -> None:
         assert find_unknown_filters_and_tests(template_source=template_source, template_category=TemplateCategory.LLM_PROMPT) == expected_names
+
+    @pytest.mark.builds_problems_without_required_params(reason="renders outside any pipe, whose failure location names the pipe")
+    @pytest.mark.parametrize(
+        ("template_owner", "view", "code"),
+        [
+            (TemplateOwner.METHOD, ProblemView.CALLER, CoreCode.METHOD_TEMPLATE_INVALID),
+            (TemplateOwner.METHOD, ProblemView.OPERATOR, CoreCode.METHOD_TEMPLATE_INVALID),
+            (TemplateOwner.PIPELEX, ProblemView.OPERATOR, CoreCode.RUNTIME_UNEXPECTED),
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_an_invalid_template_error_is_rebuilt_from_its_problem(self, template_owner: TemplateOwner, view: ProblemView, code: str) -> None:
+        """A host carrying the failure out of a leaf rebuilds the same error from its problem: owner, fault and code."""
+        error = await _render_failure(_UNKNOWN_FILTER_IN_A_BRANCH, template_owner=template_owner)
+        assert isinstance(error, Jinja2TemplateInvalidError)
+
+        rebuilt = Jinja2TemplateInvalidError.from_problem(problem=error.to_problem(view=view))
+
+        assert rebuilt.template_owner == template_owner
+        assert rebuilt.fault == error.fault == "No filter named 'frob_the_lane' at line 1."
+        assert str(rebuilt) == str(error)
+        assert rebuilt.to_problem(view=ProblemView.OPERATOR).code == code
+        assert rebuilt.to_problem(view=view).params == error.to_problem(view=view).params
+
+    @pytest.mark.builds_problems_without_required_params(reason="a render failure built outside any render, to give its problem")
+    def test_a_problem_of_another_code_is_refused(self) -> None:
+        error = Jinja2TemplateRenderError("Jinja2 render — a value is missing")
+        with pytest.raises(ValueError, match=r"pipe\.template_render_failed"):
+            Jinja2TemplateInvalidError.from_problem(problem=error.to_problem(view=ProblemView.OPERATOR))

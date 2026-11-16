@@ -421,12 +421,7 @@ def _make_invalid_template_error(*, template_error: TemplateError, template_sour
         fault = "template not found: the template includes, imports or extends a template it cannot reach."
     else:
         fault = _describe_template_fault(template_error=template_error, template_source=template_source)
-    msg = f"Jinja2 render — the template cannot render as written: {fault}"
-    invalid_error = _coded_by_owner(error=Jinja2TemplateInvalidError(msg, fault=fault, template_owner=template_owner), template_owner=template_owner)
-    if template_owner.is_method:
-        # The fault names the construct Jinja2 refused and never the source, so the method's author reads it as the finding.
-        invalid_error.with_params(finding=fault)
-    return invalid_error
+    return Jinja2TemplateInvalidError.make_for_owner(fault=fault, template_owner=template_owner)
 
 
 def _make_data_render_error(*, msg: str, template_owner: TemplateOwner) -> Jinja2TemplateRenderError:
