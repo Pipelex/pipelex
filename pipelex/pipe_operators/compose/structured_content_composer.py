@@ -11,6 +11,7 @@ from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.non_null_any import field_admits_none
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
@@ -86,6 +87,64 @@ class StructuredContentComposer:
         # Shape per entry: {"method": ConstructFieldMethod, "rendered": str (templates only)}.
         # Nested fields record only their method; their sub-fields are not surfaced.
         self.field_resolutions: dict[str, dict[str, Any]] = {}
+
+    def from_paths_extracting_values(self) -> frozenset[str]:
+        """The `from` paths, nested constructs included, whose field extracts a value from the content it reads.
+
+        A stored `Text`, `Markdown`, `Html` or `JSON` value must be loaded before its value is extracted, which a field
+        does when it expects a native value (a `str`, a number, a list of them) or when its path walks into a content,
+        where it may end on a stored content's value field, such as `pages.text`. A field expecting a content copies the
+        content as it is, a stored one keeping its reference, so its path is left out and nothing is loaded for it.
+
+        Raises:
+            StructuredContentComposerTypeError: A nested field's class cannot be determined from the output class.
+        """
+        read_paths: set[str] = set()
+        for field_name, field_blueprint in self.construct_blueprint.fields.items():
+            match field_blueprint.method:
+                case ConstructFieldMethod.FROM_VAR:
+                    from_path = field_blueprint.from_path
+                    if from_path and self._from_path_extracts_a_value(
+                        from_path=from_path, expected_type=self._get_field_expected_type(field_name=field_name)
+                    ):
+                        read_paths.add(from_path)
+                case ConstructFieldMethod.NESTED:
+                    if field_blueprint.nested:
+                        nested_composer = StructuredContentComposer(
+                            construct_blueprint=field_blueprint.nested,
+                            working_memory=self.working_memory,
+                            output_class=self._get_nested_field_class(field_name=field_name),
+                            templating_style=self.templating_style,
+                            runtime_params=self.runtime_params,
+                            extra_context=self.extra_context,
+                        )
+                        read_paths.update(nested_composer.from_paths_extracting_values())
+                case ConstructFieldMethod.TEMPLATE | ConstructFieldMethod.FIXED:
+                    pass
+        return frozenset(read_paths)
+
+    def _from_path_extracts_a_value(self, *, from_path: str, expected_type: type[Any] | None) -> bool:
+        """Whether a `from` field reads a value out of the content its path reaches, rather than copying the content.
+
+        The decision mirrors `_convert_for_target_type`: a content-typed target keeps the content, a native scalar
+        target or a list of native scalars extracts each value, and a dotted path walks into a content.
+        """
+        if expected_type is not None:
+            if self._expects_type(expected_type=expected_type, target_type=StuffContent) or self._expects_list_content_type(
+                expected_type=expected_type
+            ):
+                return False
+            if self._expects_native_scalar(expected_type=expected_type):
+                return True
+            if self._expects_list_type(expected_type=expected_type):
+                expected_item_type = self._get_list_item_type(expected_type=expected_type)
+                if expected_item_type is not None and self._expects_native_scalar(expected_type=expected_item_type):
+                    return True
+        return "." in from_path
+
+    def _expects_native_scalar(self, *, expected_type: type[Any]) -> bool:
+        """Whether the expected type is one a scalar content wrapper is unwrapped into (`NATIVE_SCALAR_TARGET_TYPES`), or a subclass of one."""
+        return any(self._expects_type(expected_type=expected_type, target_type=native_type) for native_type in NATIVE_SCALAR_TARGET_TYPES)
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -307,6 +366,9 @@ class StructuredContentComposer:
 
         Returns:
             The value at the end of the attribute path, converted as appropriate
+
+        Raises:
+            StoredValueNotLoadedError: The path reads the value of a stored content that was never loaded.
         """
         # The blueprint refuses these at load; the walk below is raw `getattr`, so it refuses them again.
         if private_segment := find_private_path_segment(path=path):
@@ -319,10 +381,13 @@ class StructuredContentComposer:
         stuff = self.working_memory.get_stuff(base_name)
         stuff_content: StuffContent = stuff.content
 
-        # Navigate the attribute path - this is dynamic attribute access at runtime
+        # Navigate the attribute path - this is dynamic attribute access at runtime. A stored content's value field holds
+        # `None`, its value living at its URL, so the value is read through the content, as the template sandbox does.
         current_value: Any = stuff_content
         for attr in attr_path.split("."):
-            if hasattr(current_value, attr):  # pyright: ignore[reportUnknownArgumentType]
+            if isinstance(current_value, StoredValueContent) and current_value.is_value_field(field_name=attr):
+                current_value = current_value.require_value()
+            elif hasattr(current_value, attr):  # pyright: ignore[reportUnknownArgumentType]
                 current_value = getattr(current_value, attr)  # pyright: ignore[reportUnknownArgumentType]
             elif isinstance(current_value, dict) and attr in current_value:  # pyright: ignore[reportUnknownVariableType]
                 current_value = current_value[attr]  # pyright: ignore[reportUnknownVariableType]

@@ -1,7 +1,7 @@
 from typing import Any, Literal, Self
 
 from mthds.protocol.problem.registry import CoreCode
-from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.judgment.judgment_models import (
@@ -142,10 +142,6 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
     question: PipeJudgeQuestion | None = None
     questions: dict[str, PipeJudgeQuestion] | None = None
 
-    # The parsed read paths, kept in a private attribute: never serialized, so a pipe carried across a process boundary
-    # (kajson encodes a model from its `__dict__`) holds no cache, and the receiving process parses them again.
-    _template_read_paths: frozenset[str] | None = PrivateAttr(default=None)
-
     @model_validator(mode="after")
     def _asks_one_question_or_several(self) -> Self:
         if self.question is not None and self.questions is not None:
@@ -167,17 +163,16 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
 
     @property
     def template_read_paths(self) -> frozenset[str]:
-        """The dotted paths through which the evidence and every question read their inputs, parsed once per instance.
+        """The dotted paths through which the evidence and every question read their inputs, each template parsed once per process.
 
         A step loads the stored values these paths read before it renders the evidence and the questions
-        (`load_stored_values_read_from_memory`), since it renders them where it runs.
+        (`load_stored_values_read_from_memory`), since it renders them where it runs. The parse is cached by template
+        source (`TemplateBlueprint.read_paths`), never on this pipe, which crosses a host boundary inside a pipe job.
         """
-        if self._template_read_paths is None:
-            read_paths: set[str] = set(self.prompt_content.template.read_paths())
-            for _, question in self.labelled_questions:
-                read_paths.update(question.template_blueprint.read_paths())
-            self._template_read_paths = frozenset(read_paths)
-        return self._template_read_paths
+        read_paths: set[str] = set(self.prompt_content.template.read_paths())
+        for _, question in self.labelled_questions:
+            read_paths.update(question.template_blueprint.read_paths())
+        return frozenset(read_paths)
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

@@ -108,7 +108,11 @@ class TestTemplateReadersKajson:
         load_test_library: Callable[[list[Path]], None],
         kind: str,
     ) -> None:
-        """The read paths a pipe caches are never serialized, so a hosted job carrying the pipe encodes and decodes it."""
+        """A pipe whose read paths were read still encodes as its fields alone, so a hosted job carrying it decodes an equal pipe.
+
+        pydantic's equality compares private attributes too, so a read-path cache held on the pipe would make it unequal
+        to its decoded copy: the paths are parsed once per template source in a process and held on no pipe.
+        """
         load_test_library([_BUNDLES_DIR])
         pipe = _make_pipe(kind=kind)
         read_paths = _read_paths_of(pipe)
@@ -118,5 +122,6 @@ class TestTemplateReadersKajson:
         deserialized = kajson.loads(serialized)  # pyright: ignore[reportUnknownMemberType]
 
         assert isinstance(deserialized, type(pipe))
+        assert deserialized == pipe
         assert deserialized.model_dump() == pipe.model_dump()
         assert _read_paths_of(deserialized) == read_paths

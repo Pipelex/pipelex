@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import PrivateAttr
 from typing_extensions import override
 
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
@@ -40,20 +39,15 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     exclude_domains: list[str] | None = None
     is_structured_output: bool
 
-    # The parsed read paths, kept in a private attribute: never serialized, so a pipe carried across a process boundary
-    # (kajson encodes a model from its `__dict__`) holds no cache, and the receiving process parses them again.
-    _prompt_read_paths: frozenset[str] | None = PrivateAttr(default=None)
-
     @property
     def prompt_read_paths(self) -> frozenset[str]:
-        """The dotted paths through which the query template reads its inputs, parsed once per instance.
+        """The dotted paths through which the query template reads its inputs, parsed once per template source in a process.
 
         A step loads the stored values these paths read before it renders the query
-        (`load_stored_values_read_from_memory`), since it renders it where it runs.
+        (`load_stored_values_read_from_memory`), since it renders it where it runs. The parse is cached by template
+        source (`TemplateBlueprint.read_paths`), never on this pipe, which crosses a host boundary inside a pipe job.
         """
-        if self._prompt_read_paths is None:
-            self._prompt_read_paths = frozenset(self.prompt_blueprint.read_paths())
-        return self._prompt_read_paths
+        return self.prompt_blueprint.read_paths()
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

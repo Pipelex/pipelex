@@ -14,3 +14,10 @@ description = "The verdicts of several questions about pages"
 [concept.PagesVerdicts.structure]
 is_long  = { type = "concept", concept_ref = "YesNo", description = "Whether the pages are long", required = true }
 is_about = { type = "concept", concept_ref = "YesNo", description = "Whether the pages are about the subject", required = true }
+
+[concept.PagesFolder]
+description = "Pages kept as they are, beside a heading"
+
+[concept.PagesFolder.structure]
+heading = { type = "text", description = "The folder's heading", required = true }
+pages   = { type = "concept", concept_ref = "Text", description = "The pages, kept as content", required = true }

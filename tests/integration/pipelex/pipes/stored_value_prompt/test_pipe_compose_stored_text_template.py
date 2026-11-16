@@ -22,6 +22,8 @@ from tests.integration.pipelex.pipes.stored_value_prompt.test_data import STORED
 
 _SUBJECT = "the quarterly report"
 _BUNDLES_DIR = Path("tests/integration/pipelex/pipes/stored_value_prompt/bundles")
+_DOMAIN_CONCEPT_CODES = ["PagesDigest", "PagesFolder"]
+_TEXT_INPUTS = {"subject": NativeConceptCode.TEXT, "pages": NativeConceptCode.TEXT}
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -82,7 +84,7 @@ class TestPipeComposeStoredTextTemplate:
             blueprint=PipeComposeBlueprint.model_validate(
                 {"description": "Compose pages that may live in storage", "inputs": inputs, **blueprint_fields}
             ),
-            concept_codes_from_the_same_domain=["PagesDigest"],
+            concept_codes_from_the_same_domain=_DOMAIN_CONCEPT_CODES,
         )
         get_pipe_library().add_new_pipe(pipe)
 
@@ -98,3 +100,121 @@ class TestPipeComposeStoredTextTemplate:
             assert [uri_reference.uri for uri_reference in load_spy.call_args.kwargs["uri_references"]] == [STORED_TEXT_URL]
         else:
             assert not pages.is_loaded
+
+    async def test_an_extra_context_value_shadowing_a_stored_input_loads_nothing(
+        self,
+        mocker: MockerFixture,
+        load_test_library: Callable[[list[Path]], None],
+        scoped_job_metadata: JobMetadata,
+        recording_content_generator: RecordingContentGenerator,
+    ) -> None:
+        """An `extra_context` key wins over the stuff of the same name in the render, so the stored value under it is never read or loaded."""
+        load_test_library([_BUNDLES_DIR])
+        load_spy = mocker.spy(recording_content_generator, "load_stored_texts")
+        pages = stored_pages()
+        pipe = PipeFactory[PipeCompose].make_from_blueprint(
+            domain_code="stored_value_readers",
+            pipe_code="compose_shadowed_pages",
+            blueprint=PipeComposeBlueprint.model_validate(
+                {
+                    "description": "Compose pages an extra context value shadows",
+                    "inputs": _TEXT_INPUTS,
+                    "output": NativeConceptCode.TEXT,
+                    "template": {
+                        "template": "Digest of {{ subject.text }}: {{ pages }}",
+                        "category": "basic",
+                        "extra_context": {"pages": "OVERRIDDEN"},
+                    },
+                }
+            ),
+            concept_codes_from_the_same_domain=_DOMAIN_CONCEPT_CODES,
+        )
+        get_pipe_library().add_new_pipe(pipe)
+
+        pipe_output = await run_pipe_dry(
+            pipe=pipe,
+            working_memory=make_text_memory(texts={"subject": TextContent(text=_SUBJECT), "pages": pages}),
+            job_metadata=scoped_job_metadata,
+        )
+
+        assert pipe_output.main_stuff.content.smart_dump() == {"text": f"Digest of {_SUBJECT}: OVERRIDDEN"}
+        assert load_spy.call_count == 0
+        assert not pages.is_loaded
+
+    @pytest.mark.parametrize(
+        ("construct", "output", "expected_body", "expected_nb_loads"),
+        [
+            pytest.param(
+                {"heading": {"template": "On {{ subject.text }}"}, "body": {"from": "pages"}},
+                "PagesDigest",
+                STORED_TEXT,
+                1,
+                id="a_from_field_extracts_a_stored_text_into_a_str_field",
+            ),
+            pytest.param(
+                {"heading": {"template": "On {{ subject.text }}"}, "body": {"from": "pages.text"}},
+                "PagesDigest",
+                STORED_TEXT,
+                1,
+                id="a_from_path_ends_on_a_stored_text_value_field",
+            ),
+            pytest.param(
+                {"heading": {"from": "subject"}, "body": {"from": "subject.text"}},
+                "PagesDigest",
+                _SUBJECT,
+                0,
+                id="from_fields_read_inline_values_only",
+            ),
+            pytest.param(
+                {"heading": {"from": "subject"}, "pages": {"from": "pages"}},
+                "PagesFolder",
+                None,
+                0,
+                id="a_from_field_copies_a_stored_text_as_content",
+            ),
+        ],
+    )
+    async def test_construct_from_fields_load_the_stored_values_whose_value_they_extract(
+        self,
+        mocker: MockerFixture,
+        load_test_library: Callable[[list[Path]], None],
+        scoped_job_metadata: JobMetadata,
+        recording_content_generator: RecordingContentGenerator,
+        construct: dict[str, Any],
+        output: str,
+        expected_body: str | None,
+        expected_nb_loads: int,
+    ) -> None:
+        """A `from` field extracting a stored text's value loads it first; one copying the content keeps the reference unloaded."""
+        load_test_library([_BUNDLES_DIR])
+        load_spy = mocker.spy(recording_content_generator, "load_stored_texts")
+        pages = stored_pages()
+        # A declared input left unread is refused, so the step declares the inputs its construct names.
+        inputs = {input_name: input_concept for input_name, input_concept in _TEXT_INPUTS.items() if input_name in repr(construct)}
+        pipe = PipeFactory[PipeCompose].make_from_blueprint(
+            domain_code="stored_value_readers",
+            pipe_code="compose_from_the_pages",
+            blueprint=PipeComposeBlueprint.model_validate(
+                {"description": "Compose from pages that may live in storage", "inputs": inputs, "output": output, "construct": construct}
+            ),
+            concept_codes_from_the_same_domain=_DOMAIN_CONCEPT_CODES,
+        )
+        get_pipe_library().add_new_pipe(pipe)
+
+        pipe_output = await run_pipe_dry(
+            pipe=pipe,
+            working_memory=make_text_memory(texts={"subject": TextContent(text=_SUBJECT), "pages": pages}),
+            job_metadata=scoped_job_metadata,
+        )
+
+        composed = pipe_output.main_stuff.content
+        assert load_spy.call_count == expected_nb_loads
+        if expected_body is not None:
+            assert composed.smart_dump()["body"] == expected_body
+        else:
+            composed_pages: object = vars(composed)["pages"]
+            assert isinstance(composed_pages, TextContent)
+            assert composed_pages.is_stored
+            assert not pages.is_loaded
+        if expected_nb_loads:
+            assert [uri_reference.uri for uri_reference in load_spy.call_args.kwargs["uri_references"]] == [STORED_TEXT_URL]

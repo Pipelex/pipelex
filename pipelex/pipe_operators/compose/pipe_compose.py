@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexUnexpectedError
@@ -29,7 +29,7 @@ from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_read_paths, detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables, parse_jinja2_read_paths
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -56,45 +56,51 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     # Construct mode field (used when construct is provided)
     construct_blueprint: ConstructBlueprint | None = None
 
-    # The parsed read paths, kept in a private attribute: never serialized, so a pipe carried across a process boundary
-    # (kajson encodes a model from its `__dict__`) holds no cache, and the receiving process parses them again.
-    _template_read_paths: frozenset[str] | None = PrivateAttr(default=None)
-
     @property
     def template_read_paths(self) -> frozenset[str]:
         """The dotted paths through which the template, or every template field of the construct, reads its inputs.
 
-        Parsed once per instance from the sigil-rewritten sources the step renders. A step loads the stored values these
-        paths read before it renders (`load_stored_values_read_from_memory`), since it renders where it runs.
+        Parsed from the sigil-rewritten sources the step renders, each once per template source in a process
+        (`parse_jinja2_read_paths`), never on this pipe, which crosses a host boundary inside a pipe job. A step loads
+        the stored values these paths read before it renders (`load_stored_values_read_from_memory`), since it renders
+        where it runs.
 
         Raises:
             Jinja2DetectVariablesError: A template does not parse. Nothing is cached then, so each read raises again.
         """
-        if self._template_read_paths is None:
-            read_paths: set[str] = set()
-            if self.construct_blueprint is not None:
-                for _, field_template in self.construct_blueprint.field_templates():
-                    read_paths.update(
-                        detect_jinja2_read_paths(template_category=TemplateCategory.BASIC, template_source=rewrite_template_sigils(field_template))
-                    )
-            elif self.template is not None:
-                read_paths.update(detect_jinja2_read_paths(template_category=self.category, template_source=rewrite_template_sigils(self.template)))
-            self._template_read_paths = frozenset(read_paths)
-        return self._template_read_paths
+        read_paths: set[str] = set()
+        if self.construct_blueprint is not None:
+            for _, field_template in self.construct_blueprint.field_templates():
+                read_paths.update(
+                    parse_jinja2_read_paths(template_category=TemplateCategory.BASIC, template_source=rewrite_template_sigils(field_template))
+                )
+        elif self.template is not None:
+            read_paths.update(parse_jinja2_read_paths(template_category=self.category, template_source=rewrite_template_sigils(self.template)))
+        return frozenset(read_paths)
 
-    async def _load_stored_values_read_by_templates(
-        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams
-    ) -> None:
-        """Load, through a leaf, the stored values the templates read, so they render over their text.
+    def _template_read_paths_from_memory(self) -> frozenset[str] | None:
+        """The template read paths that read the working memory, None when a template does not parse.
 
-        The templates render here, in the operator, which on a host runtime is workflow code that reads no storage.
-        Templates reading only inline values dispatch nothing.
+        An `extra_context` key wins over the stuff of the same name in the render (`build_compose_context`), so a path
+        starting from one reads the extra context value and nothing of the memory: the stored value under that name is
+        never read, and never loaded.
         """
         try:
             read_paths = self.template_read_paths
         except Jinja2DetectVariablesError:
             # The render that follows refuses the template with its own error, located on the template's field.
-            return
+            return None
+        shadowed_names = set(self.extra_context or {})
+        return frozenset(read_path for read_path in read_paths if get_root_from_dotted_path(read_path) not in shadowed_names)
+
+    async def _load_stored_values_read_in_step(
+        self, *, read_paths: frozenset[str], job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams
+    ) -> None:
+        """Load, through a leaf, the stored values the step reads, so it renders and extracts them over their text.
+
+        The step reads them here, in the operator, which on a host runtime is workflow code that reads no storage.
+        Paths reading only inline values dispatch nothing.
+        """
         await load_stored_values_read_from_memory(
             memory=working_memory, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
         )
@@ -228,7 +234,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeComposeOutput:
-        await self._load_stored_values_read_by_templates(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params)
         if self.is_construct_mode:
             return await self._run_construct_mode(
                 job_metadata=job_metadata,
@@ -257,6 +262,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             # The factory refuses a template mode with no template, so this is a bug of ours.
             msg = "Template is required for template mode"
             raise PipelexUnexpectedError(msg)
+        template_read_paths = self._template_read_paths_from_memory()
+        if template_read_paths is not None:
+            await self._load_stored_values_read_in_step(
+                read_paths=template_read_paths, job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params
+            )
 
         # Resolved here rather than inside the kernel: turning a concept into a class is a library's
         # business, and handing the class over is what spares the kernel a registry read.
@@ -320,6 +330,15 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             extra_context=self.extra_context,
         )
         try:
+            # The template fields render and the `from` fields extract here: the stored values they read are loaded first,
+            # a `from` field's only when it extracts a value rather than copying the content, which keeps its reference.
+            read_paths = set(composer.from_paths_extracting_values())
+            template_read_paths = self._template_read_paths_from_memory()
+            if template_read_paths is not None:
+                read_paths.update(template_read_paths)
+            await self._load_stored_values_read_in_step(
+                read_paths=frozenset(read_paths), job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params
+            )
             the_content = await composer.compose()
         except PipeComposeError as exc:
             msg = f"In pipe '{self.code}' (output: {self.output.concept.code}): {exc.message}"
