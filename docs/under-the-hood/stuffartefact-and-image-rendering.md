@@ -139,6 +139,18 @@ StuffArtefact supports bracket notation and iteration:
 
 Bracket access and `get` never resolve to the artefact's own attributes, such as the wrapped `Stuff` or a method. The accessors above and the four metadata fields are what `StuffArtefact` declares as its template surface: the only methods a template may call on it and the only underscore names it may read.
 
+### Stored values are loaded before rendering
+
+A `Text`, `Markdown`, `Html` or `JSON` content may hold a reference to its value in storage instead of the value: `url`, with `size`, `mime_type` and `preview`, in place of `text`, `inner_html` or `json_obj` (`pipelex/core/stuffs/stored_value_content.py`). Rendering never reads storage. Every synchronous render reads the value through the content's `require_text()`, `require_inner_html()` or `require_json_obj()`, which returns the value held inline or loaded earlier, and raises `StoredValueNotLoadedError` for a reference never loaded, so a template never prints an empty string, `None` or a URL where a text belongs. The same holds wherever a template reaches such a content:
+
+- `{{ note }}`, `{{ note | format }}` and the `@note` and `$note` sigils go through the `rendered_*` methods.
+- `{{ note.text }}`, `note["text"]` and `note.get("text")` return the value through `require_value()`, never the `None` the field holds in the stored form. `url`, `size`, `mime_type` and `preview` stay readable as fields.
+- `iter_keys()`, `iter_items()` and `iter_values()` list the fields of the inline form (`text`, or `inner_html` and `css_class`, or `json_obj`), whichever form the content holds.
+- A structure holding such a content renders it through `rendered_value_form()`, the dict its inline form dumps, which `serialize_model` uses in place of the model's fields (`ValueFormRenderable` in `pipelex/tools/typing/pydantic_utils.py`).
+- Below the top level, `{{ report.body.text }}` and `report.body["text"]` read the value the same way: the template sandbox answers a read of a content's value field with `require_value()` (`ValueFieldReadable` in `pipelex/tools/typing/pydantic_utils.py`, read in `pipelex/tools/jinja2/jinja2_sandbox.py`), and so does a binding step whose path ends on it, such as `page.inner_html` over a stored `Html` (`pipelex/pipe_controllers/binding/binding_value.py`).
+
+Loading is the caller's job, done before rendering in code that may perform IO: `load_stored_value(content, read_scope=…, position=…, storage_provider=…)` in `pipelex/core/stuffs/stored_value_loader.py` reads the value through `load_text_from_any_uri` (`pipelex/tools/uri/uri_text.py`), which checks the run's read scope exactly as an image read does, and keeps it in a private attribute of the content. That attribute is never serialized, so a loaded content still dumps as its reference. Workflow code never loads, since it performs no IO.
+
 ---
 
 ## ImageRenderable Protocol
@@ -337,6 +349,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | `pipelex/core/stuffs/image_content.py` | Self-registering image token |
 | `pipelex/core/stuffs/list_content.py` | List iteration for images |
 | `pipelex/core/stuffs/text_and_images_content.py` | Text + images rendering |
+| `pipelex/core/stuffs/stored_value_content.py` | The inline and stored forms of `Text`, `Html` and `JSON`, and their synchronous readers |
+| `pipelex/core/stuffs/stored_value_loader.py` | `load_stored_value`, the read of a stored value under the run's read scope |
 
 ---
 

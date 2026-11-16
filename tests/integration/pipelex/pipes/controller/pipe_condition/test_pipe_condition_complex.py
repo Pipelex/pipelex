@@ -80,7 +80,7 @@ class TestPipeConditionComplex:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         if pipe_run_mode.is_live:
-            assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
+            assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.require_text()
 
     async def test_business_finance_routing(
         self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
@@ -128,7 +128,7 @@ class TestPipeConditionComplex:
         if pipe_run_mode.is_live:
             final_result = pipe_output.main_stuff
             assert isinstance(final_result.content, TextContent)
-            assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
+            assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.require_text()
 
     async def test_legal_complex_routing(
         self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
@@ -176,7 +176,7 @@ class TestPipeConditionComplex:
         if pipe_run_mode.is_live:
             final_result = pipe_output.main_stuff
             assert isinstance(final_result.content, TextContent)
-            assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
+            assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.require_text()
 
     async def test_technical_expert_high_complexity_routing(
         self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
@@ -232,7 +232,7 @@ class TestPipeConditionComplex:
         if pipe_run_mode.is_live:
             final_result = pipe_output.main_stuff
             assert isinstance(final_result.content, TextContent)
-            assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
+            assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.require_text()
 
     # DRY RUN TESTS
     async def test_complex_pipeline_dry_run_success(

@@ -420,7 +420,7 @@ class TestPipeComposeStuffContentSubclasses:
         web_content = main_stuff.content
         assert web_content.content_title == "Homepage Section"  # type: ignore[attr-defined]
         assert isinstance(web_content.html_block, HtmlContent)  # type: ignore[attr-defined]
-        assert "<h1>Welcome</h1>" in web_content.html_block.inner_html  # type: ignore[attr-defined]
+        assert "<h1>Welcome</h1>" in web_content.html_block.require_inner_html()  # type: ignore[attr-defined]
         assert web_content.html_block.css_class == "main-content"  # type: ignore[attr-defined]
 
         pretty_print(web_content, title="WebContent - HtmlContent")
@@ -482,8 +482,8 @@ class TestPipeComposeStuffContentSubclasses:
         payload = main_stuff.content
         assert payload.payload_name == "API Response"  # type: ignore[attr-defined]
         assert isinstance(payload.data, JSONContent)  # type: ignore[attr-defined]
-        assert payload.data.json_obj["status"] == "success"  # type: ignore[attr-defined]
-        assert payload.data.json_obj["data"]["id"] == 123  # type: ignore[attr-defined]
+        assert payload.data.require_json_obj()["status"] == "success"  # type: ignore[attr-defined]
+        assert payload.data.require_json_obj()["data"]["id"] == 123  # type: ignore[attr-defined]
 
         pretty_print(payload, title="DataPayload - JSONContent")
 

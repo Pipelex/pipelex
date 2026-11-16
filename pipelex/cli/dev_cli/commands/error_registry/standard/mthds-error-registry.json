@@ -1,5 +1,5 @@
 {
-  "version": "8.1.0",
+  "version": "9.0.0",
   "base_url": "https://mthds.ai/errors",
   "extension_prefixes": [
     {
@@ -2099,7 +2099,7 @@
           "description": "The fields the structure holds where the walk stops, empty when the walk stops at a leaf."
         }
       },
-      "meaning": "A binding's `from`, a construct's `from` or a template's field read walks past what the declared structures hold, such as a segment naming no field, or one following a native that holds its value in a single field.",
+      "meaning": "A binding's `from`, a construct's `from` or a template's field read walks past what the declared structures hold, such as a segment naming no field, or one following a native that holds a single value.",
       "what_to_do": "Compare the path with the concepts' structures, using `params.available_fields` at the failing segment, and correct it, or bind the field first and walk on from the bound value.",
       "see": [
         {

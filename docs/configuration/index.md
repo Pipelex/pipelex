@@ -57,7 +57,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 1. `pipelex_local.toml`
 2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests use `tests/pipelex_unit_test.toml`, the one override file read outside a `.pipelex/` directory)
+3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; the tests use `tests/pipelex_unit_test.toml` instead, under every test run mode, the one override file read outside a `.pipelex/` directory)
 4. `pipelex_override.toml` (recommended to gitignore)
 5. `pipelex_temporary_override.toml` (recommended to gitignore)
 
@@ -68,7 +68,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 The configuration is organized into these main sections. The first three mirror the layers of the runtime:
 
-1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), the limits a spreadsheet is read under (`[runtime.table_reading]`, see [PipeStructure › Reading a spreadsheet](../building-methods/pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet)), reporting, tracing, observation, and the plugin denylist
+1. `[runtime]` - process-scoped infrastructure: storage (including `inline_text_max_bytes`, the size past which a text, HTML or JSON value is to be stored rather than kept inline, read by nothing yet, see [Cloud Storage › Large texts](../features/cloud-storage.md#large-texts)), secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), the limits a spreadsheet is read under (`[runtime.table_reading]`, see [PipeStructure › Reading a spreadsheet](../building-methods/pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet)), reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, the limits a method tree is listed under, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
@@ -96,7 +96,7 @@ The exact loading sequence is (later wins, per leaf key):
 Notes on the override sequence:
 
 - `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) is selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under unit testing the run-mode overlay is sourced exclusively from `./tests/pipelex_{run_mode}.toml`
+- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under any test run mode (`unit_test`, `ci_test`, `codex_cloud_test`) no run-mode file is read from a `.pipelex/` directory, and `./tests/pipelex_unit_test.toml` is layered on top instead
 - Each subsequent configuration file in this sequence can override settings from the previous ones, and project-level files override the global `~/.pipelex/` layer
 - The two inference documents, `inference/backends.toml` and `inference/routing_profiles.toml`, are not part of this merge. Each has a single personal override file beside it, `backends_override.toml` and `routing_profiles_override.toml`, merged over the resolved base — global tier first, then project tier. See [Personal overrides](config-technical/inference-backend-config.md#personal-overrides)
 

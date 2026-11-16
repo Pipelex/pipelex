@@ -168,11 +168,11 @@ class TestStorageProviderConfig:
         assert "local config is required to access storage_path" in str(exc_info.value)
 
     def test_storage_config_boolean_flags_are_required(self):
-        """StorageConfig requires both boolean flags: omitting them fails validation with 'missing' errors."""
+        """StorageConfig requires both boolean flags and the inline threshold: omitting them fails validation with 'missing' errors."""
         with pytest.raises(ValidationError) as exc_info:
             StorageConfig.model_validate({"method": "in_memory", "in_memory": make_in_memory_config()})
         missing_fields = {error["loc"][0] for error in exc_info.value.errors() if error["type"] == "missing"}
-        assert missing_fields == {"is_fetch_remote_content_enabled", "is_upload_local_content_enabled"}
+        assert missing_fields == {"is_fetch_remote_content_enabled", "is_upload_local_content_enabled", "inline_text_max_bytes"}
 
     def test_storage_config_boolean_flags_round_trip_through_model_dump(self):
         """The boolean flags survive a model_dump round-trip with their exact values."""
@@ -181,6 +181,7 @@ class TestStorageProviderConfig:
             in_memory=make_in_memory_config(),
             is_fetch_remote_content_enabled=True,
             is_upload_local_content_enabled=False,
+            inline_text_max_bytes=4096,
         )
         dumped = storage_config.model_dump()
         assert dumped["is_fetch_remote_content_enabled"] is True

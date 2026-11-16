@@ -32,9 +32,9 @@ def plain_data(value: Any) -> Any:
         case ListContent():
             return [plain_data(item) for item in value.items]  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         case TextContent():
-            return value.text
+            return value.require_text()
         case HtmlContent():
-            return value.inner_html
+            return value.require_inner_html()
         case NumberContent():
             return value.number
         case YesNoContent():
@@ -50,7 +50,7 @@ def plain_data(value: Any) -> Any:
         case TimeContent():
             return value.time
         case JSONContent():
-            return value.json_obj
+            return value.require_json_obj()
         case BaseModel():
             return _structure_plain_data(structure=value)
         case list() | tuple():

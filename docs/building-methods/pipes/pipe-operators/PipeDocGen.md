@@ -274,6 +274,7 @@ When the plugin's engine checks an office template file, validation reports what
 
 ## Related documentation
 
+- [Editing a User's Workbook](../../editing-a-users-workbook.md), a guide to methods that append rows to a user's workbook or fill in its empty cells
 - [PipeCompose](./PipeCompose.md), which renders a template into a `Text` or `Html` output
 - [Native concepts](../../concepts/native-concepts.md), for `Document` and `Markdown`
 - [`pipelex run`](../../../tools/cli/run.md)

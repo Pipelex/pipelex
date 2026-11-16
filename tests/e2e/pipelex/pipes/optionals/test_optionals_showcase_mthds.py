@@ -47,7 +47,7 @@ class TestOptionalsShowcaseE2E:
 
         assert response.state == RunState.COMPLETED
         assert response.pipe_output.working_memory.absences == {}
-        report_text = response.pipe_output.main_stuff.as_text.text
+        report_text = response.pipe_output.main_stuff.as_text.require_text()
         assert "summary: analysis of clause 12" in report_text
         assert "Risk: penalty risk detected" in report_text
 
@@ -62,7 +62,7 @@ class TestOptionalsShowcaseE2E:
         response = await runner.execute(pipe_code="oshow_main_flow", inputs={"contract": "a clean contract"})
 
         assert response.state == RunState.COMPLETED
-        report_text = response.pipe_output.main_stuff.as_text.text
+        report_text = response.pipe_output.main_stuff.as_text.require_text()
         assert "No risk assessment." in report_text
         assert "summary: analysis" not in report_text
 

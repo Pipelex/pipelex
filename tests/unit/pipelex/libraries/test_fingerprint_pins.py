@@ -27,9 +27,10 @@ _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "p
 # a pinned definition legitimately moves every conforming implementation's normalized digest — the
 # content pin, which hashes only authored content, did not move. It moved once more, for the same
 # reason, when MTHDS 3.0.0 gave `native.YesNo` its optional `probability`: removing that one member
-# from the pinned definition reproduces the previous digest exactly.
+# from the pinned definition reproduces the previous digest exactly. And again when MTHDS 9.0.0 gave
+# `native.Text`, `native.Html` and `native.JSON` the optional `url`, `size`, `mime_type` and `preview` of a stored value.
 _PINNED_CONTENT_FINGERPRINT = "053d3ce1a1963feffcea1aaea21e6329a7d2d2371cecdb92eb4a1e51269b0043"
-_PINNED_NORMALIZED_FINGERPRINT = "6c53e12e4dd7af352130382c4dd39dc3ac4767783b30f3e42cc8f2c42f84dffa"
+_PINNED_NORMALIZED_FINGERPRINT = "38d3de598f5b4b610d76d748fb2f431d152ff1b43b17f6135d6d8e779f4ecb3c"
 
 _MTHDS_TEST_VERSION = "0.0.0-test"
 
