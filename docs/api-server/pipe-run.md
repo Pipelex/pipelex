@@ -83,7 +83,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `created_at` (string): ISO timestamp when the pipeline was created.
 - `state` (string): One of `"RUNNING"`, `"COMPLETED"`, `"FAILED"`, `"CANCELLED"`, `"ERROR"`, `"STARTED"`.
 - `finished_at` (string | null): ISO timestamp when the pipeline finished, or `null` if still running.
-- `main_stuff_name` (string | null): Key under `pipe_output.working_memory.root` where the main result lives. Use this to extract the typed output: `pipe_output.working_memory.root[main_stuff_name].content`.
+- `main_stuff_name` (string | null): Key under `pipe_output.working_memory.root` where the main result lives. Use this to extract the typed output: `pipe_output.working_memory.root[main_stuff_name].content`. A `Text`, `Markdown`, `Html` or `JSON` value larger than the runner's inline threshold is not in the response itself: see [Large texts arrive as a reference](#large-texts-arrive-as-a-reference).
 - `crate_fingerprint` (string | null): **Pipelex extension.** The fingerprint of the library crate the run's method was loaded into, the identity of its concepts and pipes, which changes with their meaning and not with their formatting or comments; a host records it on its run beside the digest of the method tree that ran. `null` when the run was built from no crate.
 - `pipe_output` (object): Result of the pipeline execution. Contains `working_memory` with `root` (every named stuff produced during the run) and `aliases` (built-in name mappings such as `main_stuff`).
 - `pipe_output.tokens_usages` (array | null): Per-inference-call token usage in the client wire shape (`TokensUsageRecord`): `model_type`, model name/id, `pipe_code`, job-kind fields, `nb_tokens_by_category`, computed USD `cost` (`null` when the model has no rate table), and ISO timestamps. `null` when usage assembly was off for the run, `[]` when no inference happened. `pipe_output.usage_assembly_error` (string | null) is non-null when usage assembly failed. See the pipelex runtime's [TokensUsage Wire Records](https://docs.pipelex.com/under-the-hood/tokens-usage-wire-records/) for the full field reference.
@@ -92,6 +92,35 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `method_provenance` (object, only on `method_ref` runs): `{address, tag, commit_sha, tree_digest, display_name}` — the package's resolved full address, the requested tag (`null` for a bare address), the commit SHA that was actually fetched, the digest of the method tree the run loaded, and the `display_name` the package's `METHODS.toml` declares (`null` when it declares none). Absent for runs from inline source or a bundle. See [Running a method by address](#running-a-method-by-address-method_ref).
 
 **Errors** are returned as [RFC 9457 `application/problem+json`](error-responses.md) bodies with HTTP 4xx/5xx status codes. The successful response body has no `status`/`error` field — the HTTP status code is the source of truth. An invalid bundle is refused before any pipe runs with a `422` `method.invalid` problem whose `errors` are the same located items validating it gives ([Structured validation errors](error-responses.md#structured-validation-errors)), and a run that fails reports its root fault at the pipe that failed ([Run failures](error-responses.md#run-failures-the-root-fault-located-at-the-failing-pipe)).
+
+#### Large texts arrive as a reference
+
+A `Text`, `Markdown`, `Html` or `JSON` value whose size passes the runtime's inline threshold (`[runtime.storage] inline_text_max_bytes`, 4096 bytes of UTF-8 by default, measured on a JSON value's serialized form) is stored in the run's storage where it is produced, and the response carries its **reference** in place of the value, whatever the size of the output. A content holds one form or the other, never both:
+
+```json
+{ "concept": "native.Text", "content": { "text": "A short answer." } }
+```
+
+```json
+{
+  "concept": "native.Text",
+  "content": {
+    "url": "pipelex-storage://org-1/run-1/generated/9f2c41d07a6b3e58/value.txt",
+    "size": 48213,
+    "mime_type": "text/plain",
+    "preview": "The first few hundred characters of the text…"
+  }
+}
+```
+
+- `url` (string): where the value is stored, a storage URI here, which the runner reads under the run's `read_scope`; a value a caller sent as a URL keeps the URL it was sent with.
+- `size` (integer): the stored value's length in bytes.
+- `mime_type` (string): `text/plain`, `text/markdown`, `text/html` or `application/json`.
+- `preview` (string): the value's first few hundred characters, always its true start.
+
+The value field (`text`, `inner_html`, `json_obj`) is absent from a reference, and the four reference fields are absent from an inline value, not sent as `null`; `Html`'s `css_class` stays inline in both forms. The same holds wherever such a value sits, a nested one included, such as each page's `text_and_images.text` in a `Page[]` output, and for every stuff of `working_memory`, an input sent inline and stored at intake included. Tell a stored text from a file by the concept the output names at that path (`native.Text`, `native.Html`, …), never by its `url` or its `mime_type`, since a `Document` may be `text/plain` too.
+
+A raw HTTP caller reads a referenced value from storage itself; on the hosted API the run's result files and storage routes serve it. The Pipelex SDKs load every reference before they return a result, so a caller using one reads the value inline unless it opts out. The [generated types](codegen.md#loaded-and-wire-shapes) describe both shapes: `Text` parses the loaded value, `TextWire` either form.
 
 ---
 

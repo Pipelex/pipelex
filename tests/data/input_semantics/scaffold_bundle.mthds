@@ -98,3 +98,26 @@ description = "SCAFFOLD_pipe_scaffold_verdict_natives: the verdict natives, each
 inputs      = { approved_in = "YesNo", team_in = "Choice", grade_in = "Rating" }
 output      = "Text"
 template    = "SCAFFOLD_template_verdict_natives: $approved_in $team_in $grade_in"
+
+# The natives that may hold their value in storage, at slot positions, directly and refined. A stored
+# value's reference (`url`, `size`, `mime_type`, `preview`) is what the runtime puts in place of a large
+# value; a caller supplies the value itself, so the descriptor states the value form alone and no
+# template asks for a reference, whether the slot names the native or a concept refining it.
+[concept.Webpage]
+description = "SCAFFOLD_desc_concept_Webpage: a page of HTML, refining the native"
+refines     = "Html"
+
+[concept.Payload]
+description = "SCAFFOLD_desc_concept_Payload: a JSON payload, refining the native"
+refines     = "JSON"
+
+[concept.Memo]
+description = "SCAFFOLD_desc_concept_Memo: a memo, refining the native text"
+refines     = "Text"
+
+[pipe.scaffold_stored_natives]
+type        = "PipeCompose"
+description = "SCAFFOLD_pipe_scaffold_stored_natives: the natives a run may store, and concepts refining them, each at a slot position"
+inputs      = { markdown_in = "Markdown", webpage_in = "Webpage", payload_in = "Payload", memo_in = "Memo" }
+output      = "Text"
+template    = "SCAFFOLD_template_stored_natives: $markdown_in $webpage_in $payload_in $memo_in"

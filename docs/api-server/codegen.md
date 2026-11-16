@@ -104,6 +104,10 @@ An unknown `kind` or `target` is a request-shape `422` problem+json, never a `20
 }
 ```
 
+### Loaded and wire shapes
+
+A run carries a large `Text`, `Markdown`, `Html` or `JSON` value as a [reference to it in storage](pipe-run.md#large-texts-arrive-as-a-reference), so `python-pydantic` and `ts-zod` emit two types for every concept reaching one: the **loaded shape** under the concept's own name, where such a value is held inline and required (`Text` is `{ text: string }`), which is what a Pipelex SDK returns once it has loaded every reference, and the **wire shape** under the name with `Wire` appended (`TextWire`, `ReportWire`), which accepts the value inline or as `url`, `size`, `mime_type` and `preview`, and is what a raw HTTP caller, or an SDK caller who opts out of loading, parses. The `ts-zod` binder carries a `parse`/`serialize` pair for both. A concept reaching no such value has one type. `python-structures` is unchanged: its classes are the runtime's own, which hold either form. See [Codegen Projections](../under-the-hood/codegen-projections.md#stored-values-the-loaded-shape-and-the-wire-shape).
+
 ### The trust chain over HTTP
 
 Every artifact ships **stamped** (source-crate fingerprint, engine version, projection, content hash) and the response carries the matching `codegen.lock`. A client that writes each `artifacts[]` entry and the `lock` **verbatim** reproduces a local `pipelex codegen types` run byte-for-byte — so the offline `pipelex codegen check` passes on the written tree exactly as it would on locally generated files.
