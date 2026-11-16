@@ -758,6 +758,17 @@ class TestStructureGeneratorClassDocstringEscaping:
         assert STATEMENTS_RUN == []
         assert inspect.getdoc(generated_class) == normalized_docstring_text(description)
 
+    def test_indented_body_after_a_blank_first_line_keeps_its_relative_indentation(self):
+        """A description that opens on a blank line and indents its whole body reads back as `inspect.cleandoc` leaves it."""
+        description = "\n  Intro:\n    - item one\n    - item two"
+
+        _, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="Described", structure_blueprint={}, description=description
+        )
+
+        assert inspect.getdoc(generated_class) == "Intro:\n  - item one\n  - item two"
+        assert generated_class.model_json_schema()["description"] == "Intro:\n  - item one\n  - item two"  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
     def test_long_class_description_gains_no_line_break(self):
         """A one-line description longer than any line limit stays one line: no newline the author did not write."""
         _, generated_class = StructureGenerator().generate_from_structure_blueprint(

@@ -41,7 +41,11 @@ from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.emitters.ts_zod import TS_PRINT_WIDTH, emit_ts_zod
 from pipelex.codegen.resolved_concepts import ResolvedLibrary, resolve_concepts_from_crate
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.resolved_fields import ResolvedType, ResolvedTypeKind
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from tests.helpers.ts_toolchain import resolve_prettier
 
@@ -127,6 +131,50 @@ def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: st
     _assert_ruff_format_stable(tmp_path=tmp_path, target=target, line_length=line_length)
 
 
+# Class descriptions at the edges of the docstring rendering: a quote at either end, a backslash ending a line or
+# beside a triple quote, later lines sharing an indent, and characters that leave no verbatim rendering.
+_AWKWARD_CLASS_DESCRIPTIONS = (
+    '"Quoted" at the start',
+    "'Quoted' at the start",
+    'Ends with "quoted"',
+    'First line\nthe last one ends with "quoted"',
+    "First line\nthe last one ends with 'quoted'",
+    "\n  Intro:\n    - item one\n    - item two",
+    "A path C:\\dir\\\nand the next line",
+    'Holds \\""" beside a backslash',
+    'Holds """ and a backslash \\ on one line\nand a second line',
+    "A bell \x07 and\n  an indented second line",
+    "Summary line.\n\nSecond paragraph:\n  - first item\n  - second item",
+)
+
+
+def _awkward_descriptions_crate() -> LibraryCrate:
+    concepts: dict[str, ConceptBlueprint | str] = {
+        f"fidelity.Described{index}": ConceptBlueprint(
+            description=description,
+            structure={"value": ConceptStructureBlueprint(description="A value", type=ConceptStructureBlueprintFieldType.TEXT, required=True)},
+        )
+        for index, description in enumerate(_AWKWARD_CLASS_DESCRIPTIONS)
+    }
+    authored = LibraryCrate(
+        mthds_version="1.0.0-test",
+        concepts=concepts,
+        domains={"fidelity": DomainBlueprint(code="fidelity", description="Fidelity domain")},
+    )
+    return normalize_crate(authored, mthds_version="1.0.0-test")
+
+
+def _assert_no_safe_fix(*, tmp_path: Path, target: str) -> None:
+    """Require `ruff check --fix` to have nothing to change: a rule may report, but no safe fix may rewrite the bytes."""
+    check = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+        [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG, "--diff"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert check.returncode == 0, f"[{target}] `ruff check --fix` would rewrite the emitted artifact:\n{check.stdout}{check.stderr}"
+
+
 class TestEmittedArtifactsAreLintClean:
     def test_fixture_covers_every_resolved_type_kind(self, every_type_kind_crate: LibraryCrate):
         """The fixture is the single source of type-kind coverage — a new kind must be wired into it."""
@@ -185,6 +233,22 @@ class TestEmittedArtifactsAreLintClean:
         _assert_ruff_clean(
             emitted=emit(resolve_concepts_from_crate(every_type_kind_crate)), tmp_path=tmp_path, target=target, line_length=line_length
         )
+
+    @pytest.mark.parametrize(("target", "emit"), _EMITTERS)
+    def test_awkward_class_descriptions_leave_ruff_nothing_to_rewrite(
+        self,
+        tmp_path: Path,
+        target: str,
+        emit: Callable[[ResolvedLibrary], list[EmittedFile]],
+    ):
+        """A docstring with an edge quote, a backslash or an indented body is still a formatter and fixer fixed point.
+
+        The escaped form trips `D301`, whose fix ruff classes unsafe, so `ruff check` may report it: what must hold
+        is that neither `ruff format` nor a safe fix such as `D212`'s or `D208`'s rewrites a byte.
+        """
+        _write_artifacts(emitted=emit(resolve_concepts_from_crate(_awkward_descriptions_crate())), tmp_path=tmp_path)
+        _assert_ruff_format_stable(tmp_path=tmp_path, target=target)
+        _assert_no_safe_fix(tmp_path=tmp_path, target=target)
 
     @pytest.mark.parametrize("crate_fixture", ["all_opaque_crate", "refines_native_only_crate"])
     @pytest.mark.parametrize(("target", "emit"), _EMITTERS)
