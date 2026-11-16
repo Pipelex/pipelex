@@ -90,6 +90,76 @@ def _docstring_delimiter(text: str) -> str | None:
     return None
 
 
+# The section names ruff's docstring parser knows, across the Google and NumPy conventions, lowercased.
+_DOCSTRING_SECTION_NAMES = frozenset(
+    {
+        "args",
+        "arguments",
+        "attention",
+        "attributes",
+        "caution",
+        "danger",
+        "error",
+        "example",
+        "examples",
+        "extended summary",
+        "hint",
+        "important",
+        "keyword args",
+        "keyword arguments",
+        "methods",
+        "note",
+        "notes",
+        "other args",
+        "other arguments",
+        "other parameters",
+        "other params",
+        "parameters",
+        "raises",
+        "receives",
+        "references",
+        "return",
+        "returns",
+        "see also",
+        "short summary",
+        "tip",
+        "todo",
+        "warning",
+        "warnings",
+        "warns",
+        "yield",
+        "yields",
+    }
+)
+
+
+def _is_section_header(*, line: str) -> bool:
+    """Whether ruff could read `line` as a docstring section header: a section name alone, a colon after it allowed.
+
+    Ruff also weighs the line before and the line after, so this is the wider test, which is the safe direction: a line
+    it flags only costs the verbatim rendering.
+    """
+    stripped = line.strip()
+    if stripped.endswith(":"):
+        stripped = stripped[:-1].rstrip()
+    return stripped.lower() in _DOCSTRING_SECTION_NAMES
+
+
+def _verbatim_invites_a_safe_fix(*, lines: list[str]) -> bool:
+    """Whether a verbatim docstring of `lines` is one a safe fix of ruff's docstring rules would rewrite.
+
+    Two shapes are left, once the summary-first layout has satisfied the indentation, whitespace and quote rules. A run
+    of blank lines after the summary, which `D205` collapses to one. And a line after the summary that reads as a
+    section header (`Args:`, `Notes`, `See Also`), which the section rules reshape: `D405` capitalizes it, `D416` adds
+    its colon, `D411`, `D412` and `D413` add or remove the blank lines around it, `D214` and `D215` dedent it, and under
+    the NumPy convention `D406`, `D407` and `D409` underline it. The escaped form sits on one physical line, where ruff
+    finds neither shape.
+    """
+    if len(lines) > 2 and not lines[1].strip() and not lines[2].strip():
+        return True
+    return any(_is_section_header(line=line) for line in lines[1:])
+
+
 def _summary_first_value(*, lines: list[str], indent: str, closing_indent: bool) -> str:
     """The value of a docstring of `lines` laid out summary-first: the summary beside the opening quotes, the rest indented.
 
@@ -111,13 +181,19 @@ def class_docstring(description: str, *, extra_line: str | None = None, indent: 
     is an auto-applied fix, and each one changes the body bytes the codegen stamp hashes, which is precisely
     the drift the codegen emitters exist to prevent.
 
+    That shape still leaves two texts a safe fix rewrites, because the rewrite is of the text itself: a run of
+    blank lines after the summary, which `D205` collapses, and a line that reads as a section header, such as
+    `Args:` or `Notes`, which the section rules reshape (see `_verbatim_invites_a_safe_fix`). Neither is
+    rendered verbatim.
+
     `inspect.getdoc` strips the indentation the lines after the first share, so the summary-first shape only
     reads back when those lines share none. When they do — a text that opens on a blank line and indents its
-    whole body — or when no verbatim rendering exists, the docstring is escaped onto one physical line:
+    whole body — or when no verbatim rendering exists, or the verbatim one would invite a safe fix, the
+    docstring is escaped onto one physical line:
     summary-first when that reads back, and otherwise opening with an escaped newline, which leaves `getdoc`
     no first line to treat apart. The escaped form trips `D301`, but ruff classes that fix as *unsafe*, so a
     consumer's `ruff check --fix` leaves the bytes — and the stamp — alone; on one physical line, it trips no
-    `D212`, whose fix is safe.
+    `D212`, `D205` or section rule, whose fixes are safe.
 
     So `__doc__` is deliberately *not* byte-identical to the authored description: on Python 3.11 and 3.12
     it keeps the class-body indentation every hand-written docstring carries, and from 3.13 the compiler
@@ -136,7 +212,7 @@ def class_docstring(description: str, *, extra_line: str | None = None, indent: 
     body = "\n\n".join(parts)
     lines = body.split("\n")
     delimiter = _docstring_delimiter(body)
-    if delimiter is not None:
+    if delimiter is not None and not _verbatim_invites_a_safe_fix(lines=lines):
         # Text holding no escape reads back as written, in a raw string as in a plain one: this is the docstring's value.
         verbatim = _summary_first_value(lines=lines, indent=indent, closing_indent=True)
         if cleandoc(verbatim) == body:

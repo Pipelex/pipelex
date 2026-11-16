@@ -89,6 +89,42 @@ class TestClassDocstring:
         assert class_docstring(description) == expected
         assert _rendered_docstring(description) == description
 
+    @pytest.mark.parametrize(
+        ("description", "expected"),
+        [
+            pytest.param("Summary.\n\n\nBody", '    """Summary.\\n\\n\\n    Body"""', id="blank-line-run-after-the-summary"),
+            pytest.param(
+                "Summary.\n\nArgs:\n    value: the value", '    """Summary.\\n\\n    Args:\\n        value: the value"""', id="section-header"
+            ),
+            pytest.param("Summary.\n\nnotes\n  a note", '    """Summary.\\n\\n    notes\\n      a note"""', id="lowercase-section-name"),
+            pytest.param(
+                "Summary.\nSee Also :\n  another class", '    """Summary.\\n    See Also :\\n      another class"""', id="colon-after-a-space"
+            ),
+            pytest.param(
+                "Summary.\nReturns\n-------\n  nothing", '    """Summary.\\n    Returns\\n    -------\\n      nothing"""', id="numpy-section"
+            ),
+        ],
+    )
+    def test_text_a_safe_docstring_fix_would_rewrite_renders_escaped(self, description: str, expected: str):
+        """`D205` collapses a blank-line run after the summary and the section rules reshape a section header, so such text is escaped."""
+        assert class_docstring(description) == expected
+        assert _rendered_docstring(description) == normalized_docstring_text(description)
+
+    @pytest.mark.parametrize(
+        "description",
+        [
+            pytest.param("Summary.\n\nBody.\n\n\nMore body.", id="blank-line-run-after-the-body"),
+            pytest.param("Summary.\n\nArgs: the arguments come next", id="section-name-starting-a-sentence"),
+            pytest.param("Notes", id="section-name-as-the-summary"),
+        ],
+    )
+    def test_text_no_safe_docstring_fix_rewrites_stays_verbatim(self, description: str):
+        """Only the summary's blank-line run and a line that is a section name alone invite a fix: the text around them stays verbatim."""
+        rendered = class_docstring(description)
+
+        assert "\\" not in rendered
+        assert _rendered_docstring(description) == description
+
     @pytest.mark.parametrize("character", PythonLiteralsTestData.SPLITLINES_ONLY_BREAKS)
     def test_characters_other_than_newline_read_back_unchanged(self, character: str):
         description = f"before{character}after\nsecond line{character}"
