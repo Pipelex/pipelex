@@ -673,6 +673,7 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeBatch.md: "PipeBatch"
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
         - building-methods/pipes/signature-pipes.md: "Signature Pipes"
+        - building-methods/editing-a-users-workbook.md: "Editing a User's Workbook"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
         - building-methods/templating-style.md: "Templating Style"
         Reference:
@@ -894,6 +895,7 @@ nav:
         - Working Memory: building-methods/pipes/working-memory.md
         - Pipe Output: building-methods/pipes/pipe-output.md
         - CSV Input & Output: building-methods/pipes/csv-input-and-output.md
+        - Editing a User's Workbook: building-methods/editing-a-users-workbook.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
         - Understanding Optionality: building-methods/pipes/understanding-optionality.md
         - Pipe Operators:

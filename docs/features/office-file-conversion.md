@@ -7,6 +7,8 @@ description: "How Pipelex converts a Word, Excel or PowerPoint file to PDF when 
 
 A `Document` input may hold an Office file: Word (`.docx`, `.doc`, `.odt`), Excel (`.xlsx`, `.xls`, `.ods`) or PowerPoint (`.pptx`, `.ppt`, `.odp`). Many models read only PDFs, and page views are always drawn from a PDF. When the runtime has a document converter, a step that cannot read an Office file as it is reads the file's PDF instead, which Pipelex makes, keeps and reuses. Without a converter, which is the default, nothing is converted and such a file is refused as it always was.
 
+This page covers the reading direction, where a model reads an Office file. For the editing direction, where a method returns an edited copy of an Excel workbook a user supplies, with rows appended to a Table or empty cells filled in, see [Editing a User's Workbook](../building-methods/editing-a-users-workbook.md).
+
 The converter, its configuration and its trace record belong to the Pipelex runtime. The MTHDS standard only says that a `Document` may be a PDF or an Office file; how a runtime gets a model to read one is the runtime's business.
 
 ## Turning it on
@@ -157,3 +159,4 @@ They convert `.docx`, `.xlsx` and `.pptx` test files and check each PDF's page c
 - [Page views need a PDF](../building-methods/pipes/pipe-operators/PipeExtract.md#page-views-need-a-pdf) - What a `PipeExtract` step asking for page views reads
 - [Storage Provider Plugins](../under-the-hood/storage-provider-plugins.md#object-metadata) - The object metadata a kept PDF carries
 - [Execution Graph Tracing](../under-the-hood/execution-graph-tracing.md#trace-events) - The `file_converted` trace event
+- [Editing a User's Workbook](../building-methods/editing-a-users-workbook.md) - Returning an edited copy of an Excel workbook a user supplies
