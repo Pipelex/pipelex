@@ -45,6 +45,7 @@ refines     = "Document"
 description = "One expense, as a receipt shows it"
 
 [concept.Expense.structure]
+expense_id  = { type = "text", description = "The receipt's number, which identifies the expense", required = true }
 date        = { type = "date", description = "The day the expense was made", required = true }
 description = { type = "text", description = "What the expense was for", required = true }
 amount      = { type = "number", description = "The amount paid", required = true }
@@ -66,7 +67,7 @@ description = "Read the expense a receipt shows"
 inputs      = { receipt = "Document" }
 output      = "Expense"
 prompt      = """
-Read this receipt and record the expense it shows: its date, a short description, the total amount paid and a category (Travel, Lodging, Meals, Supplies or Software).
+Read this receipt and record the expense it shows: the receipt's number as its identifier, its date, a short description, the total amount paid and a category (Travel, Lodging, Meals, Supplies or Software).
 
 @receipt
 """
@@ -84,7 +85,7 @@ table_fill     = "append"
 The `append_expenses` step is the whole edit:
 
 - **`template_input = "register"`** names the input whose file is filled. That input is the template, not data: only the step's other inputs fill it, here `expenses`.
-- **The list `expenses` fills the Table `Expenses`** because a list of records goes into the Table named after it. A column whose header matches no field of the records is not filled, so the `Expense ID` column, which the `Expense` concept has no field for, is left empty in the new rows.
+- **The list `expenses` fills the Table `Expenses`** because a list of records goes into the Table named after it. Each column takes the field its header matches, so `Expense ID` takes `expense_id`; a column whose header matches no field of the records is left empty in the new rows. Giving every appended row its identifier matters here, because the update below finds its rows by that column.
 - **`table_fill = "append"`** keeps every row the Table holds and writes the records after the last row holding data. Empty rows at the end of the Table are filled first, then the Table grows into the empty rows below it. A calculated column, one whose formula Excel filled down the column, keeps calculating on the new rows.
 
 The output is a new `ExpenseRegister`, named after the file the user sent unless the step sets a `filename`.
