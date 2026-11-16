@@ -188,6 +188,7 @@ pipelex/suggested_fix.py | _refuse_wildcard_key | ValueError | validator
 pipelex/system/error_tracking/error_report.py | make_error_report | ValueError | invariant
 pipelex/system/telemetry/otel_constants.py | make_otel_gen_ai_output_type | ValueError | invariant
 pipelex/system/usage_stats/usage_stats_core.py | UsageStatsState.replace_installation_id | OSError | caught
+pipelex/tools/jinja2/exceptions.py | Jinja2TemplateInvalidError.from_problem | ValueError | invariant
 pipelex/tools/jinja2/jinja2_render_budget.py | RenderBudget._refuse | RenderBudgetExceededError | carrier
 pipelex/tools/jinja2/jinja2_render_budget.py | refuse_int_result | RenderBudgetExceededError | carrier
 pipelex/tools/jinja2/jinja2_render_charging.py | charged_filter | TypeError | invariant
