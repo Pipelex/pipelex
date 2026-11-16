@@ -2141,6 +2141,19 @@ For AWS configuration, see [AWS Configuration](../configuration/config-technical
 
 When an image-generation provider returns a URL rather than bytes and `is_fetch_remote_content_enabled` is on, Pipelex downloads the image into storage. That download, like every download of a URL a value carries, goes through the SSRF guard, which refuses private and metadata addresses; see [Network Configuration](../configuration/config-technical/network-config.md).
 
+## Large texts
+
+A `Text`, `Markdown`, `Html` or `JSON` value past a size threshold is meant to live in storage and travel as a reference, as an image does, so that a long extracted page or a large JSON document is not copied into every step, trace event and result that carries it. The threshold is a byte count under `[runtime.storage]`:
+
+```toml
+[runtime.storage]
+inline_text_max_bytes = 4096
+```
+
+A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form will be exercised everywhere once values are stored. The value must not be negative.
+
+The setting is read by the code that stores values as they are produced, which arrives in a later release; until then it changes nothing. How a stored value looks, and what a run does with one today, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).
+
 
 ## Cost Tracking & Reporting
 
@@ -2209,7 +2222,7 @@ Within each tier, the base `pipelex.toml` is followed by an override sequence, m
 
 - `pipelex_local.toml` — git-ignored, for machine-specific values
 - `pipelex_{environment}.toml` — e.g. `pipelex_dev.toml`, `pipelex_prod.toml`. The environment is selected by the `PIPELEX_ENV` environment variable (accepted values: `local`, `dev`, `staging`, `prod`; defaults to `dev`).
-- `pipelex_{run_mode}.toml` — e.g. `pipelex_unit_test.toml`, `pipelex_ci_test.toml`. The run mode is selected by the `RUN_MODE` environment variable (defaults to `normal`).
+- `pipelex_{run_mode}.toml` — e.g. `pipelex_normal.toml`, `pipelex_codex_cloud.toml`. The run mode is selected by the `RUN_MODE` environment variable (defaults to `normal`). Under a test run mode no run-mode file is read from a `.pipelex/` directory: the tests read `tests/pipelex_unit_test.toml` instead.
 - `pipelex_override.toml` — general-purpose overrides
 - `pipelex_temporary_override.toml` — last-resort, highest-precedence overrides within the tier
 
@@ -3749,18 +3762,24 @@ The simplest native concept:
 
 ```python
 class TextContent(StuffContent):
-    text: str
+    text: str | None = None
+    url: str | None = None
+    size: int | None = None
+    mime_type: str | None = None
+    preview: str | None = None
 ```
+
+A text is held in one of two forms. **Inline**, `text` holds it. **Stored**, it lives in the run's storage and `url` points at it, as an image's URL points at its bytes; `size` (its length in bytes), `mime_type` (`text/plain` or `text/markdown`) and `preview` (the first few hundred characters, always the true start of the text) describe it without reading it. A text holds exactly one of `text` and `url`, and the three others only beside `url`. Read it in Python with `require_text()`, which returns the text in either form; see [Stored values](#stored-values) below.
 
 **Use for:** Plain text outputs, summaries, descriptions, etc.
 
 ### MarkdownContent
 
-A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the single field of `TextContent`, which holds the Markdown source:
+A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the fields of `TextContent`, its value holding the Markdown source:
 
 ```python
 class MarkdownContent(TextContent):
-    text: str
+    text: str | None = None  # the Markdown source, or None when it is stored at `url`
 ```
 
 What sets it apart from `Text` is how it is shown: the HTML view, an HTML template and a PDF laid out without a template format a `Markdown` value and show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list there. The terminal's pretty view is the exception: it renders both through Markdown.
@@ -3780,7 +3799,7 @@ Write these site notes up as an inspection report in Markdown, with a heading fo
 """
 ```
 
-Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.text`.
+Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.require_text()`.
 
 **Refinement.** A `Markdown` value is accepted wherever a `Text` is: a pipe whose input is `Text` takes a `Markdown` report, and its prompt receives the source. The reverse does not hold: a `Text` value, or a concept that refines `Text`, is not accepted where a `Markdown` is required, since nothing says it was written as Markdown. To name a specific kind of report, declare a concept with `refines = "Markdown"`.
 
@@ -3791,7 +3810,7 @@ Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.tex
 - In a prompt, and in the plain and Markdown views, it is its source as it is. `pipelex run --save-main-stuff` writes that source verbatim as `main_stuff.md`.
 - Its HTML view converts the Markdown to HTML rather than escaping it, so `main_stuff.html` and the HTML tab of `main_stuff_viewer.html` show the formatted report. Raw HTML inside the source is shown as text rather than passed through, and only URLs with a scheme, such as `https://example.com`, become links, so a file name like `README.md` stays text.
 - The pretty view in the terminal renders it as Markdown.
-- Its JSON form is `{"text": "..."}`, the same as a `Text`.
+- Its JSON form is `{"text": "..."}`, the same as a `Text`, or its stored form, `{"url": "...", "size": ..., "mime_type": "text/markdown", "preview": "..."}`.
 
 **Inside an HTML template**, such as a `PipeCompose` template with `category = "html"`, `{{ report }}` prints a `Markdown` value as its converted HTML with no filter, while a `Text` value keeps being escaped. A `Markdown` field of a structure converts the same way, as in `{{ digest.summary }}`. `{{ report.text }}` is the Markdown source, escaped like any string. The `$report` sigil and `{{ report | format }}` print the converted HTML too, unless the template names another format, as in `{{ report | format("plain") }}`, which prints the Markdown source, escaped. The `@report` sigil wraps the source in tags for a prompt and is not meant for HTML templates.
 
@@ -4036,8 +4055,14 @@ A concept that represents a JSON object. This enables pipes to receive as input 
 
 ```python
 class JSONContent(StuffContent):
-    json_obj: dict[str, Any]
+    json_obj: dict[str, Any] | None = None
+    url: str | None = None
+    size: int | None = None
+    mime_type: str | None = None
+    preview: str | None = None
 ```
+
+Like a text, a JSON object is held inline in `json_obj`, or stored at `url` as its serialized form, with `mime_type` `application/json`; read it in Python with `require_json_obj()`. See [Stored values](#stored-values).
 
 A `JSON` input takes a JSON object as it is, `{"a": 1}`, and its inputs template shows the bare object; `JSON[]` takes a list of objects. `JSON` is a JSON object, not any JSON value, so a string or a number there is refused. The explicit form carries the content form: `{"concept": "JSON", "content": {"json_obj": {"a": 1}}}`.
 
@@ -4049,16 +4074,35 @@ Represents HTML content with styling:
 
 ```python
 class HtmlContent(StuffContent):
-    inner_html: str
+    inner_html: str | None = None
     css_class: str | None = None
+    url: str | None = None
+    size: int | None = None
+    mime_type: str | None = None
+    preview: str | None = None
 ```
 
 **Fields:**
 
-- `inner_html`: The inner HTML of the content
-- `css_class`: The CSS class applied to the wrapping element, optional — content that needs no wrapper simply omits it, and the HTML rendering then returns the raw `inner_html` with no wrapping `div`
+- `inner_html`: The inner HTML of the content, when it is held inline
+- `css_class`: The CSS class applied to the wrapping element, optional — content that needs no wrapper simply omits it, and the HTML rendering then returns the raw `inner_html` with no wrapping `div`. It stays inline in both forms.
+- `url`, `size`, `mime_type` (`text/html`) and `preview`: the stored form, as for a [text](#stored-values)
+
+Read the markup in Python with `require_inner_html()`.
 
 **Use for:** Rendered HTML fragments, styled content blocks, HTML-based reports.
+
+### Stored values
+
+A `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, exactly as an image or a document does, so that a long page, a fetched web page or a large JSON document need not be copied into every step, trace event and result that carries it. The value field is then absent, and the content carries `url`, `size`, `mime_type` and `preview` instead:
+
+```json
+{"url": "pipelex-storage://…/generated/…/text.txt", "size": 48213, "mime_type": "text/plain", "preview": "Page 1. The parties agree…"}
+```
+
+A value holds exactly one of the two forms. In this release Pipelex accepts and keeps the stored form, and can load a stored value under the same read rules as an image, so a run never reads a stored value another run owns; it does not yet store a value past the size threshold by itself, nor load a stored value where a step reads it, so a stored value given to a step that renders it is refused rather than read. Both arrive in later releases. The threshold is `inline_text_max_bytes` under `[runtime.storage]`, 4096 bytes by default, and nothing reads it yet (see [Cloud Storage](../../features/cloud-storage.md#large-texts)).
+
+In Python, `require_text()`, `require_inner_html()` and `require_json_obj()` return the value in either form, once a stored one has been loaded. Code that can read storage loads it with `load_stored_value` (`pipelex.core.stuffs.stored_value_loader`); reading or rendering a stored value that was never loaded raises `StoredValueNotLoadedError` rather than printing nothing.
 
 ### SearchResultContent
 
@@ -6440,7 +6484,7 @@ Each works only if the main_stuff is (or refines) the matching verdict native.
 **`main_stuff_as_markdown`** - Returns `MarkdownContent` object:
 
 ```python
-report = pipe_output.main_stuff_as_markdown.text  # the Markdown source
+report = pipe_output.main_stuff_as_markdown.require_text()  # the Markdown source
 ```
 
 This works only if the main_stuff is (or refines) a `MarkdownContent` concept.
@@ -7829,6 +7873,7 @@ For the common case where the text is freshly produced by an LLM and you want a 
 - [PipeExtract](./PipeExtract.md) — produces text from PDFs and images, a natural upstream step.
 - [Understanding Multiplicity](../understanding-multiplicity.md) — single vs list outputs.
 - [CSV Input & Output](../csv-input-and-output.md) — a CSV file or a workbook given directly as a method's list input, and CSV output.
+- [Editing a User's Workbook](../../editing-a-users-workbook.md) — reading a workbook's rows, then writing an edited copy of it with `PipeDocGen`.
 
 
 ## PipeExtract
@@ -9047,6 +9092,7 @@ When the plugin's engine checks an office template file, validation reports what
 
 ## Related documentation
 
+- [Editing a User's Workbook](../../editing-a-users-workbook.md), a guide to methods that append rows to a user's workbook or fill in its empty cells
 - [PipeCompose](./PipeCompose.md), which renders a template into a `Text` or `Html` output
 - [Native concepts](../../concepts/native-concepts.md), for `Document` and `Markdown`
 - [`pipelex run`](../../../tools/cli/run.md)
@@ -10110,6 +10156,287 @@ Once every signature in the dependency graph is replaced, strict validation succ
 - [Pipe Operators](pipe-operators/index.md) — operators you can swap a signature out for.
 - [Pipe Controllers](pipe-controllers/index.md) — controllers that orchestrate signatures alongside real pipes.
 - [CLI Validate](../../tools/cli/validate.md) — the `--allow-signatures` flag and validation surface.
+
+
+## Editing a User's Workbook
+
+# Editing a User's Workbook
+
+A method can take an Excel workbook a user already keeps, such as an expenses register, and return a copy of it with new rows added to a Table or with the empty cells of some rows filled in. The user's file is never changed: the method returns a new file, named after theirs, and they decide what to do with it.
+
+Two steps do the work, and this guide shows how they fit together:
+
+- a [`PipeDocGen`](pipes/pipe-operators/PipeDocGen.md) step with a `template_input` fills a copy of the workbook the run supplies, either appending records to a Table (`table_fill = "append"`) or writing each record into the row it matches (`table_fill = "update"`);
+- a [`PipeStructure`](pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet) step reads a Table of the same workbook into a list of records, calling no model, so that a method can see which rows have gaps.
+
+The reference pages hold every field and every rule; this page shows the shape of the two methods and the rules an author runs into first.
+
+!!! note "The document generation plugin writes the workbook"
+    An `xlsx` step is printed by the `pipelex-xlsx` engine of the Pipelex document generation plugin, which the hosted Pipelex API runs. A runtime without the plugin refuses a method with such a step when it loads, naming the missing engine (see [Document engines](pipes/pipe-operators/PipeDocGen.md#document-engines)). Reading the workbook with `PipeStructure` needs only Pipelex, with the `tabular` extra when you run it yourself.
+
+## The workbook
+
+Both methods below work on a register whose rows live in an Excel Table named `Expenses`, the named table object Excel creates with Insert > Table. Its columns are `Expense ID`, `Date`, `Description`, `Amount` and `Category`. A column header is matched to a field ignoring case, spaces, dots and underscores, so `Expense ID` is the field `expense_id`.
+
+The workbook comes into the method as a `Document` input. Declaring a concept that refines `Document` says what the file is:
+
+```toml
+[concept.ExpenseRegister]
+description = "A user's expenses workbook, holding an Excel Table named Expenses"
+refines     = "Document"
+```
+
+## Appending rows
+
+The first method reads a batch of receipts with a model and appends one row per receipt to the register's `Expenses` Table:
+
+```toml
+domain      = "expense_append"
+description = "Add the expenses shown on receipts to the user's expenses register"
+main_pipe   = "add_receipts"
+
+[concept.ExpenseRegister]
+description = "A user's expenses workbook, holding an Excel Table named Expenses"
+refines     = "Document"
+
+[concept.Expense]
+description = "One expense, as a receipt shows it"
+
+[concept.Expense.structure]
+expense_id  = { type = "text", description = "The receipt's number, which identifies the expense", required = true }
+date        = { type = "date", description = "The day the expense was made", required = true }
+description = { type = "text", description = "What the expense was for", required = true }
+amount      = { type = "number", description = "The amount paid", required = true }
+category    = { type = "text", description = "The expense category, such as Travel, Meals or Supplies" }
+
+[pipe.add_receipts]
+type        = "PipeSequence"
+description = "Read each receipt into an expense, then append the expenses to the register"
+inputs      = { register = "ExpenseRegister", receipts = "Document[]" }
+output      = "ExpenseRegister"
+steps = [
+    { pipe = "read_receipt", batch_over = "receipts", batch_as = "receipt", result = "expenses" },
+    { pipe = "append_expenses", result = "updated_register" },
+]
+
+[pipe.read_receipt]
+type        = "PipeLLM"
+description = "Read the expense a receipt shows"
+inputs      = { receipt = "Document" }
+output      = "Expense"
+prompt      = """
+Read this receipt and record the expense it shows: the receipt's number as its identifier, its date, a short description, the total amount paid and a category (Travel, Lodging, Meals, Supplies or Software).
+
+@receipt
+"""
+
+[pipe.append_expenses]
+type           = "PipeDocGen"
+description    = "Add the expenses after the rows the register's Expenses Table already holds"
+inputs         = { register = "ExpenseRegister", expenses = "Expense[]" }
+output         = "ExpenseRegister"
+format         = "xlsx"
+template_input = "register"
+table_fill     = "append"
+```
+
+The `append_expenses` step is the whole edit:
+
+- **`template_input = "register"`** names the input whose file is filled. That input is the template, not data: only the step's other inputs fill it, here `expenses`.
+- **The list `expenses` fills the Table `Expenses`** because a list of records goes into the Table named after it. Each column takes the field its header matches, so `Expense ID` takes `expense_id`; a column whose header matches no field of the records is left empty in the new rows. Giving every appended row its identifier matters here, because the update below finds its rows by that column.
+- **`table_fill = "append"`** keeps every row the Table holds and writes the records after the last row holding data. Empty rows at the end of the Table are filled first, then the Table grows into the empty rows below it. A calculated column, one whose formula Excel filled down the column, keeps calculating on the new rows.
+
+The output is a new `ExpenseRegister`, named after the file the user sent unless the step sets a `filename`.
+
+## Filling in the empty cells
+
+The second method fills in the categories the register leaves empty. It reads the Table's rows, keeps those with no category, asks a model for each one's category, and writes the categories back into the rows they belong to:
+
+```toml
+domain      = "expense_update"
+description = "Fill in the categories an expenses register leaves empty"
+main_pipe   = "complete_categories"
+
+[concept.ExpenseRegister]
+description = "A user's expenses workbook, holding an Excel Table named Expenses"
+refines     = "Document"
+
+[concept.ExpenseRow]
+description = "One row of the register's Expenses Table"
+
+[concept.ExpenseRow.structure]
+expense_id  = { type = "text", description = "The expense's identifier", required = true }
+date        = { type = "date", description = "The day the expense was made" }
+description = { type = "text", description = "What the expense was for", required = true }
+amount      = { type = "number", description = "The amount paid" }
+category    = { type = "text", description = "The expense category, empty when not yet filled in" }
+
+[concept.CategoryPick]
+description = "The category chosen for one expense"
+
+[concept.CategoryPick.structure]
+category = { type = "text", description = "Exactly one of: Travel, Lodging, Meals, Supplies, Software", required = true }
+
+[concept.ExpenseCompletion]
+description = "The missing category of one expense, with the identifier of its row"
+
+[concept.ExpenseCompletion.structure]
+expense_id = { type = "text", description = "The expense's identifier, copied from the row read", required = true }
+category   = { type = "text", description = "The category to write into the empty cell", required = true }
+
+[pipe.complete_categories]
+type        = "PipeSequence"
+description = "Read the register's rows, categorize those with no category, and write the categories back"
+inputs      = { register = "ExpenseRegister" }
+output      = "ExpenseRegister"
+steps = [
+    { pipe = "read_rows", result = "rows" },
+    { pipe = "complete_if_missing", batch_over = "rows", batch_as = "row", result = "expenses" },
+    { pipe = "fill_categories", result = "completed_register" },
+]
+
+[pipe.read_rows]
+type        = "PipeStructure"
+description = "Read the rows of the register's Expenses Table"
+inputs      = { register = "ExpenseRegister" }
+output      = "ExpenseRow[]"
+table       = "Expenses"
+
+[pipe.complete_if_missing]
+type                = "PipeCondition"
+description         = "Categorize a row whose category is empty, and skip the others"
+inputs              = { row = "ExpenseRow" }
+output              = "ExpenseCompletion?"
+expression_template = "{% if row.category %}skip{% else %}fill{% endif %}"
+default_outcome     = "continue"
+
+[pipe.complete_if_missing.outcomes]
+fill = "categorize_row"
+skip = "continue"
+
+[pipe.categorize_row]
+type        = "PipeSequence"
+description = "Choose the row's category, then pair it with the row's identifier"
+inputs      = { row = "ExpenseRow" }
+output      = "ExpenseCompletion"
+steps = [
+    { pipe = "pick_category", result = "pick" },
+    { pipe = "build_completion", result = "completion" },
+]
+
+[pipe.pick_category]
+type        = "PipeLLM"
+description = "Choose the expense's category from its description and amount"
+inputs      = { row = "ExpenseRow" }
+output      = "CategoryPick"
+prompt      = """
+Choose the category of this business expense. Answer with exactly one of: Travel, Lodging, Meals, Supplies, Software.
+
+Description: $row.description
+Amount: $row.amount
+"""
+
+[pipe.build_completion]
+type        = "PipeCompose"
+description = "Pair the chosen category with the row's identifier, copied unchanged"
+inputs      = { row = "ExpenseRow", pick = "CategoryPick" }
+output      = "ExpenseCompletion"
+
+[pipe.build_completion.construct]
+expense_id = { from = "row.expense_id" }
+category   = { from = "pick.category" }
+
+[pipe.fill_categories]
+type           = "PipeDocGen"
+description    = "Write each category into the empty cell of the row holding its expense identifier"
+inputs         = { register = "ExpenseRegister", expenses = "ExpenseCompletion[]" }
+output         = "ExpenseRegister"
+format         = "xlsx"
+template_input = "register"
+table_fill     = "update"
+match_on       = ["expense_id"]
+cells          = "fill_empty"
+```
+
+The method's steps, one by one:
+
+1. **`read_rows` reads the Table.** A `PipeStructure` step whose input is a `Document` reads one Table of the workbook into a list of records, one per data row, without calling a model. `table` names the Table, compared ignoring case. The Table's totals row is not read, an empty cell leaves its field empty, and a column the `ExpenseRow` concept has no field for is ignored, so the concept only needs the columns the method uses.
+2. **`complete_if_missing` keeps the rows with a gap.** Batched over the rows, the condition sends a row with no category to `categorize_row` and `continue`s past the others. A `continue` produces no output, and a batch drops the branches that produced none, so `expenses` holds a completion only for the rows that needed one (see [PipeBatch](pipes/pipe-controllers/PipeBatch.md) and [PipeCondition](pipes/pipe-controllers/PipeCondition.md#special-outcomes-continue-and-fail)).
+3. **`categorize_row` asks the model, then copies the key.** The model chooses the category, and a `PipeCompose` step pairs it with the row's `expense_id`, copied from the row read rather than written by the model, so the completion finds its row again.
+4. **`fill_categories` writes the copy.** With `table_fill = "update"`, each record of `expenses` is written into the one row of the `Expenses` Table whose `Expense ID` cell holds its `expense_id`. The key field is never written. `cells = "fill_empty"`, which is also the default, writes only empty cells.
+
+### Matching by row position instead
+
+A sheet with no column that identifies its rows can be matched by position. The `PipeStructure` step records each row's position among the Table's data rows, counted from 1, in the field `row_field` names, the completion carries that position unchanged, and the update step names it with `match_row` in place of `match_on`:
+
+```toml
+[concept.ExpenseRow.structure]
+position    = { type = "integer", description = "The row's position among the Table's data rows", required = true }
+# ... the other fields as above
+
+[concept.ExpenseCompletion.structure]
+position   = { type = "integer", description = "The row's position, copied from the row read", required = true }
+category   = { type = "text", description = "The category to write into the empty cell", required = true }
+
+[pipe.read_rows]
+type        = "PipeStructure"
+description = "Read the rows of the register's Expenses Table"
+inputs      = { register = "ExpenseRegister" }
+output      = "ExpenseRow[]"
+table       = "Expenses"
+row_field   = "position"
+
+[pipe.build_completion.construct]
+position   = { from = "row.position" }
+category   = { from = "pick.category" }
+
+[pipe.fill_categories]
+type           = "PipeDocGen"
+description    = "Write each category into the empty cell of the row at its position"
+inputs         = { register = "ExpenseRegister", expenses = "ExpenseCompletion[]" }
+output         = "ExpenseRegister"
+format         = "xlsx"
+template_input = "register"
+table_fill     = "update"
+match_row      = "position"
+cells          = "fill_empty"
+```
+
+The position must travel through the method unchanged and never be produced by a model. A batch keeps it, since each branch works on one row and copies its position into its result. No column of the Table may match the `row_field`.
+
+## The rules you will meet
+
+These are the rules a method author runs into first. The [`PipeDocGen`](pipes/pipe-operators/PipeDocGen.md#a-template-the-run-supplies) and [`PipeStructure`](pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet) reference pages hold the rest.
+
+### Naming
+
+- **A list input is named after the Table it fills.** The records go into the Table whose name matches the list's name, compared ignoring case, spaces, dots and underscores, so the list `expenses` fills the Table `Expenses`. A list named `expense_records` never reaches a Table named `Expenses`: name the list after the Table, or the Table after the list.
+- **Under `append` or `update`, a list of records that reaches no Table refuses the run.** Adding or updating rows is the step's only purpose, so a run that would return the workbook unchanged is refused instead, as `pipelex.docgen.template_input_unfit`, naming the list and the Tables the workbook holds. A list of documents or images, such as the receipts beside the register, needs no Table.
+- **The workbook is checked when a run supplies it.** `pipelex validate` cannot see a file the run will send, so its verdict carries a `template_check_warning` saying the template is checked later. When a run starts, before any step does, the workbook is checked against the step's inputs, and an error refuses the run as `pipelex.docgen.template_input_unfit`.
+
+### Matching rows under `update`
+
+- **A record finds its row by a key or by its position, exactly one of the two.** `match_on` names the fields whose columns are the Table's key; `match_row` names the field holding the row's position.
+- **Matching is exact, and refuses rather than guesses.** Every record is matched before any cell is written. A key that appears twice in the Table, a record that matches no row, and two records matching the same row each fail the step, and the workbook is not written at all.
+- **A key held only through the reader's lenient conversion is refused.** `PipeStructure` reads a text cell into a number field leniently: `00042`, `+42` and ` 42 ` all read as the integer 42. A record whose key is 42 cannot say which of those cells it came from, so a row holding its key only that way is refused, naming the record and the row, rather than written.
+- **A text key compares as written**, case, spaces and leading zeros included, so the texts `042` and `42` are two keys. A number compares as its value, so `42` and `42.0` are the same key.
+- **Read an identifier into a text field.** When a key column holds identifiers such as `00042`, declare its field as `text`, as `expense_id` is above, so each key keeps the form the workbook writes it in and finds its row exactly.
+
+### What is written, and what is not
+
+- **A null leaves its cell as it was.** In an update, a null means the method produced nothing for that cell, so the cell keeps what it holds.
+- **`cells = "fill_empty"`, the default, writes only empty cells.** A filled cell already holding the record's value is left alone, and one holding a different value is a conflict that fails the step. `cells = "overwrite"` writes every cell a non-null value matches, for corrections.
+- **Formulas and calculated columns are never written.** Under `update`, a formula cell and every cell of a calculated column are left as they are, and a record field matching a calculated column is refused. Under `append`, a calculated column's formula is carried to each new row, so the column keeps calculating.
+- **A totals row is kept under `update`**, since the Table neither grows nor shrinks. Under `append` the Table grows, so a Table with a totals row is refused: put the totals above the Table, beside it or on another sheet, as structured references such as `=SUM(Expenses[Amount])`, which cover every row however many are added.
+- **The user's file is never modified.** The engine fills a copy of the input's file and the step stores it as a new document, named after the input's file unless the step sets a `filename`.
+
+## Related documentation
+
+- [PipeDocGen](pipes/pipe-operators/PipeDocGen.md): every field, [a template the run supplies](pipes/pipe-operators/PipeDocGen.md#a-template-the-run-supplies) and [updating a Table's rows](pipes/pipe-operators/PipeDocGen.md#updating-a-tables-rows)
+- [PipeStructure](pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet): how a spreadsheet's rows, columns and values are read
+- [Understanding Optionality](pipes/understanding-optionality.md): absent results, and how a batch drops them
+- [Office File Conversion](../features/office-file-conversion.md): the reading direction, when a model reads a Word, Excel or PowerPoint file
+- [CSV Input & Output](pipes/csv-input-and-output.md): a spreadsheet given directly as a method's list input
 
 
 ## Optimize Cost & Quality
@@ -12929,7 +13256,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 1. `pipelex_local.toml`
 2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests use `tests/pipelex_unit_test.toml`, the one override file read outside a `.pipelex/` directory)
+3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; the tests use `tests/pipelex_unit_test.toml` instead, under every test run mode, the one override file read outside a `.pipelex/` directory)
 4. `pipelex_override.toml` (recommended to gitignore)
 5. `pipelex_temporary_override.toml` (recommended to gitignore)
 
@@ -12940,7 +13267,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 The configuration is organized into these main sections. The first three mirror the layers of the runtime:
 
-1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), the limits a spreadsheet is read under (`[runtime.table_reading]`, see [PipeStructure › Reading a spreadsheet](../building-methods/pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet)), reporting, tracing, observation, and the plugin denylist
+1. `[runtime]` - process-scoped infrastructure: storage (including `inline_text_max_bytes`, the size past which a text, HTML or JSON value is to be stored rather than kept inline, read by nothing yet, see [Cloud Storage › Large texts](../features/cloud-storage.md#large-texts)), secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), the limits a spreadsheet is read under (`[runtime.table_reading]`, see [PipeStructure › Reading a spreadsheet](../building-methods/pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet)), reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, the limits a method tree is listed under, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
@@ -12968,7 +13295,7 @@ The exact loading sequence is (later wins, per leaf key):
 Notes on the override sequence:
 
 - `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) is selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under unit testing the run-mode overlay is sourced exclusively from `./tests/pipelex_{run_mode}.toml`
+- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under any test run mode (`unit_test`, `ci_test`, `codex_cloud_test`) no run-mode file is read from a `.pipelex/` directory, and `./tests/pipelex_unit_test.toml` is layered on top instead
 - Each subsequent configuration file in this sequence can override settings from the previous ones, and project-level files override the global `~/.pipelex/` layer
 - The two inference documents, `inference/backends.toml` and `inference/routing_profiles.toml`, are not part of this merge. Each has a single personal override file beside it, `backends_override.toml` and `routing_profiles_override.toml`, merged over the resolved base — global tier first, then project tier. See [Personal overrides](config-technical/inference-backend-config.md#personal-overrides)
 
@@ -15567,7 +15894,7 @@ from pipelex.core.stuffs.text_content import TextContent
 async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
     input_data = working_memory.get_stuff("input_name")
     # Process data
-    return TextContent(text=f"Processed: {input_data.content.text}")
+    return TextContent(text=f"Processed: {input_data.content.require_text()}")
 ```
 
 The step then reads `function_name = "funcs.processing.my_custom_function"`. See [PipeFunc](../../building-methods/pipes/pipe-operators/PipeFunc.md) for the rules, and `pipelex fix function-names` to migrate a method still naming its functions by flat names.
@@ -17933,15 +18260,30 @@ The threshold is 88 columns — ruff's own default, chosen because it is the *ti
 
 #### Docstrings
 
-A concept description becomes the generated class's docstring, rendered the way a human writes one: summary on the first line, continuation lines indented to the class body, closing delimiter on its own line. That shape is not cosmetic — it is the only one that `ruff format` and the pydocstyle rules both leave alone. Rendered flat, a multi-line description trips `D207`/`D209` and edge whitespace trips `D210`, all of which ruff fixes automatically, rewriting the bytes.
+A concept description becomes the generated class's docstring. Where the text allows it, the docstring is verbatim and shaped the way a human writes one: summary on the first line, continuation lines indented to the class body, closing delimiter on its own line. That shape is not cosmetic — it is the only one that `ruff format` and the pydocstyle rules both leave alone. Rendered flat, a multi-line description trips `D207`/`D209`, edge whitespace trips `D210`, and a summary moved off the first line trips `D212`, all of which ruff fixes automatically, rewriting the bytes. The delimiter is `"""`, or `'''` for a text holding `"""`, and the docstring is raw when the text holds a backslash.
 
-So `__doc__` carries the class-body indentation, exactly as a hand-written docstring does. What holds exactly is the value you actually read:
+The verbatim form is not always possible, and then the docstring is escaped onto one physical line, every quote and backslash escaped. That happens when:
+
+- the text holds a control character or another character that does not print, or both triple-quote styles;
+- a quote at the edge of the text would make `ruff format` pad it with a space, or a backslash ends a line or stands beside a triple quote;
+- the text holds a shape that a safe fix of the pydocstyle rules rewrites whatever its layout: two or more blank lines right after the summary, which `D205` collapses to one, or a line after the summary that a docstring-section parser reads as a section header — a section name such as `Args`, `Notes`, `Returns` or `See Also` alone on its line, in any case, with or without a colon — which the section rules (`D214`, `D215`, `D405` to `D407`, `D409` to `D413`, `D416`) reshape under one convention or another;
+- the lines after the first share an indentation, as in a text that opens on a blank line and indents its whole body.
+
+The section and blank-line case holds under every pydocstyle convention a consumer may pick, and with none. The test for a section header is wider than ruff's, which also weighs the lines around it, so a text it flags only costs the verbatim rendering, never a rewritten byte.
+
+The last case is about reading the docstring back. `inspect.getdoc` strips the indentation shared by the lines after the first, so a summary-first docstring would lose the relative indentation of such a body. The escaped form then opens with an escaped newline, which leaves `getdoc` no first line to set apart, and the body reads back with its relative indentation. An escaped docstring trips `D301`, but ruff classes that fix as unsafe, so `ruff check --fix` leaves the bytes alone, and on one physical line it trips no `D212`, no `D205` and no section rule.
+
+So `__doc__` is not byte-identical to the authored description. On Python 3.11 and 3.12 it keeps the class-body indentation, exactly as a hand-written docstring does; from Python 3.13 the compiler strips that shared indentation. `inspect.getdoc` reads back the same text on every version, and that is the value that holds exactly:
 
 ```python
-inspect.getdoc(GeneratedClass) == inspect.cleandoc(authored_description)
+inspect.getdoc(GeneratedClass) == inspect.cleandoc(normalized_description)
 ```
 
+where `normalized_description` is the authored description with each line's trailing spaces and tabs removed (`ruff format` strips them inside a docstring) and with `\r\n` and `\r` read as `\n`. No other character breaks a line, and the docstring is never wrapped: it is the model's JSON schema description, so a line break added to it would change the text every consumer reads.
+
 Exact bytes survive wherever they are consumed programmatically rather than read as prose — `Field(description=...)` keeps the description verbatim, and so does the crate.
+
+The runtime structure generator, which builds the class of a concept with a `structure` when a bundle loads, renders class docstrings through the same renderer, under the same contract, and never wraps them either. A field description too long for one line is split into adjacent string literals that concatenate back to the authored text, character for character. Before running the module it generated, the structure generator checks its shape: a header docstring, `from … import` statements, and one undecorated class of the expected name whose body is its docstring followed by annotated fields. A module of any other shape is refused rather than run.
 
 #### TypeScript assumes Prettier's defaults
 
@@ -17965,7 +18307,7 @@ The remaining findings are artifacts of *how* you lint, not of file content. Non
 
 - `INP001` ("implicit namespace package") fires when you point ruff at a bare directory with no `__init__.py`. Add one, or lint the package that contains it.
 - `E501` on a single long string literal, as described above.
-- `D301` ("use `r\"\"\"`") on the rare description that carries both `\"\"\"` and `'''`, or a control character — the only inputs with no verbatim rendering, which therefore have to be escaped. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
+- `D301` ("use `r\"\"\"`") on a description rendered as an escaped docstring, in any of the cases listed under Docstrings above. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
 - Import grouping for the `python-structures` target assumes `pipelex` is a third-party dependency — which it is in your tree. The Pipelex repo itself, where `pipelex` is first-party, is the one place ruff wants the opposite order; no generated artifact is committed there, so the consumer's grouping is the one the emitter targets.
 
 ## Serving the engine over HTTP
@@ -20488,6 +20830,18 @@ StuffArtefact supports bracket notation and iteration:
 
 Bracket access and `get` never resolve to the artefact's own attributes, such as the wrapped `Stuff` or a method. The accessors above and the four metadata fields are what `StuffArtefact` declares as its template surface: the only methods a template may call on it and the only underscore names it may read.
 
+### Stored values are loaded before rendering
+
+A `Text`, `Markdown`, `Html` or `JSON` content may hold a reference to its value in storage instead of the value: `url`, with `size`, `mime_type` and `preview`, in place of `text`, `inner_html` or `json_obj` (`pipelex/core/stuffs/stored_value_content.py`). Rendering never reads storage. Every synchronous render reads the value through the content's `require_text()`, `require_inner_html()` or `require_json_obj()`, which returns the value held inline or loaded earlier, and raises `StoredValueNotLoadedError` for a reference never loaded, so a template never prints an empty string, `None` or a URL where a text belongs. The same holds wherever a template reaches such a content:
+
+- `{{ note }}`, `{{ note | format }}` and the `@note` and `$note` sigils go through the `rendered_*` methods.
+- `{{ note.text }}`, `note["text"]` and `note.get("text")` return the value through `require_value()`, never the `None` the field holds in the stored form. `url`, `size`, `mime_type` and `preview` stay readable as fields.
+- `iter_keys()`, `iter_items()` and `iter_values()` list the fields of the inline form (`text`, or `inner_html` and `css_class`, or `json_obj`), whichever form the content holds.
+- A structure holding such a content renders it through `rendered_value_form()`, the dict its inline form dumps, which `serialize_model` uses in place of the model's fields (`ValueFormRenderable` in `pipelex/tools/typing/pydantic_utils.py`).
+- Below the top level, `{{ report.body.text }}` and `report.body["text"]` read the value the same way: the template sandbox answers a read of a content's value field with `require_value()` (`ValueFieldReadable` in `pipelex/tools/typing/pydantic_utils.py`, read in `pipelex/tools/jinja2/jinja2_sandbox.py`), and so does a binding step whose path ends on it, such as `page.inner_html` over a stored `Html` (`pipelex/pipe_controllers/binding/binding_value.py`).
+
+Loading is the caller's job, done before rendering in code that may perform IO: `load_stored_value(content, read_scope=…, position=…, storage_provider=…)` in `pipelex/core/stuffs/stored_value_loader.py` reads the value through `load_text_from_any_uri` (`pipelex/tools/uri/uri_text.py`), which checks the run's read scope exactly as an image read does, and keeps it in a private attribute of the content. That attribute is never serialized, so a loaded content still dumps as its reference. Workflow code never loads, since it performs no IO.
+
 ---
 
 ## ImageRenderable Protocol
@@ -20686,6 +21040,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | `pipelex/core/stuffs/image_content.py` | Self-registering image token |
 | `pipelex/core/stuffs/list_content.py` | List iteration for images |
 | `pipelex/core/stuffs/text_and_images_content.py` | Text + images rendering |
+| `pipelex/core/stuffs/stored_value_content.py` | The inline and stored forms of `Text`, `Html` and `JSON`, and their synchronous readers |
+| `pipelex/core/stuffs/stored_value_loader.py` | `load_stored_value`, the read of a stored value under the run's read scope |
 
 ---
 
@@ -24947,7 +25303,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.103.1` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.104.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -25589,7 +25945,7 @@ Load order:
 6. **Programmatic `extra_overrides`** passed into `ConfigLoader.load_config()` (if any).
 
 !!! note "Unit-test special case"
-    When `runtime_manager.is_unit_testing` is true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from `./tests/pipelex_{run_mode}.toml` (e.g. `tests/pipelex_unit_test.toml`). Global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides.
+    When `runtime_manager.is_unit_testing` is true, under any test run mode (`unit_test` on a developer's machine, `ci_test` on CI, `codex_cloud_test` in Codex Cloud), global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides, and `./tests/pipelex_unit_test.toml` is layered on top instead. It is the same file under every test run mode, so a setting the tests depend on, such as `[runtime.storage] inline_text_max_bytes = 0`, holds on CI exactly as it does locally.
 
 ### The inference documents
 
@@ -27444,7 +27800,7 @@ A **surface** is one artifact family with one schema version and one ledger. The
 | `telemetry-config` | — | `telemetry.toml` | `telemetry_*.toml` | `TelemetryConfig` | Model defaults |
 | `inference-backend` | `inference/backends/` | — | `*.toml` | `InferenceModelSpecFileNode`, one root table at a time | Copied document (the kit's `inference/backends/portkey.toml`) |
 
-Paths are relative to a configuration directory, and every surface spans exactly two of them: the global `~/.pipelex/` and the project's `.pipelex/`. `pipelex migrate` walks both, and only those. Two paths that look like configuration are outside the walk by design: the unit-testing tier `./tests/pipelex_{run_mode}.toml`, and a directory an embedder hands `Pipelex.make(config_dir=…)` that is neither of the two. Boot tolerance and the error-path diagnosis still read such a directory (see [Boot tolerance](#boot-tolerance)), but its files are the embedder's to bring up to date: `pipelex migrate` has no way to be pointed at them, and does not pretend otherwise.
+Paths are relative to a configuration directory, and every surface spans exactly two of them: the global `~/.pipelex/` and the project's `.pipelex/`. `pipelex migrate` walks both, and only those. Two paths that look like configuration are outside the walk by design: the unit-testing tier `./tests/pipelex_unit_test.toml`, and a directory an embedder hands `Pipelex.make(config_dir=…)` that is neither of the two. Boot tolerance and the error-path diagnosis still read such a directory (see [Boot tolerance](#boot-tolerance)), but its files are the embedder's to bring up to date: `pipelex migrate` has no way to be pointed at them, and does not pretend otherwise.
 
 A surface's **directory** is where its files sit *within* a configuration directory. Most surfaces have none and live directly in it; a surface may instead own a subdirectory, and then it owns that subdirectory one level deep and to the exclusion of every other surface. A subdirectory no surface owns is never walked at all.
 
@@ -27939,7 +28295,7 @@ Two commands run a migration, and they are the same run with two audiences.
 | `--dry-run` | plan and stop | plan and stop (the default, said explicitly) |
 | Answer | Rich output | JSON, or Markdown with `--format markdown` |
 
-**Both walk the global `~/.pipelex/` and the project `.pipelex/`, and nothing else.** An embedder's `config_dir=` outside those two and this repository's own `tests/pipelex_{run_mode}.toml` are outside the walk: the first is the embedder's to update, the second is not a user's configuration at all, and migrating a directory nobody asked about is how a tool earns a reputation for touching things. A directory that does not exist is skipped, and a project rooted at the home directory is walked once rather than twice.
+**Both walk the global `~/.pipelex/` and the project `.pipelex/`, and nothing else.** An embedder's `config_dir=` outside those two and this repository's own `tests/pipelex_unit_test.toml` are outside the walk: the first is the embedder's to update, the second is not a user's configuration at all, and migrating a directory nobody asked about is how a tool earns a reputation for touching things. A directory that does not exist is skipped, and a project rooted at the home directory is walked once rather than twice.
 
 **The walk is each surface's own directory, one level deep.** Most surfaces live directly in a configuration directory and their tier files sit beside their base file. A surface may instead own a subdirectory — `inference/backends/` — and then that subdirectory is walked the same way, one level, for that surface alone. A subdirectory no surface owns, such as `inference/deck/`, is never entered at all, and no walk goes deeper than the directory a surface names.
 
@@ -27973,7 +28329,7 @@ The rules this encodes:
 - **The retry never becomes the failure.** Anything that goes wrong inside it — a ledger that will not load, a file that will not parse — makes it decline, and the error the *configuration* produced is what the user sees. Their error names the key to fix; ours would name our packaging. A file that cannot be re-read abandons the whole retry rather than being skipped, because skipping it would drop a layer from the merge and a re-validation that then succeeded would boot on a configuration the user does not have.
 - **The main configuration's warning waits for the logger.** That configuration is what configures logging, so when its retry succeeds there is no logger yet — the loader parks the warning (`config_manager.take_stale_configuration_warning()`) and the boot emits it right after `log.configure`. The telemetry and service loaders run after that point and warn directly. The warning is the same either way; only *when* it is said moves.
 - **The inference backend loader parks its warning too, and for a different reason: a caller, not boot order.** By the time backends load, logging has been configured for a while. What that loader has instead is `pipelex doctor`, which probes the backend files by loading the whole library **once per backend** — so a loader that logged for itself would repeat one stale directory's warning a dozen times in one report. It hands the warning over instead (`take_stale_configuration_warning()`), and the caller that owes the user a copy takes it: the models-manager setup emits it exactly once per boot, the doctor's per-backend probe simply never asks, and no abstract interface widens to carry it. One warning per load, not one per backend probe.
-- **The warning names `pipelex migrate` only for a file the command would reach.** The retry replays whatever the loader merged, and a loader pointed at a directory of its own — an embedder's `config_dir=`, or this repository's `tests/pipelex_{run_mode}.toml` — merges files [outside the walk](#the-commands). For those the warning says the file is the caller's to update where it lives, and does not name a command that would then report nothing to do; a load that spans both gets both remedies, each on the lines of its own files. Same rule as [the remedy on a validation error](#every-surface-reports-it-the-same-way-and-none-of-them-says-start-over): *a remedy is named only where it would write*. The walk is `config_manager.existing_config_dirs`, which is also where `config_directories_to_migrate` reads it — one derivation, read from both ends, so a boot cannot promise what the command declines. Reach is per *surface*, not per path: the file must sit in the directory **its own surface** owns under one of those roots, so a `telemetry.toml` dropped into `inference/backends/` is out of reach exactly as it was before any surface owned a subdirectory.
+- **The warning names `pipelex migrate` only for a file the command would reach.** The retry replays whatever the loader merged, and a loader pointed at a directory of its own — an embedder's `config_dir=`, or this repository's `tests/pipelex_unit_test.toml` — merges files [outside the walk](#the-commands). For those the warning says the file is the caller's to update where it lives, and does not name a command that would then report nothing to do; a load that spans both gets both remedies, each on the lines of its own files. Same rule as [the remedy on a validation error](#every-surface-reports-it-the-same-way-and-none-of-them-says-start-over): *a remedy is named only where it would write*. The walk is `config_manager.existing_config_dirs`, which is also where `config_directories_to_migrate` reads it — one derivation, read from both ends, so a boot cannot promise what the command declines. Reach is per *surface*, not per path: the file must sit in the directory **its own surface** owns under one of those roots, so a `telemetry.toml` dropped into `inference/backends/` is out of reach exactly as it was before any surface owned a subdirectory.
 - **The warning is a line per stale file.** Each line is the same fixed message, `A configuration file is out of date and was migrated in memory only`, with the file's remedy, `pipelex migrate` or an edit where the file lives, as its advice in `user_action`, the file in `file.path`, the titles of the ledger steps the replay carried in `migration_steps` and whether one of them is blocked in `has_blocked_steps`. The message follows the [log-call conventions](tools/logging.md#log-call-conventions): the files are values, so they ride fields rather than the text, and a list of paths in one field would be cut short on the console, which writes each field on one line at a fixed width. Everything on the line but the path is ledger text; nothing read from the user's file reaches it.
 - **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never reads a ledger, never re-parses a document, and never even imports the migration engine. (Not "never loads tomlkit": the ordinary configuration read has always imported it. What a healthy boot avoids is the second, DOM-level read.) Replay neutrality is what makes the retry free when it does run.
 - **One shared helper**, called by each configuration-surface loader — and that helper is also where `[meta] schema_version` is stripped. The strip belongs there and **not** in the generic TOML reader, which also reads `.mthds` files, backend definitions and the kit index, none of which reserve that key.
