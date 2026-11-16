@@ -22,6 +22,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.kernel.exceptions import PromptContentError
 from pipelex.kernel.img_gen_ops import build_img_gen_job_params, resolve_img_gen_setting, run_img_gen
+from pipelex.kernel.stored_value_ops import load_stored_values_read_from_memory
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError, PipeImgGenRunError
@@ -176,6 +177,14 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         model_spec = get_model_deck().get_optional_inference_model(model_handle=img_gen_setting.model, model_type=ModelType.IMG_GEN)
         max_prompt_images = model_spec.max_prompt_images if model_spec else None
 
+        # The prompts render here, which on a host runtime is workflow code: the stored values they read are loaded
+        # through a leaf first, and a step whose prompts read only inline values dispatches nothing.
+        await load_stored_values_read_from_memory(
+            memory=working_memory,
+            read_paths=self.img_gen_prompt_blueprint.template_read_paths,
+            job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
+        )
         try:
             img_gen_prompt = await self.img_gen_prompt_blueprint.make_img_gen_prompt(
                 context_provider=working_memory,

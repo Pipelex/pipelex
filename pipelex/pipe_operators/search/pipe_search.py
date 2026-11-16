@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from pydantic import PrivateAttr
 from typing_extensions import override
 
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
@@ -10,6 +11,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.kernel.search_ops import resolve_search_setting, run_search
+from pipelex.kernel.stored_value_ops import load_stored_values_read_from_memory
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -37,6 +39,21 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     include_domains: list[str] | None = None
     exclude_domains: list[str] | None = None
     is_structured_output: bool
+
+    # The parsed read paths, kept in a private attribute: never serialized, so a pipe carried across a process boundary
+    # (kajson encodes a model from its `__dict__`) holds no cache, and the receiving process parses them again.
+    _prompt_read_paths: frozenset[str] | None = PrivateAttr(default=None)
+
+    @property
+    def prompt_read_paths(self) -> frozenset[str]:
+        """The dotted paths through which the query template reads its inputs, parsed once per instance.
+
+        A step loads the stored values these paths read before it renders the query
+        (`load_stored_values_read_from_memory`), since it renders it where it runs.
+        """
+        if self._prompt_read_paths is None:
+            self._prompt_read_paths = frozenset(self.prompt_blueprint.read_paths())
+        return self._prompt_read_paths
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -100,6 +117,14 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         if self.is_structured_output:
             output_structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
 
+        # The query renders here, which on a host runtime is workflow code: the stored values it reads are loaded through
+        # a leaf first, and a query reading only inline values dispatches nothing.
+        await load_stored_values_read_from_memory(
+            memory=working_memory,
+            read_paths=self.prompt_read_paths,
+            job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
+        )
         with locating_template_refusal(template_field="prompt"):
             search_result = await run_search(
                 memory=working_memory,

@@ -1,7 +1,7 @@
 from typing import Any, Literal, Self
 
 from mthds.protocol.problem.registry import CoreCode
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.judgment.judgment_models import (
@@ -33,6 +33,7 @@ from pipelex.kernel.judgment_ops import (
 )
 from pipelex.kernel.prompt_assembly import UserPromptContent
 from pipelex.kernel.prompt_references import DocumentReference, ImageReference
+from pipelex.kernel.stored_value_ops import load_stored_values_read_from_memory
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_controllers.binding.binding_concept_resolvers import LibraryConceptWalkResolver, library_concept_key
 from pipelex.pipe_controllers.binding.binding_derivation import BindingValueKind, ConceptShape, WalkableField
@@ -141,6 +142,10 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
     question: PipeJudgeQuestion | None = None
     questions: dict[str, PipeJudgeQuestion] | None = None
 
+    # The parsed read paths, kept in a private attribute: never serialized, so a pipe carried across a process boundary
+    # (kajson encodes a model from its `__dict__`) holds no cache, and the receiving process parses them again.
+    _template_read_paths: frozenset[str] | None = PrivateAttr(default=None)
+
     @model_validator(mode="after")
     def _asks_one_question_or_several(self) -> Self:
         if self.question is not None and self.questions is not None:
@@ -159,6 +164,20 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         if self.question is not None:
             return [("question", self.question)]
         return []
+
+    @property
+    def template_read_paths(self) -> frozenset[str]:
+        """The dotted paths through which the evidence and every question read their inputs, parsed once per instance.
+
+        A step loads the stored values these paths read before it renders the evidence and the questions
+        (`load_stored_values_read_from_memory`), since it renders them where it runs.
+        """
+        if self._template_read_paths is None:
+            read_paths: set[str] = set(self.prompt_content.template.read_paths())
+            for _, question in self.labelled_questions:
+                read_paths.update(question.template_blueprint.read_paths())
+            self._template_read_paths = frozenset(read_paths)
+        return self._template_read_paths
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -402,6 +421,14 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         # No authored style on this operator: its prompt and question templates take the runtime default,
         # the same one an LLM pipe that declares nothing gets.
         templating_style = resolve_templating_style(authored=None)
+        # The evidence and the questions render in the kernel's judgment op, here, which on a host runtime is workflow code:
+        # the stored values they read are loaded through a leaf first, and templates reading only inline values dispatch nothing.
+        await load_stored_values_read_from_memory(
+            memory=working_memory,
+            read_paths=self.template_read_paths,
+            job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
+        )
         execution_data_dict: dict[str, Any]
         result_memory: WorkingMemory
         if self.questions is not None:

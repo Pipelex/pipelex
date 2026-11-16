@@ -1,0 +1,16 @@
+domain      = "stored_value_readers"
+description = "Concepts for the operators that render templates over values which may live in storage"
+
+[concept.PagesDigest]
+description = "A digest of pages, composed field by field"
+
+[concept.PagesDigest.structure]
+heading = { type = "text", description = "The digest's heading", required = true }
+body    = { type = "text", description = "The digest's body", required = true }
+
+[concept.PagesVerdicts]
+description = "The verdicts of several questions about pages"
+
+[concept.PagesVerdicts.structure]
+is_long  = { type = "concept", concept_ref = "YesNo", description = "Whether the pages are long", required = true }
+is_about = { type = "concept", concept_ref = "YesNo", description = "Whether the pages are about the subject", required = true }
