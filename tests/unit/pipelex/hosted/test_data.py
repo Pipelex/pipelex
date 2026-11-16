@@ -1,5 +1,6 @@
 """Shared data for the unit tests of `pipelex/hosted/`: a captured pipe-io descriptor and the problem documents of hosted refusals."""
 
+import base64
 import json
 from typing import Any, ClassVar
 
@@ -170,3 +171,44 @@ class HostedPipeIoRefusals:
         '"change_input", "detail": "Send the field \'extra\' in a form this runtime accepts, then send the request again."}, '
         '"params": {"field": "extra", "reason": "hosted_only_extension"}}'
     )
+
+
+class HostedStoredTexts:
+    """A run's long Text output as the hosted API answers it: a stored text's reference, `{url, size, mime_type, preview}`.
+
+    `LOADABLE_REFERENCE` carries the text as a `data:` URL, which pipelex-sdk decodes without a request; `FOREIGN_REFERENCE`
+    names a host the method chose, which pipelex-sdk refuses to fetch (`unsupported_url`), so its load fails without a request.
+    """
+
+    RUN_ID: ClassVar[str] = "run_stored"
+    LONG_TEXT: ClassVar[str] = "# A long report\n\nIt travelled as a stored text, not inline."
+    LOADABLE_REFERENCE: ClassVar[dict[str, Any]] = {
+        "url": "data:text/plain;base64," + base64.b64encode(LONG_TEXT.encode("utf-8")).decode("ascii"),
+        "size": len(LONG_TEXT.encode("utf-8")),
+        "mime_type": "text/plain",
+        "preview": "# A long report",
+    }
+    FOREIGN_URL: ClassVar[str] = "https://elsewhere.test/report.txt"
+    FOREIGN_REFERENCE: ClassVar[dict[str, Any]] = {
+        "url": FOREIGN_URL,
+        "size": 4096,
+        "mime_type": "text/plain",
+        "preview": "# A long report",
+    }
+
+    LOADABLE_RESULTS: ClassVar[dict[str, Any]] = {
+        "pipeline_run_id": RUN_ID,
+        "main_stuff": LOADABLE_REFERENCE,
+        "working_memory": {
+            "root": {"main_stuff": {"concept": "native.Text", "content": LOADABLE_REFERENCE, "stuff_code": "abc", "stuff_name": "main_stuff"}},
+            "aliases": {},
+        },
+    }
+    FOREIGN_RESULTS: ClassVar[dict[str, Any]] = {
+        "pipeline_run_id": RUN_ID,
+        "main_stuff": FOREIGN_REFERENCE,
+        "working_memory": {
+            "root": {"main_stuff": {"concept": "native.Text", "content": FOREIGN_REFERENCE, "stuff_code": "abc", "stuff_name": "main_stuff"}},
+            "aliases": {},
+        },
+    }

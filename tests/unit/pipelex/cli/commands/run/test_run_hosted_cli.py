@@ -14,10 +14,12 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from mthds.protocol.models import VersionInfo
 from mthds.protocol.problem.models import Problem, ProblemItem
+from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, MissingMainStuffError, RunFailedError, RunTimeoutError, run_failed_problem
 from pipelex_sdk.problem_items import read_problem_items
-from pipelex_sdk.runs import RunResults, RunStatus
+from pipelex_sdk.runs import PipelexRunResultStart, RunResults, RunStatus
 from pydantic import ValidationError
 from rich.console import Console
 from typer.testing import CliRunner
@@ -34,7 +36,7 @@ from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY
 from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems
-from tests.unit.pipelex.hosted.test_data import HostedRefusals
+from tests.unit.pipelex.hosted.test_data import HostedRefusals, HostedStoredTexts, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -110,6 +112,14 @@ def _hosted_request(*, run_hosted: AsyncMock) -> HostedRunRequest:
     request = run_hosted.await_args.kwargs["request"]
     assert isinstance(request, HostedRunRequest)
     return request
+
+
+def _hosted_api_answering(mocker: MockerFixture, *, results: dict[str, Any]) -> None:
+    """The real client, `run_hosted` included, over a hosted API that acknowledges the start and answers these results."""
+    mocker.patch.object(PipelexAPIClient, "version", new=mocker.AsyncMock(return_value=VersionInfo.model_validate_json(HostedVersions.HOSTED)))
+    started = PipelexRunResultStart(pipeline_run_id=HostedStoredTexts.RUN_ID)
+    mocker.patch.object(PipelexAPIClient, "start", new=mocker.AsyncMock(return_value=started))
+    mocker.patch.object(PipelexAPIClient, "wait_for_result", new=mocker.AsyncMock(return_value=RunResults.model_validate(results)))
 
 
 class TestRunHostedCli:
@@ -320,6 +330,44 @@ class TestRunHostedCli:
         run_bundle_cmd(path=str(bundle_dir), hosted=True, output_dir=str(output_dir), no_pretty_print=True)
 
         assert (output_dir / "summarize_output_01" / "main_stuff.md").read_text(encoding="utf-8") == REPORT_TEXT
+
+    def test_a_stored_long_text_output_is_shown_and_saved_as_its_text(self, mocker: MockerFixture, bundle_dir: Path, tmp_path: Path) -> None:
+        """A long Text output the hosted API answers as a stored text's reference is saved as its text, never as the reference."""
+        _hosted_api_answering(mocker, results=HostedStoredTexts.LOADABLE_RESULTS)
+        output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=output, width=250))
+        output_dir = tmp_path / "results"
+
+        run_bundle_cmd(path=str(bundle_dir), hosted=True, output_dir=str(output_dir), no_pretty_print=True)
+
+        run_folder = output_dir / "summarize_output_01"
+        assert (run_folder / "main_stuff.md").read_text(encoding="utf-8") == HostedStoredTexts.LONG_TEXT
+        assert json.loads((run_folder / "main_stuff.json").read_text(encoding="utf-8")) == {"text": HostedStoredTexts.LONG_TEXT}
+        assert "Hosted run completed successfully" in output.getvalue()
+
+    def test_a_stored_text_that_cannot_be_loaded_is_saved_as_its_reference_and_reported(
+        self, mocker: MockerFixture, bundle_dir: Path, tmp_path: Path
+    ) -> None:
+        """The run completed: its output is saved as the reference the hosted API answered, and stderr says which text did not load and why."""
+        _hosted_api_answering(mocker, results=HostedStoredTexts.FOREIGN_RESULTS)
+        output = io.StringIO()
+        failure_output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=output, width=250))
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_error_console", return_value=Console(file=failure_output, width=250))
+        output_dir = tmp_path / "results"
+
+        run_bundle_cmd(path=str(bundle_dir), hosted=True, output_dir=str(output_dir), no_pretty_print=True)
+
+        run_folder = output_dir / "summarize_output_01"
+        assert json.loads((run_folder / "main_stuff.json").read_text(encoding="utf-8")) == HostedStoredTexts.FOREIGN_REFERENCE
+        assert not (run_folder / "main_stuff.md").exists()
+        reported = failure_output.getvalue()
+        assert "A stored text of the run's output could not be loaded" in reported
+        assert "unsupported_url" in reported
+        assert HostedStoredTexts.FOREIGN_URL in reported
+        printed = output.getvalue()
+        assert "Hosted run completed, but a stored text of its output was not loaded" in printed
+        assert "Hosted run completed successfully" not in printed
 
     def test_an_unexpected_failure_exits_with_a_failure_line(self, mocker: MockerFixture, bundle_dir: Path) -> None:
         """A failure no hosted arm names, such as a results body that drifted, is a failure line and exit 1, not a traceback."""
