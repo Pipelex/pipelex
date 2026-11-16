@@ -14,20 +14,35 @@ the hosted API acknowledges the start: the caller is told it at once, and a fail
 run, which may still be going and is paid for, instead of reading as a network failure before any run. A connection
 lost after the request that runs the method was sent is not read as a network failure either, since the hosted API may
 have created the run before it.
+
+A long `Text`, `Markdown`, `Html` or `JSON` value of the run's main output travels as a stored text's reference,
+`{url, size, mime_type, preview}`. The results are read in that wire shape, then each stored text is loaded into its
+inline form (`{text}`, `{inner_html}`, `{json_obj}`) through pipelex-sdk's `load_stored_texts`, on both routes. The run
+has completed by then, so a text that cannot be loaded costs it nothing: the outcome keeps the wire shape and names the
+failure as its `stored_text_error`.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Protocol, Self
+from typing import Any, NamedTuple, Protocol, Self
 
 import httpx
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.registry import RetryVerdict
+from pipelex_sdk.artifacts import load_stored_texts
 from pipelex_sdk.client import PipelexAPIClient
-from pipelex_sdk.errors import ApiUnreachableError, MissingMainStuffError, RunFailedError, RunLifecycleUnavailableError, RunTimeoutError
+from pipelex_sdk.errors import (
+    ApiUnreachableError,
+    MissingMainStuffError,
+    RunFailedError,
+    RunLifecycleUnavailableError,
+    RunTimeoutError,
+    StoredTextLoadError,
+)
 from pipelex_sdk.execute_result import results_from_execute
 from pipelex_sdk.runs import RunResults
 from pipelex_sdk.upload import UploadRecord
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from pipelex.hosted.exceptions import HostedRunOutcomeUnknownError, HostedRunPollingError
 from pipelex.hosted.hosted_inputs import prepare_hosted_inputs
@@ -74,15 +89,28 @@ class HostedRunRequest(BaseModel):
         return self
 
 
-class HostedRunOutcome(BaseModel):
-    """A completed hosted run: its results, the files uploaded for it, and the qualified pipe its inputs were read for."""
+class HostedRunOutcome(NamedTuple):
+    """A completed hosted run: its results, the files uploaded for it, and the qualified pipe its inputs were read for.
 
-    model_config = ConfigDict(frozen=True)
+    `results.main_stuff` holds every stored text of the main output loaded into its inline form, unless one could not
+    be loaded: `stored_text_error` then names it, where it sits and why, and `results` is the run's answer as the hosted
+    API gave it, every stored text still its reference. A record handed from `run_hosted` to the command that called
+    it, never serialized, so it holds the SDK's error as it was raised.
+    """
 
     results: RunResults
-    uploads: list[UploadRecord] = Field(default_factory=list[UploadRecord])
+    uploads: Sequence[UploadRecord] = ()
     #: The qualified ref (`domain.pipe_code`) of the pipe that ran, when the inputs' preparation read it; `None` otherwise.
     pipe_ref: str | None = None
+    #: The stored text of the main output that could not be loaded, `None` when every one was, or when there was none.
+    stored_text_error: StoredTextLoadError | None = None
+
+
+class _LoadedResults(NamedTuple):
+    """A completed run's results with their stored texts loaded, or as answered with the load's failure beside them."""
+
+    results: RunResults
+    stored_text_error: StoredTextLoadError | None
 
 
 async def _serves_run_lifecycle(*, client: PipelexAPIClient) -> bool:
@@ -165,7 +193,8 @@ async def _follow(*, client: PipelexAPIClient, run_id: str) -> RunResults:
     does not parse, is raised as a `HostedRunPollingError` naming the run, which may still be going.
     """
     try:
-        return await client.wait_for_result(run_id)
+        # Read as answered: the stored texts are loaded once the run is known to have completed (`_load_stored_texts`).
+        return await client.wait_for_result(run_id, load_stored_texts=False)
     except (RunFailedError, RunTimeoutError, MissingMainStuffError):
         raise
     except (PipelineRequestError, httpx.HTTPError, ValueError) as exc:
@@ -174,6 +203,21 @@ async def _follow(*, client: PipelexAPIClient, run_id: str) -> RunResults:
         # failure met after the start was acknowledged loses the id of a run that may still be going.
         msg = f"The run {run_id} started on the hosted API, but following it to its result failed: {exc}"
         raise HostedRunPollingError(msg, pipeline_run_id=run_id) from exc
+
+
+async def _load_stored_texts(*, client: PipelexAPIClient, results: RunResults) -> _LoadedResults:
+    """Load the stored texts of a completed run's main output, or keep the results as answered when one cannot be loaded.
+
+    pipelex-sdk tells a stored text from a file by the concept the run's working memory names, resolves a
+    `pipelex-storage://` reference through the platform and decodes a `data:` URL; it refuses a text under any other
+    URL without fetching it, and raises `StoredTextLoadError` for every text it cannot load, a failure of the resolve
+    route as a whole included. The run has completed, so that failure is not raised: it is handed back beside the
+    results as answered, for the caller to report.
+    """
+    try:
+        return _LoadedResults(results=await load_stored_texts(client, results), stored_text_error=None)
+    except StoredTextLoadError as exc:
+        return _LoadedResults(results=results, stored_text_error=exc)
 
 
 async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_started: RunStartedCallback | None = None) -> HostedRunOutcome:
@@ -188,7 +232,9 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_
 
     Returns:
         The outcome, its `results` read the same way whatever the source: `results.main_stuff` is the main output's
-        content, `results.working_memory` the whole working memory, `results.pipeline_run_id` the run's id.
+        content, every stored text loaded into its inline form, `results.working_memory` the whole working memory, as
+        answered, `results.pipeline_run_id` the run's id. A stored text that could not be loaded is the outcome's
+        `stored_text_error`, `results` then keeping each one as its reference.
 
     Raises:
         HostedLocalFileUploadUnavailableError: If the inputs name a local file and the method calls another one by its
@@ -226,4 +272,5 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_
         if on_started is not None:
             on_started(pipeline_run_id=run_id_or_results)
         results = await _follow(client=client, run_id=run_id_or_results)
-    return HostedRunOutcome(results=results, uploads=prepared.uploads, pipe_ref=prepared.pipe_ref)
+    loaded = await _load_stored_texts(client=client, results=results)
+    return HostedRunOutcome(results=loaded.results, uploads=prepared.uploads, pipe_ref=prepared.pipe_ref, stored_text_error=loaded.stored_text_error)

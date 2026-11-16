@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Requires `pipelex-sdk` 0.69.0 (Breaking)**: the exact pin moves from `pipelex-sdk==0.68.0` to `pipelex-sdk==0.69.0`, which still pins `mthds==0.28.0`, so a project that also pins `pipelex-sdk` moves with it. In that release `get_run_result`, `wait_for_result` and `start_and_wait` load every stored text of `main_stuff` into its inline form by default and raise `StoredTextLoadError` for one they cannot load, `load_stored_texts=False` returning the references, and `download_artifacts` saves a stored text as a text file.
+
+### Fixed
+
+- **A hosted run shows and saves a long text output as its text**: `pipelex run --hosted` and `pipelex-agent run --runner hosted` load each stored `Text`, `Markdown`, `Html` or `JSON` value of the main output through pipelex-sdk before they print or save it, so `main_stuff.json` holds the value and `main_stuff.md` the text of a Text output, where they showed and saved the reference and wrote no `main_stuff.md`. A text that cannot be loaded never fails a run that completed: the output is shown and saved with its reference, and `pipelex run` reports on stderr which text it was, where it is stored and why, then exits 0, while `pipelex-agent run --runner hosted` exits 0 with a `warnings` item of type `stored_text_not_loaded` in its `--with-memory` envelope and a `## Warnings` section in its Markdown, naming the text's path, the reason, its problem's code and the run to read again. `run_hosted` in `pipelex.hosted.hosted_run` loads them on both the polled and the blocking route, and its `HostedRunOutcome`, now a named tuple rather than a pydantic model, names a text it could not load as `stored_text_error`.
+
 ## [v0.106.0] - 2026-11-16
 
 ### Added

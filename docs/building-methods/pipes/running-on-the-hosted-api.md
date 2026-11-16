@@ -35,7 +35,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-`results.main_stuff` is the main output's content, as JSON. `results.working_memory` holds every stuff of the run, each naming its concept by ref, and `results.graph_spec` the run's execution graph.
+`results.main_stuff` is the main output's content, as JSON. A `Text`, `Markdown`, `Html` or `JSON` value long enough to be [stored](../../features/cloud-storage.md#large-texts) travels as its reference, `{url, size, mime_type, preview}`, and the client loads it into its inline form (`{text}`, `{inner_html}`, `{json_obj}`) before it hands the results back; pass `load_stored_texts=False` to read the references instead. `results.working_memory` holds every stuff of the run, each naming its concept by ref, and `results.graph_spec` the run's execution graph.
 
 To run your own method, send its tree and name the pipe, or leave `pipe_code` out to run the method's entry pipe:
 
@@ -83,6 +83,7 @@ A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subcl
 - `RunFailedError` is a run that started and failed. Its problem is `run.failed`, naming the run and its terminal status, and `run_error` is the run's own problem, why it did not succeed, under its own code, with its own retry verdict and next step, or `None` when the run stored none.
 - `RunTimeoutError` is a run that outlived the wait. Its problem is `client.follow_failed`: the run keeps running, and `run_id` reads its result later with `wait_for_result`.
 - `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its problem is `client.unreachable` naming the base URL, or `client.timeout` naming the time limit for a request whose time ran out. Its `__cause__` is httpx's exception, and its `network_code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
+- `StoredTextLoadError` is a run that completed with a stored text in its output that could not be loaded. Its `path` says where the text sits in `main_stuff` (`$` for the whole output), `uri` where it is stored and `reason` why; read the result again with `load_stored_texts=False` to get it with each stored text as its reference. `pipelex run --hosted` reads the result that way, then loads its stored texts itself, so when one cannot be loaded it still prints and saves the output, the text as its reference, and reports the failure.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
 - `MethodFileTransferError` is a file of a tree sent by hash that could not be uploaded to the hosted API's storage before the request, so nothing was started. Its `reason` says why, `unreachable`, `storage_error`, `refused` or `mismatch`, and its problem's retry verdict whether the same call can succeed later, which holds for `unreachable` and `storage_error`.
 
