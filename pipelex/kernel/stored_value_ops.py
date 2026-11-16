@@ -89,11 +89,12 @@ async def load_stored_values_read_from_memory(
         UriReadRefusedError: A stored value's URL is outside the run's read scope.
         StoredValueUnreadableError: A stored text is not a value of its content's kind.
     """
-    read_contents: dict[str, Any] = {}
-    for read_name in sorted({get_root_from_dotted_path(read_path) for read_path in read_paths}):
-        read_stuff = memory.get_optional_stuff(name=read_name)
-        if read_stuff is not None:
-            read_contents[read_name] = read_stuff.content
-    return await load_stored_values_through_leaf(
-        roots=read_contents, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=cogt_run_params
-    )
+    with job_metadata.log_context():
+        read_contents: dict[str, Any] = {}
+        for read_name in sorted({get_root_from_dotted_path(read_path) for read_path in read_paths}):
+            read_stuff = memory.get_optional_stuff(name=read_name)
+            if read_stuff is not None:
+                read_contents[read_name] = read_stuff.content
+        return await load_stored_values_through_leaf(
+            roots=read_contents, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=cogt_run_params
+        )
