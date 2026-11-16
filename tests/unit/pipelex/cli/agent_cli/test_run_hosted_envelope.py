@@ -24,6 +24,7 @@ from pipelex_sdk.errors import (
     PipelineExecuteTimeoutError,
     RunFailedError,
     RunTimeoutError,
+    StoredTextLoadError,
     UnsupportedUploadCapabilityError,
     run_failed_problem,
 )
@@ -34,6 +35,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
+from pipelex.cli.agent_cli.commands.run._run_hosted import STORED_TEXT_NOT_LOADED_WARNING
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
 from pipelex.errors.problem import UNKNOWN_CODE_ITEM_DETAIL, ProblemView, make_problem
@@ -51,6 +53,7 @@ from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY
 from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems, RetiredEnvelope, StoredRunReports
+from tests.unit.pipelex.hosted.test_data import HostedStoredTexts
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -70,6 +73,18 @@ HOSTED_RESULTS: dict[str, Any] = {
         "aliases": {},
     },
 }
+
+
+def _run_hosted_with_unloaded_text(mocker: MockerFixture) -> None:
+    """`run_hosted` answering a completed run whose long Text output it could not load, as pipelex-sdk refuses a foreign link."""
+    stored_text_error = StoredTextLoadError(
+        "The stored text at $ could not be loaded: its url is neither a pipelex-storage:// reference nor a data: URL",
+        uri=HostedStoredTexts.FOREIGN_URL,
+        path="$",
+        reason="unsupported_url",
+    )
+    outcome = HostedRunOutcome(results=RunResults.model_validate(HostedStoredTexts.FOREIGN_RESULTS), stored_text_error=stored_text_error)
+    mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(return_value=outcome))
 
 
 class TestRunHostedEnvelope:
@@ -106,6 +121,59 @@ class TestRunHostedEnvelope:
         assert envelope["main_stuff"]["json"] == STATS
         assert envelope["working_memory"]["root"]["main_stuff"]["concept"] == "text_stats.Stats"
         assert envelope["uploads"][0]["uri"] == "pipelex-storage://uploads/a.pdf"
+        assert "warnings" not in envelope
+
+    def test_with_memory_warns_of_a_stored_text_that_was_not_loaded(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """The run completed: the envelope keeps the reference the hosted API answered and names, in `warnings`, the text
+        that was not loaded, where it sits, why, and the run to read again, never its link.
+        """
+        _run_hosted_with_unloaded_text(mocker)
+
+        run_method_cmd(name=METHOD_REF, hosted=True, with_memory=True, output_format=CliOutputFormat.JSON)
+
+        envelope = json.loads(capsys.readouterr().out)
+        assert envelope["main_stuff"]["json"] == HostedStoredTexts.FOREIGN_REFERENCE
+        assert envelope["pipeline_run_id"] == HostedStoredTexts.RUN_ID
+        warnings = envelope["warnings"]
+        assert len(warnings) == 1
+        warning = warnings[0]
+        assert warning["type"] == STORED_TEXT_NOT_LOADED_WARNING
+        assert warning["path"] == "$"
+        assert warning["reason"] == "unsupported_url"
+        assert warning["code"] == "client.link_refused"
+        assert warning["pipeline_run_id"] == HostedStoredTexts.RUN_ID
+        assert "$" in warning["message"]
+        assert "unsupported_url" in warning["message"]
+        assert HostedStoredTexts.RUN_ID in warning["message"]
+        assert HostedStoredTexts.FOREIGN_URL not in json.dumps(warnings)
+
+    @pytest.mark.parametrize("with_memory", [False, True])
+    def test_markdown_warns_of_a_stored_text_that_was_not_loaded(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], with_memory: bool
+    ) -> None:
+        """Compact or not, the Markdown shows the reference as the result, then a Warnings section naming the text."""
+        _run_hosted_with_unloaded_text(mocker)
+
+        run_method_cmd(name=METHOD_REF, hosted=True, with_memory=with_memory, output_format=CliOutputFormat.MARKDOWN)
+
+        markdown = capsys.readouterr().out
+        assert markdown.startswith("# Pipeline run complete")
+        result_section, _, warnings_section = markdown.partition("## Warnings (1)")
+        assert '"preview": "# A long report"' in result_section
+        assert f"**{STORED_TEXT_NOT_LOADED_WARNING}**" in warnings_section
+        assert "unsupported_url" in warnings_section
+        assert HostedStoredTexts.RUN_ID in warnings_section
+        assert HostedStoredTexts.FOREIGN_URL not in warnings_section
+
+    def test_compact_json_is_the_main_output_as_answered_when_a_stored_text_was_not_loaded(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The compact output is the main output's content alone, here its reference: no member is added to a concept's JSON."""
+        _run_hosted_with_unloaded_text(mocker)
+
+        run_method_cmd(name=METHOD_REF, hosted=True, output_format=CliOutputFormat.JSON)
+
+        assert json.loads(capsys.readouterr().out) == HostedStoredTexts.FOREIGN_REFERENCE
 
     def test_markdown_renders_the_main_output(self, run_hosted: AsyncMock, capsys: pytest.CaptureFixture[str]) -> None:
         run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.MARKDOWN)

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from kajson import kajson
 from kajson.exceptions import KajsonException
 
 from pipelex.tools.misc.json_utils import clean_json_dumps
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 def build_run_output(
@@ -66,7 +69,7 @@ def _render_json_payload_lines(result_payload: Any) -> list[str]:
     return ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
 
 
-def format_run_markdown(result: dict[str, Any], *, with_memory: bool) -> str:
+def format_run_markdown(result: dict[str, Any], *, with_memory: bool, warnings: Sequence[Mapping[str, Any]] = ()) -> str:
     """Render a pipeline-run result dict as agent-readable markdown.
 
     Handles both shapes ``build_run_output()`` produces, disambiguated by the
@@ -79,6 +82,8 @@ def format_run_markdown(result: dict[str, Any], *, with_memory: bool) -> str:
         with_memory: True when ``result`` is the full envelope (``main_stuff`` +
             ``working_memory`` + side-effect metadata); False when ``result`` is
             the bare compact concept JSON.
+        warnings: What the run reports beside its output without failing, each a `{type, message, …}` object, rendered
+            as a `## Warnings` section after the result in both shapes, since the compact one has no room for them.
 
     Returns:
         A markdown string for stdout.
@@ -93,6 +98,7 @@ def format_run_markdown(result: dict[str, Any], *, with_memory: bool) -> str:
             lines += _render_json_payload_lines(result)
         else:
             lines.append("_The pipeline produced no main output._")
+        lines += _render_warning_lines(warnings=warnings)
         return "\n".join(lines)
 
     main_stuff = result.get("main_stuff")
@@ -127,4 +133,15 @@ def format_run_markdown(result: dict[str, Any], *, with_memory: bool) -> str:
         if isinstance(graph_html, str):
             lines += ["", f"**Graph:** `{graph_html}`"]
 
+    lines += _render_warning_lines(warnings=warnings)
     return "\n".join(lines)
+
+
+def _render_warning_lines(*, warnings: Sequence[Mapping[str, Any]]) -> list[str]:
+    """The `## Warnings` section of a run's Markdown, one `- **<type>** — <message>` line per warning, as `validate` renders its own."""
+    if not warnings:
+        return []
+    lines: list[str] = ["", f"## Warnings ({len(warnings)})", ""]
+    for warning in warnings:
+        lines.append(f"- **{warning.get('type')}** — {warning.get('message')}")
+    return lines
