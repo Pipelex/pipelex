@@ -3,6 +3,11 @@
 A hosted run needs no provider key and no inference configuration on this machine: it reads the `[run]` setting and
 the scan settings from the configuration files, sends the method and its inputs through pipelex-sdk, and writes what
 the hosted API returns where a local run writes its own outputs.
+
+A long text of the main output, which the hosted API answers as a stored text's reference, is shown and saved as its
+text, `pipelex.hosted.hosted_run` having loaded it. One that could not be loaded is shown and saved as its reference,
+and the failure is reported on stderr after the run's outputs, as a local run describes a stored value it cannot load
+rather than failing a run that succeeded.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from pipelex.tools.misc.pretty import pretty_print, pretty_print_md
 
 if TYPE_CHECKING:
     from pipelex_sdk.client import PipelexAPIClient
+    from pipelex_sdk.errors import StoredTextLoadError
 
     from pipelex.cli.commands.run._inputs_file_loader import DetectedInputsFile
 
@@ -43,6 +49,7 @@ _MAIN_STUFF_NAME = "main_stuff"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
 _GRAPHSPEC_FILENAME = "graphspec.json"
 _FAILURE_HEADING = "Failed to run on the hosted API"
+_STORED_TEXT_HEADING = "A stored text of the run's output could not be loaded"
 #: The exit status of a command interrupted by Ctrl-C, the shell's 128 + SIGINT, which Typer gives one too.
 _INTERRUPTED_EXIT_CODE = 130
 
@@ -142,6 +149,23 @@ def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError, crede
         console.print(f"[bold green]💡 Tip:[/bold green] {printed_tip}\n")
 
 
+def _print_stored_text_failure(*, error: StoredTextLoadError, credential_sent: bool) -> None:
+    """Print, on stderr, the stored text of a completed run's output that could not be loaded: where it sits, where it is
+    stored, why, and the problem's rows, saying that the output shown and saved holds it as its reference.
+    """
+    view = describe_hosted_error(error=error, credential_sent=credential_sent)
+    console = get_error_console()
+    console.print(f"\n[bold yellow]{escape(_STORED_TEXT_HEADING)}[/bold yellow]\n")
+    sentence = (
+        f"The run completed, but the text at {error.path} in its output, stored at {error.uri}, could not be loaded ({error.reason}). "
+        "The output shown and saved holds it as its reference: its url, size, MIME type and preview."
+    )
+    console.print(f"  {escape(sentence)}\n")
+    printed_message = escape(view.message) if view.message else None
+    print_problem_rows(console=console, problem=view.problem, error_message=printed_message, tip=None)
+    print_problem_items(console=console, problem=view.problem)
+
+
 async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest, on_started: RunStartedCallback) -> HostedRunOutcome:
     async with client:
         return await run_hosted(client=client, request=request, on_started=on_started)
@@ -160,7 +184,11 @@ def _main_stuff_concept_ref(*, outcome: HostedRunOutcome) -> str | None:
 
 
 def _main_text(*, outcome: HostedRunOutcome) -> str | None:
-    """The main output's text when it is native Text, which reads best rendered as Markdown."""
+    """The main output's text when it is native Text, which reads best rendered as Markdown.
+
+    A stored text that was loaded is its text here; one that could not be loaded is still its reference, which has no
+    `text`, so it is shown and saved as JSON.
+    """
     main_stuff = outcome.results.main_stuff
     if _main_stuff_concept_ref(outcome=outcome) != _NATIVE_TEXT_CONCEPT_REF or not isinstance(main_stuff, dict):
         return None
@@ -215,7 +243,8 @@ def execute_hosted_run(
 
     The outputs go to `<output_dir>/<output_label>_output_NN/`: `main_stuff.json` (and `main_stuff.md` for a text
     output), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which
-    `pipelex graph render` turns into a viewer.
+    `pipelex graph render` turns into a viewer. A stored text of the main output is saved as its text; one that could not
+    be loaded is saved as its reference, and the command reports it on stderr and still exits 0, since the run completed.
 
     The run's id is printed as soon as the hosted API acknowledges the start. Interrupted by Ctrl-C, the command names
     the run, which keeps going on the hosted API, and exits 130.
@@ -301,7 +330,11 @@ def execute_hosted_run(
         save_as_json_to_path(object_to_save=results.graph_spec, path=graphspec_path)
         saved.append(_GRAPHSPEC_FILENAME)
 
-    console.print("\n[green]✓[/green] [bold]Hosted run completed successfully[/bold]")
+    stored_text_error = outcome.stored_text_error
+    if stored_text_error is None:
+        console.print("\n[green]✓[/green] [bold]Hosted run completed successfully[/bold]")
+    else:
+        console.print("\n[yellow]![/yellow] [bold]Hosted run completed, but a stored text of its output was not loaded[/bold]")
     console.print(f"  Run id: {escape(results.pipeline_run_id)}")
     if outcome.uploads:
         console.print(f"  Uploaded {len(outcome.uploads)} local file(s) for the run")
@@ -311,3 +344,5 @@ def execute_hosted_run(
             console.print(f"    [green]✓[/green] {escape(saved_name)}")
     if graphspec_path is not None:
         console.print(f"  View the run's graph with: pipelex graph render {escape(str(graphspec_path))}")
+    if stored_text_error is not None:
+        _print_stored_text_failure(error=stored_text_error, credential_sent=credential_sent)

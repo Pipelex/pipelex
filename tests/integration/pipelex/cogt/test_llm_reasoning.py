@@ -24,7 +24,7 @@ def _skip_unless_the_model_reasons(llm_worker: LLMWorkerAbstract) -> None:
 
 
 def _skip_unless_the_model_structures(llm_worker: LLMWorkerAbstract) -> None:
-    """Skip a model whose spec declares no structured output, such as the text-only Magistral models."""
+    """Skip a model whose spec declares no structured output."""
     if not llm_worker.is_gen_object_supported:
         pytest.skip(f"'{llm_worker.inference_model.name}' does not support object generation")
 

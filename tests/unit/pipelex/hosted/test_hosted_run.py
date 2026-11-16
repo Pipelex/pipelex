@@ -20,6 +20,7 @@ from pipelex_sdk.errors import (
     RunFailedError,
     RunLifecycleUnavailableError,
     RunTimeoutError,
+    StoredTextLoadError,
 )
 from pipelex_sdk.runs import PipelexRunResultStart, RunResults, RunStatus
 from pipelex_sdk.upload import UploadRecord
@@ -33,7 +34,7 @@ from pipelex.hosted.exceptions import (
     HostedRunPollingError,
 )
 from pipelex.hosted.hosted_run import HostedRunRequest, run_hosted
-from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoRefusals, HostedPipeIoVerdicts, HostedVersions
+from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoRefusals, HostedPipeIoVerdicts, HostedStoredTexts, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -160,7 +161,7 @@ class TestHostedRun:
             method_ref=None,
             method_id=None,
         )
-        client.wait_for_result.assert_awaited_once_with(RUN_ID)
+        client.wait_for_result.assert_awaited_once_with(RUN_ID, load_stored_texts=False)
         client.pipe_io.assert_not_awaited()
         client.prepare_inputs.assert_not_awaited()
         assert outcome.results.pipeline_run_id == "run_1"
@@ -431,6 +432,45 @@ class TestHostedRun:
         assert exc_info.value is terminal_error
 
     @pytest.mark.asyncio
+    async def test_a_stored_text_of_the_main_output_is_loaded_into_its_text(self, mocker: MockerFixture) -> None:
+        """A long Text output arrives as a stored text's reference: the outcome holds its text, as an inline one is held."""
+        client = _mocked_client(mocker)
+        client.wait_for_result.return_value = RunResults.model_validate(HostedStoredTexts.LOADABLE_RESULTS)
+
+        outcome = await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
+
+        client.wait_for_result.assert_awaited_once_with(RUN_ID, load_stored_texts=False)
+        assert outcome.results.main_stuff == {"text": HostedStoredTexts.LONG_TEXT}
+        assert outcome.stored_text_error is None
+
+    @pytest.mark.asyncio
+    async def test_a_stored_text_that_cannot_be_loaded_leaves_its_reference_and_says_why(self, mocker: MockerFixture) -> None:
+        """The run completed, so a text that cannot be loaded costs it nothing: its reference stays, and the outcome names the failure."""
+        client = _mocked_client(mocker)
+        client.wait_for_result.return_value = RunResults.model_validate(HostedStoredTexts.FOREIGN_RESULTS)
+
+        outcome = await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
+
+        assert outcome.results.main_stuff == HostedStoredTexts.FOREIGN_REFERENCE
+        error = outcome.stored_text_error
+        assert isinstance(error, StoredTextLoadError)
+        assert error.uri == HostedStoredTexts.FOREIGN_URL
+        assert error.path == "$"
+        assert error.reason == "unsupported_url"
+
+    @pytest.mark.asyncio
+    async def test_a_blocking_run_loads_its_stored_texts_too(self, mocker: MockerFixture) -> None:
+        """A runner with no run store answers the results directly, and their stored texts are loaded as a followed run's are."""
+        client = _mocked_client(mocker, version=HostedVersions.BARE_RUNNER)
+        mocker.patch(f"{HOSTED_RUN_MODULE}.results_from_execute", return_value=RunResults.model_validate(HostedStoredTexts.LOADABLE_RESULTS))
+
+        outcome = await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
+
+        client.start.assert_not_awaited()
+        assert outcome.results.main_stuff == {"text": HostedStoredTexts.LONG_TEXT}
+        assert outcome.stored_text_error is None
+
+    @pytest.mark.asyncio
     async def test_a_bare_runner_runs_the_blocking_route(self, mocker: MockerFixture) -> None:
         """A runner whose handshake names no run store is never started: it gets the blocking execute, as the SDK does."""
         bare_version = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
@@ -473,7 +513,8 @@ class TestHostedRun:
         def _on_started(*, pipeline_run_id: str) -> None:
             announced.append(pipeline_run_id)
 
-        def _follow(run_id: str) -> RunResults:
+        def _follow(run_id: str, *, load_stored_texts: bool) -> RunResults:
+            assert not load_stored_texts
             assert announced == [run_id], "the start must be announced before the run is followed"
             return DONE
 

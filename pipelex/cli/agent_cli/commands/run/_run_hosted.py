@@ -14,6 +14,10 @@ declared members alone, with the next step this client tailors for a failure of 
 the hosted edge, and pipelex's own `HostedRunError`s give theirs. A failure no arm names is this process's own and is
 reported as a local one is, in the operator's view: a Pipelex error under its own code, any other exception as
 `runtime.unexpected`.
+
+A run that completed but whose main output holds a stored text that could not be loaded succeeds: its output is the
+reference the hosted API answered, and the `--with-memory` envelope's `warnings` names the text, where it sits, why it
+was not loaded and the run to read again, never its link; the Markdown of either shape renders that warning too.
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from pipelex.system.usage_stats.usage_stats_runs import sent_usage_stats_error, 
 
 if TYPE_CHECKING:
     from pipelex_sdk.client import PipelexAPIClient
+    from pipelex_sdk.errors import StoredTextLoadError
 
 #: The `--runner` help, shared by the run commands. Typer renders help as Rich markup, which drops an unescaped `[run]`,
 #: so the bracket is escaped as `\[`.
@@ -57,6 +62,8 @@ BASE_URL_OPTION_HELP = (
 )
 #: The exit status of a command interrupted by Ctrl-C, the shell's 128 + SIGINT, which Typer gives one too.
 _INTERRUPTED_EXIT_CODE = 130
+#: The `type` of the warning a hosted run's envelope carries for a stored text of its main output that was not loaded.
+STORED_TEXT_NOT_LOADED_WARNING = "stored_text_not_loaded"
 
 
 def resolve_agent_run_execution(*, runner: RunExecution | None, hosted: bool | None, base_url: str | None) -> RunExecution:
@@ -136,12 +143,42 @@ def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, credenti
     agent_error_problem(problem=view.problem, cause=error, noted_error=noted_error, message=view.message, exit_code=exit_code)
 
 
+def stored_text_warnings(*, outcome: HostedRunOutcome) -> list[dict[str, Any]]:
+    """The warnings of a completed hosted run whose main output holds a stored text that could not be loaded, else none.
+
+    The warning names the text by its path in the output (`$` for the whole output), why it was not loaded (pipelex-sdk's
+    `reason`, and the code of its problem), and the run whose results to read again. It never holds the text's `url`,
+    which may be a signed link; the reference in the output carries it as the hosted API answered it.
+    """
+    error = outcome.stored_text_error
+    if error is None:
+        return []
+    return [_stored_text_warning(error=error, pipeline_run_id=outcome.results.pipeline_run_id)]
+
+
+def _stored_text_warning(*, error: StoredTextLoadError, pipeline_run_id: str) -> dict[str, Any]:
+    message = (
+        f"The run completed, but the stored text at {error.path} in its output could not be loaded ({error.reason}), "
+        "so the output holds it as its reference: its url, size, MIME type and preview. "
+        f"Read the results of run {pipeline_run_id} again to load it."
+    )
+    return {
+        "type": STORED_TEXT_NOT_LOADED_WARNING,
+        "path": error.path,
+        "reason": error.reason,
+        "code": error.problem.code,
+        "pipeline_run_id": pipeline_run_id,
+        "message": message,
+    }
+
+
 def build_hosted_run_output(*, outcome: HostedRunOutcome, with_memory: bool) -> dict[str, Any]:
     """The run envelope of a hosted run, in the shape a local run's has.
 
     Compact, it is the main output's content. With memory, `main_stuff.json` is that content (the hosted API renders
-    no Markdown or HTML, so the Markdown output falls back to it), `working_memory` is the whole working memory, and
-    `pipeline_run_id` names the run on the hosted API. Nothing is written to disk.
+    no Markdown or HTML, so the Markdown output falls back to it), `working_memory` is the whole working memory,
+    `pipeline_run_id` names the run on the hosted API, and `warnings` names a stored text of the main output that could
+    not be loaded (`stored_text_warnings`), present only then. Nothing is written to disk.
     """
     results = outcome.results
     content: Any = results.main_stuff
@@ -150,6 +187,9 @@ def build_hosted_run_output(*, outcome: HostedRunOutcome, with_memory: bool) -> 
     extra_metadata: dict[str, Any] = {"pipeline_run_id": results.pipeline_run_id}
     if outcome.uploads:
         extra_metadata["uploads"] = [upload.model_dump(mode="json") for upload in outcome.uploads]
+    warnings = stored_text_warnings(outcome=outcome)
+    if warnings:
+        extra_metadata["warnings"] = warnings
     return build_run_output(
         with_memory=with_memory,
         main_stuff_json={"json": content, "markdown": "", "html": ""},
@@ -195,4 +235,6 @@ def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, wit
         # body that drifted, as `runtime.unexpected`.
         agent_error(str(exc), cause=exc)
     result = build_hosted_run_output(outcome=outcome, with_memory=with_memory)
-    agent_success_formatted(result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format)
+    # The compact output is the main output's content alone, so the Markdown is handed the warnings rather than reading them from it.
+    markdown_renderer = functools.partial(format_run_markdown, with_memory=with_memory, warnings=stored_text_warnings(outcome=outcome))
+    agent_success_formatted(result, markdown_renderer=markdown_renderer, output_format=output_format)

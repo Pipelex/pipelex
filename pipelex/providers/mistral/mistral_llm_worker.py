@@ -217,7 +217,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         if isinstance(mistral_response_content, str):
             result_text = mistral_response_content
         elif isinstance(mistral_response_content, list):
-            # Reasoning models (magistral) return a list of chunks: ThinkChunk (reasoning trace) and TextChunk (answer)
+            # A reasoning reply (reasoning_effort set) is a list of chunks: ThinkChunk (reasoning trace) and TextChunk (answer)
             text_parts: list[str] = []
             for chunk in mistral_response_content:
                 match chunk:
