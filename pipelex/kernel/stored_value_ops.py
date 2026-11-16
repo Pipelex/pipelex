@@ -11,7 +11,7 @@ always tests a short value. When something is loaded, the texts enter the workfl
 is acceptable for the rare value it is.
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
@@ -21,13 +21,17 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.uri.uri_read_scope import UriReference
 
 
-async def load_stored_values_through_leaf(*, roots: Mapping[str, Any], job_metadata: JobMetadata, cogt_run_params: CogtRunParams) -> int:
-    """Load every stored value under the given roots through the content generator's leaf, and keep each on its content.
+async def load_stored_values_through_leaf(
+    *, roots: Mapping[str, Any], read_paths: Collection[str] | None, job_metadata: JobMetadata, cogt_run_params: CogtRunParams
+) -> int:
+    """Load the stored values under the given roots that the reader reads, through the content generator's leaf.
 
-    The contents' fields are left unchanged, so a dump of each is still its reference.
+    Each loaded text is kept on its content, whose fields are left unchanged, so a dump of it is still its reference.
 
     Args:
         roots: The values the reader reads, each keyed by its name: a stuff's content keyed by the stuff's name.
+        read_paths: The dotted paths the reader reads through, so a stored value it never reads, such as a field beside
+            the one it reads, is not loaded (`StoredValueAtPath.is_read_through`). ``None`` loads every stored value.
         job_metadata: The step's metadata, whose run's read scope the leaf authorizes each read against.
         cogt_run_params: The run's execution mode.
 
@@ -39,7 +43,7 @@ async def load_stored_values_through_leaf(*, roots: Mapping[str, Any], job_metad
         StoredValueUnreadableError: A stored text is not a value of its content's kind.
     """
     with job_metadata.log_context():
-        stored_values = find_unloaded_stored_values(roots=roots)
+        stored_values = find_unloaded_stored_values(roots=roots, read_paths=read_paths)
         uri_references = [
             UriReference(uri=stored_value.content.url, position=stored_value.position)
             for stored_value in stored_values

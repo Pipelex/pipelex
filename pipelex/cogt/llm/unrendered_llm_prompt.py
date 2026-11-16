@@ -32,6 +32,8 @@ class UnrenderedLLMPrompt(BaseModel):
         user_template: The user prompt's template, if any.
         templating_style: The style the templates render under, unless a template declares its own.
         context: The working memory the templates read, holding only the stuffs they name, its stored values unloaded.
+        read_paths: The dotted paths through which the templates read the context, so the leaf loads only the stored
+            values they read. ``None`` loads every stored value the context holds.
         extra_params: The run's parameters the templates may read beside the memory (`_nb_output`, ...).
         output_structure_prompt: The description of the output structure appended to the user text, already rendered:
             it is Pipelex's own text about the output class and reads no run data.
@@ -44,6 +46,7 @@ class UnrenderedLLMPrompt(BaseModel):
     user_template: TemplateBlueprint | None = None
     templating_style: TemplatingStyle = Field(strict=False)
     context: WorkingMemory = Field(default_factory=WorkingMemory)
+    read_paths: list[str] | None = None
     extra_params: dict[str, Any] = Field(default_factory=dict)
     output_structure_prompt: str | None = None
     files: PromptFileRegistrations = Field(default_factory=PromptFileRegistrations)

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from mthds.protocol.problem.registry import CoreCode
@@ -245,14 +246,14 @@ class ContentGenerator(ContentGeneratorProtocol):
         # Read in every run mode: a dry run reads the values its caller sent by URL as a live run does, and stores none.
         read_scope = job_metadata.run_metadata.read_scope
         storage_provider = self._generated_content_factory.storage_provider
-        loaded_texts: list[str] = []
-        for uri_reference in uri_references:
-            loaded_texts.append(
-                await load_text_from_any_uri(
-                    uri_reference.uri, read_scope=read_scope, position=uri_reference.position, storage_provider=storage_provider
-                )
+        # `gather` keeps the order of the references, which the caller zips the texts back onto.
+        loaded_texts = await asyncio.gather(
+            *(
+                load_text_from_any_uri(uri_reference.uri, read_scope=read_scope, position=uri_reference.position, storage_provider=storage_provider)
+                for uri_reference in uri_references
             )
-        return loaded_texts
+        )
+        return list(loaded_texts)
 
     @override
     @update_job_metadata

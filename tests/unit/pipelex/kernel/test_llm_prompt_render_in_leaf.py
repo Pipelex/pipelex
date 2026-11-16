@@ -14,12 +14,14 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt, prepare_llm_prompt, render_llm_prompt
 from pipelex.kernel.prompt_references import DocumentReference, DocumentReferenceKind, ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
 
@@ -37,6 +39,21 @@ _PAGE_FIGURE = "pipelex-storage://org/page-figure.png"
 _CLAIM = "pipelex-storage://org/claim.pdf"
 _ANNEX_FIRST = "pipelex-storage://org/annex-1.pdf"
 _ANNEX_SECOND = "pipelex-storage://org/annex-2.pdf"
+
+
+_READ_SCOPE = "org_abc"
+_READ_KEY = "org_abc/mt_1/run_9/generated/0123abcd/b.txt"
+# Outside the read scope: reading it would be refused, so the render only succeeds if it is never read.
+_UNREAD_KEY = "org_other/mt_1/run_9/generated/4567abcd/c.txt"
+
+
+class _Inner(StructuredContent):
+    b: TextContent
+    c: TextContent
+
+
+class _Doc(StructuredContent):
+    a: _Inner
 
 
 def _template(source: str) -> TemplateBlueprint:
@@ -142,3 +159,20 @@ class TestLlmPromptRenderInLeaf:
 
         assert set(unrendered_prompt.context.root) == {"note", "photo", "album", "page", "claim", "annexes"}
         assert unrendered_prompt.context.aliases == {"remark": "note"}
+
+    async def test_only_the_stored_values_the_templates_read_are_loaded(self) -> None:
+        """`{{ doc.a.b }}` loads `doc.a.b` and never reads `doc.a.c`, a stored value beside it outside the read scope."""
+        storage = InMemoryStorageProvider()
+        storage.root[_READ_KEY] = b"B-TEXT"
+        unread_value = TextContent(url=f"pipelex-storage://{_UNREAD_KEY}")
+        doc = _Doc(a=_Inner(b=TextContent(url=f"pipelex-storage://{_READ_KEY}"), c=unread_value))
+        anything = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.ANYTHING)
+        memory = WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[StuffFactory.make_stuff(concept=anything, content=doc, name="doc")])
+
+        unrendered_prompt = prepare_llm_prompt(
+            prompt_content=LlmPromptContent(user_template=_template("Read: {{ doc.a.b }}")), memory=memory, templating_style=_STYLE
+        )
+        rendered = await render_llm_prompt(unrendered_prompt=unrendered_prompt, read_scope=_READ_SCOPE, storage_provider=storage)
+
+        assert rendered.user_text == "Read: B-TEXT"
+        assert not unread_value.is_loaded

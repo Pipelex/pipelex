@@ -441,6 +441,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     nb_loaded = asyncio.run(
         load_stored_values_through_leaf(
             roots={"verdict": stored_text},
+            read_paths=["verdict"],
             job_metadata=kernel.make_step_metadata(),
             cogt_run_params=kernel.cogt_run_params,
         )

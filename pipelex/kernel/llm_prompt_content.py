@@ -21,9 +21,10 @@ by the activity. :func:`assemble_llm_prompt` does both halves in one process, ov
 stored values are already loaded.
 """
 
+from collections.abc import Sequence
 from typing import Any, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
@@ -55,6 +56,19 @@ class LlmPromptContent(BaseModel):
     user_document_references: list[DocumentReference] | None = None
     system_image_references: list[ImageReference] | None = None
     system_document_references: list[DocumentReference] | None = None
+    read_paths: frozenset[str] = Field(
+        default_factory=frozenset,
+        description=(
+            "The dotted paths through which the two templates read their inputs (`detect_jinja2_read_paths`). Derived "
+            "from the templates when not given; a pipe gives the paths it computed once, so no step parses them again."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def derive_read_paths(self) -> Self:
+        if "read_paths" not in self.model_fields_set:
+            self.read_paths = templates_read_paths(templates=[self.system_template, self.user_template])
+        return self
 
     @classmethod
     def make_from_text(cls, *, user: str, system: str | None = None) -> Self:
@@ -67,6 +81,15 @@ class LlmPromptContent(BaseModel):
             user_template=TemplateBlueprint(template=user, category=TemplateCategory.LLM_PROMPT),
             system_template=TemplateBlueprint(template=system, category=TemplateCategory.LLM_PROMPT) if system is not None else None,
         )
+
+
+def templates_read_paths(*, templates: Sequence[TemplateBlueprint | None]) -> frozenset[str]:
+    """The dotted paths through which any of the given templates reads its inputs, each template parsed once."""
+    read_paths: set[str] = set()
+    for template in templates:
+        if template is not None:
+            read_paths.update(template.read_paths())
+    return frozenset(read_paths)
 
 
 def prepare_llm_prompt(
@@ -93,6 +116,7 @@ def prepare_llm_prompt(
         user_template=prompt_content.user_template,
         templating_style=templating_style,
         context=_memory_read_by_prompt(prompt_content=prompt_content, memory=memory),
+        read_paths=sorted(prompt_content.read_paths),
         extra_params=dict(extra_params) if extra_params else {},
         output_structure_prompt=output_structure_prompt,
         files=prompt_files.to_registrations(),
@@ -105,10 +129,12 @@ async def render_llm_prompt(
     read_scope: str | None,
     storage_provider: StorageProviderAbstract | None,
 ) -> LLMPrompt:
-    """The leaf's half: load every stored value the prompt's memory holds, then render both templates.
+    """The leaf's half: load the stored values the templates read, then render both templates.
 
-    Every stored value is loaded before anything renders, wherever it sits (a stuff's content, a list item, a field of
-    a structure), so a template and its filters read the real text. Each read is checked against the run's read scope.
+    Every stored value the templates read is loaded before anything renders, wherever it sits (a stuff's content, a list
+    item, a field of a structure), so a template and its filters read the real text. A stored value the templates never
+    read, such as a field beside the one a template names, is not read at all (`StoredValueAtPath.is_read_through`).
+    Each read is checked against the run's read scope.
 
     Args:
         unrendered_prompt: The prompt the operator prepared with :func:`prepare_llm_prompt`.
@@ -121,9 +147,13 @@ async def render_llm_prompt(
         Jinja2TemplateInvalidError: A template cannot render as written, located on its prompt field.
     """
     memory = unrendered_prompt.context
-    stuff_contents = {stuff_name: stuff.content for stuff_name, stuff in memory.root.items()}
+    # Keyed by the names the templates read the stuffs by, an alias included, so a read path through an alias matches.
+    read_contents: dict[str, Any] = {stuff_name: stuff.content for stuff_name, stuff in memory.root.items()}
+    for alias, target in memory.aliases.items():
+        if target in memory.root:
+            read_contents[alias] = memory.root[target].content
     await load_stored_values(
-        stored_values=find_unloaded_stored_values(roots=stuff_contents),
+        stored_values=find_unloaded_stored_values(roots=read_contents, read_paths=unrendered_prompt.read_paths),
         read_scope=read_scope,
         storage_provider=storage_provider,
     )
@@ -178,10 +208,7 @@ def _memory_read_by_prompt(*, prompt_content: LlmPromptContent, memory: WorkingM
     A name read through an alias keeps the alias and brings its target, so the context the leaf generates binds the
     name to the same stuff the operator's memory does.
     """
-    read_names: set[str] = set()
-    for template in (prompt_content.system_template, prompt_content.user_template):
-        if template is not None:
-            read_names.update(get_root_from_dotted_path(variable_path) for variable_path in template.required_variables())
+    read_names: set[str] = {get_root_from_dotted_path(read_path) for read_path in prompt_content.read_paths}
     for references in (
         prompt_content.system_image_references,
         prompt_content.user_image_references,

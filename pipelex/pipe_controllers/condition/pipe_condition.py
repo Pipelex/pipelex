@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal
 
 from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSite
@@ -39,7 +40,7 @@ from pipelex.system.invocation_path import DEFAULT_OUTCOME_SEGMENT, outcome_segm
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2TemplateInvalidError
 from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_read_paths
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -85,6 +86,23 @@ class PipeCondition(PipeController):
     default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
 
+    @cached_property
+    def expression_read_paths(self) -> frozenset[str]:
+        """The dotted paths the expression reads through, parsed once from the sigil-rewritten source it renders from.
+
+        Its roots are the inputs the expression requires, and the paths themselves say which stored values a run must
+        load before it renders (`detect_jinja2_read_paths`).
+
+        Raises:
+            Jinja2DetectVariablesError: The expression does not parse. Nothing is cached then, so each read raises again.
+        """
+        return frozenset(
+            detect_jinja2_read_paths(
+                template_category=TemplateCategory.EXPRESSION,
+                template_source=rewrite_template_sigils(self.expression),
+            )
+        )
+
     @override
     def pipe_dependencies(self) -> set[str]:
         codes = set(self.outcome_map.values())
@@ -97,11 +115,7 @@ class PipeCondition(PipeController):
         required_variables: set[str] = set()
 
         # Variables from the expression/expression_template
-        full_paths = detect_jinja2_required_variables(
-            template_category=TemplateCategory.EXPRESSION,
-            template_source=self.expression,
-        )
-        required_variables.update(get_root_from_dotted_path(path) for path in full_paths)
+        required_variables.update(get_root_from_dotted_path(path) for path in self.expression_read_paths)
 
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
@@ -229,11 +243,7 @@ class PipeCondition(PipeController):
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         # Add the expression variables from self.inputs (with their declared concepts)
-        full_paths = detect_jinja2_required_variables(
-            template_category=TemplateCategory.EXPRESSION,
-            template_source=self.expression,
-        )
-        expression_variables = {get_root_from_dotted_path(path) for path in full_paths}
+        expression_variables = {get_root_from_dotted_path(path) for path in self.expression_read_paths}
         for var_name in expression_variables:
             if not var_name.startswith("_"):
                 # Get the concept from declared inputs
@@ -437,17 +447,15 @@ class PipeCondition(PipeController):
     async def _load_stored_values_read_by_expression(
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams
     ) -> None:
-        """Load, through a leaf, the stored values among the stuffs the expression reads, so it renders over their text.
+        """Load, through a leaf, the stored values the expression reads, so it renders over their text.
 
         The expression renders here, in the controller, which on a host runtime is workflow code that reads no storage.
-        A stuff the expression names that holds a stored text never loaded is loaded through the content generator's
-        `load_stored_texts` leaf; an expression reading only inline values dispatches nothing.
+        A stored text never loaded that the expression reads, by its path or by a path above or below it, is loaded
+        through the content generator's `load_stored_texts` leaf; one beside what it reads, such as a sibling field, is
+        not. An expression reading only inline values dispatches nothing.
         """
         try:
-            read_paths = detect_jinja2_required_variables(
-                template_category=TemplateCategory.EXPRESSION,
-                template_source=rewrite_template_sigils(self.expression),
-            )
+            read_paths = self.expression_read_paths
         except Jinja2DetectVariablesError:
             # The render that follows refuses the expression with the method's own error, which names the field.
             return
@@ -456,7 +464,9 @@ class PipeCondition(PipeController):
             read_stuff = working_memory.get_optional_stuff(name=read_name)
             if read_stuff is not None:
                 read_contents[read_name] = read_stuff.content
-        await load_stored_values_through_leaf(roots=read_contents, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params)
+        await load_stored_values_through_leaf(
+            roots=read_contents, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
+        )
 
     async def _render_expression(self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> str:
         """Render the conditional expression over the run's data, the stored values it reads loaded first.
@@ -685,10 +695,7 @@ class PipeCondition(PipeController):
     ) -> PipeOutput:
         # Validate that the expression template is valid
         try:
-            detect_jinja2_required_variables(
-                template_category=TemplateCategory.EXPRESSION,
-                template_source=self.expression,
-            )
+            _ = self.expression_read_paths
         except Jinja2DetectVariablesError as exc:
             # Nothing is logged here: the refusal raised below is the failure, and whoever handles it reports it.
             # The expression is the caller's own method. The message quotes neither the expression nor the parser's
