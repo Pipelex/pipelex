@@ -324,7 +324,7 @@ The tracer writes one event for each thing that happens in the run, in the order
 - `event_kind`, which tells the event's kind;
 - `mode`, `live` or `dry`, the mode of the run that wrote it.
 
-An event is frozen, since it records what happened, and it computes its chain, its chain key and its store key once, the first time they are read, since every read and every assembly of a run reads them for each of its events; a copy made with `model_copy(update=...)` computes them again from its own fields. An event whose `workflow_id` is empty is refused when it is read, like any event in a shape this version does not accept, with `EventLogSchemaMismatchError`.
+An event is frozen, since it records what happened, and it computes its chain key once, when it is built, and keeps it in a private attribute, since every read and every assembly of a run reads it for each of its events; its chain and its store key are derived again from its fields at each read, the store key from that kept chain key. A copy made with `model_copy(update=...)` computes its chain key again from its own fields, since an update can change the fields it is read from. An event whose `workflow_id` is empty is refused when it is read, like any event in a shape this version does not accept, with `EventLogSchemaMismatchError`.
 
 Each event kind that the hosted progress contract, which defines the run progress the hosted API reports, maps to a progress event carries that progress event's fields: the contract's `execution` is `workflow_id`, its `at` is `timestamp`, and its `kind` is read off `event_kind`.
 

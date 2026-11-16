@@ -23,8 +23,10 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, YesNoAnswer, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration, LLMTextGeneration
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -56,6 +58,8 @@ REQUEST_ID = "req-kernel-step"
 
 #: Named but never resolved: the probe replaces the content generator, so no worker is looked up.
 LLM_SETTING = LLMSetting(model="kernel-log-context-model", temperature=0.5)
+#: What the probe answers it rendered: it renders nothing, the leaf being replaced.
+RENDERED_PROMPT = LLMPromptTrace(user_text="Pick a number.")
 
 
 class ContentGeneratorProbe:
@@ -67,17 +71,17 @@ class ContentGeneratorProbe:
     def _record(self) -> None:
         self.seen.append(get_log_context())
 
-    async def make_llm_text(self, **kwargs: Any) -> str:  # ruff: ignore[unused-method-argument]
+    async def make_llm_text(self, **kwargs: Any) -> LLMTextGeneration:  # ruff: ignore[unused-method-argument]
         self._record()
-        return "generated text"
+        return LLMTextGeneration(text="generated text", rendered_prompt=RENDERED_PROMPT)
 
-    async def make_object(self, **kwargs: Any) -> NumberContent:  # ruff: ignore[unused-method-argument]
+    async def make_object(self, **kwargs: Any) -> LLMObjectGeneration[NumberContent]:  # ruff: ignore[unused-method-argument]
         self._record()
-        return NumberContent(number=7)
+        return LLMObjectGeneration(generated_object=NumberContent(number=7), rendered_prompt=RENDERED_PROMPT)
 
-    async def make_object_list(self, **kwargs: Any) -> list[NumberContent]:  # ruff: ignore[unused-method-argument]
+    async def make_object_list(self, **kwargs: Any) -> LLMObjectListGeneration[NumberContent]:  # ruff: ignore[unused-method-argument]
         self._record()
-        return [NumberContent(number=7), NumberContent(number=8)]
+        return LLMObjectListGeneration(generated_objects=[NumberContent(number=7), NumberContent(number=8)], rendered_prompt=RENDERED_PROMPT)
 
     async def make_extract_pages(self, **kwargs: Any) -> list[Any]:  # ruff: ignore[unused-method-argument]
         self._record()
@@ -165,7 +169,9 @@ class TestKernelLogContext:
         await generate_object_content(
             job_metadata=step,
             cogt_run_params=kernel.cogt_run_params,
-            llm_prompt=LLMPrompt(user_text="Pick a number."),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text="Pick a number.", templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting=LLM_SETTING,
             output_class=NumberContent,
             is_multiple_output=is_multiple_output,

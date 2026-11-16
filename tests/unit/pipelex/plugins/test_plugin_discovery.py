@@ -196,7 +196,17 @@ class TestPluginDiscovery:
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
             _build_registrar_with(mocker=mocker, plugins=[v10_plugin])
         assert "written_against_v10" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 11
+
+    def test_a_plugin_written_before_prompts_rendered_in_the_leaf_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v11 content generators took a rendered prompt and returned the value alone, with no `load_stored_texts` leaf.
+
+        A v11 content generator would refuse the `unrendered_prompt` keyword on its first LLM step.
+        """
+        v11_plugin = _InferencePlugin(name="written_against_v11", sdk="v11_sdk", targets_api=11)
+        with pytest.raises(PluginApiVersionMismatchError) as exc_info:
+            _build_registrar_with(mocker=mocker, plugins=[v11_plugin])
+        assert "written_against_v11" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 12
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:

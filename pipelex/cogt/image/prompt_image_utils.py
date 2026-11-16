@@ -58,35 +58,35 @@ async def prepare_prompt_image(
 
         case PromptImageUri():
             match prompt_image.resolved:
-                case ResolvedHttpUrl():
+                case ResolvedHttpUrl() as resolved_uri:
                     if is_http_url_enabled:
-                        prepared = PreparedFileHttpUrl(url=prompt_image.resolved.url)
+                        prepared = PreparedFileHttpUrl(url=resolved_uri.url)
                     else:
                         with fetching_for_input(input_name=prompt_image.input_name):
-                            raw_bytes = await fetch_file_from_url_httpx(url=prompt_image.resolved.url)
+                            raw_bytes = await fetch_file_from_url_httpx(url=resolved_uri.url)
                         prepared = PreparedFileBase64(
                             base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                             file_type=detect_file_type_from_bytes(raw_bytes),
                         )
 
-                case ResolvedLocalPath():
-                    raw_bytes = await load_binary_async(Path(prompt_image.resolved.path))
+                case ResolvedLocalPath() as resolved_uri:
+                    raw_bytes = await load_binary_async(Path(resolved_uri.path))
                     prepared = PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
-                case ResolvedPipelexStorage():
+                case ResolvedPipelexStorage() as resolved_uri:
                     storage = get_storage_provider()
-                    raw_bytes = await storage.load(uri=prompt_image.resolved.storage_uri)
+                    raw_bytes = await storage.load(uri=resolved_uri.storage_uri)
                     prepared = PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
-                case ResolvedBase64DataUrl():
+                case ResolvedBase64DataUrl() as resolved_uri:
                     # base64_data from ResolvedBase64DataUrl is already a string
-                    base64_data = prompt_image.resolved.base64_data
+                    base64_data = resolved_uri.base64_data
                     prepared = PreparedFileBase64(
                         base64_data=base64_data,
                         file_type=detect_file_type_from_base64(base64_data),
@@ -141,31 +141,31 @@ async def prepare_prompt_image_as_base64(prompt_image: PromptImage) -> PreparedF
 
         case PromptImageUri():
             match prompt_image.resolved:
-                case ResolvedHttpUrl():
+                case ResolvedHttpUrl() as resolved_uri:
                     with fetching_for_input(input_name=prompt_image.input_name):
-                        raw_bytes = await fetch_file_from_url_httpx(url=prompt_image.resolved.url)
+                        raw_bytes = await fetch_file_from_url_httpx(url=resolved_uri.url)
                     return PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
-                case ResolvedLocalPath():
-                    raw_bytes = await load_binary_async(Path(prompt_image.resolved.path))
+                case ResolvedLocalPath() as resolved_uri:
+                    raw_bytes = await load_binary_async(Path(resolved_uri.path))
                     return PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
-                case ResolvedPipelexStorage():
+                case ResolvedPipelexStorage() as resolved_uri:
                     storage = get_storage_provider()
-                    raw_bytes = await storage.load(uri=prompt_image.resolved.storage_uri)
+                    raw_bytes = await storage.load(uri=resolved_uri.storage_uri)
                     return PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
-                case ResolvedBase64DataUrl():
-                    base64_data = prompt_image.resolved.base64_data
+                case ResolvedBase64DataUrl() as resolved_uri:
+                    base64_data = resolved_uri.base64_data
                     return PreparedFileBase64(
                         base64_data=base64_data,
                         file_type=detect_file_type_from_base64(base64_data),

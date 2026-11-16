@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt
+from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt, templates_read_paths
 from pipelex.kernel.prompt_references import DocumentReference, ImageReference
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -28,6 +28,16 @@ class LLMPromptBlueprint(BaseModel):
     system_image_references: list[ImageReference] | None = None
     system_document_references: list[DocumentReference] | None = None
 
+    @property
+    def template_read_paths(self) -> frozenset[str]:
+        """The dotted paths through which the two templates read their inputs, each template parsed once per process.
+
+        Their roots are the variables the prompt requires, and the paths themselves tell each step's leaf which stored
+        values to load (`LlmPromptContent.read_paths`). The parse is cached by template source
+        (`parse_jinja2_read_paths`), never on this blueprint, which crosses a host boundary inside its pipe.
+        """
+        return templates_read_paths(templates=[self.system_prompt_blueprint, self.prompt_blueprint])
+
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         if self.user_image_references:
@@ -43,10 +53,7 @@ class LLMPromptBlueprint(BaseModel):
             system_doc_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.system_document_references]
             required_variables.update(system_doc_ref_root_names)
 
-        if self.prompt_blueprint:
-            required_variables.update(get_root_from_dotted_path(path) for path in self.prompt_blueprint.required_variables())
-        if self.system_prompt_blueprint:
-            required_variables.update(get_root_from_dotted_path(path) for path in self.system_prompt_blueprint.required_variables())
+        required_variables.update(get_root_from_dotted_path(path) for path in self.template_read_paths)
         return {variable_name for variable_name in required_variables if not variable_name.startswith("_") and variable_name != "place_holder"}
 
     def to_prompt_content(self) -> LlmPromptContent:
@@ -58,6 +65,7 @@ class LLMPromptBlueprint(BaseModel):
             user_document_references=self.user_document_references,
             system_image_references=self.system_image_references,
             system_document_references=self.system_document_references,
+            read_paths=self.template_read_paths,
         )
 
     async def make_llm_prompt(

@@ -547,6 +547,21 @@ class TestHydrateWorkingMemory:
             with pytest.raises(PipeJobError, match="no longer reachable"):
                 hydrate_working_memory(working_memory_raw)
 
+    def test_hydrate_an_empty_memory_reads_no_library(self) -> None:
+        """A memory holding no stuff names no concept, so a binding that outlived its library does not refuse it.
+
+        A prompt that reads no run data carries an empty context to its leaf, which may run where the contextvar
+        still names a library torn down since.
+        """
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        with scoped_current_library(library_id=library_id):
+            library_manager.teardown(library_id=library_id)
+
+            working_memory = hydrate_working_memory({"root": {}, "aliases": {}})
+
+        assert working_memory.root == {}
+
     def test_hydrate_raises_when_the_structure_class_is_not_registered(self) -> None:
         """A concept the library holds whose structure class this process never registered still refuses clearly.
 

@@ -21,7 +21,7 @@ A run without a read scope reads exactly as it always did.
 The check performs no IO, so a refusal says nothing about whether the file exists.
 """
 
-from typing import NamedTuple
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.system.storage_scope import is_key_within_read_scope
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
@@ -30,11 +30,20 @@ from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUr
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
-class UriReference(NamedTuple):
-    """A URL a payload will read, and where it sits, for a refusal to name."""
+class UriReference(BaseModel):
+    """A URL a payload will read, and where it sits, for a refusal to name.
+
+    A frozen model, so a host runtime carries a list of them across its activity boundary, into the leaf that loads the
+    stored texts a prompt or a condition reads (`ContentGeneratorProtocol.load_stored_texts`), as it carries any payload.
+
+    Attributes:
+        uri: The URL the payload will read.
+        position: Where the URL sits, in the caller's words: "image 2 of the prompt", "the document to extract".
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     uri: str
-    # Where the URL sits, in the caller's words: "image 2 of the prompt", "the document to extract".
     position: str
 
 

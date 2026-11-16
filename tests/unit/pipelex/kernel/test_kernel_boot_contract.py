@@ -70,6 +70,7 @@ SUBPROCESS_TIMEOUT_SECONDS = 300
 _KERNEL_CALL_SCRIPT = textwrap.dedent(
     """
     import asyncio
+    import base64
     import sys
 
     from typing_extensions import override
@@ -116,6 +117,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.kernel.prompt_assembly import UserPromptContent
     from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
     from pipelex.kernel.search_ops import run_search
+    from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
     from pipelex.kernel.templating_style_ops import resolve_templating_style
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.pipe_run_mode import PipeRunMode
@@ -431,6 +433,21 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     if not isinstance(func_result.content, TextContent) or func_result.content.text != FUNCTION_TEXT:
         fail("run_func did not return what the function it was handed produced")
     check_stored(func_result, "run_func", TextContent)
+
+    # A stored text, given as a data URL so no storage is needed, loaded through the content generator's leaf and kept
+    # on its content: what a reader in workflow code, such as a condition's expression, does before it renders.
+    STORED_TEXT = "a text kept out of line"
+    stored_text = TextContent(url="data:text/plain;base64," + base64.b64encode(STORED_TEXT.encode("utf-8")).decode("ascii"))
+    nb_loaded = asyncio.run(
+        load_stored_values_through_leaf(
+            roots={"verdict": stored_text},
+            read_paths=["verdict"],
+            job_metadata=kernel.make_step_metadata(),
+            cogt_run_params=kernel.cogt_run_params,
+        )
+    )
+    if nb_loaded != 1 or stored_text.require_text() != STORED_TEXT:
+        fail("load_stored_values_through_leaf did not load the stored text through the content generator's leaf")
 
     # Swept last, so a function-local interpreter import taken during any of the calls is caught too.
     offenders = sorted(

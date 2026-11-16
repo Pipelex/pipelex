@@ -6,10 +6,10 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.dry_mock import build_mock_object
 from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
-from pipelex.cogt.templating.template_rendering import render_template
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.config import get_config
 from pipelex.core.concepts.exceptions import ConceptStructureClassNotFoundError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -30,9 +30,10 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.runtime_hub import get_class_registry, get_content_generator
+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_memory_transport
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.tabular.csv_codec import flat_field_names
 from pipelex.tools.tabular.exceptions import CsvError, CsvFlatnessError
 from pipelex.tools.tabular.table_reader import locate_table_error, table_subject
@@ -44,6 +45,8 @@ RowModel: TypeAlias = type[StuffContent]
 
 # How the node's execution data names the spreadsheet path, beside the Text path's `structure`.
 SPREADSHEET_STRUCTURING_PATH: Final[str] = "table_read"
+# The name the structuring prompt template (`structuring_prompt` in the LLM config) reads the source text by.
+STRUCTURING_PROMPT_SOURCE_NAME: Final[str] = "text"
 
 
 class PipeStructureOutput(PipeOutput):
@@ -414,7 +417,13 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             return await self._read_spreadsheet(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
-        text_str = working_memory.get_stuff_as_str(name=self.source_input_name)
+        source_stuff = working_memory.get_stuff(name=self.source_input_name)
+        # The source as a text, refused here when it is none. Its value is not read here: it may be stored, and the
+        # leaf that renders the structuring prompt loads it. It is a native `Text` stuff whatever the source's concept, so
+        # the leaf types it again with no library, the content and its concept agreeing.
+        source_text_stuff = source_stuff.model_copy(
+            update={"concept": get_native_concept(native_concept=NativeConceptCode.TEXT), "content": source_stuff.as_text}
+        )
 
         # Resolve list-vs-single from base + override.
         multiplicity_resolution = output_multiplicity_to_apply(
@@ -428,38 +437,39 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         # no text choice of its own, so the kernel's object chain reduces to exactly those three rungs.
         llm_setting_for_object: LLMSetting = resolve_llm_setting_for_object(llm_choice=self.llm_choice)
 
-        # Render the structuring prompt template against the input text. Prompt *assembly* is not
-        # shared with PipeLLM: this pipe has no template of its own and no memory-borne references —
-        # it renders one configured template over one input string.
+        # The structuring prompt renders in the leaf, as PipeLLM's does, so a stored source text is read only there.
+        # Prompt *assembly* is not shared with PipeLLM: this pipe has no template of its own and no memory-borne
+        # references — one configured template reads one input text, under the name `text`.
         # No authored style on this operator: the structuring prompt takes the runtime default, the
         # same one an LLM pipe that declares nothing gets.
         templating_style = resolve_templating_style(authored=None)
         llm_config = get_config().inference.llm
         structuring_template = llm_config.get_template(template_name="structuring_prompt")
-        rendered_user_prompt = await render_template(
-            template=structuring_template,
-            category=TemplateCategory.LLM_PROMPT,
-            context={"text": text_str},
-            templating_style=templating_style,
-        )
 
         content_class: type[StuffContent] = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
 
-        # Append the schema description, from the same kernel derivation PipeLLM's object path uses.
+        # The schema description is appended to the user text, from the same kernel derivation PipeLLM's object path uses.
         output_structure_prompt = await derive_structure_prompt(output_class=content_class, templating_style=templating_style)
-        if output_structure_prompt:
-            rendered_user_prompt += output_structure_prompt
 
-        llm_prompt = LLMPrompt(user_text=rendered_user_prompt)
+        unrendered_prompt = UnrenderedLLMPrompt(
+            user_template=TemplateBlueprint(template=structuring_template, category=TemplateCategory.LLM_PROMPT),
+            templating_style=templating_style,
+            context=get_memory_transport().pack(working_memory=WorkingMemory(root={STRUCTURING_PROMPT_SOURCE_NAME: source_text_stuff})),
+            output_structure_prompt=output_structure_prompt,
+            # Pipelex's own template, written in no field of the pipe: its failure is ours, and is located on no field.
+            system_template_field=None,
+            user_template_field=None,
+            template_owner=TemplateOwner.PIPELEX,
+        )
 
         try:
-            the_content = await generate_object_content(
+            generated = await generate_object_content(
                 job_metadata=job_metadata,
                 cogt_run_params=pipe_run_params.cogt_run_params,
-                llm_prompt=llm_prompt,
+                unrendered_prompt=unrendered_prompt,
                 llm_setting=llm_setting_for_object,
                 output_class=content_class,
                 is_multiple_output=is_multiple_output,
@@ -474,7 +484,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         working_memory = store_result(
             memory=working_memory,
             concept=self.output.concept,
-            content=the_content,
+            content=generated.content,
             result_name=output_name,
             result_code=pipe_run_params.final_stuff_code,
         )
@@ -482,7 +492,8 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         execution_data_dict: dict[str, Any] = {
             "resolved_model": concrete_llm_model_handle(llm_setting_for_object.model),
             "is_multiple_output": is_multiple_output,
-            "rendered_user_prompt": rendered_user_prompt,
+            # Rendered by the leaf, which returned it with the object, a text past the trace's bound as its preview.
+            "rendered_user_prompt": generated.rendered_prompt.traced_user_text,
             "structuring_path": "structure",
         }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)

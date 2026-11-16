@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pytest
+from kajson import kajson
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import TypeAdapter, ValidationError
 from pytest_mock import MockerFixture
@@ -627,9 +628,13 @@ class TestTraceEvents:
         retried = event.model_copy(update={"attempt": 3})
         assert retried.chain == [ExecutionAttempt(execution="wf_run", attempt=1), ExecutionAttempt(execution=_Shared.WORKFLOW_ID, attempt=3)]
         assert retried.store_key == (f"wf_run@1/{_Shared.WORKFLOW_ID}@3", "primary", "PipeStartEvent", 4)
-        # The keys are no field: they are neither serialized nor compared.
+        # The keys are no field: they are serialized by no encoding, the instance-dict encoding of kajson included.
         assert "chain_key" not in event.model_dump()
         assert _any_trace_event_adapter.validate_json(event.model_dump_json()) == event
+        assert not {"chain", "chain_key", "store_key"} & set(vars(event))
+        roundtripped = kajson.loads(kajson.dumps(event))  # pyright: ignore[reportUnknownMemberType]
+        assert roundtripped == event
+        assert roundtripped.store_key == event.store_key
 
     def test_all_event_kinds_covered(self) -> None:
         """Every TraceEventKind has a corresponding test case and event class."""

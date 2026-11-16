@@ -33,6 +33,10 @@ _PLAIN_DEFAULT_SCALAR_TYPES: tuple[type[Any], ...] = (_NoneType, str, int, float
 _PLAIN_DEFAULT_COLLECTION_TYPES: tuple[type[Any], ...] = (list, tuple, set, frozenset, dict)
 # The class-level entry points to a model's JSON schema; a plain model inherits all three from `BaseModel`.
 _MODEL_SCHEMA_ENTRY_POINTS = ("model_json_schema", "__get_pydantic_core_schema__", "__get_pydantic_json_schema__")
+# The class attribute naming the schema entry points a class overrides without changing the schema `model_json_schema()`
+# writes by default, such as a hook that reshapes it only inside a scope the caller opens (`generation_schema` in
+# `pipelex.core.stuffs.stored_value_content`). The plainness walk looks past such an override to the class's bases.
+SCHEMA_NEUTRAL_HOOKS_ATTRIBUTE = "__schema_neutral_hooks__"
 
 
 def normalize_property_for_comparison(prop: dict[str, Any]) -> dict[str, Any]:
@@ -101,10 +105,18 @@ def _has_one_of_types(*, value: object, allowed_types: tuple[type[Any], ...]) ->
 
 
 def _is_inherited_from_base_model(*, model_class: type[BaseModel], attribute_name: str) -> bool:
-    """Whether `model_class` inherits `attribute_name` from `BaseModel` rather than defining its own."""
+    """Whether `model_class` inherits `attribute_name` from `BaseModel` rather than defining its own.
+
+    An override its class declares schema-neutral (`SCHEMA_NEUTRAL_HOOKS_ATTRIBUTE`) is looked past, to the bases.
+    """
     for klass in model_class.__mro__:
-        if attribute_name in vars(klass):
-            return klass is BaseModel
+        if attribute_name not in vars(klass):
+            continue
+        if klass is BaseModel:
+            return True
+        if attribute_name in vars(klass).get(SCHEMA_NEUTRAL_HOOKS_ATTRIBUTE, ()):
+            continue
+        return False
     return False
 
 

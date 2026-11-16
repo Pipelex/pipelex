@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Final
 
 from jinja2.exceptions import SecurityError as JinjaSecurityError
 from mthds.protocol.problem.models import ProblemLocation
@@ -7,7 +7,7 @@ from typing_extensions import Self, override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
-from pipelex.errors.problem import make_location
+from pipelex.errors.problem import PipelexProblem, make_location
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 
@@ -35,6 +35,10 @@ class Jinja2TemplateRenderError(ToolError):
     )
 
 
+# What the message of a template that cannot render as written starts with, its fault following.
+INVALID_TEMPLATE_MESSAGE_PREFIX: Final[str] = "Jinja2 render — the template cannot render as written: "
+
+
 class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
     """A template that cannot render as written, whatever the data.
 
@@ -55,6 +59,51 @@ class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
         # render, such as the deployment's structure prompt beside a PipeLLM's prompt: it reports a refusal of its
         # template only for the method's, and lets Pipelex's own go on as ours.
         self.template_owner = template_owner
+
+    @classmethod
+    def make_for_owner(cls, *, fault: str, template_owner: TemplateOwner) -> Self:
+        """The error of a template that cannot render as written, coded by whose template it is.
+
+        On a method's template it is `method.template_invalid`, its fault the ``finding`` its problem shows the caller,
+        since the fault names the construct Jinja2 refused and never the template source; on Pipelex's own it is
+        `runtime.unexpected`, whose message never reaches a caller.
+        """
+        error = cls(f"{INVALID_TEMPLATE_MESSAGE_PREFIX}{fault}", fault=fault, template_owner=template_owner)
+        match template_owner:
+            case TemplateOwner.METHOD:
+                return error.with_params(finding=fault)
+            case TemplateOwner.PIPELEX:
+                return error.with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+
+    @classmethod
+    def from_problem(cls, *, problem: PipelexProblem) -> Self:
+        """The error again, from the problem it was reported as, such as one a host runtime carried out of a leaf.
+
+        The problem's code says whose template it was: `method.template_invalid` the method's, `runtime.unexpected`
+        Pipelex's own. The fault is the problem's ``finding`` on a method's template; on Pipelex's own, which the caller
+        never reads, it is the error's message in the operator view's diagnostics, its prefix dropped.
+
+        Raises:
+            ValueError: The problem's code is not one this error is reported as.
+        """
+        template_owner: TemplateOwner
+        match problem.code:
+            case CoreCode.METHOD_TEMPLATE_INVALID:
+                template_owner = TemplateOwner.METHOD
+            case CoreCode.RUNTIME_UNEXPECTED:
+                template_owner = TemplateOwner.PIPELEX
+            case _:
+                msg = f"A problem coded '{problem.code}' is not one a template that cannot render as written is reported as"
+                raise ValueError(msg)
+        finding = problem.params.model_dump().get("finding") if problem.params is not None else None
+        fault: str
+        if isinstance(finding, str):
+            fault = finding
+        elif problem.diagnostics is not None:
+            fault = problem.diagnostics.message.removeprefix(INVALID_TEMPLATE_MESSAGE_PREFIX)
+        else:
+            fault = problem.detail or "the template uses a construct Jinja2 cannot render."
+        return cls.make_for_owner(fault=fault, template_owner=template_owner)
 
 
 class Jinja2TemplateSecurityError(SecurityError):

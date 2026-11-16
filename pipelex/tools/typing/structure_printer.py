@@ -5,6 +5,7 @@ from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.misc.python_literals import class_docstring, escape_py_string
 
@@ -255,11 +256,19 @@ class StructurePrinter:
                         continue
 
                 current_fields = set(dict(fields).keys())
-                non_inherited_fields = current_fields - parent_fields
+                printed_fields = current_fields - parent_fields
+
+                # A model generating a content writes its value, never a reference to it, so a content that may hold its
+                # value stored is printed as `generation_schema()` writes it: its value's fields, inherited ones included,
+                # the value required, and none of the reference's fields.
+                stored_value_field_name: str | None = None
+                if issubclass(class_type, StoredValueContent):
+                    stored_value_field_name = class_type.value_field_name
+                    printed_fields = (printed_fields | set(class_type.value_form_field_names)) - set(STORED_VALUE_REFERENCE_FIELDS)
 
                 # Output fields
                 for fname, ftype in fields:
-                    if fname in non_inherited_fields or (fname == "items" and "List" in base_class_name):
+                    if fname in printed_fields or (fname == "items" and "List" in base_class_name):
                         # Initialize is_optional to False by default
                         is_optional = False
 
@@ -267,12 +276,15 @@ class StructurePrinter:
                             ftype_str = ftype.__name__
                         else:
                             field_type = type_hints[fname]
-                            ftype_str = format_type(field_type)
-
                             field_origin = get_origin(field_type)
                             field_args = get_args(field_type)
+                            is_union = field_origin in {Union, types.UnionType}
 
-                            is_optional = field_origin in {Union, types.UnionType} and type(None) in field_args
+                            if fname == stored_value_field_name and is_union and type(None) in field_args:
+                                ftype_str = " | ".join(format_type(field_arg) for field_arg in field_args if field_arg is not type(None))
+                            else:
+                                ftype_str = format_type(field_type)
+                                is_optional = is_union and type(None) in field_args
 
                         # Handle default values
                         field_default = None

@@ -11,8 +11,9 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, Extrac
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration, LLMTextGeneration
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -25,6 +26,7 @@ from pipelex.tools.tabular.exceptions import TableReaderMisconfiguredError
 from pipelex.tools.tabular.table_records import TableRecords
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.tools.uri.uri_read_scope import UriReference
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 P = ParamSpec("P")
@@ -59,6 +61,14 @@ class ContentGeneratorProtocol(Protocol):
     they build, so the leaf sees the same ``run_mode`` on any backend — inline or inside a
     Temporal activity. The two search methods take a pre-built assignment instead; the operator
     stamps ``cogt_run_params`` at assignment construction.
+
+    **The LLM entry points render their prompt.** ``make_llm_text``, ``make_object`` and ``make_object_list`` take an
+    :class:`~pipelex.cogt.llm.unrendered_llm_prompt.UnrenderedLLMPrompt`: the templates, the working memory they read
+    with its stored values still references, and the files the operator registered. The implementation loads every
+    stored value that memory holds under the run's read scope (``job_metadata.run_metadata.read_scope``), renders the
+    prompt with :func:`~pipelex.kernel.llm_prompt_content.render_llm_prompt`, generates, and returns the rendered prompt
+    beside what it generated, since the operator records it in the trace. On a host runtime this is where the activity
+    boundary falls: workflow code reads no storage, so a stored text is read only inside the activity.
     """
 
     def make_llm_text(
@@ -67,8 +77,8 @@ class ContentGeneratorProtocol(Protocol):
         job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-    ) -> Coroutine[Any, Any, str]: ...
+        unrendered_prompt: UnrenderedLLMPrompt,
+    ) -> Coroutine[Any, Any, LLMTextGeneration]: ...
 
     def make_object(
         self,
@@ -77,8 +87,8 @@ class ContentGeneratorProtocol(Protocol):
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
-        llm_prompt_for_object: LLMPrompt,
-    ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...
+        unrendered_prompt: UnrenderedLLMPrompt,
+    ) -> Coroutine[Any, Any, LLMObjectGeneration[BaseModelTypeVar]]: ...
 
     def make_object_list(
         self,
@@ -87,9 +97,9 @@ class ContentGeneratorProtocol(Protocol):
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
-        llm_prompt_for_object_list: LLMPrompt,
+        unrendered_prompt: UnrenderedLLMPrompt,
         nb_items: int | None = None,
-    ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
+    ) -> Coroutine[Any, Any, LLMObjectListGeneration[BaseModelTypeVar]]: ...
 
     def make_single_image(
         self,
@@ -124,6 +134,26 @@ class ContentGeneratorProtocol(Protocol):
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> Coroutine[Any, Any, str]: ...
+
+    def load_stored_texts(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        uri_references: list[UriReference],
+    ) -> Coroutine[Any, Any, list[str]]:
+        """Read the texts stored at the given URLs, under the run's read scope, for workflow code that must read them.
+
+        A leaf operation, since it reads storage: workflow code that needs a stored value synchronously, a
+        `PipeCondition` expression reading a stored text, hands the URLs here and keeps the texts the leaf returns on
+        the contents (`accept_loaded_text`). The texts then enter the workflow's history, which is acceptable for the
+        rare value it is. Each URL is authorized against ``job_metadata.run_metadata.read_scope`` before it is read, and
+        a refusal names its reference's position.
+
+        Returns:
+            The texts, decoded as UTF-8, in the order of the references.
+        """
+        ...
 
     def make_render_page_views(
         self,

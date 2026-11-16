@@ -12,6 +12,7 @@ from pipelex.cogt.content_generation.object_class_resolution import resolve_obje
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
+from pipelex.core.stuffs.stored_value_content import generation_schema
 from pipelex.runtime_hub import get_llm_worker
 
 
@@ -49,10 +50,12 @@ async def llm_gen_object(object_assignment: ObjectAssignment, *, object_class: t
     )
     content_class = resolve_object_class(object_assignment=object_assignment, object_class=object_class)
     dump_prompt(llm_prompt=llm_job.llm_prompt)
-    generated_object: BaseModel = await llm_worker.gen_object(
-        llm_job=llm_job,
-        schema=content_class,
-    )
+    # The provider writes the schema it shows the model from the class: a stored-value content's value alone.
+    with generation_schema():
+        generated_object: BaseModel = await llm_worker.gen_object(
+            llm_job=llm_job,
+            schema=content_class,
+        )
     dump_response_from_text_gen(response=generated_object)
     return generated_object
 
@@ -100,10 +103,11 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment, *, object_cla
     list_schema = make_object_list_schema(item_class=item_class, item_class_name=item_class_name)
 
     dump_prompt(llm_prompt=llm_job.llm_prompt)
-    wrapped_list = await llm_worker.gen_object(
-        llm_job=llm_job,
-        schema=list_schema,
-    )
+    with generation_schema():
+        wrapped_list = await llm_worker.gen_object(
+            llm_job=llm_job,
+            schema=list_schema,
+        )
     dump_response_from_text_gen(response=wrapped_list)
     # The wrapper's one field, which `make_object_list_schema` declares.
     generated_list: list[BaseModel] = cast("list[BaseModel]", wrapped_list.items)  # type: ignore[attr-defined] # pyright: ignore[reportAttributeAccessIssue,reportUnknownMemberType]

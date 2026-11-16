@@ -7,8 +7,12 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex import pretty_print
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.python_literals import normalized_docstring_text
 from pipelex.tools.typing.structure_printer import StructurePrinter
@@ -38,6 +42,20 @@ class MusicGenre(StrEnum):
 # Simple Content Classes
 class SimpleTextContent(TextContent):
     """A simple text content class"""
+
+
+class StoredValueFieldsContent(StructuredContent):
+    """A structure holding stored-value contents as direct fields"""
+
+    summary: TextContent
+    data: JSONContent
+    page: HtmlContent | None = None
+
+
+class TextSubclassFieldContent(StructuredContent):
+    """A structure holding a concept refining Text"""
+
+    headline: SimpleTextContent
 
 
 class MusicCategoryContent(StructuredContent):
@@ -168,7 +186,7 @@ class TestStructurePrinter:
         expected = [
             "class SimpleTextContent(TextContent):",
             '    """A simple text content class"""',
-            "    # No additional fields",
+            "    text: str  # The text",
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
@@ -358,6 +376,46 @@ class TestStructurePrinter:
             "class Milestone(StructuredContent):",
             "    name: str",
             "    date: datetime | None = None",
+        ]
+        assert result == expected
+
+    def test_stored_value_fields_print_their_value_alone(self) -> None:
+        """A model writes a Text, JSON or Html field's value, so its structure shows the value, required, and never a url."""
+        result = StructurePrinter().get_type_structure(StoredValueFieldsContent, base_class=StuffContent)
+        expected = [
+            "class StoredValueFieldsContent(StructuredContent):",
+            '    """A structure holding stored-value contents as direct fields"""',
+            "    summary: TextContent",
+            "    data: JSONContent",
+            "    page: HtmlContent | None = None",
+            "",
+            "class TextContent(StoredValueContent):",
+            '    """A text"""',
+            "    text: str  # The text",
+            "",
+            "class JSONContent(StoredValueContent):",
+            "    json_obj: Dict[str, Any]  # The JSON object",
+            "",
+            "class HtmlContent(StoredValueContent):",
+            '    """HTML content"""',
+            "    inner_html: str  # The inner HTML of the content",
+            "    css_class: str | None = None  # The CSS class of the content",
+        ]
+        assert result == expected
+        for reference_field_name in STORED_VALUE_REFERENCE_FIELDS:
+            assert not any(line.strip().startswith(f"{reference_field_name}:") for line in result)
+
+    def test_a_text_subclass_field_prints_its_inherited_value(self) -> None:
+        """A concept refining Text inherits its value field, which is printed, required, on the refining class."""
+        result = StructurePrinter().get_type_structure(TextSubclassFieldContent, base_class=StuffContent)
+        expected = [
+            "class TextSubclassFieldContent(StructuredContent):",
+            '    """A structure holding a concept refining Text"""',
+            "    headline: SimpleTextContent",
+            "",
+            "class SimpleTextContent(TextContent):",
+            '    """A simple text content class"""',
+            "    text: str  # The text",
         ]
         assert result == expected
 

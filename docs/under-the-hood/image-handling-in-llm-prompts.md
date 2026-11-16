@@ -211,7 +211,7 @@ system_image_references = [ImageReference(variable_path="context_image", kind=Im
 
 ### Runtime: Image Collection
 
-When the prompt is built:
+The first three steps run in the operator, which prepares the prompt without rendering it (`prepare_llm_prompt`), and hands their registrations to the content-generation leaf; the leaf loads any stored value the prompt reads and runs the rest (`render_llm_prompt`), so the numbering is the same wherever the leaf runs. When the prompt is built:
 
 1. **Create registry** - Fresh `ImageRegistry` for this prompt; a reference whose root input is optional and was not given is skipped here, taking no number, so the template's guard renders it out
 2. **Extract system prompt images first** - Direct and list references from `system_prompt` are processed first, getting lower numbers

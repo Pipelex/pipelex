@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import pytest
 
+from pipelex.cogt.llm.llm_generation import LLMTextGeneration
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.kernel import llm_ops
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
@@ -48,9 +50,9 @@ class ContentGeneratorProbe:
     def __init__(self) -> None:
         self.seen: list[LogContext | None] = []
 
-    async def make_llm_text(self, **kwargs: Any) -> str:  # ruff: ignore[unused-method-argument]
+    async def make_llm_text(self, **kwargs: Any) -> LLMTextGeneration:  # ruff: ignore[unused-method-argument]
         self.seen.append(get_log_context())
-        return "generated text"
+        return LLMTextGeneration(text="generated text", rendered_prompt=LLMPromptTrace(user_text="rendered by the leaf"))
 
 
 class KernelCallSpy:

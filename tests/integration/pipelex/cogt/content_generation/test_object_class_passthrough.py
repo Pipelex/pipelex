@@ -31,8 +31,10 @@ from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_
 from pipelex.cogt.content_generation.search_generate import search_gen_structured, search_gen_structured_object
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -199,14 +201,17 @@ class TestObjectClassPassthrough:
         the result against the same class would run them again on data they had already normalized —
         ``INV-INV-…`` — which is the opposite of honoring the invariant this change exists to preserve.
         """
-        result = await content_generator.make_object(
+        object_generation = await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
             object_class=NormalizedReference,
-            llm_prompt_for_object=LLMPrompt(user_text="make a reference"),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text="make a reference", templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting_for_object=LLMSetting(model="test-model", temperature=0.5),
         )
 
+        result = object_generation.generated_object
         assert result.reference.startswith("INV-")
         assert not result.reference.startswith("INV-INV-")
 
@@ -214,15 +219,18 @@ class TestObjectClassPassthrough:
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
     ) -> None:
         """The list path revalidates per item, so it carries the same once-only contract."""
-        results = await content_generator.make_object_list(
+        object_list_generation = await content_generator.make_object_list(
             job_metadata=job_metadata,
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
             object_class=NormalizedReference,
-            llm_prompt_for_object_list=LLMPrompt(user_text="make references"),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text="make references", templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting_for_object_list=LLMSetting(model="test-model", temperature=0.5),
             nb_items=3,
         )
 
+        results = object_list_generation.generated_objects
         assert len(results) == 3
         # Both directions: `not INV-INV-` alone would also pass if the validator never ran at all.
         assert all(item.reference.startswith("INV-") for item in results)

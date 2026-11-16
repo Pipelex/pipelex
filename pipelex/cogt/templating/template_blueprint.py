@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables, parse_jinja2_read_paths
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -41,4 +41,11 @@ class TemplateBlueprint(BaseModel):
         return detect_jinja2_required_variables(
             template_category=self.category,
             template_source=template_source,
+        )
+
+    def read_paths(self) -> frozenset[str]:
+        """The dotted paths through which the template may read its inputs' values, parsed once per source (`parse_jinja2_read_paths`)."""
+        return parse_jinja2_read_paths(
+            template_category=self.category,
+            template_source=preprocess_template(self.template),
         )

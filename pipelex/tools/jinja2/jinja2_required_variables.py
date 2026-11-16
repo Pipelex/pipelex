@@ -6,6 +6,7 @@ reported as the input of that name everywhere else, such as after an `if` whose 
 """
 
 from dataclasses import field
+from functools import lru_cache
 
 from jinja2 import nodes
 from jinja2.exceptions import (
@@ -102,6 +103,81 @@ def detect_jinja2_required_variables(
 
     walk_template_reads(template=parsed_ast, global_names=set(jinja2_env.globals), handle_read=collect_full_path)
     return paths
+
+
+def detect_jinja2_read_paths(
+    *,
+    template_category: TemplateCategory,
+    template_source: str,
+) -> set[str]:
+    """Returns the dotted paths through which the Jinja2 template may read its inputs' values.
+
+    It is the set `detect_jinja2_required_variables` returns, plus the object of every method the template calls: a
+    call such as `{{ doc.get("a") }}` or `{% for key, value in doc.mapping.items() %}` reads values below `doc` or
+    `doc.mapping` that no attribute path names, so the path the method is called on is a read path too. A value is read
+    by the template when its path equals a read path, is a prefix of one, or is prefixed by one, compared segment by
+    segment: `{{ doc.a.b }}` reads `doc.a.b` and everything under it, and nothing under `doc.a.c`.
+
+    Args:
+        template_category: Category of the template (HTML, MARKDOWN, etc.)
+        template_source: Jinja2 template string
+
+    Returns:
+        Set of full dotted read paths
+
+    Raises:
+        Jinja2DetectVariablesError: If there is an error parsing the template
+    """
+    jinja2_env = make_jinja2_env_without_loader(
+        template_category=template_category,
+    )
+
+    try:
+        parsed_ast = jinja2_env.parse(template_source)
+    except (Jinja2StuffError, TemplateSyntaxError, UndefinedError) as parse_error:
+        raise _make_detect_variables_error(parse_error=parse_error, template_category=template_category) from parse_error
+
+    paths: set[str] = set()
+
+    def collect_read_path(*, node: nodes.Node, bindings: ScopeBindings) -> bool:
+        if isinstance(node, nodes.Call) and isinstance(node.node, nodes.Getattr):
+            # A method reads the object it is called on, whatever its arguments say: that object's path is read whole.
+            # The walk goes on into the call, so the method's own path and its arguments are collected too.
+            called_on_path = dotted_attribute_path(node.node.node)
+            if called_on_path is not None and get_root_from_dotted_path(called_on_path) not in bindings:
+                paths.add(called_on_path)
+            return False
+        if not isinstance(node, (nodes.Name, nodes.Getattr)):
+            return False
+        full_path = dotted_attribute_path(node)
+        if full_path is None:
+            return False
+        if get_root_from_dotted_path(full_path) not in bindings:
+            paths.add(full_path)
+        return True
+
+    walk_template_reads(template=parsed_ast, global_names=set(jinja2_env.globals), handle_read=collect_read_path)
+    return paths
+
+
+# How many distinct templates keep their parsed read paths in one process: every template of the methods a long-running
+# worker serves, bounded so that the cache never grows with them.
+_READ_PATHS_CACHE_SIZE = 4096
+
+
+@lru_cache(maxsize=_READ_PATHS_CACHE_SIZE)
+def parse_jinja2_read_paths(*, template_category: TemplateCategory, template_source: str) -> frozenset[str]:
+    """The read paths of `detect_jinja2_read_paths`, parsed once per template source and category in a process.
+
+    A pipe reads the paths of its templates at validation and again at every step it runs, so they are parsed once and
+    shared. The cache is keyed on the template category and source and held outside every model: a path set cached on a pydantic
+    instance would sit in its `__dict__`, which a host runtime's data converter (kajson) encodes the model from. A
+    template that does not parse caches nothing, so each call raises again.
+
+    Raises:
+        Jinja2DetectVariablesError: If there is an error parsing the template
+    """
+    return frozenset(detect_jinja2_read_paths(template_category=template_category, template_source=template_source))
 
 
 def _extract_filters_and_variable(node: nodes.Node) -> tuple[list[str], nodes.Node | None]:
