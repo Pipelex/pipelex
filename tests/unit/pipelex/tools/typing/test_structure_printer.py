@@ -138,6 +138,20 @@ class QuotedContent(StructuredContent):
 QuotedContent.__doc__ = 'Says """hello""" in a list:\n  - with an indented line\nand ends with a backslash \\'
 
 
+class OddValue(StrEnum):
+    QUOTED = 'says "hi" and \\ a backslash'
+    APOSTROPHE = "it's"
+
+
+class OddValueContent(StructuredContent):
+    odd: OddValue
+    choice: Literal['says "hi"', "it's"]
+
+
+class MultiLineDescriptionContent(StructuredContent):
+    value: str = Field(description="first line\nb = 1\r\nc = 2\rd = 3")
+
+
 class TestStructurePrinter:
     def test_simple_text_content(self):
         """Test structure of simple text content"""
@@ -347,3 +361,40 @@ class TestStructurePrinter:
         assert set(class_defs) == {"QuotedContent", "QuotedGenre"}
         assert ast.get_docstring(class_defs["QuotedContent"]) == normalized_docstring_text(QuotedContent.__doc__ or "")
         assert ast.get_docstring(class_defs["QuotedGenre"]) == normalized_docstring_text(QuotedGenre.__doc__ or "")
+
+    def test_enum_and_literal_values_print_as_literals_of_themselves(self):
+        """An enum member or a Literal value holding quotes or a backslash prints as a string literal that evaluates back to it."""
+        result = StructurePrinter().get_type_structure(OddValueContent)
+
+        module = ast.parse("\n".join(result))
+        class_defs = {node.name: node for node in module.body if isinstance(node, ast.ClassDef)}
+        assert set(class_defs) == {"OddValueContent", "OddValue"}
+        member_values: dict[str, object] = {
+            statement.targets[0].id: ast.literal_eval(statement.value)
+            for statement in class_defs["OddValue"].body
+            if isinstance(statement, ast.Assign) and isinstance(statement.targets[0], ast.Name)
+        }
+        assert member_values == {member.name: member.value for member in OddValue}
+        choice = next(
+            statement
+            for statement in class_defs["OddValueContent"].body
+            if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name) and statement.target.id == "choice"
+        )
+        assert isinstance(choice.annotation, ast.Subscript)
+        assert ast.literal_eval(choice.annotation.slice) == ('says "hi"', "it's")
+
+    def test_multi_line_field_description_continues_as_comments(self):
+        """Every line of a multi-line field description prints as a comment, whatever line break ends the one before."""
+        result = StructurePrinter().get_type_structure(MultiLineDescriptionContent)
+
+        assert result == [
+            "class MultiLineDescriptionContent(StructuredContent):",
+            "    value: str  # first line",
+            "    # b = 1",
+            "    # c = 2",
+            "    # d = 3",
+        ]
+        module = ast.parse("\n".join(result))
+        class_def = module.body[0]
+        assert isinstance(class_def, ast.ClassDef)
+        assert [type(statement) for statement in class_def.body] == [ast.AnnAssign]

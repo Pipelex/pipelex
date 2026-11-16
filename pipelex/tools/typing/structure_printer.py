@@ -1,3 +1,4 @@
+import re
 import types
 from enum import Enum, StrEnum
 from typing import Any, Union, get_args, get_origin, get_type_hints
@@ -5,7 +6,17 @@ from typing import Any, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 
 from pipelex.runtime_hub import get_class_registry
-from pipelex.tools.misc.python_literals import class_docstring
+from pipelex.tools.misc.python_literals import class_docstring, escape_py_string
+
+# A line break as Python source reads one, so that no line of a printed comment continues as code.
+_SOURCE_LINE_BREAK = re.compile(r"\r\n|\r|\n")
+
+
+def _value_literal(*, value: Any) -> str:
+    """The Python literal of an enum member's or a `Literal` choice's value: an escaped string literal for a string."""
+    if isinstance(value, str):
+        return escape_py_string(value)
+    return repr(value)
 
 
 def _build_type_hints_namespace() -> dict[str, Any]:
@@ -52,9 +63,9 @@ class StructurePrinter:
             values: list[str] = []
             for arg in args:
                 if isinstance(arg, (Enum, StrEnum)):
-                    values.append(f'"{arg.value}"')
+                    values.append(_value_literal(value=arg.value))
                 else:
-                    values.append(repr(arg))
+                    values.append(_value_literal(value=arg))
             # Return multi-line format for Literal fields
             if len(values) > 1:
                 return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
@@ -114,18 +125,17 @@ class StructurePrinter:
                 enum_type = None
                 for arg in args:
                     if isinstance(arg, (Enum, StrEnum)):
-                        values.append(arg.value)
+                        values.append(_value_literal(value=arg.value))
                         if enum_type is None:
                             enum_type = type(arg)
                     else:
-                        values.append(str(arg))
+                        values.append(_value_literal(value=arg))
                 # Add enum type to collected_enums if found
                 if enum_type is not None:
                     collected_enums[enum_type.__name__] = enum_type
                 # Return multi-line format for Literal fields
                 if len(values) > 1:
-                    lines = [f'"{value}"' for value in values]
-                    return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
+                    return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
                 return f"Literal[{', '.join(values)}]"
 
             if origin is list:
@@ -289,19 +299,21 @@ class StructurePrinter:
 
                         # Add description as a comment if available
                         # First check if there's a direct field description from model_fields
+                        comment: str | None = None
                         if field_description:
-                            field_line += f"  # {field_description}"
+                            comment = field_description
                         # Then check if the field type itself has model_fields and a description
                         # This handles nested content types that have field descriptions
                         elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"):  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                            field_line += f"  # {ftype.model_fields[fname].description}"  # pyright: ignore[reportUnknownMemberType]
+                            comment = f"{ftype.model_fields[fname].description}"  # pyright: ignore[reportUnknownMemberType]
 
-                        # Split multi-line field lines
-                        if "\n" in field_line:
-                            lines = field_line.split("\n")
-                            output.extend(lines)
-                        else:
-                            output.append(field_line)
+                        # A multi-line Literal annotation spans several lines of its own
+                        output.extend(field_line.split("\n"))
+                        if comment is not None:
+                            # Every line of the comment stays a comment, so none of it prints as code
+                            first_comment_line, *continuation = _SOURCE_LINE_BREAK.split(comment)
+                            output[-1] += f"  # {first_comment_line}"
+                            output.extend(f"    # {comment_line}" for comment_line in continuation)
                         continue
 
                 # If no fields were output, show inheritance comment
@@ -320,6 +332,6 @@ class StructurePrinter:
             # This ensures we only include meaningful custom docstrings
             if enum_type.__doc__ and enum_type.__doc__.strip() != "An enumeration.":
                 output.extend(class_docstring(enum_type.__doc__).split("\n"))
-            output += [f'    {member.name} = "{member.value}"' for member in enum_type]
+            output += [f"    {member.name} = {_value_literal(value=member.value)}" for member in enum_type]
 
         return output
