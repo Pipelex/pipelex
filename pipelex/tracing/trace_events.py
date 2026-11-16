@@ -8,10 +8,9 @@ for NDJSON file storage and cross-worker graph assembly.
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from functools import cached_property
 from typing import Annotated, Any, Literal, NamedTuple, Protocol, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, field_validator
 from pydantic_core import to_json
 from typing_extensions import override
 
@@ -80,9 +79,10 @@ class TraceEvent(BaseModel):
     A store keeps apart every two events whose chain, writer or sequence differ (`store_key`): keyed on the workflow,
     the writer and the sequence alone, a workflow's new attempt would overwrite the events of its earlier one.
 
-    An event is frozen, since it records what happened: its chain, its chain key and its store key are computed from its
-    fields once, the first time they are read, and kept, as every read and every assembly of a run reads them for each
-    of its events.
+    An event is frozen, since it records what happened: its chain key is computed from its fields once, when the event
+    is built, as every read and every assembly of a run reads it for each of its events. It is kept in a private
+    attribute, which is never serialized: a value cached in the instance `__dict__` would travel with the event through
+    a host runtime's data converter (kajson), which encodes a model from it.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -97,17 +97,23 @@ class TraceEvent(BaseModel):
     timestamp: datetime
     sequence: int
 
-    @cached_property
+    _chain_key: str = PrivateAttr()
+
+    @override
+    def model_post_init(self, context: Any, /) -> None:
+        self._chain_key = execution_chain_key(chain=self.chain)
+
+    @property
     def chain(self) -> list[ExecutionAttempt]:
         """The attempts from the run's own workflow down to the one that emitted this event."""
         return [*self.lineage, ExecutionAttempt(execution=self.workflow_id, attempt=self.attempt)]
 
-    @cached_property
+    @property
     def chain_key(self) -> str:
         """One string naming this event's chain, distinct for every two chains that differ."""
-        return execution_chain_key(chain=self.chain)
+        return self._chain_key
 
-    @cached_property
+    @property
     def store_key(self) -> tuple[str, str, str, int]:
         """What tells this event apart from every other event of its run in a store: its chain, its writer, its kind
         and its sequence. Two writes with the same key are one event, written again by a replay.
@@ -116,10 +122,9 @@ class TraceEvent(BaseModel):
 
     @override
     def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
-        """A copy of this event, which computes its keys again: an update can change the fields they are read from."""
+        """A copy of this event, which computes its chain key again: an update can change the fields it is read from."""
         copied = super().model_copy(update=update, deep=deep)
-        for cached_name in _CACHED_EVENT_KEYS:
-            vars(copied).pop(cached_name, None)
+        copied.model_post_init(None)
         return copied
 
     def reduced_to_fit(self, *, fits: "TraceEventFitCheck") -> "ReducedTraceEvent":
@@ -163,9 +168,6 @@ class TraceEvent(BaseModel):
         """
         return []
 
-
-# The names under which a trace event keeps the keys it computed from its fields.
-_CACHED_EVENT_KEYS: tuple[str, ...] = ("chain", "chain_key", "store_key")
 
 # The key an io item's `extra` carries, beside its `data` set to None, when its data was left out for size: the size
 # in bytes of the JSON the data serialized to.

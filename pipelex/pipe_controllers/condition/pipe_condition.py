@@ -1,4 +1,3 @@
-from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal
 
 from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSite
@@ -40,7 +39,7 @@ from pipelex.system.invocation_path import DEFAULT_OUTCOME_SEGMENT, outcome_segm
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2TemplateInvalidError
 from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_read_paths
+from pipelex.tools.jinja2.jinja2_required_variables import parse_jinja2_read_paths
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -86,21 +85,20 @@ class PipeCondition(PipeController):
     default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
 
-    @cached_property
+    @property
     def expression_read_paths(self) -> frozenset[str]:
-        """The dotted paths the expression reads through, parsed once from the sigil-rewritten source it renders from.
+        """The dotted paths the expression reads through, parsed from the sigil-rewritten source it renders from.
 
         Its roots are the inputs the expression requires, and the paths themselves say which stored values a run must
-        load before it renders (`detect_jinja2_read_paths`).
+        load before it renders (`detect_jinja2_read_paths`). The parse is cached by source (`parse_jinja2_read_paths`),
+        never on this pipe, which crosses a host boundary inside a pipe job.
 
         Raises:
             Jinja2DetectVariablesError: The expression does not parse. Nothing is cached then, so each read raises again.
         """
-        return frozenset(
-            detect_jinja2_read_paths(
-                template_category=TemplateCategory.EXPRESSION,
-                template_source=rewrite_template_sigils(self.expression),
-            )
+        return parse_jinja2_read_paths(
+            template_category=TemplateCategory.EXPRESSION,
+            template_source=rewrite_template_sigils(self.expression),
         )
 
     @override

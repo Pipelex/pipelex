@@ -6,7 +6,6 @@ for document understanding. Follows the same pattern as PromptImage.
 
 import base64
 import binascii
-from functools import cached_property
 from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field, field_validator
@@ -49,9 +48,13 @@ class PromptDocumentUri(BaseModel):
             raise ValueError(msg)
         return uri
 
-    @cached_property
+    @property
     def resolved(self) -> ResolvedUri:
-        """Lazily resolve the URI to a typed ResolvedUri."""
+        """The URI resolved to a typed ResolvedUri, on each read.
+
+        It is not cached on the instance: a host runtime's data converter encodes a model from its instance `__dict__`,
+        where a cached resolution, a base64 data URL's whole payload included, would travel beside the URI.
+        """
         return resolve_uri(self.uri)
 
     @override
