@@ -170,7 +170,7 @@ def parse_jinja2_read_paths(*, template_category: TemplateCategory, template_sou
     """The read paths of `detect_jinja2_read_paths`, parsed once per template source and category in a process.
 
     A pipe reads the paths of its templates at validation and again at every step it runs, so they are parsed once and
-    shared. The cache is keyed on the source alone and held outside every model: a path set cached on a pydantic
+    shared. The cache is keyed on the template category and source and held outside every model: a path set cached on a pydantic
     instance would sit in its `__dict__`, which a host runtime's data converter (kajson) encodes the model from. A
     template that does not parse caches nothing, so each call raises again.
 
