@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Stored values read by image prompts, judgments, searches and compose templates**: a `PipeImgGen` prompt or negative prompt, a `PipeJudge`'s evidence or question, a `PipeSearch` query and a `PipeCompose` template or construct template field that read a stored `Text`, `Markdown`, `Html` or `JSON` value now render it in full, a dry run included, and a step whose templates read only inline values loads nothing. A `PipeCompose` construct `from` field taking the value of a stored text, a `str` field filled from a stored `Text` or a path ending on its value field such as `pages.text`, reads it in full too, where it raised `StoredValueNotLoadedError` or read `None`; a `from` field copying the content keeps its reference and loads nothing, and a `PipeCompose` template path starting from an `extra_context` key, which wins over the stuff of that name, loads nothing either. `load_stored_values_read_from_memory` in `pipelex.kernel.stored_value_ops` loads the stored values of a working memory that a set of template read paths reads, which a programmatic caller of `assemble_img_gen_prompt`, `run_judgment`, `run_multi_judgment`, `run_search` or `run_compose_template` calls first.
+
 ## [v0.105.0] - 2026-11-16
 
 ### Added

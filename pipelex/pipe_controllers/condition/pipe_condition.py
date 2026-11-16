@@ -17,7 +17,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
-from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
+from pipelex.kernel.stored_value_ops import load_stored_values_read_from_memory
 from pipelex.pipe_controllers.absence_taint import (
     ConditionTaintAnalysis,
     ForceConsumptionInfo,
@@ -457,13 +457,8 @@ class PipeCondition(PipeController):
         except Jinja2DetectVariablesError:
             # The render that follows refuses the expression with the method's own error, which names the field.
             return
-        read_contents: dict[str, Any] = {}
-        for read_name in sorted({get_root_from_dotted_path(read_path) for read_path in read_paths}):
-            read_stuff = working_memory.get_optional_stuff(name=read_name)
-            if read_stuff is not None:
-                read_contents[read_name] = read_stuff.content
-        await load_stored_values_through_leaf(
-            roots=read_contents, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
+        await load_stored_values_read_from_memory(
+            memory=working_memory, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
         )
 
     async def _render_expression(self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> str:
