@@ -43,7 +43,9 @@ class SchemaCapturingSearchWorker:
 
 def _search_assignment() -> SearchAssignment:
     return SearchAssignment(
-        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_search_schema")),
+        job_metadata=JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_search_schema")
+        ),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         query="what is pipelex?",
         search_setting=SearchSetting(model="mock-search-handle"),
