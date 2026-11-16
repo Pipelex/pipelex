@@ -75,7 +75,7 @@ class UsageFixtures:
         return ExtractTokensUsage(
             job_metadata=cls.full_job_metadata(unit_job_id=UnitJobId.EXTRACT_PAGES, job_category=JobCategory.EXTRACT_JOB),
             inference_model_name="mistral-ocr",
-            inference_model_id="mistral-ocr-2505",
+            inference_model_id="mistral-ocr-4-1",
             nb_tokens_by_category=dict(RATED_NB_TOKENS),
             unit_costs=dict(RATED_UNIT_COSTS),
         )

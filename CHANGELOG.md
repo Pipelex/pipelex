@@ -5,6 +5,7 @@
 ### Changed
 
 - **Requires `pipelex-sdk` 0.69.0 (Breaking)**: the exact pin moves from `pipelex-sdk==0.68.0` to `pipelex-sdk==0.69.0`, which still pins `mthds==0.28.0`, so a project that also pins `pipelex-sdk` moves with it. In that release `get_run_result`, `wait_for_result` and `start_and_wait` load every stored text of `main_stuff` into its inline form by default and raise `StoredTextLoadError` for one they cannot load, `load_stored_texts=False` returning the references, and `download_artifacts` saves a stored text as a text file.
+- **The Mistral backend follows Mistral's current catalog (Breaking)**: it adds `mistral-large-4` (text, images and PDF in, reasoning by effort), `ministral-14b`, `mistral-codestral-2508` and the `mistral-ocr-4.1` extractor, and drops the handles whose models Mistral has retired: `mistral-7b-2312`, `mistral-8x7b-2312`, `mistral-codestral-2405`, `pixtral-12b`, `pixtral-large`, `mistral-small-2506`, `mistral-small-3.2`, `mistral-medium-2508`, `mistral-medium-3.1`, the four `magistral-*` handles, `mistral-ocr-2503` and `mistral-ocr-2505`. The aliases now describe the models they resolve to, with their prices: `mistral-large` is Large 4, `mistral-medium` is Medium 3.5 with reasoning, `mistral-ocr` is OCR 4.1, and `ministral-3b` and `ministral-8b` are the Ministral 3 models with image and PDF input; the Mistral Small 4 handles also take PDF. A method naming a dropped handle moves to its successor, such as `mistral-small-4` for a Magistral Small handle or `mistral-large` for a Pixtral one.
 
 ### Fixed
 

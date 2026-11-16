@@ -138,26 +138,16 @@ mistralai = [
   "bedrock-mistral-large",
   "ministral-3b",
   "ministral-8b",
-  "mistral-7b-2312",
-  "mistral-8x7b-2312",
-  "mistral-codestral-2405",
-  "pixtral-12b",
-  "pixtral-large",
-  "mistral-small-2506",
-  "mistral-small-3.2",
+  "ministral-14b",
+  "mistral-codestral-2508",
   "mistral-small-2603",
   "mistral-small-4",
   "mistral-small",
-  "mistral-medium-2508",
-  "mistral-medium-3.1",
   "mistral-medium",
   "mistral-large-2512",
   "mistral-large-3",
+  "mistral-large-4",
   "mistral-large",
-  "magistral-small-2509",
-  "magistral-small",
-  "magistral-medium-2509",
-  "magistral-medium",
 ]
 
 # --- Moonshot AI Models ---
@@ -257,19 +247,16 @@ from_pdf = [
   "pypdfium2-extract-pdf",
   "docling-extract-text",
   "mistral-ocr",
-  "mistral-ocr-2503",
-  "mistral-ocr-2505",
   "mistral-ocr-2512",
-  "mistral-document-ai-2505",
+  "mistral-ocr-4.1",
 ]
 
 # --- Image Extraction Models ---
 from_image = [
   "docling-extract-text",
   "mistral-ocr",
-  "mistral-ocr-2503",
-  "mistral-ocr-2505",
   "mistral-ocr-2512",
+  "mistral-ocr-4.1",
   "deepseek-ocr",
 ]
 
