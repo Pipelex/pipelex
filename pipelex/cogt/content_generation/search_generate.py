@@ -33,6 +33,7 @@ from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.core.stuffs.search_result_content import SearchResultContent
+from pipelex.core.stuffs.stored_value_content import generation_schema
 from pipelex.runtime_hub import get_model_deck, get_report_delegate
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -117,7 +118,13 @@ async def search_gen_structured_object(
 
 
 async def _run_structured_search(search_assignment: SearchAssignment, *, schema: type[BaseModel]) -> dict[str, Any]:
-    """Resolve the worker and run the provider call — the part both arms share."""
+    """Resolve the worker and run the provider call — the part both arms share.
+
+    The provider writes the schema it shows the model from the class, so the call runs under `generation_schema()`:
+    a stored-value content is its value alone, required, and the model is never asked for a `url`. On the boundary arm
+    the class rebuilt from the assignment's schema is already in that form, so the scope changes nothing there.
+    """
     worker = _make_search_worker(search_assignment)
     search_job = _make_search_job(search_assignment)
-    return await worker.search_structured(search_job=search_job, schema=schema)
+    with generation_schema():
+        return await worker.search_structured(search_job=search_job, schema=schema)
