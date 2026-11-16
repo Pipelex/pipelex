@@ -49,7 +49,7 @@ async def load_stored_values_through_leaf(
     with job_metadata.log_context():
         stored_values = find_unloaded_stored_values(roots=roots, read_paths=read_paths)
         uri_references = [
-            UriReference(uri=stored_value.content.url, position=stored_value.position)
+            UriReference(uri=stored_value.content.url, position=stored_value.position, input_name=stored_value.input_name)
             for stored_value in stored_values
             if stored_value.content.url is not None
         ]

@@ -131,4 +131,4 @@ class TestDependencyBindingSteps:
         )
 
         assert ({LEDGER_ALIAS}, False) in library_states
-        assert result.pipe_output.main_stuff.as_text.text == "Atelier Morvan: 1250.5 euros"
+        assert result.pipe_output.main_stuff.as_text.require_text() == "Atelier Morvan: 1250.5 euros"

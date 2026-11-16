@@ -48,7 +48,7 @@ def optionals_seq_sink(working_memory: WorkingMemory) -> TextContent:
     b_out_stuff = working_memory.get_optional_stuff(name="b_out")
     if b_out_stuff is None:
         return TextContent(text=f"report about {topic} (no analysis available)")
-    return TextContent(text=f"report about {topic}: {b_out_stuff.as_text.text}")
+    return TextContent(text=f"report about {topic}: {b_out_stuff.as_text.require_text()}")
 
 
 def _make_live_run_params() -> PipeRunParams:
@@ -141,7 +141,7 @@ class TestLiftSequence:
         )
 
         # The sink ran on the absent arm and delivered the sequence's output.
-        assert pipe_output.main_stuff.as_text.text == "report about penalties (no analysis available)"
+        assert pipe_output.main_stuff.as_text.require_text() == "report about penalties (no analysis available)"
 
         result_memory = pipe_output.working_memory
         a_record = result_memory.get_optional_absence("a_out")
@@ -226,7 +226,7 @@ class TestLiftSequence:
             pipe_run_params=_make_live_run_params(),
         )
 
-        assert pipe_output.main_stuff.as_text.text == "report about penalties: b:a:clause 12"
+        assert pipe_output.main_stuff.as_text.require_text() == "report about penalties: b:a:clause 12"
         assert pipe_output.working_memory.absences == {}
 
     async def test_prepare_pipe_job_seeds_boundary_optional_from_declared_marker(self, load_empty_library: Callable[[], str]):
@@ -260,4 +260,4 @@ class TestLiftSequence:
             working_memory=job_memory,
             pipe_run_params=pipe_job.pipe_run_params,
         )
-        assert pipe_output.main_stuff.as_text.text == "report about penalties (no analysis available)"
+        assert pipe_output.main_stuff.as_text.require_text() == "report about penalties (no analysis available)"

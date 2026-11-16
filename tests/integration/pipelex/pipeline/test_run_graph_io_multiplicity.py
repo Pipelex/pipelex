@@ -275,7 +275,7 @@ class TestRunGraphIoMultiplicity:
         with scoped_event_log(InMemoryEventLog()):
             response = await runner.execute(mthds_contents=[_LIFT_BUNDLE], inputs={})
 
-        assert response.pipe_output.main_stuff.as_text.text == "0 findings, 0 more"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "0 findings, 0 more"
         assembled_graph = response.pipe_output.graph_spec
         assert assembled_graph is not None
         in_process_graph = _in_process_graph(teardown_spy)

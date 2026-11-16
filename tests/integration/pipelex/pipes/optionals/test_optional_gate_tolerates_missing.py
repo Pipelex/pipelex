@@ -76,7 +76,7 @@ class TestOptionalGateToleratesMissing:
             working_memory=working_memory,
             pipe_run_params=_make_live_run_params(),
         )
-        assert pipe_output.main_stuff.as_text.text == "report about penalties"
+        assert pipe_output.main_stuff.as_text.require_text() == "report about penalties"
 
     async def test_condition_gate_tolerates_missing_optional(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """The PipeCondition chosen-pipe gate applies the same rule for the chosen pipe's
@@ -105,4 +105,4 @@ class TestOptionalGateToleratesMissing:
             working_memory=working_memory,
             pipe_run_params=_make_live_run_params(),
         )
-        assert pipe_output.main_stuff.as_text.text == "report about penalties"
+        assert pipe_output.main_stuff.as_text.require_text() == "report about penalties"

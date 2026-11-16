@@ -15,6 +15,11 @@ things to each:
   are enabled, is stored and its url becomes a `pipelex-storage://` reference, and every input gets
   a `public_url` a template can render.
 
+The `Text`, `Markdown`, `Html` and `JSON` inputs are visited too. One a caller gave as a `url` has that URL authorized
+under the run's read scope, as a file input's is, and is loaded later where a step reads it. One given inline whose
+value is past `[runtime.storage] inline_text_max_bytes` is stored under `{storage_scope}/assets/` when the run relocates
+its inputs, and travels as its reference from then on (`pipelex.core.stuffs.stored_value_storer`).
+
 `collect_file_inputs` then reads the stamped formats back, each with its path in the inputs
 (`transcripts[2]`, `case.attachment`), for the checks that refuse a run before it starts.
 """
@@ -37,6 +42,8 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
+from pipelex.core.stuffs.stored_value_storer import store_value_if_large
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipeline.exceptions import (
     PipelineInputContentError,
@@ -45,6 +52,7 @@ from pipelex.pipeline.exceptions import (
     PipelineInputUrlMissingError,
 )
 from pipelex.runtime_hub import get_storage_provider
+from pipelex.system.storage_scope import INPUT_ASSETS_LEAF
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import (
     FILE_HEAD_NB_BYTES,
@@ -115,6 +123,7 @@ class _PreparationContext(NamedTuple):
     storage_scope: str
     read_scope: str | None
     is_relocation_enabled: bool
+    is_dry_run: bool
     semaphore: asyncio.Semaphore
 
 
@@ -172,11 +181,13 @@ async def prepare_file_inputs(
     storage_scope: str,
     read_scope: str | None,
     is_relocation_enabled: bool,
+    is_dry_run: bool = False,
 ) -> WorkingMemory:
     """Establish the format of every file input, and relocate it to storage when configured.
 
     Visits every ImageContent and DocumentContent in the working memory, including the items of a
-    list and the fields of a structured content, recursively. The images inside a
+    list and the fields of a structured content, recursively, and every TextContent, HtmlContent and
+    JSONContent (`_prepare_stored_value_content`). The images inside a
     TextAndImagesContent are not reached, and keep their url, public_url and mime_type as given.
     File inputs are prepared concurrently, at most `MAX_CONCURRENT_FILE_IDENTIFICATIONS` at a time.
     See `_prepare_url_content` for what happens to each form of url.
@@ -191,13 +202,15 @@ async def prepare_file_inputs(
             read or signed, since a signed link is a read. The refusal names the input. ``None``
             for an unscoped run. See :mod:`pipelex.tools.uri.uri_read_scope`.
         is_relocation_enabled: Whether data URLs and local files are stored and every input gets a
-            `public_url`. Identification runs either way.
+            `public_url`, and whether a text, HTML or JSON input past the inline threshold is stored.
+            Identification, and the authorization of a text input given as a URL, run either way.
+        is_dry_run: Whether the run is a dry run, which stores no text, HTML or JSON input whatever its size.
 
     Returns:
         The same WorkingMemory instance, its file inputs stamped with their `mime_type`.
 
     Raises:
-        PipelineInputUrlMissingError: An input's url is blank.
+        PipelineInputUrlMissingError: An input's url is blank, a text input's included.
         PipelineInputNotAnImageError: An Image input's bytes identify something other than an image.
         PipelineInputUrlInvalidError: An http(s) url does not parse as one (when relocating).
         PipelineInputContentError: A data URL is not valid base64, a local path cannot be read
@@ -210,6 +223,7 @@ async def prepare_file_inputs(
         storage_scope=storage_scope,
         read_scope=read_scope,
         is_relocation_enabled=is_relocation_enabled,
+        is_dry_run=is_dry_run,
         semaphore=asyncio.Semaphore(MAX_CONCURRENT_FILE_IDENTIFICATIONS),
     )
     named_stuffs = list(working_memory.root.items())
@@ -278,6 +292,10 @@ async def _prepare_value(*, value: Any, path: FileInputPath, context: _Preparati
     if isinstance(value, (ImageContent, DocumentContent)):
         prepared = await _prepare_url_content(content=value, path=path, context=context)
         return prepared, prepared is not value
+
+    if isinstance(value, StoredValueContent):
+        await _prepare_stored_value_content(content=value, path=path, context=context)
+        return value, False
 
     if isinstance(value, StructuredContent):
         return await _prepare_structured_content(structured_content=value, path=path, context=context)
@@ -423,6 +441,37 @@ async def _prepare_url_content(
                 return await _prepare_local_path(content=content, resolved_uri=resolved_uri, path=path, context=context)
 
 
+async def _prepare_stored_value_content(*, content: StoredValueContent, path: FileInputPath, context: _PreparationContext) -> None:
+    """Prepare one `Text`, `Markdown`, `Html` or `JSON` input: authorize the URL a caller gave, or store a large inline value.
+
+    A caller may give such a value as its `url` rather than inline. The URL is authorized here, as a file input's is,
+    so a storage key outside the run's read scope, or a local path on a scoped run, is refused naming the input before
+    the run starts; the value itself is loaded later, where a step reads it. An inline value past the inline threshold is
+    stored under `{storage_scope}/assets/` when the run relocates its inputs, and the content becomes its reference, in
+    place, with the value kept loaded.
+
+    Raises:
+        PipelineInputUrlMissingError: The URL the caller gave is blank.
+        UriReadRefusedError: The URL is a local path, or a storage reference outside the read scope, on a run with a
+            read scope.
+    """
+    if content.url is not None:
+        if not content.url.strip():
+            msg = f"{type(content).__name__} input has a blank url — provide its value inline, or a https://, data: or pipelex-storage:// URL."
+            raise PipelineInputUrlMissingError(msg, **_refused_file_input(path=path, field_suffix=_URL_FIELD))
+        authorize_uri_read(
+            uri=content.url,
+            read_scope=context.read_scope,
+            position=f"the value given for input '{format_file_input_path(path)}'",
+            **_refused_file_input(path=path),
+        )
+        return
+    if not context.is_relocation_enabled or context.is_dry_run:
+        return
+    async with context.semaphore:
+        await store_value_if_large(content, storage_provider=context.storage, storage_scope=context.storage_scope, leaf=INPUT_ASSETS_LEAF)
+
+
 def _prepare_http_url(
     *, content: NormalizableContent, resolved_uri: ResolvedHttpUrl, path: FileInputPath, context: _PreparationContext
 ) -> NormalizableContent:
@@ -522,7 +571,7 @@ async def _prepare_data_url(
     # only by a random id. Under the run's own scope they are inside the
     # tenant's namespace and go away with the run.
     extension = _storage_key_extension(raw_bytes=raw_bytes, mime_type=mime_type, fallback_suffix=None)
-    key = f"{context.storage_scope}/assets/{shortuuid.uuid()}.{extension}"
+    key = f"{context.storage_scope}/{INPUT_ASSETS_LEAF}/{shortuuid.uuid()}.{extension}"
     storage_uri = await context.storage.store(data=raw_bytes, key=key, content_type=mime_type)
     public_url = await context.storage.public_url(uri=storage_uri)
 
@@ -580,7 +629,7 @@ async def _prepare_local_path(
         path=path,
     )
     extension = _storage_key_extension(raw_bytes=raw_bytes, mime_type=mime_type, fallback_suffix=local_path.suffix.removeprefix(".") or None)
-    key = f"{context.storage_scope}/assets/{shortuuid.uuid()}.{extension}"
+    key = f"{context.storage_scope}/{INPUT_ASSETS_LEAF}/{shortuuid.uuid()}.{extension}"
     storage_uri = await context.storage.store(data=raw_bytes, key=key, content_type=mime_type)
     public_url = await context.storage.public_url(uri=storage_uri)
 

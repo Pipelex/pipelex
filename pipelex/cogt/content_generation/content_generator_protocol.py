@@ -69,6 +69,12 @@ class ContentGeneratorProtocol(Protocol):
     prompt with :func:`~pipelex.kernel.llm_prompt_content.render_llm_prompt`, generates, and returns the rendered prompt
     beside what it generated, since the operator records it in the trace. On a host runtime this is where the activity
     boundary falls: workflow code reads no storage, so a stored text is read only inside the activity.
+
+    **The leaves that produce a text store it past the inline threshold.** ``make_llm_text`` returns its text as a
+    content, stored under ``{storage_scope}/generated/`` and carried as its reference when it is past
+    ``[runtime.storage] inline_text_max_bytes``, and a `MarkdownContent` when ``output_mime_type`` is ``text/markdown``;
+    ``make_extract_pages`` stores each page's text the same way. A dry run stores nothing
+    (:mod:`pipelex.core.stuffs.stored_value_storer`).
     """
 
     def make_llm_text(
@@ -78,6 +84,7 @@ class ContentGeneratorProtocol(Protocol):
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         unrendered_prompt: UnrenderedLLMPrompt,
+        output_mime_type: str,
     ) -> Coroutine[Any, Any, LLMTextGeneration]: ...
 
     def make_object(

@@ -43,7 +43,7 @@ def optionals_taint_sink(working_memory: WorkingMemory) -> TextContent:
     b_out_stuff = working_memory.get_optional_stuff(name="b_out")
     if b_out_stuff is None:
         return TextContent(text="no analysis")
-    return TextContent(text=f"analysis: {b_out_stuff.as_text.text}")
+    return TextContent(text=f"analysis: {b_out_stuff.as_text.require_text()}")
 
 
 def _register_step_pipes(*, source_input_ref: str = "Text") -> None:

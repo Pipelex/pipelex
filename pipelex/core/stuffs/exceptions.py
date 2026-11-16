@@ -1,9 +1,13 @@
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.problem import make_location
+from pipelex.tools.uri.exceptions import StoredTextUnreadableReason
 
 
 class StuffError(PipelexError):
@@ -77,6 +81,36 @@ class StoredValueNotLoadedError(StuffError):
 
 
 class StoredValueUnreadableError(StuffError):
-    """The stored value of a content could be read but is not a value of its kind, such as a JSON value that is not an object."""
+    """The stored value of a content could be read but is not a value of its kind, such as a JSON value that is not an object.
 
-    error_code = CoreCode.RUNTIME_UNEXPECTED
+    The runtime stores only values it holds, which are always of their kind, so a stored value that is not is a URL a
+    caller or a method pointed at the wrong file: ``input.file_unreadable``, naming the kind the value was read as and
+    why it failed, and the input whose value it is once the reader that knows it names it (`with_input`).
+    """
+
+    error_code = CoreCode.INPUT_FILE_UNREADABLE
+
+    def __init__(self, message: str, *, file_type: str, reason: StoredTextUnreadableReason):
+        super().__init__(message)
+        # The kind of value it was read as, the `file_type` of `input.file_unreadable`: "json".
+        self.file_type = file_type
+        self.reason = reason
+        self.input_name: str | None = None
+
+    def with_input(self, *, input_name: str | None) -> Self:
+        """Name, where it is caught, the input whose stored value could not be read; ``None`` names nothing.
+
+        Returns:
+            This error, so that the catch site can re-raise it.
+        """
+        if input_name is not None:
+            self.input_name = input_name
+        return self
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name, "file_type": self.file_type, "reason": self.reason}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name, field=None)

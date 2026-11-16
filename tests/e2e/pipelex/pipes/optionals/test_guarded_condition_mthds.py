@@ -29,7 +29,7 @@ class TestGuardedConditionExpression:
         response = await runner.execute(pipe_code="ogc_route_on_flag", inputs={"flag": "urgent"})
 
         assert response.state == RunState.COMPLETED
-        assert response.pipe_output.main_stuff.as_text.text == "flagged-branch"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "flagged-branch"
         assert response.pipe_output.working_memory.absences == {}
 
     async def test_flag_absent_selects_no_flag_branch_and_keeps_record(self):
@@ -41,7 +41,7 @@ class TestGuardedConditionExpression:
         response = await runner.execute(pipe_code="ogc_route_on_flag", inputs={})
 
         assert response.state == RunState.COMPLETED
-        assert response.pipe_output.main_stuff.as_text.text == "plain-branch"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "plain-branch"
         flag_record = response.pipe_output.working_memory.get_optional_absence("flag")
         assert flag_record is not None
         assert flag_record.kind == AbsenceKind.NOT_PROVIDED

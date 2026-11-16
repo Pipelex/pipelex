@@ -17,6 +17,7 @@ from typing import Any, Generic, cast
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -33,11 +34,16 @@ def _names_no_object_class(*, model_class: type[BaseModel]) -> bool:
 
 
 class LLMTextGeneration(BaseModel):
-    """A generated text and the trace of the prompt it was generated from."""
+    """A generated text and the trace of the prompt it was generated from.
+
+    The text is a content, inline or, past the inline threshold, stored by the leaf that generated it and carried as its
+    reference, so a large text never travels back whole. It is a `MarkdownContent` when the step asked for Markdown,
+    which adds no field to `TextContent`, so it crosses a process boundary as a `TextContent` naming `text/markdown`.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    text: str
+    text_content: TextContent
     rendered_prompt: LLMPromptTrace
 
 

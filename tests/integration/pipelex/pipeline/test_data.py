@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.pipeline_inputs import PipelineInputs
 
@@ -1017,3 +1017,70 @@ prompt = "Read the visit from: $text"
     FORWARD_REF_FIELD_FINDING: ClassVar[str] = (
         "its field 'shadowing_refs__Person' has the name of the Python class of the concept 'shadowing_refs.Person', which the structure refers to"
     )
+
+
+class LargeTextsStoredTestData:
+    """A bundle whose steps produce texts, markdown, HTML and JSON, each past the tests' inline threshold of 0 bytes."""
+
+    READ_SCOPE: ClassVar[str] = "org_large_texts"
+
+    # Longer than a preview, so a preview that is not the true start of the value would show.
+    GENERATED_TEXT: ClassVar[str] = "A long report, written by the model, one paragraph after another.\n" * 20
+    FUNCTION_TEXT: ClassVar[str] = "A long text a function returned, line after line.\n" * 20
+    FUNCTION_INNER_HTML: ClassVar[str] = "<p>A long fragment a function returned.</p>" * 20
+    FUNCTION_JSON_OBJ: ClassVar[dict[str, Any]] = {"title": "A function's long JSON", "items": [f"item {index}" for index in range(40)]}
+    CALLER_TEXT: ClassVar[str] = "Notes the caller stored before the run, read by the step in full.\n" * 20
+
+    MTHDS: ClassVar[str] = """
+domain = "large_texts"
+description = "Steps producing large texts, markdown, HTML and JSON"
+
+[pipe.write_report]
+type = "PipeLLM"
+description = "Write a report about the topic"
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Write a report about $topic"
+
+[pipe.write_markdown_report]
+type = "PipeLLM"
+description = "Write a markdown report about the topic"
+inputs = { topic = "Text" }
+output = "Markdown"
+prompt = "Write a markdown report about $topic"
+
+[pipe.return_text]
+type = "PipeFunc"
+description = "Return a long text"
+inputs = { topic = "Text" }
+output = "Text"
+function_name = "tests.integration.pipelex.pipeline.test_large_texts_stored_at_production.large_texts_return_text"
+
+[pipe.return_html]
+type = "PipeFunc"
+description = "Return a long HTML fragment"
+inputs = { topic = "Text" }
+output = "Html"
+function_name = "tests.integration.pipelex.pipeline.test_large_texts_stored_at_production.large_texts_return_html"
+
+[pipe.return_json]
+type = "PipeFunc"
+description = "Return a long JSON object"
+inputs = { topic = "Text" }
+output = "JSON"
+function_name = "tests.integration.pipelex.pipeline.test_large_texts_stored_at_production.large_texts_return_json"
+
+[pipe.echo_notes]
+type = "PipeFunc"
+description = "Return the notes the caller gave, as the function read them"
+inputs = { notes = "Text" }
+output = "Text"
+function_name = "tests.integration.pipelex.pipeline.test_large_texts_stored_at_production.large_texts_echo_notes"
+
+[pipe.quote_notes]
+type = "PipeCompose"
+description = "Quote the notes the caller gave"
+inputs = { notes = "Text" }
+output = "Text"
+template = "Quoted: {{ notes.text }}"
+"""

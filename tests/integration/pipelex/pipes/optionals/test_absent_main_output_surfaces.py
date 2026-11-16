@@ -109,5 +109,5 @@ class TestAbsentMainOutputSurfaces:
         response = await runner.execute(mthds_contents=[_BUNDLE], inputs={"source": "clause 12"})
 
         assert response.state == RunState.COMPLETED
-        assert response.pipe_output.main_stuff.as_text.text == "summary: analysis of clause 12"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "summary: analysis of clause 12"
         assert response.pipe_output.working_memory.absences == {}

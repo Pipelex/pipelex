@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 import pytest
+from rich.text import Text
 
 from pipelex.core.stuffs.exceptions import StoredValueNotLoadedError
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -17,7 +18,8 @@ from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
     StoredValueTestData,
 )
 
-_RENDERERS = ["rendered_plain", "rendered_markdown", "rendered_html", "rendered_json", "rendered_pretty"]
+# A pretty print is a display, which describes a reference never loaded rather than refusing it.
+_RENDERERS = ["rendered_plain", "rendered_markdown", "rendered_html", "rendered_json"]
 
 _REFERENCED_CONTENTS = [
     pytest.param(lambda: TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE), id="Text"),
@@ -41,6 +43,17 @@ class TestStoredValueRendering:
         message = str(exc_info.value)
         assert content.__class__.__name__ in message
         assert "load_stored_value" in message
+
+    @pytest.mark.parametrize("make_content", _REFERENCED_CONTENTS)
+    def test_a_pretty_print_of_a_reference_never_loaded_describes_it(self, make_content: Callable[[], StoredValueContent]):
+        """The CLI prints a hosted run's output where its storage is not reachable: it shows the reference, never fails."""
+        content = make_content()
+        pretty = content.rendered_pretty()
+        assert isinstance(pretty, Text)
+        assert f"{content.size} bytes" in pretty.plain
+        assert "not loaded" in pretty.plain
+        assert content.preview is not None
+        assert pretty.plain.endswith(content.preview)
 
     @pytest.mark.parametrize(
         ("make_content", "loaded_value", "expected_plain"),

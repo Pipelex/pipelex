@@ -33,6 +33,8 @@ from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_json, build_absence_markdown
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_loader import load_stored_values
+from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.errors.failure_problem import failure_log_fields
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
@@ -46,12 +48,13 @@ from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
-from pipelex.runtime_hub import get_console, get_error_console, get_telemetry_manager
+from pipelex.runtime_hub import get_console, get_error_console, get_storage_provider, get_telemetry_manager
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
@@ -195,6 +198,22 @@ def _resolve_row_model_for_empty_result(
         get_library_manager().teardown(library_id=library_id)
 
 
+async def _load_stored_values_of_output(*, content: StuffContent) -> None:
+    """Load the stored values the run's output holds, so it prints whole, or leave them as references.
+
+    A value this process stored is still loaded and reads nothing. One it cannot read, such as a URL the caller gave that
+    no longer answers, stays a reference, which a pretty print describes by its size, location and preview.
+    """
+    stored_values = find_unloaded_stored_values(roots={"main_stuff": content})
+    if not stored_values:
+        return
+    try:
+        await load_stored_values(stored_values=stored_values, read_scope=None, storage_provider=get_storage_provider())
+    except PipelexError as exc:
+        # The load fails in many domain-specific ways (storage, fetch, decoding), none of which should stop showing the run's output.
+        log.warning("The stored values of the output could not be loaded, and print as references", fields=error_fields(exc=exc))
+
+
 async def _execute_run(
     *,
     pipe_code: str | None,
@@ -333,6 +352,8 @@ async def _execute_run(
                 f"Final output of pipe [red]{pipe_code}[/red] resolved absent: {main_resolved.reason}",
             )
         else:
+            # A stored value prints its text when the storage serves it, and its description otherwise.
+            await _load_stored_values_of_output(content=main_resolved.content)
             title = f"Final output of pipe [red]{pipe_code}[/red]"
             main_resolved.pretty_print_stuff(title=title)
 

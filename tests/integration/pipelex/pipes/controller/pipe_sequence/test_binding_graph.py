@@ -83,7 +83,7 @@ class TestBindingGraph:
         with scoped_event_log(InMemoryEventLog()):
             response = await runner.execute(mthds_contents=[_BUNDLE], inputs={"amount": {"concept": "native.Number", "content": {"number": 318}}})
 
-        assert response.pipe_output.main_stuff.as_text.text == "Received: 318.0 euros"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "Received: 318.0 euros"
         assembled_graph = response.pipe_output.graph_spec
         assert assembled_graph is not None
         in_process_graph = _in_process_graph(teardown_spy)

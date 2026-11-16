@@ -159,7 +159,7 @@ class TestPipeFuncTransportedEntrypoint:
     ) -> None:
         """A failure that is not the function's own exits non-zero with no result file, so its executor gives it a code of its own."""
         if times_out:
-            mocker.patch.object(DirectPipeFuncExecutor, "run_pipe_func", side_effect=TimeoutError)
+            mocker.patch.object(DirectPipeFuncExecutor, "_run_pipe_func", side_effect=TimeoutError)
 
         with _note_request(tmp_path=tmp_path) as request, pytest.raises(PipelexError) as raised:
             _run_entrypoint(mocker=mocker, request=request.model_copy(update=request_update), work_dir=tmp_path)

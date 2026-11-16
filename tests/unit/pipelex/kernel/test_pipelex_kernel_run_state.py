@@ -209,7 +209,9 @@ class TestPipelexKernelRunState:
 
         async def make_llm_text(**kwargs: object) -> LLMTextGeneration:  # ruff: ignore[unused-function-argument, unused-async]
             seen.append(get_log_context())
-            return LLMTextGeneration(text="generated text", rendered_prompt=LLMPromptTrace(user_text="rendered by the leaf"))
+            return LLMTextGeneration(
+                text_content=TextContent(text="generated text"), rendered_prompt=LLMPromptTrace(user_text="rendered by the leaf")
+            )
 
         content_generator = mocker.MagicMock()
         content_generator.make_llm_text = make_llm_text

@@ -107,7 +107,9 @@ class TestRunContentStaysOutOfSinks:
             ),
             ("a date the content factory cannot read", "echo_date", {"when": MARKER}, CoreCode.INPUT_INVALID, False),
             ("a function quoting its input", "file_note", {"note": MARKER}, CoreCode.PIPE_FUNCTION_RAISED, True),
-            ("a value the composer copied into a choice", "make_ticket", {"level": MARKER}, CoreCode.PIPE_OUTPUT_INVALID, True),
+            # The text input is stored at intake, the tests' inline threshold being 0, so pydantic quotes its reference,
+            # whose preview its repr cuts before the marker.
+            ("a value the composer copied into a choice", "make_ticket", {"level": MARKER}, CoreCode.PIPE_OUTPUT_INVALID, False),
             ("a model answer the structure refuses", "count_notes", {"note": "three apples"}, CoreCode.RUNTIME_UNEXPECTED, True),
         ],
     )

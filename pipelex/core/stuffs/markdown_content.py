@@ -28,6 +28,8 @@ class MarkdownContent(TextContent):
     """A text written in Markdown"""
 
     value_kind_desc: ClassVar[str] = "markdown"
+    stored_mime_type: ClassVar[str] = "text/markdown"
+    stored_file_extension: ClassVar[str] = "md"
 
     text: str | None = Field(default=None, description="The text, written in Markdown")
 
@@ -45,6 +47,8 @@ class MarkdownContent(TextContent):
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
         # Always Markdown: `TextContent` sniffs for HTML first, but raw HTML in a Markdown source is text.
+        if not self.is_loaded:
+            return self.rendered_reference_pretty()
         text = self.require_text()
         require_rich_for_rendering()
         from rich.markdown import Markdown

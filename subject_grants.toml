@@ -2892,6 +2892,10 @@ rationale = "Type-directed accessor: the target item type; single operand."
 param = "content"
 rationale = "Loads the stored value of the one content it is given."
 
+["pipelex/core/stuffs/stored_value_storer.py::store_value_if_large"]
+param = "content"
+rationale = "Reads as a verb-object sentence on the one content it stores, as load_stored_value reads on the one it loads; the call sites pass a self-labelling content."
+
 ["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_with_images"]
 param = "value"
 rationale = "Transforms the value; rendering context stays keyword."

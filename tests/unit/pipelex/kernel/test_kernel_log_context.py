@@ -73,7 +73,7 @@ class ContentGeneratorProbe:
 
     async def make_llm_text(self, **kwargs: Any) -> LLMTextGeneration:  # ruff: ignore[unused-method-argument]
         self._record()
-        return LLMTextGeneration(text="generated text", rendered_prompt=RENDERED_PROMPT)
+        return LLMTextGeneration(text_content=TextContent(text="generated text"), rendered_prompt=RENDERED_PROMPT)
 
     async def make_object(self, **kwargs: Any) -> LLMObjectGeneration[NumberContent]:  # ruff: ignore[unused-method-argument]
         self._record()

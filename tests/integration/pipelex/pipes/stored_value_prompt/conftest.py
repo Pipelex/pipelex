@@ -82,10 +82,15 @@ class RecordingContentGenerator(ContentGenerator):
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         unrendered_prompt: UnrenderedLLMPrompt,
+        output_mime_type: str,
     ) -> LLMTextGeneration:
         self._record(entry_point="make_llm_text", unrendered_prompt=unrendered_prompt)
         return await super().make_llm_text(
-            job_metadata=job_metadata, cogt_run_params=cogt_run_params, llm_setting_main=llm_setting_main, unrendered_prompt=unrendered_prompt
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            llm_setting_main=llm_setting_main,
+            unrendered_prompt=unrendered_prompt,
+            output_mime_type=output_mime_type,
         )
 
     @override
