@@ -218,8 +218,8 @@ class StructurePrinter:
             if output:
                 output.append("")
 
-            # Get class docstring
-            doc = class_type.__doc__ and class_type.__doc__.strip()
+            # Get class docstring, raw: stripping it would flatten the relative indentation of a body opening on a new line
+            doc = class_type.__doc__
             base_class_name = class_type.__bases__[0].__name__
 
             # Get generic parameters if any
@@ -229,7 +229,7 @@ class StructurePrinter:
 
             # Class definition with docstring, rendered so that no quote or backslash in it can close it early
             output.append(f"class {class_name}({base_class_name}):")
-            if doc:
+            if doc and doc.strip():
                 output.extend(class_docstring(doc).split("\n"))
             class_header_length = len(output)
 

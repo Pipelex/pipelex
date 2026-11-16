@@ -1,4 +1,5 @@
 import ast
+import inspect
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
@@ -136,6 +137,14 @@ class QuotedContent(StructuredContent):
 
 
 QuotedContent.__doc__ = 'Says """hello""" in a list:\n  - with an indented line\nand ends with a backslash \\'
+
+
+class IndentedBodyContent(StructuredContent):
+    name: str
+
+
+# Assigned after the class is built, so the compiler leaves its indentation in place on every Python version.
+IndentedBodyContent.__doc__ = "\n    Intro:\n      - item one\n      - item two\n    "
 
 
 class OddValue(StrEnum):
@@ -361,6 +370,18 @@ class TestStructurePrinter:
         assert set(class_defs) == {"QuotedContent", "QuotedGenre"}
         assert ast.get_docstring(class_defs["QuotedContent"]) == normalized_docstring_text(QuotedContent.__doc__ or "")
         assert ast.get_docstring(class_defs["QuotedGenre"]) == normalized_docstring_text(QuotedGenre.__doc__ or "")
+
+    def test_docstring_with_an_indented_body_reads_back_as_getdoc_reads_it(self):
+        """A class docstring opening on a new line with an indented body prints with its relative indentation intact."""
+        result = StructurePrinter().get_type_structure(IndentedBodyContent)
+
+        module = ast.parse("\n".join(result))
+        class_def = module.body[0]
+        assert isinstance(class_def, ast.ClassDef)
+        assert class_def.name == "IndentedBodyContent"
+        printed_docstring = ast.get_docstring(class_def, clean=False)
+        assert printed_docstring is not None
+        assert inspect.cleandoc(printed_docstring) == inspect.getdoc(IndentedBodyContent) == "Intro:\n  - item one\n  - item two"
 
     def test_enum_and_literal_values_print_as_literals_of_themselves(self):
         """An enum member or a Literal value holding quotes or a backslash prints as a string literal that evaluates back to it."""
