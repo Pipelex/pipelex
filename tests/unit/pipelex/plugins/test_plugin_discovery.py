@@ -206,7 +206,15 @@ class TestPluginDiscovery:
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
             _build_registrar_with(mocker=mocker, plugins=[v11_plugin])
         assert "written_against_v11" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 12
+        assert PLUGIN_API_VERSION > 11
+
+    def test_a_plugin_written_before_large_texts_were_stored_in_the_leaf_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v12 content generators returned a generated text bare, and took no `output_mime_type`."""
+        v12_plugin = _InferencePlugin(name="written_against_v12", sdk="v12_sdk", targets_api=12)
+        with pytest.raises(PluginApiVersionMismatchError) as exc_info:
+            _build_registrar_with(mocker=mocker, plugins=[v12_plugin])
+        assert "written_against_v12" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 13
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:

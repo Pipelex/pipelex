@@ -92,14 +92,17 @@ class TestDocGenPrintTemplateFile:
             format=DocGenFormat.PDF, source=DocGenSource.HTML, filename="invoice.pdf", title="Invoice", template_file=template_file
         )
 
+        storage_provider = mocker.MagicMock()
         read_template = await doc_gen_generate.read_template_file(
-            render_assignment=_assignment(composition=composition), storage_provider=mocker.MagicMock()
+            render_assignment=_assignment(composition=composition), storage_provider=storage_provider
         )
 
         assert read_template.html == "<h1>INV-1</h1>"
         assert read_template.template is None
         read_spy.assert_awaited_once_with(file_ref=_FILE, read_scope="acme/runs")
-        stage.render_html_template_file.assert_awaited_once_with(template_file=template_file, template_source="<h1>{{ invoice.number }}</h1>")
+        stage.render_html_template_file.assert_awaited_once_with(
+            template_file=template_file, template_source="<h1>{{ invoice.number }}</h1>", read_scope="acme/runs", storage_provider=storage_provider
+        )
 
     async def test_an_office_template_file_s_bytes_go_to_the_engine_unrendered(self, mocker: MockerFixture) -> None:
         mocker.patch.object(doc_gen_generate, "read_method_file", new=mocker.AsyncMock(return_value=b"PK docx"))

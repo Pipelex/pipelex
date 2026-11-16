@@ -24,6 +24,7 @@ import pytest
 from pipelex.cogt.llm.llm_generation import LLMTextGeneration
 from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel import llm_ops
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
@@ -52,7 +53,7 @@ class ContentGeneratorProbe:
 
     async def make_llm_text(self, **kwargs: Any) -> LLMTextGeneration:  # ruff: ignore[unused-method-argument]
         self.seen.append(get_log_context())
-        return LLMTextGeneration(text="generated text", rendered_prompt=LLMPromptTrace(user_text="rendered by the leaf"))
+        return LLMTextGeneration(text_content=TextContent(text="generated text"), rendered_prompt=LLMPromptTrace(user_text="rendered by the leaf"))
 
 
 class KernelCallSpy:

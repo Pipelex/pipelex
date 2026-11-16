@@ -20,6 +20,15 @@ from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.qualified_ref_exceptions import QualifiedRefError
+from pipelex.core.stuffs.exceptions import StoredValueNotLoadedError
+from pipelex.core.stuffs.stored_value_output import (
+    holds_stored_values,
+    load_stored_values_of_output,
+    render_reference_form_json,
+    render_unloaded_output_html,
+    render_unloaded_output_markdown,
+    render_unloaded_output_viewer,
+)
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -175,6 +184,7 @@ class DeliveryExecutor:
         pipe_output: PipeOutput | None,
         *,
         storage_scope: str,
+        read_scope: str | None,
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
@@ -187,6 +197,9 @@ class DeliveryExecutor:
 
         ``problem`` is a failed run's problem in the operator's view, which each of the host's webhooks receives in its
         own view, and each caller webhook in the caller's (:mod:`pipelex.pipe_run.caller_webhook_delivery`).
+
+        ``read_scope`` is the run's read scope, under which the result files read the stored values of the run's output
+        (:meth:`generate_result_files`), ``None`` for an unscoped run.
 
         When the host step fails, the caller's webhooks are told how the run ends, and the host step's error is raised
         once they were. Their own failures never raise: each is logged. ``finished_at`` is when the run ended, the
@@ -205,6 +218,7 @@ class DeliveryExecutor:
                 await self.execute_host_delivery(
                     pipe_output,
                     storage_scope=storage_scope,
+                    read_scope=read_scope,
                     pipeline_run_id=pipeline_run_id,
                     delivery_assignment=delivery_assignment,
                     status=status,
@@ -245,6 +259,7 @@ class DeliveryExecutor:
         pipe_output: PipeOutput | None,
         *,
         storage_scope: str,
+        read_scope: str | None,
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
@@ -252,6 +267,10 @@ class DeliveryExecutor:
         request_id: str | None = None,
     ) -> None:
         """The host step: store a completed run's result files, then notify each of the host's own webhooks.
+
+        ``read_scope`` is the run's read scope, required with no default as the storage scope is: the result files load
+        the stored values of the run's output under it, so a host that forgot it would read past its tenant's prefix.
+        ``None`` states that the run is unscoped.
 
         Raises:
             StorageDeliveryError: The result files could not be generated or stored; no webhook was notified.
@@ -264,6 +283,7 @@ class DeliveryExecutor:
                 result_url = await self._store_results(
                     pipe_output,
                     storage_scope=storage_scope,
+                    read_scope=read_scope,
                     pipeline_run_id=pipeline_run_id,
                     storage=delivery_assignment.storage,
                 )
@@ -319,7 +339,7 @@ class DeliveryExecutor:
 
     # ---- Result file generation ----
 
-    async def generate_result_files(self, pipe_output: PipeOutput) -> dict[str, ResultFile]:
+    async def generate_result_files(self, pipe_output: PipeOutput, *, read_scope: str | None) -> dict[str, ResultFile]:
         """Generate the full set of result files from a PipeOutput.
 
         Produces: working_memory.json, main_stuff (json/md/html/viewer),
@@ -342,6 +362,12 @@ class DeliveryExecutor:
         with neither a value nor a recorded absence is a contract violation
         that fails the delivery loudly, never an "empty envelope" silently
         missing its result files.
+
+        A main output holding values in storage, a large text above all, writes ``main_stuff.json`` with each one as
+        its reference, the shape the wire carries, which a client loads. The Markdown, the HTML and the viewer are read
+        by a person, so the values are loaded first, under ``read_scope``, the run's read scope; one that cannot be
+        loaded is described by its reference rather than leaving the files out
+        (:mod:`pipelex.core.stuffs.stored_value_output`).
         """
         files: dict[str, ResultFile] = {}
 
@@ -363,7 +389,7 @@ class DeliveryExecutor:
             else:
                 hydrated_main_stuff = self.try_local_hydrate_stuff(raw_main_stuff)
                 if hydrated_main_stuff is not None:
-                    await self._generate_main_stuff_files(hydrated_main_stuff, files=files)
+                    await self._generate_main_stuff_files(hydrated_main_stuff, read_scope=read_scope, files=files)
                 else:
                     self._generate_main_stuff_files_from_raw(raw_main_stuff, files=files)
         else:
@@ -375,7 +401,7 @@ class DeliveryExecutor:
             if isinstance(main_resolved, AbsenceRecord):
                 self._generate_absence_files(main_resolved, files=files)
             else:
-                await self._generate_main_stuff_files(main_resolved, files=files)
+                await self._generate_main_stuff_files(main_resolved, read_scope=read_scope, files=files)
 
         files["tokens_usages.json"] = self._generate_usage_file(pipe_output)
 
@@ -570,11 +596,30 @@ class DeliveryExecutor:
         # like "</pre><script>...</script>" in pipeline outputs.
         files["main_stuff.html"] = ResultFile(data=f"<pre>{html.escape(json_text)}</pre>".encode(), content_type="text/html")
 
-    async def _generate_main_stuff_files(self, main_stuff: Stuff, *, files: dict[str, ResultFile]) -> None:
+    async def _generate_main_stuff_files(self, main_stuff: Stuff, *, read_scope: str | None, files: dict[str, ResultFile]) -> None:
         content = main_stuff.content
-        await self._try_add_rendered_file(
-            files=files, filename="main_stuff.json", render=content.rendered_json_async(), content_type="application/json"
-        )
+        if not holds_stored_values(content=content):
+            await self._try_add_rendered_file(
+                files=files, filename="main_stuff.json", render=content.rendered_json_async(), content_type="application/json"
+            )
+        else:
+            # The wire carries a stored value as its reference, which a client loads (`wip/large-text-storage`, decision 4).
+            files["main_stuff.json"] = ResultFile(data=render_reference_form_json(content=content).encode("utf-8"), content_type="application/json")
+            is_loaded = await load_stored_values_of_output(content=content, read_scope=read_scope, storage_provider=get_storage_provider())
+            if not is_loaded:
+                self._add_optional_text_file(
+                    files=files, filename="main_stuff.md", text=render_unloaded_output_markdown(content=content), content_type="text/markdown"
+                )
+                self._add_optional_text_file(
+                    files=files, filename="main_stuff.html", text=render_unloaded_output_html(content=content), content_type="text/html"
+                )
+                self._add_optional_text_file(
+                    files=files,
+                    filename="main_stuff_viewer.html",
+                    text=render_unloaded_output_viewer(content=content, title=main_stuff.title),
+                    content_type="text/html",
+                )
+                return
         await self._try_add_rendered_file(
             files=files, filename="main_stuff.md", render=content.rendered_markdown_async(), content_type="text/markdown"
         )
@@ -618,9 +663,17 @@ class DeliveryExecutor:
         render: Awaitable[str],
         content_type: str,
     ) -> None:
-        """Await a render coroutine and store the encoded result; log a warning on failure."""
+        """Await a render coroutine and store the encoded result; log a warning on failure, an error on a value never loaded."""
         try:
             text = await render
+        except StoredValueNotLoadedError as exc:
+            # The delivery loads every stored value of the output, or describes it, before rendering: a render that still
+            # meets one never loaded is a fault of ours, which drops a file from a run that succeeded.
+            log.error(
+                "A result file met a stored value never loaded and was left out",
+                fields={"file.name": filename, **error_fields(exc=exc)},
+            )
+            return
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort: per-format rendering (incl. jinja2 viewer); a single render failure must not drop the other result files.
             log.warning(
@@ -643,6 +696,7 @@ class DeliveryExecutor:
         pipe_output: PipeOutput,
         *,
         storage_scope: str,
+        read_scope: str | None,
         pipeline_run_id: str,
         storage: StorageTarget,
     ) -> str:
@@ -663,7 +717,7 @@ class DeliveryExecutor:
             prefix: str = storage.key_prefix or ""
             base_key: str = f"{storage_scope}/{prefix}results"
 
-            result_files = await self.generate_result_files(pipe_output)
+            result_files = await self.generate_result_files(pipe_output, read_scope=read_scope)
 
             for filename, result_file in result_files.items():
                 key: str = f"{base_key}/{filename}"

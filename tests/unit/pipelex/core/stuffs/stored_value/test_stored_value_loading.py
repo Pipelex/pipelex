@@ -1,17 +1,25 @@
+import asyncio
+import base64
 import json
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
+from pydantic import PrivateAttr
 from pytest_mock import MockerFixture
+from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import StoredValueUnreadableError
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
-from pipelex.core.stuffs.stored_value_loader import load_stored_value
+from pipelex.core.stuffs.stored_value_loader import load_stored_value, load_stored_values
+from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
-from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError, UriTextNotUtf8Error
+from pipelex.tools.storage.storage_provider_abstract import StoredData
+from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError, UriTextNotUtf8Error, UriTextTooLargeError
+from pipelex.tools.uri.uri_bytes import MAX_CONCURRENT_URI_READS
 from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
     FOREIGN_URL,
     HTML_KEY,
@@ -24,6 +32,27 @@ from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
     TEXT_KEY,
     StoredValueTestData,
 )
+
+
+class ConcurrencyCountingStorage(InMemoryStorageProvider):
+    """An in-memory storage whose every read takes a moment, counting the most reads in flight at once."""
+
+    _nb_in_flight: int = PrivateAttr(default=0)
+    _max_in_flight: int = PrivateAttr(default=0)
+
+    @property
+    def max_in_flight(self) -> int:
+        return self._max_in_flight
+
+    @override
+    async def load_with_metadata(self, uri: str) -> StoredData:
+        self._nb_in_flight += 1
+        self._max_in_flight = max(self._max_in_flight, self._nb_in_flight)
+        try:
+            await asyncio.sleep(0.01)
+            return await super().load_with_metadata(uri)
+        finally:
+            self._nb_in_flight -= 1
 
 
 def _storage_holding_every_value() -> InMemoryStorageProvider:
@@ -152,3 +181,67 @@ class TestStoredValueLoading:
 
         assert round_tripped.smart_dump() == reference
         assert not round_tripped.is_loaded
+
+    async def test_a_stored_text_that_is_not_utf8_is_the_caller_s_unreadable_input(self):
+        """Bytes that are not a text are a URL pointed at the wrong file: `input.file_unreadable`, naming the input."""
+        storage = InMemoryStorageProvider()
+        storage.root[TEXT_KEY] = b"\xff\xfe\xfa not utf-8"
+        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+
+        with pytest.raises(UriTextNotUtf8Error) as exc_info:
+            await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage, input_name="pages")
+
+        assert exc_info.value.error_code == CoreCode.INPUT_FILE_UNREADABLE
+        assert exc_info.value.problem_params() == {"input": "pages", "file_type": "text", "reason": "not_utf8"}
+
+    async def test_a_stored_json_that_is_not_an_object_is_the_caller_s_unreadable_input(self):
+        storage = InMemoryStorageProvider()
+        storage.root[JSON_KEY] = b"[1, 2, 3]"
+        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+
+        with pytest.raises(StoredValueUnreadableError) as exc_info:
+            await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage, input_name="report")
+
+        assert exc_info.value.error_code == CoreCode.INPUT_FILE_UNREADABLE
+        assert exc_info.value.problem_params() == {"input": "report", "file_type": "json", "reason": "not_a_json_object"}
+
+    async def test_a_stored_text_past_the_fetch_cap_is_refused_before_it_is_read(self, mocker: MockerFixture):
+        """A stored object is sized first, and one past `[runtime.network] max_fetch_bytes` is `input.too_large`, unread."""
+        mocker.patch("pipelex.tools.uri.uri_text.fetch_max_bytes", return_value=16)
+        storage = _storage_holding_every_value()
+        load_spy = mocker.spy(InMemoryStorageProvider, "load_with_metadata")
+        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+
+        with pytest.raises(UriTextTooLargeError) as exc_info:
+            await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage, input_name="pages")
+
+        assert exc_info.value.error_code == CoreCode.INPUT_TOO_LARGE
+        assert exc_info.value.problem_params() == {"input": "pages", "limit": 16, "size": len(STORED_TEXT.encode("utf-8"))}
+        load_spy.assert_not_called()
+        assert not content.is_loaded
+
+    async def test_a_data_url_past_the_fetch_cap_is_refused(self, mocker: MockerFixture):
+        mocker.patch("pipelex.tools.uri.uri_text.fetch_max_bytes", return_value=16)
+        data_url = "data:text/plain;base64," + base64.b64encode(STORED_TEXT.encode("utf-8")).decode("ascii")
+        content = TextContent(url=data_url)
+
+        with pytest.raises(UriTextTooLargeError) as exc_info:
+            await load_stored_value(content, read_scope=None, position="a value", input_name="pages")
+
+        assert exc_info.value.problem_params()["limit"] == 16
+
+    async def test_a_tree_of_stored_values_loads_a_bounded_number_at_a_time(self):
+        storage = ConcurrencyCountingStorage()
+        nb_values = 3 * MAX_CONCURRENT_URI_READS
+        roots: dict[str, Any] = {}
+        for index_value in range(nb_values):
+            key = f"{READ_SCOPE}/mt_1/run_9/generated/{index_value:016x}/value.txt"
+            storage.root[key] = f"value {index_value}".encode()
+            roots[f"text_{index_value}"] = TextContent(url=f"pipelex-storage://{key}")
+
+        await load_stored_values(stored_values=find_unloaded_stored_values(roots=roots), read_scope=READ_SCOPE, storage_provider=storage)
+
+        assert [roots[f"text_{index_value}"].require_text() for index_value in range(nb_values)] == [
+            f"value {index_value}" for index_value in range(nb_values)
+        ]
+        assert 1 < storage.max_in_flight <= MAX_CONCURRENT_URI_READS

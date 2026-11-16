@@ -20,6 +20,8 @@ class HtmlContent(StoredValueContent):
     # `css_class` stays inline in both forms, beside the markup.
     value_form_field_names: ClassVar[tuple[str, ...]] = ("inner_html", "css_class")
     value_kind_desc: ClassVar[str] = "html"
+    stored_mime_type: ClassVar[str] = "text/html"
+    stored_file_extension: ClassVar[str] = "html"
 
     inner_html: str | None = Field(default=None, description="The inner HTML of the content")
     css_class: str | None = Field(default=None, description="The CSS class of the content")
@@ -74,6 +76,8 @@ class HtmlContent(StoredValueContent):
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        if not self.is_loaded:
+            return self.rendered_reference_pretty()
         value_form = self.rendered_value_form()
         require_rich_for_rendering()
         from rich.json import JSON

@@ -268,7 +268,9 @@ async def read_template_file(*, render_assignment: RenderDocumentAssignment, sto
             .with_error_code(PipelexErrorCode.DOCGEN_TEMPLATE_INVALID)
             .with_params(template=template_file.name, reason="unreadable", finding="the file is not UTF-8 text")
         ) from exc
-    html = await get_template_file_stage().render_html_template_file(template_file=template_file, template_source=template_source)
+    html = await get_template_file_stage().render_html_template_file(
+        template_file=template_file, template_source=template_source, read_scope=read_scope, storage_provider=storage_provider
+    )
     return TemplateFileForPrint(html=html, template=None)
 
 

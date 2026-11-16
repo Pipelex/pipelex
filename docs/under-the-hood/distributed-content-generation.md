@@ -19,7 +19,7 @@ When content generation (LLM structured output, image generation, PDF extraction
 | Challenge | Trigger | Root cause | Solution |
 |-----------|---------|------------|----------|
 | **Dynamic class propagation** | LLM structured output (`PipeLLM` with object concept) | The submitter creates a Pydantic model at runtime from `.mthds` concept definitions; the worker process has no such class | Embed the JSON schema in the assignment, reconstruct the class on the worker, carry the source code through the transport's payload metadata |
-| **Large payload management** | Image generation (`PipeImgGen`), PDF extraction (`PipeExtract`) | Binary data (base64 images, rendered pages) exceeds a host runtime's payload limit (Temporal's is ~2 MB) | Activities store binary data to external storage, return lightweight URI references |
+| **Large payload management** | Image generation (`PipeImgGen`), PDF extraction (`PipeExtract`), LLM text (`PipeLLM`), `PipeFunc` | Binary data (base64 images, rendered pages) and large texts exceed a host runtime's payload limit (Temporal's is ~2 MB) | Activities store binary data and texts past the inline threshold to external storage, return lightweight URI references |
 
 ---
 
@@ -171,7 +171,7 @@ What gets stored vs. what crosses the boundary, by content type:
 | Extracted pages | Extracted page images → storage | `list[PageContent]` with URI references |
 | Rendered page views | PDF page renders → storage | `list[ImageContent]` with URIs |
 | PDF of an Office file | The converted PDF → storage, beside its source or under the run's storage scope, with its metadata | `ReadablePdf`: the PDF's URI, whether it was kept or made, the converter and its version, the page count |
-| LLM text | Nothing (text is small) | Plain `str` |
+| LLM text | The text, when it is past `inline_text_max_bytes` | `TextContent` or `MarkdownContent`, inline or as its reference |
 | LLM object | Nothing (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
 | Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
@@ -182,6 +182,20 @@ The traffic also runs the other way, and no file of the method rides it. A run's
 Two leaves read through it. The print stage of a `PipeDocGen` step reads its template file: the compose stage, which may run in a workflow, names the file in the step's `DocumentComposition`, with what an HTML template renders with (`TemplateRenderContext`): the stuffs the step's inputs name, the only ones its template may read, dumped for transport, the concepts and domains of the run's crate with none of its pipes, the crate's fingerprint, and the run's runtime parameters. The composition crosses into the print activity's payload, so it carries neither the run's pipes nor data the step does not read. The print renders it with the interpreter's template file stage (`pipelex/pipe_operators/doc_gen/template_file_stage.py`, installed on the runtime hub when the interpreter boots), which types the data again in the run's own library when this process holds it, and otherwise in a library loaded from the concepts alone, which the process keeps, by the concepts' fingerprint, for the prints that follow (`ConceptsLibraryCache` in `pipelex/libraries/concepts_libraries.py`, which an LLM prompt's leaf shares), then prints. At a dry print, the HTML template is rendered too, and an office template is handed to its engine's template checker, whose findings the stage reports. And an out-of-process `PipeFunc` call names its step's tree by digest (`PipeFuncExecutionRequest.tree_digest`), and whoever runs it reads the files of the tree but its bundles (`read_pipe_func_call_files`) and writes them where the function imports them. A run records both identities of the method it ran in its `RunMetadata`: the digest of the tree its pipe belongs to, which changes with any byte of the method, and the crate's fingerprint, which changes only with the meaning of its concepts and pipes.
 
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
+
+### Large texts are stored where they are produced
+
+A `Text`, `Markdown`, `Html` or `JSON` value past `[runtime.storage] inline_text_max_bytes` (4096 bytes by default, measured on the UTF-8 text a value is stored as, a JSON object's serialized form) is stored by the code that holds it where IO is allowed, and travels from then on as its reference, its `url` with its `size`, `mime_type` and a `preview` of its first 300 characters. Three places store, all through `store_value_if_large` and `store_large_values` (`pipelex/core/stuffs/stored_value_storer.py`):
+
+- **Run setup** stores the run's inputs, in `prepare_file_inputs` (`pipelex/pipeline/input_normalizer.py`), under the same `is_normalize_data_urls_to_storage` switch that uploads data URLs and local files. A text input the caller gives as a URL is not copied: it is authorized against the run's read scope at intake, which refuses a storage key another tenant owns before any step runs, and is read where a step reads it.
+- **The content-generation leaves** store what they generate, through `GeneratedContentFactory.make_text_content`: `make_llm_text` returns a `TextContent`, or a `MarkdownContent` when the operator asks for `text/markdown` through `output_mime_type`, and the texts of the pages an extraction returns are stored together after it, their writes overlapping a bounded number at a time.
+- **A PipeFunc's executor** loads every stored value of the memory before the function runs, since a function reads its memory synchronously, and stores the large values the function returned once it has. A sandbox reaches no storage, so the host that dispatches a call to one does both on its side of the boundary, with two helpers of `pipelex/pipe_operators/func/pipe_func_execution_transport.py`: `inline_stored_values_for_sandbox(request=…)` loads every stored value the request's memory holds, under the run's read scope, and returns the request with them inline, which goes to the sandbox by upload and never through a workflow's history; and `store_large_values_of_sandbox_response(request=…, response=…)` stores the large values of the output the sandbox returned under the run's storage scope and returns the response holding the output alone, so it crosses back as its reference. A host that dispatches to a sandbox calls the first before the sandbox runs and the second after it returns, in the activity running the call.
+
+Every value is stored under `{storage_scope}/{leaf}/{hash}/value.{extension}`: the leaf is `generated` for what the run produced and `assets` for what it received, so both lie under the run's storage scope, the hash is the first 16 hexadecimal digits of the stored bytes' SHA-256, which the write carries whole, and the extension is the content's (`txt`, `md`, `html`, `json`), so the key's last segment is a filename every `pipelex-storage://` reader accepts. A dry run stores nothing, and nothing is ever stored under `DRY_RUN_STORAGE_SCOPE`. The content turns into its reference in place, keeping its value loaded, so a reader in the same process reads it without loading it again, while every dump of it, the one that crosses an activity boundary included, is the reference alone.
+
+Workflow code never stores, so a `PipeCompose` output, which is assembled in the step, stays inline. A search's answer and a judgment's verdicts stay inline too, being plain strings. The `Text` fields of a structured output stay inline by design for now: structured generation runs in a leaf, which could store them, but this step stores only the leaves' text outputs, the pages of an extraction and a function's output.
+
+Reading a stored value back is bounded the same way as every read of a URL: `load_text_from_any_uri` (`pipelex/tools/uri/uri_text.py`) sizes a stored object or a data URL before reading it and refuses one past `[runtime.network] max_fetch_bytes` with `input.too_large`, and a text whose bytes are not UTF-8, or a JSON value that is not an object, is the caller's `input.file_unreadable`, naming the input the value belongs to. The loaders read a bounded number of values at a time (`MAX_CONCURRENT_URI_READS`), and so do the leaves that prepare a prompt's images and documents.
 
 ### What a leaf may read: the read scope
 
@@ -195,11 +209,11 @@ The read scope leaves `https://` URLs alone because they are not the process's t
 
 ### Prompts render in the leaf
 
-Large texts take the same path as binary data in the other direction: a `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, so a prompt that reads one can only be rendered where storage may be read, which is the leaf, never workflow code. The LLM entries of `ContentGeneratorProtocol` therefore take the prompt unrendered and return what they rendered beside what they generated, a change of plugin API 12 (`PLUGIN_API_VERSION` in `pipelex/plugins/contract.py`), so a content generator written against 11 is refused when its plugin is discovered:
+Large texts take the same path as binary data in the other direction: a `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, so a prompt that reads one can only be rendered where storage may be read, which is the leaf, never workflow code. The LLM entries of `ContentGeneratorProtocol` therefore take the prompt unrendered and return what they rendered beside what they generated, a change of plugin API 12 (`PLUGIN_API_VERSION` in `pipelex/plugins/contract.py`), so a content generator written against 11 is refused when its plugin is discovered. Plugin API 13 then made `make_llm_text` take the output's MIME type and return the generated text as a content the leaf may have stored (see [Large texts are stored where they are produced](#large-texts-are-stored-where-they-are-produced)), so one written against 12 is refused too:
 
 | Entry | Takes | Returns |
 |-------|-------|---------|
-| `make_llm_text` | `unrendered_prompt: UnrenderedLLMPrompt` | `LLMTextGeneration`: `text`, `rendered_prompt: LLMPromptTrace` |
+| `make_llm_text` | `unrendered_prompt: UnrenderedLLMPrompt`, `output_mime_type: str` | `LLMTextGeneration`: `text_content: TextContent`, `rendered_prompt: LLMPromptTrace` |
 | `make_object` | `unrendered_prompt: UnrenderedLLMPrompt` | `LLMObjectGeneration`: `generated_object`, `rendered_prompt: LLMPromptTrace` |
 | `make_object_list` | `unrendered_prompt: UnrenderedLLMPrompt` | `LLMObjectListGeneration`: `generated_objects`, `rendered_prompt: LLMPromptTrace` |
 | `load_stored_texts` | `uri_references: list[UriReference]`, each a frozen model of `uri` and `position` | `list[str]`, the text behind each URL in order |
@@ -255,6 +269,7 @@ Resolution order:
 | Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
 | Judgment generation function | `pipelex/cogt/content_generation/judgment_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
+| Storing large texts, and reading them back | `pipelex/core/stuffs/stored_value_storer.py`, `pipelex/core/stuffs/stored_value_loader.py`, `pipelex/tools/uri/uri_text.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |
 | PageContent model | `pipelex/core/stuffs/page_content.py` |

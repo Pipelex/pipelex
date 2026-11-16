@@ -21,6 +21,8 @@ class TextContent(StoredValueContent):
     value_field_name: ClassVar[str] = "text"
     value_form_field_names: ClassVar[tuple[str, ...]] = ("text",)
     value_kind_desc: ClassVar[str] = "text"
+    stored_mime_type: ClassVar[str] = "text/plain"
+    stored_file_extension: ClassVar[str] = "txt"
 
     text: str | None = Field(default=None, description="The text")
     url: str | None = Field(default=None, description="The URL of the stored text: a storage URI, an HTTP(S) URL, or a base64 data URL")
@@ -68,6 +70,8 @@ class TextContent(StoredValueContent):
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        if not self.is_loaded:
+            return self.rendered_reference_pretty()
         text = self.require_text()
         require_rich_for_rendering()
         from rich.markdown import Markdown

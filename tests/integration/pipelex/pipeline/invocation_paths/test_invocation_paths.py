@@ -280,7 +280,7 @@ class TestInvocationPaths:
                 inputs={"filing": {"concept": "bound_steps.Filing", "content": {"title": "Annual accounts"}}},
             )
 
-        assert response.pipe_output.main_stuff.as_text.text == "Label: Annual accounts"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "Label: Annual accounts"
         starts = [(line["pipe_code"], line["path"]) for line in _read_trace_lines(tmp_path) if line["event_kind"] == "pipe_start"]
         assert starts == [("label_filing", "bound_steps.label_filing"), ("filing.title", None), ("write_label", None)]
         assert [getattr(record, "pipe_ref", None) for record in invocation_path_faults] == ["bound_steps.write_label"]

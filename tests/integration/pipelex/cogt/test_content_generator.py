@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
@@ -69,10 +70,11 @@ class TestContentGenerator:
                 user_text=USER_TEXT_FOR_BASE, templating_style=resolve_templating_style(authored=None)
             ),
             llm_setting_main=llm_setting_main,
+            output_mime_type=TextContent.stored_mime_type,
         )
-        pretty_print(text_generation.text, title="make_llm_text")
+        pretty_print(text_generation.text_content.require_text(), title="make_llm_text")
 
-        assert text_generation.text
+        assert text_generation.text_content.require_text()
         assert text_generation.rendered_prompt.traced_user_text == USER_TEXT_FOR_BASE
 
     @pytest.mark.llm
@@ -197,6 +199,7 @@ class TestContentGenerator:
                     user_text=USER_TEXT_FOR_BASE, templating_style=resolve_templating_style(authored=None)
                 ),
                 llm_setting_main=llm_setting_main,
+                output_mime_type=TextContent.stored_mime_type,
             )
         error = excinfo.value
         pretty_print(f"Caught expected error: {error}")

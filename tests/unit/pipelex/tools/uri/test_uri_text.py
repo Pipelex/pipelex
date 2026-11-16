@@ -38,8 +38,11 @@ class TestLoadTextFromAnyUri:
     )
     async def test_a_url_outside_the_read_scope_is_refused_before_any_read(self, uri: str, expected_reason: UriReadRefusalReason) -> None:
         with pytest.raises(UriReadRefusedError) as exc_info:
-            await load_text_from_any_uri(uri, read_scope=READ_SCOPE, position="the text input 'pages'", storage_provider=_storage())
+            await load_text_from_any_uri(
+                uri, read_scope=READ_SCOPE, position="the text input 'pages'", storage_provider=_storage(), input_name="pages"
+            )
         assert exc_info.value.reason == expected_reason
+        assert exc_info.value.input_name == "pages"
         assert "the text input 'pages'" in str(exc_info.value)
 
     async def test_a_storage_key_without_a_provider_is_refused(self) -> None:

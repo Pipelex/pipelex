@@ -62,7 +62,7 @@ from pipelex.pipeline.validate_bundle_translation import (
     translate_to_validate_bundle_error,
     withholding_host_library_files,
 )
-from pipelex.runtime_hub import get_optional_document_converter
+from pipelex.runtime_hub import get_optional_document_converter, resolve_effective_run_mode
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -530,6 +530,7 @@ async def prepare_pipe_job(
             storage_scope=storage_scope,
             read_scope=read_scope,
             is_relocation_enabled=execution_config.is_normalize_data_urls_to_storage,
+            is_dry_run=resolve_effective_run_mode(requested=pipe_run_mode, is_mock_usage=is_mock_usage).is_dry,
         )
         # Refuse the run now, rather than at the step that would fail mid-run, when a file input is
         # certain to reach a pipe whose model cannot read its format.

@@ -40,8 +40,12 @@ from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import StoredValueNotLoadedError
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 from pipelex.tools.uri.uri_resolver import describe_uri
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 # The fields of the referenced form, which accompany `url` and are absent from the inline form.
 REFERENCE_METADATA_FIELDS: tuple[str, ...] = ("size", "mime_type", "preview")
@@ -88,6 +92,10 @@ class StoredValueContent(StuffContent):
     value_form_field_names: ClassVar[tuple[str, ...]]
     # The value's kind in a description or a message: "text", "markdown", "html", "JSON".
     value_kind_desc: ClassVar[str]
+    # The MIME type a value of this class is stored under, and the extension its storage key ends with: what the code
+    # that stores a large value (`pipelex.core.stuffs.stored_value_storer`) writes.
+    stored_mime_type: ClassVar[str]
+    stored_file_extension: ClassVar[str]
 
     # The value read from storage for a referenced content, never serialized.
     _loaded_value: StoredValue | None = PrivateAttr(default=None)
@@ -228,6 +236,53 @@ class StoredValueContent(StuffContent):
             for field_name in self.value_form_field_names
         }
 
+    def stored_text(self) -> str:
+        """The text an inline value is stored as, which `size` measures and `preview` starts: the value itself, for a text or HTML.
+
+        Raises:
+            StoredValueNotLoadedError: The content holds a reference to its value that was never loaded.
+        """
+        value = self.require_value()
+        if not isinstance(value, str):
+            msg = f"A {self.__class__.__name__} holds a value that is not a text, and must say how it is stored."
+            raise TypeError(msg)
+        return value
+
+    def accept_storage(self, *, url: str, size: int, mime_type: str, preview: str) -> None:
+        """Turn this inline content into its reference to the value just stored, keeping the value loaded.
+
+        The code that stored the value calls it, in place, so every holder of the content sees the reference, a dump of it
+        is the reference alone, and a reader in the same process still reads the value without loading it again.
+
+        Args:
+            url: Where the value was stored.
+            size: The stored value's length in bytes.
+            mime_type: The MIME type it was stored under.
+            preview: The true start of the value.
+        """
+        value = self.require_value()
+        # Through pydantic's own assignment, below this class's, which would clear the loaded value on assigning the value.
+        super().__setattr__(self.value_field_name, None)
+        super().__setattr__("url", url)
+        super().__setattr__("size", size)
+        super().__setattr__("mime_type", mime_type)
+        super().__setattr__("preview", preview)
+        self._loaded_value = value
+
+    def hold_value_inline(self) -> None:
+        """Turn this content into its inline form, holding its value, inline or loaded, and dropping any reference.
+
+        For a process handing the content to one that reaches no storage, such as a host dispatching a PipeFunc call to a
+        sandbox: a dump of it is then the value itself.
+
+        Raises:
+            StoredValueNotLoadedError: The content holds a reference to its value that was never loaded.
+        """
+        if self.url is None:
+            return
+        # Assigning the value clears the reference and its metadata (`__setattr__`).
+        setattr(self, self.value_field_name, self.require_value())
+
     def accept_loaded_text(self, *, text: str) -> None:
         """Keep the value read from storage, given as the text it was stored as, so the content can be read synchronously.
 
@@ -248,6 +303,28 @@ class StoredValueContent(StuffContent):
             StoredValueUnreadableError: The text is not a value of the content's kind.
         """
         return text
+
+    def rendered_reference_pretty(self) -> "PrettyPrintable":
+        """What a pretty print shows of a stored value never loaded: its kind, size, location and preview.
+
+        A pretty print is a display, made where storage may not be reachable, such as a terminal printing a hosted run's
+        output, so it describes the reference rather than refusing it, as a render for a reader does.
+        """
+        require_rich_for_rendering()
+        from rich.text import Text
+
+        described = Text(self.reference_summary())
+        if self.preview:
+            described.append(f"\nIt starts: {self.preview}")
+        return described
+
+    def reference_summary(self) -> str:
+        """One sentence describing a stored value never loaded, from its reference alone: its kind, size and location.
+
+        What a render for a person shows in place of the value when it cannot be loaded, beside the `preview`.
+        """
+        url_desc = describe_uri(self.url) if self.url is not None else "nowhere"
+        return f"{self._stored_short_desc().capitalize()}, stored at {url_desc}, not loaded."
 
     def _make_not_loaded_error(self) -> StoredValueNotLoadedError:
         url_desc = describe_uri(self.url) if self.url is not None else "nowhere"

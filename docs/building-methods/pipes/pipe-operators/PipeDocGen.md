@@ -15,6 +15,8 @@ The step runs in two stages:
 1. **Compose.** Pipelex lays the inputs out, or renders the step's HTML template against them, and renders the file's name. Every template here renders strictly: a field the inputs do not have fails the step instead of printing as empty text.
 2. **Print.** The step's document engine turns the composition into the file's bytes, and Pipelex stores them. The output is a `Document` whose URL ends in the file's own name, such as `invoice-INV-2026-0142.pdf`.
 
+A `Text`, `Markdown`, `Html` or `JSON` input held in storage, as a [large text](../../concepts/native-concepts.md#stored-values) is, prints as its value from every source: the step reads it in full before it composes, and an HTML template file reads it when the print renders it.
+
 With no template, the step lays its inputs out by itself, which is called the auto-layout:
 
 - the scalar fields of a structure, such as a number, a date or a short text, make a grid of labels and values, labelled from the fields' titles;

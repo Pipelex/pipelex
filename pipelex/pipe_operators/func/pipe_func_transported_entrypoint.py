@@ -8,7 +8,9 @@ function), and writes the serialized ``PipeFuncExecutionResponse``.
 The third argument names the directory the sandbox client unpacked the call's files into, such as from one
 archive per call: it becomes the call's import root, and is left in place. A sandbox reaches no method file
 store, so its client reads the files of the tree the request names there (``read_pipe_func_call_files``),
-where it runs, and hands them over; the request carries no file's bytes.
+where it runs, and hands them over; the request carries no file's bytes. Nor does it reach the run's storage, so its
+client hands it a request whose stored values it loaded (``inline_stored_values_for_sandbox``), and stores the large
+values of the response it gets back (``store_large_values_of_sandbox_response``).
 
 It lives in open ``pipelex`` and imports no sandbox code, so a box needs only ``pipelex`` installed —
 the sandbox *client* (box provisioning, upload/download, teardown) is a worker-side concern that stays

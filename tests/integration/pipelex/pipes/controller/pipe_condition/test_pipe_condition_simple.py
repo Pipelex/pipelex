@@ -65,7 +65,7 @@ class TestPipeConditionSimple:
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
         assert isinstance(input_text.content, TextContent)
-        assert input_text.content.text == "hello world"
+        assert input_text.content.require_text() == "hello world"
 
         pipe_output = await pipe_condition.run_pipe(
             job_metadata=job_metadata,
@@ -83,7 +83,7 @@ class TestPipeConditionSimple:
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" (11 chars > 5) -> expression="long" -> capitalize_long_text -> "LONG: HELLO WORLD"
         if pipe_run_mode.is_live:
-            assert final_result.content.text == "LONG: HELLO WORLD"
+            assert final_result.content.require_text() == "LONG: HELLO WORLD"
 
         # Verify working memory structure
         final_working_memory = pipe_output.working_memory
@@ -93,14 +93,14 @@ class TestPipeConditionSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        assert original_input.content.text == "hello world"
+        assert original_input.content.require_text() == "hello world"
 
         # Final result should be there with correct name and content
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode.is_live:
-            assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
+            assert final_result_in_memory.content.require_text() == "LONG: HELLO WORLD"
         assert (
             f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
@@ -140,7 +140,7 @@ class TestPipeConditionSimple:
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
         assert isinstance(input_text.content, TextContent)
-        assert input_text.content.text == "hi"
+        assert input_text.content.require_text() == "hi"
 
         # Actually run the PipeCondition pipe
         pipe_output = await pipe_condition.run_pipe(
@@ -159,7 +159,7 @@ class TestPipeConditionSimple:
         assert isinstance(final_result.content, TextContent)
         # Should be: "hi" (2 chars <= 5) -> expression="short" -> add_prefix_short_text -> "SHORT: hi"
         if pipe_run_mode.is_live:
-            assert final_result.content.text == "SHORT: hi"
+            assert final_result.content.require_text() == "SHORT: hi"
 
         # Verify working memory structure
         final_working_memory = pipe_output.working_memory
@@ -169,14 +169,14 @@ class TestPipeConditionSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        assert original_input.content.text == "hi"
+        assert original_input.content.require_text() == "hi"
 
         # Final result should be there with correct name and content
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode.is_live:
-            assert final_result_in_memory.content.text == "SHORT: hi"
+            assert final_result_in_memory.content.require_text() == "SHORT: hi"
         assert (
             f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"

@@ -156,6 +156,7 @@ def _posted_failure(mocker: MockerFixture, *, delivery_assignment: DeliveryAssig
         DeliveryExecutor().execute(
             None,
             storage_scope="webhook-view-scope",
+            read_scope=None,
             pipeline_run_id=_RUN_ID,
             delivery_assignment=delivery_assignment.model_copy(update={"storage": None}),
             status=DeliveryStatus.FAILED,

@@ -123,7 +123,7 @@ class TestPipeBatchCompaction:
 
         list_content = pipe_output.main_stuff.content
         assert isinstance(list_content, ListContent)
-        texts = [item.text for item in cast("ListContent[TextContent]", list_content).items]
+        texts = [item.require_text() for item in cast("ListContent[TextContent]", list_content).items]
         assert texts == ["GOOD MORNING", "GOOD NIGHT"]
 
     async def test_a_dropped_branch_is_logged_at_debug_with_its_index_and_absence_reason(

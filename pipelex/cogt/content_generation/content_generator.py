@@ -1,5 +1,5 @@
-import asyncio
-from typing import Any
+from functools import partial
+from typing import TYPE_CHECKING, Any
 
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
@@ -54,11 +54,16 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.tabular.table_records import TableRecords
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.tools.uri.uri_bytes import MAX_CONCURRENT_URI_READS
 from pipelex.tools.uri.uri_read_scope import UriReference
 from pipelex.tools.uri.uri_text import load_text_from_any_uri
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -92,6 +97,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         unrendered_prompt: UnrenderedLLMPrompt,
+        output_mime_type: str,
     ) -> LLMTextGeneration:
         rendered_prompt = await self._render_prompt(job_metadata=job_metadata, unrendered_prompt=unrendered_prompt)
         llm_assignment = LLMAssignment.make_from_prompt(
@@ -101,7 +107,13 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_prompt=rendered_prompt,
         )
         generated_text = await llm_gen_text(llm_assignment=llm_assignment)
-        return LLMTextGeneration(text=generated_text, rendered_prompt=LLMPromptTrace.make_from_prompt(llm_prompt=rendered_prompt))
+        text_content = await self._generated_content_factory.make_text_content(
+            storage_scope=job_metadata.run_metadata.storage_scope,
+            text=generated_text,
+            output_mime_type=output_mime_type,
+            is_dry=cogt_run_params.run_mode.is_dry,
+        )
+        return LLMTextGeneration(text_content=text_content, rendered_prompt=LLMPromptTrace.make_from_prompt(llm_prompt=rendered_prompt))
 
     @override
     @update_job_metadata
@@ -249,14 +261,20 @@ class ContentGenerator(ContentGeneratorProtocol):
         # Read in every run mode: a dry run reads the values its caller sent by URL as a live run does, and stores none.
         read_scope = job_metadata.run_metadata.read_scope
         storage_provider = self._generated_content_factory.storage_provider
-        # `gather` keeps the order of the references, which the caller zips the texts back onto.
-        loaded_texts = await asyncio.gather(
-            *(
-                load_text_from_any_uri(uri_reference.uri, read_scope=read_scope, position=uri_reference.position, storage_provider=storage_provider)
-                for uri_reference in uri_references
+        # A bounded number of reads at a time; `gather_bounded` keeps the order of the references, which the caller zips the
+        # texts back onto.
+        load_factories: list[Callable[[], Awaitable[str]]] = [
+            partial(
+                load_text_from_any_uri,
+                uri_reference.uri,
+                read_scope=read_scope,
+                position=uri_reference.position,
+                storage_provider=storage_provider,
+                input_name=uri_reference.input_name,
             )
-        )
-        return list(loaded_texts)
+            for uri_reference in uri_references
+        ]
+        return await gather_bounded(load_factories, max_concurrency=MAX_CONCURRENT_URI_READS)
 
     @override
     @update_job_metadata

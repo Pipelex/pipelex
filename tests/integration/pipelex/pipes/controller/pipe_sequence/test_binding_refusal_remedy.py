@@ -114,7 +114,7 @@ class TestBindingRefusalRemedy:
                 }
             },
         )
-        assert result.pipe_output.main_stuff.as_text.text == "View: Garden chairs on a lawn"
+        assert result.pipe_output.main_stuff.as_text.require_text() == "View: Garden chairs on a lawn"
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_a_pipe_step_storing_under_a_name_that_is_not_plain_is_refused(self) -> None:

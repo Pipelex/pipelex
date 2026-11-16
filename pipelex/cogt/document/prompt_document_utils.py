@@ -4,9 +4,10 @@ This module provides functions to convert PromptDocument instances into
 PreparedFile instances that can be consumed by LLM provider APIs.
 """
 
-import asyncio
 import base64
+from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pipelex.cogt.document.prompt_document import (
     PromptDocument,
@@ -15,6 +16,7 @@ from pipelex.cogt.document.prompt_document import (
     PromptDocumentUri,
 )
 from pipelex.runtime_hub import get_storage_provider
+from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx, fetching_for_input
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes
@@ -25,6 +27,10 @@ from pipelex.tools.uri.resolved_uri import (
     ResolvedLocalPath,
     ResolvedPipelexStorage,
 )
+from pipelex.tools.uri.uri_bytes import MAX_CONCURRENT_URI_READS
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 async def prepare_prompt_document(
@@ -108,8 +114,12 @@ async def prep_prompt_documents(
     Returns:
         List of PreparedFile instances ready for the LLM API
     """
-    tasks = [prepare_prompt_document(prompt_document=doc, is_http_url_enabled=is_http_url_enabled) for doc in prompt_documents]
-    return list(await asyncio.gather(*tasks))
+    # A bounded number at a time, so a prompt holding many documents does not open as many reads at once.
+    prepare_factories: list[Callable[[], Awaitable[PreparedFile]]] = [
+        partial(prepare_prompt_document, prompt_document=prompt_document, is_http_url_enabled=is_http_url_enabled)
+        for prompt_document in prompt_documents
+    ]
+    return await gather_bounded(prepare_factories, max_concurrency=MAX_CONCURRENT_URI_READS)
 
 
 async def prepare_prompt_document_as_base64(prompt_document: PromptDocument) -> PreparedFileBase64:

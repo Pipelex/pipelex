@@ -10,7 +10,9 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.stored_value_storer import store_large_values, store_value_if_large
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.storage_scope import GENERATED_CONTENT_LEAF
@@ -271,6 +273,25 @@ class GeneratedContentFactory:
             caption=raw_details.caption,
         )
 
+    async def make_text_content(self, *, storage_scope: str, text: str, output_mime_type: str, is_dry: bool) -> TextContent:
+        """The content of a generated text, stored under `{storage_scope}/generated/` when past the inline threshold.
+
+        Args:
+            storage_scope: The run's storage scope.
+            text: The generated text.
+            output_mime_type: The MIME type of the text the step produces: `text/markdown` makes a `MarkdownContent`,
+                stored as a `.md` file, and anything else a `TextContent`, stored as a `.txt` file.
+            is_dry: Whether the run is a dry run, which stores nothing.
+
+        Returns:
+            The text inline, or its reference with the text kept loaded.
+        """
+        text_class: type[TextContent] = MarkdownContent if output_mime_type == MarkdownContent.stored_mime_type else TextContent
+        text_content = text_class(text=text)
+        if not is_dry:
+            await store_value_if_large(text_content, storage_provider=self.storage_provider, storage_scope=storage_scope, leaf=GENERATED_CONTENT_LEAF)
+        return text_content
+
     async def make_page_contents(
         self,
         storage_scope: str,
@@ -296,4 +317,13 @@ class GeneratedContentFactory:
                     ),
                 )
             )
+        # A page past the inline threshold is stored, so a long document's pages travel as references: all the pages at
+        # once, their writes overlapping a bounded number at a time. The dry branch never reaches here
+        # (`extract_generate`), and a dry run's storage scope stores nothing anyway.
+        await store_large_values(
+            roots={f"page_{page_index}": page_content for page_index, page_content in enumerate(page_contents)},
+            storage_provider=self.storage_provider,
+            storage_scope=storage_scope,
+            leaf=GENERATED_CONTENT_LEAF,
+        )
         return page_contents

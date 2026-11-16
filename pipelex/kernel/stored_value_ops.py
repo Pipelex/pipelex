@@ -18,6 +18,7 @@ from typing import Any
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.exceptions import StoredValueUnreadableError
 from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.runtime_hub import get_content_generator
 from pipelex.system.job_metadata import JobMetadata
@@ -49,7 +50,7 @@ async def load_stored_values_through_leaf(
     with job_metadata.log_context():
         stored_values = find_unloaded_stored_values(roots=roots, read_paths=read_paths)
         uri_references = [
-            UriReference(uri=stored_value.content.url, position=stored_value.position)
+            UriReference(uri=stored_value.content.url, position=stored_value.position, input_name=stored_value.input_name)
             for stored_value in stored_values
             if stored_value.content.url is not None
         ]
@@ -61,7 +62,12 @@ async def load_stored_values_through_leaf(
             uri_references=uri_references,
         )
         for stored_value, loaded_text in zip(stored_values, loaded_texts, strict=True):
-            stored_value.content.accept_loaded_text(text=loaded_text)
+            try:
+                stored_value.content.accept_loaded_text(text=loaded_text)
+            except StoredValueUnreadableError as exc:
+                # The refusal names the input, as a load in this process names it (`load_stored_value`).
+                exc.with_input(input_name=stored_value.input_name)
+                raise
         return len(loaded_texts)
 
 

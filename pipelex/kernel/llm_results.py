@@ -45,12 +45,16 @@ class StructuringPath(StrEnum):
 
 
 class LlmTextResult(BaseModel):
-    """The outcome of a kernel LLM call with a text output."""
+    """The outcome of a kernel LLM call with a text output.
+
+    `content` is the output content holding the generated text: inline, or past the inline threshold its reference to the
+    text the leaf stored, which `require_text()` reads once loaded, as it is in the process that stored it.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     memory: WorkingMemory
-    text: str
+    content: StuffContent
     rendered_prompt: LLMPromptTrace
     llm_setting: LLMSetting
     structuring_path: StructuringPath

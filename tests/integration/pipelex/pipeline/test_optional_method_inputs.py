@@ -31,7 +31,7 @@ def optionals_method_report(working_memory: WorkingMemory) -> TextContent:
     source_stuff = working_memory.get_optional_stuff(name="source")
     if source_stuff is None:
         return TextContent(text=f"report about {topic} (no source)")
-    return TextContent(text=f"report about {topic} from {source_stuff.as_text.text}")
+    return TextContent(text=f"report about {topic} from {source_stuff.as_text.require_text()}")
 
 
 def _make_method_pipe() -> PipeFunc:
@@ -80,7 +80,7 @@ class TestOptionalMethodInputs:
             working_memory=job_memory,
             pipe_run_params=pipe_job.pipe_run_params,
         )
-        assert pipe_output.main_stuff.as_text.text == "report about penalties (no source)"
+        assert pipe_output.main_stuff.as_text.require_text() == "report about penalties (no source)"
 
     async def test_provided_optional_input_leaves_no_record(self, load_empty_library: Callable[[], str]):
         library_id = load_empty_library()

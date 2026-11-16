@@ -272,7 +272,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     main_text_content = text_result.memory.get_main_stuff().content
     if not isinstance(main_text_content, TextContent):
         fail(f"llm_text landed {type(main_text_content).__name__} in memory, not a TextContent")
-    if main_text_content.text != text_result.text:
+    if main_text_content.require_text() != text_result.content.require_text():
         fail("the memory returned by llm_text does not carry the text the result reports")
 
     extract_setting = ExtractSetting(model="kernel-boot-contract-extract-model")

@@ -36,6 +36,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel.document_conversion_ops import readable_prompt_documents
 from pipelex.kernel.llm_prompt_content import LlmPromptContent, prepare_llm_prompt
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult, StructuringPath
@@ -287,6 +288,23 @@ async def generate_object_content(
         return GeneratedObjectContent(content=object_generation.generated_object, rendered_prompt=object_generation.rendered_prompt)
 
 
+def output_content_of_generated_text(*, output_class: type[StuffContent], text_content: TextContent) -> StuffContent:
+    """The step's output content holding a generated text as the leaf returned it: inline, or its stored reference.
+
+    `model_validate` rather than `output_class(text=...)`: the class arrives typed as `type[StuffContent]`, whose declared
+    fields do not include `text`, the subclasses that a Text-compatible concept resolves to carry it. Validation, and the
+    `ValidationError` a mismatch raises, are identical either way. A text the leaf stored in this process is still loaded,
+    and stays so in the output content, so a reader here reads it without loading it again.
+
+    Raises:
+        ValidationError: The output class does not take the generated text.
+    """
+    content = output_class.model_validate(text_content.model_dump())
+    if isinstance(content, TextContent) and text_content.is_stored and text_content.is_loaded:
+        content.accept_loaded_text(text=text_content.require_text())
+    return content
+
+
 async def run_llm_text(
     *,
     memory: WorkingMemory,
@@ -325,16 +343,12 @@ async def run_llm_text(
             cogt_run_params=cogt_run_params,
             unrendered_prompt=unrendered_prompt,
             llm_setting_main=llm_setting,
+            output_mime_type=output_class.stored_mime_type if issubclass(output_class, TextContent) else TextContent.stored_mime_type,
         )
-        generated_text = text_generation.text
-        # `model_validate` rather than `output_class(text=...)`: the class arrives typed as
-        # `type[StuffContent]`, whose declared fields do not include `text` — the subclasses that a
-        # Text-compatible concept resolves to are what carry it. Validation, and the `ValidationError`
-        # a mismatch raises, are identical either way.
-        content = output_class.model_validate({"text": generated_text})
+        content = output_content_of_generated_text(output_class=output_class, text_content=text_generation.text_content)
         return LlmTextResult(
             memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-            text=generated_text,
+            content=content,
             rendered_prompt=text_generation.rendered_prompt,
             llm_setting=llm_setting,
             structuring_path=StructuringPath.TEXT,

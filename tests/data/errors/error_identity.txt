@@ -374,7 +374,7 @@ StorageLocalError | runtime.misconfigured
 StorageNotConfiguredError | pipelex.storage.not_configured
 StorageS3Error | one of pipelex.storage.unavailable, pipelex.config.invalid, pipelex.config.credential_refused, pipelex.config.credential_missing
 StoredValueNotLoadedError | runtime.unexpected
-StoredValueUnreadableError | runtime.unexpected
+StoredValueUnreadableError | input.file_unreadable
 StructureValidationError | one of input.invalid, input.wrong_concept
 StructuredContentComposerTypeError | pipe.output_invalid
 StructuredContentComposerValidationError | pipe.output_invalid
@@ -418,7 +418,8 @@ UnknownVarPrefixError | pipelex.config.invalid
 UnsafeSchemaError | security.schema_refused
 UnsupportedImageMimeTypeError | one of input.file_type_unsupported, provider.response_invalid
 UriReadRefusedError | one of security.input_url_refused, security.method_url_refused
-UriTextNotUtf8Error | runtime.unexpected
+UriTextNotUtf8Error | input.file_unreadable
+UriTextTooLargeError | input.too_large
 UrlSyntaxError | input.invalid
 ValidateBundleError | one of method.invalid, request.invalid
 VarFallbackPatternError | pipelex.config.variable_missing

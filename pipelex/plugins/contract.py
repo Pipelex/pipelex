@@ -140,7 +140,14 @@ if TYPE_CHECKING:
 # discovery-time mismatch naming the plugin. The prompt's memory crosses as a ``TransportedMemory`` and an object
 # generation as plain data, so a host passes both across its activity boundary untouched, and ``UriReference`` became a
 # frozen model for the same reason.
-PLUGIN_API_VERSION: int = 12
+#
+# v13 changed the text entry of the content generator an orchestrator plugin provides, now that a large text is stored
+# where it is produced. ``make_llm_text`` takes ``output_mime_type``, ``text/markdown`` for a markdown output and
+# ``text/plain`` otherwise, and its ``LLMTextGeneration`` carries ``text_content``, a ``TextContent`` or ``MarkdownContent``
+# the leaf stored when it is past ``[runtime.storage] inline_text_max_bytes`` (``GeneratedContentFactory.make_text_content``),
+# where it carried the bare ``text``. A content generator written against v12 would be called with a keyword it does not
+# accept on its first text step; the bump turns that into a discovery-time mismatch naming the plugin.
+PLUGIN_API_VERSION: int = 13
 
 
 @runtime_checkable

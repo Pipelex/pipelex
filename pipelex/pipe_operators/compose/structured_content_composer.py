@@ -1,6 +1,6 @@
 import datetime
 import inspect
-from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
+from typing import Any, Literal, NamedTuple, TypeAlias, cast, get_args, get_origin
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
@@ -38,6 +38,14 @@ NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date | dateti
 # The exact native scalar target types (no subclass matching: datetime is a date subclass
 # and bool is an int subclass, and neither cross-kind conversion is wanted).
 NATIVE_SCALAR_TARGET_TYPES: tuple[type[Any], ...] = (str, float, int, bool, datetime.date, datetime.time)
+
+
+def _is_str_choice(*, expected_type: Any) -> bool:
+    """Whether a type annotation is a choice among strings, a `Literal` whose every value is a `str`: a `str` target."""
+    if get_origin(expected_type) is not Literal:
+        return False
+    choices = get_args(expected_type)
+    return bool(choices) and all(isinstance(choice, str) for choice in choices)
 
 
 class NativeScalarExtraction(NamedTuple):
@@ -475,7 +483,7 @@ class StructuredContentComposer:
         """Extract the native scalar value from a scalar content wrapper when the target expects it.
 
         Conversion matrix (wrapper -> native target):
-        - TextContent -> str (or str subclass): extract .text
+        - TextContent -> str (or str subclass, or a choice field's `Literal` of strings): extract the text, loaded when stored
         - NumberContent -> float or int (never bool, an int subclass): extract .number
         - YesNoContent -> bool: extract .yes_no
         - DateContent -> date (exactly, never datetime, a date subclass): extract .date,
@@ -584,9 +592,13 @@ class StructuredContentComposer:
             target_type: The type to match against (e.g., str, TextContent, StuffContent)
 
         Returns:
-            True if expected_type is target_type or a subclass of it
+            True if expected_type is target_type or a subclass of it; for `str`, also a choice field, a `Literal` of strings
         """
         if expected_type is target_type:
+            return True
+        if target_type is str and _is_str_choice(expected_type=expected_type):
+            # A `choices` field is generated as a `Literal` of its strings: a Text copied into it is its text, which
+            # pydantic then checks against the choices. A `str`-based Enum is a `str` subclass, matched below.
             return True
         try:
             return issubclass(expected_type, target_type)

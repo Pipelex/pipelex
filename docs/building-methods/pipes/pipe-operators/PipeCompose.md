@@ -179,6 +179,7 @@ Conversion matrix:
 | Source input | Native target field | Composed value |
 |---|---|---|
 | `Text` | `type = "text"` | the text string |
+| `Text` | a `choices` field | the text string, which must be one of the choices |
 | `Number` | `type = "number"` | the number |
 | `YesNo` | `type = "boolean"` | the boolean |
 | `Date` | `type = "date"` | the date |

@@ -24,7 +24,7 @@ class TestMarkdownDryRun:
         assert report_stuff.concept.concept_ref == "native.Markdown"
         assert type(report_stuff.content) is MarkdownContent
         assert report_stuff.as_markdown.text
-        assert response.pipe_output.main_stuff.as_text.text
+        assert response.pipe_output.main_stuff.as_text.require_text()
 
     async def test_dry_run_markdown_envelope_fills_a_text_input(self):
         """A Markdown input in the envelope form fills a Text input and stays a Markdown in memory."""
@@ -37,4 +37,4 @@ class TestMarkdownDryRun:
         report_stuff = response.pipe_output.working_memory.get_stuff("report")
         assert report_stuff.concept.concept_ref == "native.Markdown"
         assert report_stuff.content == MarkdownContent(text=report_source)
-        assert response.pipe_output.main_stuff.as_text.text
+        assert response.pipe_output.main_stuff.as_text.require_text()
