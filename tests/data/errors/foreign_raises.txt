@@ -20,6 +20,7 @@ pipelex/base_exceptions.py | PipelexError.__init_subclass__ | TypeError | invari
 pipelex/base_exceptions.py | PipelexError.with_error_code | ValueError | invariant
 pipelex/cli/commands/init/credentials.py | set_env_file_entries | ValueError | invariant
 pipelex/cli/commands/init/ui/setup_path_ui.py | _option_number | ValueError | invariant
+pipelex/codegen/emitters/naming.py | _loaded_ref | ValueError | invariant
 pipelex/codegen/stamp.py | _reject_json_constant | ValueError | carrier
 pipelex/cogt/content_generation/content_generator.py | ContentGenerator.make_render_page_views | ValueError | invariant
 pipelex/cogt/content_generation/content_generator_protocol.py | update_job_metadata.wrapper | RuntimeError | invariant
@@ -56,6 +57,7 @@ pipelex/core/stuffs/iso_temporal.py | parse_iso_time | InputFreeValueError | val
 pipelex/core/stuffs/iso_temporal.py | parse_iso_time | InputFreeValueError | validator
 pipelex/core/stuffs/iso_temporal.py | parse_iso_time | InputFreeValueError | validator
 pipelex/core/stuffs/non_null_any.py | _refuse_none | PydanticCustomError | validator
+pipelex/core/stuffs/stored_value_content.py | StoredValueContent.stored_text | TypeError | invariant
 pipelex/core/stuffs/stuff_artefact.py | _get_content_html | AttributeError | carrier
 pipelex/core/stuffs/stuff_artefact.py | _get_template_value | KeyError | carrier
 pipelex/errors/error_class_discovery.py | _force_load_all_error_modules | RuntimeError | invariant

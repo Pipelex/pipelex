@@ -16,6 +16,9 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.method_trees.exceptions import TreePythonError
 from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
+from pipelex.core.stuffs.stored_value_loader import load_stored_values
+from pipelex.core.stuffs.stored_value_storer import store_large_values
+from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe
 from pipelex.kernel.func_ops import coerce_function_output, invoke_function
@@ -28,7 +31,9 @@ from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecuti
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult, PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_bridge.primitives.rehydration import rehydrate_library_and_memory
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.storage_scope import GENERATED_CONTENT_LEAF
 
 # The library id the transported run rebuilds under. Internal to one process (a fresh sandbox box or a
 # one-shot subprocess), so a fixed id is safe — there is no other library to collide with.
@@ -73,6 +78,34 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
     ) -> PipeFuncExecutionResult:
+        return await self._run_pipe_func(
+            job_metadata=job_metadata,
+            pipe_code=pipe_code,
+            function_name=function_name,
+            working_memory=working_memory,
+            is_storage_reachable=True,
+        )
+
+    async def _run_pipe_func(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        pipe_code: str,
+        function_name: str,
+        working_memory: WorkingMemory,
+        is_storage_reachable: bool,
+    ) -> PipeFuncExecutionResult:
+        """Run the step's function here, loading the stored values it may read first and storing the large ones it returns.
+
+        The function reads its memory synchronously, so every stored `Text`, `Markdown`, `Html` or `JSON` value the
+        memory holds is loaded before it runs, under the run's read scope; and every inline one it returns past the inline
+        threshold is stored under `{storage_scope}/generated/` once it has, so a large output travels as its reference.
+        Both need the run's storage, which a sandbox does not reach: there, `is_storage_reachable` is false, and the host
+        that dispatched the call did both on its side (`inline_stored_values_for_sandbox`,
+        `store_large_values_of_sandbox_response` in `pipe_func_execution_transport`).
+        """
+        if is_storage_reachable:
+            await self._load_stored_values(job_metadata=job_metadata, working_memory=working_memory)
         log.verbose(f"Running PipeFunc in-process with function '{function_name}'")
         # The step imported and checked its function before the run (its `_validate_before_run`), and names it for its
         # call in flight; a call that names none, the transported run's, finds the step in the current library, which
@@ -93,10 +126,34 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # Outside the function's failure: the kernel's coercion refusing what the function returned is the step's
         # output failing, `FuncOutputTypeError` with `pipe.output_invalid`, whatever shape it refused.
         call_result = coerce_function_output(function=function, function_output=function_output, function_name=function_name)
+        if is_storage_reachable:
+            await store_large_values(
+                roots={"output": call_result.content},
+                storage_provider=get_storage_provider(),
+                storage_scope=job_metadata.run_metadata.storage_scope,
+                leaf=GENERATED_CONTENT_LEAF,
+            )
         return PipeFuncExecutionResult(
             content=call_result.content,
             function_module=call_result.function_module,
             function_qualname=call_result.function_qualname,
+        )
+
+    @staticmethod
+    async def _load_stored_values(*, job_metadata: JobMetadata, working_memory: WorkingMemory) -> None:
+        """Load every stored value the memory holds, which the function may read, under the run's read scope.
+
+        Raises:
+            UriReadRefusedError: A stored value's URL is outside the run's read scope.
+            UriTextTooLargeError: A stored value is past `[runtime.network] max_fetch_bytes`.
+            UriTextNotUtf8Error: The stored bytes of a value are not UTF-8.
+            StoredValueUnreadableError: A stored text is not a value of its content's kind.
+        """
+        stored_values = find_unloaded_stored_values(roots={stuff_name: stuff.content for stuff_name, stuff in working_memory.root.items()})
+        await load_stored_values(
+            stored_values=stored_values,
+            read_scope=job_metadata.run_metadata.read_scope,
+            storage_provider=get_storage_provider(),
         )
 
     @override
@@ -121,11 +178,14 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             if request.tree_digest is not None:
                 call_files = await read_pipe_func_call_files(tree_digest=request.tree_digest, read_scope=request.job_metadata.run_metadata.read_scope)
                 write_call_files(files=call_files, destination=tree_root)
-            return await self.run_pipe_func_transported_at(request=request, tree_root=tree_root)
+            # This process reads the method file store, so it reaches the run's storage too.
+            return await self.run_pipe_func_transported_at(request=request, tree_root=tree_root, is_storage_reachable=True)
         finally:
             shutil.rmtree(tree_root, ignore_errors=True)
 
-    async def run_pipe_func_transported_at(self, *, request: PipeFuncExecutionRequest, tree_root: Path) -> PipeFuncExecutionResponse:
+    async def run_pipe_func_transported_at(
+        self, *, request: PipeFuncExecutionRequest, tree_root: Path, is_storage_reachable: bool = False
+    ) -> PipeFuncExecutionResponse:
         """Run a transported call with its Python root at `tree_root`, a directory holding the files of the call's tree.
 
         The caller wrote the files of the tree the request names there, every one but the `.mthds` files, at their tree
@@ -133,6 +193,12 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         such as from one archive per call, and hands the directory over. The directory is the call's import root: it goes
         first on `sys.path` under the process's hold on its Python, and the function is imported from it under its real
         import path.
+
+        `is_storage_reachable` says whether this process reaches the run's storage, as a process reading the method file
+        store does: the stored values the memory holds are then loaded before the function runs, and the large values it
+        returns stored. A sandbox reaches no storage, so it leaves it false, the default: its host inlines the stored values
+        before the call (`inline_stored_values_for_sandbox`) and stores the large output after it
+        (`store_large_values_of_sandbox_response`).
 
         Raises:
             PipeFuncExecutionError: The call's files cannot be read back as a tree, or the function runs past its timeout.
@@ -152,7 +218,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             # The step called, and it alone, is built in the tree written here, which holds none of its tree's bundles:
             # every other step, a sibling of the same tree included, names its tree by the digest the crate names it by.
             written_pipe_trees = {request.pipe_code: tree} if request.tree_digest is not None else {}
-            return await self._run_transported(request=request, written_pipe_trees=written_pipe_trees)
+            return await self._run_transported(request=request, written_pipe_trees=written_pipe_trees, is_storage_reachable=is_storage_reachable)
         finally:
             TREE_PYTHON_HOLD.release(holder=TRANSPORTED_LIBRARY_ID)
             TREE_PYTHON_HOLD.unload_if_unheld()
@@ -183,7 +249,9 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             generated_target.parent.mkdir(parents=True, exist_ok=True)
             generated_target.write_text(emitted.content, encoding="utf-8")
 
-    async def _run_transported(self, *, request: PipeFuncExecutionRequest, written_pipe_trees: dict[str, MethodTree]) -> PipeFuncExecutionResponse:
+    async def _run_transported(
+        self, *, request: PipeFuncExecutionRequest, written_pipe_trees: dict[str, MethodTree], is_storage_reachable: bool
+    ) -> PipeFuncExecutionResponse:
         # The crate was validated where it was assembled; its other steps name trees this process never receives, so it
         # is loaded as it is, and the one step called checks its function as it binds it.
         working_memory = rehydrate_library_and_memory(
@@ -210,12 +278,12 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # terminated).
         try:
             execution_result = await asyncio.wait_for(
-                self.run_pipe_func(
+                self._run_pipe_func(
                     job_metadata=request.job_metadata,
                     pipe_code=request.pipe_code,
                     function_name=request.function_name,
                     working_memory=working_memory,
-                    pipe_run_params=request.pipe_run_params,
+                    is_storage_reachable=is_storage_reachable,
                 ),
                 timeout=request.timeout_seconds,
             )

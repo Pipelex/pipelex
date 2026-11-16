@@ -33,6 +33,13 @@ from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_json, build_absence_markdown
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_output import (
+    load_stored_values_of_output,
+    render_reference_form_json,
+    render_unloaded_output_html,
+    render_unloaded_output_markdown,
+    render_unloaded_output_viewer,
+)
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.errors.failure_problem import failure_log_fields
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
@@ -46,7 +53,7 @@ from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
-from pipelex.runtime_hub import get_console, get_error_console, get_telemetry_manager
+from pipelex.runtime_hub import get_console, get_error_console, get_storage_provider, get_telemetry_manager
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -304,6 +311,7 @@ async def _execute_run(
                 tree_listing=tree_listing,
             )
         pipe_output = response.pipe_output
+        run_read_scope = runner.read_scope
     except ValidateBundleError as exc:
         # The run refused the bundle while loading it, before any pipe ran.
         handle_validate_bundle_error(exc, bundle_path=bundle_file_path, library_dirs=library_dir_paths)
@@ -327,7 +335,15 @@ async def _execute_run(
     # Pretty print the resolved main result unless disabled or in dry run mode. A completed run
     # always resolves its declared output: a value or a recorded absence.
     main_resolved = pipe_output.working_memory.resolve_main_stuff()
-    if not no_pretty_print and not dry_run:
+    # The output's stored values are loaded before anything prints or saves it, under the run's own read scope: a value
+    # that cannot be loaded, such as a local file that is gone, prints its description and saves as its reference.
+    is_pretty_printed = not no_pretty_print and not dry_run
+    is_main_output_loaded = True
+    if not isinstance(main_resolved, AbsenceRecord) and (is_pretty_printed or save_main_stuff):
+        is_main_output_loaded = await load_stored_values_of_output(
+            content=main_resolved.content, read_scope=run_read_scope, storage_provider=get_storage_provider()
+        )
+    if is_pretty_printed:
         if isinstance(main_resolved, AbsenceRecord):
             get_console().print(
                 f"Final output of pipe [red]{pipe_code}[/red] resolved absent: {main_resolved.reason}",
@@ -386,22 +402,37 @@ async def _execute_run(
             saved_main_stuff_formats.append("md")
         else:
             main_stuff = main_resolved
-            main_stuff_json = await main_stuff.content.rendered_json_async()
+            main_stuff_json: str
+            main_stuff_md: str
+            main_stuff_html: str
+            main_stuff_viewer: str
+            if is_main_output_loaded:
+                main_stuff_json = await main_stuff.content.rendered_json_async()
+                main_stuff_md = await main_stuff.content.rendered_markdown_async()
+                main_stuff_html = await main_stuff.content.rendered_html_async()
+                main_stuff_viewer = await render_stuff_viewer(main_stuff)
+            else:
+                typer.secho(
+                    "The output holds stored values that could not be loaded: its files describe them and its JSON keeps their references.",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+                main_stuff_json = render_reference_form_json(content=main_stuff.content)
+                main_stuff_md = render_unloaded_output_markdown(content=main_stuff.content)
+                main_stuff_html = render_unloaded_output_html(content=main_stuff.content)
+                main_stuff_viewer = render_unloaded_output_viewer(content=main_stuff.content, title=main_stuff.title)
             main_stuff_json_path = output_path / "main_stuff.json"
             main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
             saved_main_stuff_formats.append("json")
 
-            main_stuff_md = await main_stuff.content.rendered_markdown_async()
             main_stuff_md_path = output_path / "main_stuff.md"
             main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
             saved_main_stuff_formats.append("md")
 
-            main_stuff_html = await main_stuff.content.rendered_html_async()
             main_stuff_html_path = output_path / "main_stuff.html"
             main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
             saved_main_stuff_formats.append("html")
 
-            main_stuff_viewer = await render_stuff_viewer(main_stuff)
             main_stuff_viewer_path = output_path / "main_stuff_viewer.html"
             main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
             saved_main_stuff_formats.append("html_viewer")

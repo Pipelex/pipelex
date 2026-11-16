@@ -14,19 +14,36 @@ from typing import Protocol
 
 from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile
 from pipelex.cogt.doc_gen.template_check import TemplateFinding
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
 class TemplateFileStageProtocol(Protocol):
     """Renders an HTML template file with its step's data, and reports the findings of an office template's check."""
 
-    async def render_html_template_file(self, *, template_file: ComposedTemplateFile, template_source: str) -> str:
+    async def render_html_template_file(
+        self,
+        *,
+        template_file: ComposedTemplateFile,
+        template_source: str,
+        read_scope: str | None,
+        storage_provider: StorageProviderAbstract,
+    ) -> str:
         """The HTML template file's text rendered with the step's data, as the compose stage of a `PipeCompose` renders one.
 
-        Every value the template reads must exist, as in every template of a document: a missing one fails the step.
+        Every value the template reads must exist, as in every template of a document: a missing one fails the step. The
+        step's data crossed with its large texts as references, so the stored values it holds are loaded first.
 
         Args:
             template_file: The template file as the compose stage named it, with the context it renders with.
             template_source: The template file's text, read through the method file store.
+            read_scope: The run's read scope, under which the data's stored values are read.
+            storage_provider: The storage provider that resolves a storage URI.
+
+        Raises:
+            UriReadRefusedError: A stored value's URL is outside the run's read scope.
+            UriTextTooLargeError: A stored value is past `[runtime.network] max_fetch_bytes`.
+            UriTextNotUtf8Error: The stored bytes of a value are not UTF-8.
+            StoredValueUnreadableError: A stored text is not a value of its content's kind.
         """
         ...
 

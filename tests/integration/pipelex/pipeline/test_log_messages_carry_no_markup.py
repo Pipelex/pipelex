@@ -102,7 +102,7 @@ class TestLogMessagesCarryNoMarkup:
             )
 
         lines: list[dict[str, Any]] = [json.loads(line) for line in buffer.getvalue().splitlines() if line]
-        assert response.pipe_output.main_stuff_as_text.text == f"Stand-in name works in Stand-in sector: {STAND_IN_ANSWER}"
+        assert response.pipe_output.main_stuff_as_text.require_text() == f"Stand-in name works in Stand-in sector: {STAND_IN_ANSWER}"
         # The run was read at every level, and live: each pipe announced itself, the nested ones below the method's.
         assert any(line[SEVERITY_KEY] == LOGGING_LEVEL_VERBOSE_NAME for line in lines)
         announced = {(line["pipe_code"], line["pipe_depth"]) for line in lines if line[MESSAGE_KEY] == PIPE_RUN_STARTS_MESSAGE}

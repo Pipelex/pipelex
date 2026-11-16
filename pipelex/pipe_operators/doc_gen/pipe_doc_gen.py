@@ -36,6 +36,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library, get_current_library, get_library_manager, get_native_concept
 from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.kernel.memory_ops import store_result
+from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
@@ -576,6 +577,27 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     # Runs
     ####################################################################################################################
 
+    async def _load_stored_inputs(self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> None:
+        """Load the stored values of the step's inputs that the compose stage reads, through the content generator's leaf.
+
+        The compose stage reads the inputs synchronously, in the step, which on a hosted plane is workflow code: the layout
+        reads every input whole, an inline HTML template and the filename render over them, and an office template's
+        plain data is every input's value. An HTML template file is rendered by the print stage, which loads what it
+        renders itself (`DocGenTemplateFileStage`), so without a filename nothing is loaded here for it.
+
+        Raises:
+            UriReadRefusedError: A stored value's URL is outside the run's read scope.
+            StoredValueUnreadableError: A stored text is not a value of its content's kind.
+        """
+        if self.source.is_html and self.template is None and self.filename is None:
+            return
+        await load_stored_values_through_leaf(
+            roots=dict(self._named_contents(working_memory)),
+            read_paths=None,
+            job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
+        )
+
     def _store_document(
         self,
         *,
@@ -615,6 +637,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeDocGenOutput:
+        await self._load_stored_inputs(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params)
         composition = await self.compose(working_memory=working_memory, pipe_run_params=pipe_run_params)
         doc_gen_setting = self.resolve_engine()
         document = await get_content_generator().make_rendered_document(

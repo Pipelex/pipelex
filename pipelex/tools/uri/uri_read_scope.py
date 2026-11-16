@@ -39,12 +39,14 @@ class UriReference(BaseModel):
     Attributes:
         uri: The URL the payload will read.
         position: Where the URL sits, in the caller's words: "image 2 of the prompt", "the document to extract".
+        input_name: The input whose value the URL is, when the reader knows it, which a refusal to read it names.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     uri: str
     position: str
+    input_name: str | None = None
 
 
 def authorize_uri_read(*, uri: str, read_scope: str | None, position: str, input_name: str | None = None, field: str | None = None) -> None:

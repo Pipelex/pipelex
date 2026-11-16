@@ -221,7 +221,7 @@ class TestDirectExecutorWorkdir:
     @pytest.mark.asyncio
     async def test_a_transported_run_past_its_deadline_names_the_function_and_the_limit(self, tmp_path: Path, mocker: MockerFixture):
         """The runaway-code guard's refusal is `pipe.function_timed_out`, naming the function and the limit it passed."""
-        mocker.patch.object(DirectPipeFuncExecutor, "run_pipe_func", side_effect=TimeoutError)
+        mocker.patch.object(DirectPipeFuncExecutor, "_run_pipe_func", side_effect=TimeoutError)
 
         with _greet_request(tmp_path=tmp_path) as request, pytest.raises(PipelexError) as raised:
             await _run_transported(request=request.model_copy(update={"timeout_seconds": 7}))

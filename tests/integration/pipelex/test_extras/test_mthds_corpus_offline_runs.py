@@ -12,6 +12,7 @@ from typing import Any, cast
 import pytest
 
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -47,11 +48,18 @@ def _assert_matches(*, actual: Any, expected: Any, where: str) -> None:
     assert actual == expected, f"{where}: expected {expected!r}, got {actual!r}"
 
 
+def _item_dump(content: StuffContent) -> dict[str, Any]:
+    # A text past the inline threshold (0 in the tests) is stored where it is received or produced, and read as its value.
+    if isinstance(content, StoredValueContent):
+        return content.rendered_value_form()
+    return content.model_dump(mode="json")
+
+
 def _content_dump(content: StuffContent) -> dict[str, Any]:
     if isinstance(content, ListContent):
         items = cast("ListContent[StuffContent]", content).items
-        return {"items": [item.model_dump(mode="json") for item in items]}
-    return content.model_dump(mode="json")
+        return {"items": [_item_dump(item) for item in items]}
+    return _item_dump(content)
 
 
 class TestMthdsCorpusOfflineRuns:

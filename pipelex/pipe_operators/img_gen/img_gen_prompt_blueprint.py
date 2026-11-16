@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
+from pipelex.kernel.llm_prompt_content import templates_read_paths
 from pipelex.kernel.prompt_references import ImageReference
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
@@ -40,6 +41,16 @@ class ImgGenPromptBlueprint(BaseModel):
     prompt_blueprint: TemplateBlueprint | None = None
     negative_prompt_blueprint: TemplateBlueprint | None = None
     image_references: list[ImageReference] | None = None
+
+    @property
+    def template_read_paths(self) -> frozenset[str]:
+        """The dotted paths through which the prompt and the negative prompt read their inputs, each template parsed once per process.
+
+        A step loads the stored values these paths read before it renders the two prompts
+        (`load_stored_values_read_from_memory`), since it renders them where it runs. The parse is cached by template
+        source (`parse_jinja2_read_paths`), never on this blueprint, which crosses a host boundary inside its pipe.
+        """
+        return templates_read_paths(templates=[self.prompt_blueprint, self.negative_prompt_blueprint])
 
     def required_variables(self) -> set[str]:
         """Return the set of required variables from templates and image references."""

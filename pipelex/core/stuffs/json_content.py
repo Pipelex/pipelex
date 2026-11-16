@@ -11,11 +11,14 @@ from pipelex.tools.misc.filetype_utils import base_mime_type
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.typing.validation_exceptions import InputFreeValueError
+from pipelex.tools.uri.exceptions import StoredTextUnreadableReason
 
 if TYPE_CHECKING:
     from pipelex.tools.misc.pretty import PrettyPrintable
 
 JSON_MIME_TYPE = "application/json"
+# The kind of file a stored JSON value is read as, the `file_type` of `input.file_unreadable`.
+JSON_FILE_TYPE = "json"
 
 
 def is_json_mime_type(*, mime_type: str) -> bool:
@@ -39,7 +42,7 @@ def json_obj_invalidity(*, json_obj: object) -> str | None:
 
 def _refuse_non_standard_constant(constant: str) -> NoReturn:  # kw-only: ignore — `json.loads` calls `parse_constant` positionally
     msg = f"A stored JSON value is not valid JSON: it holds {constant}, which JSON cannot hold."
-    raise StoredValueUnreadableError(msg)
+    raise StoredValueUnreadableError(msg, file_type=JSON_FILE_TYPE, reason=StoredTextUnreadableReason.INVALID_JSON)
 
 
 # TODO: use pipelex.tools.misc.json_utils.JsonContent to support lists in addition to dicts
@@ -47,6 +50,8 @@ class JSONContent(StoredValueContent):
     value_field_name: ClassVar[str] = "json_obj"
     value_form_field_names: ClassVar[tuple[str, ...]] = ("json_obj",)
     value_kind_desc: ClassVar[str] = "JSON"
+    stored_mime_type: ClassVar[str] = JSON_MIME_TYPE
+    stored_file_extension: ClassVar[str] = "json"
 
     json_obj: dict[str, Any] | None = Field(default=None, description="The JSON object")
     url: str | None = Field(default=None, description="The URL of the stored JSON object: a storage URI, an HTTP(S) URL, or a base64 data URL")
@@ -68,6 +73,11 @@ class JSONContent(StoredValueContent):
         return value
 
     @override
+    def stored_text(self) -> str:
+        """The JSON object's serialized form, which a stored JSON value is written as and `size` measures."""
+        return json.dumps(self.require_json_obj(), ensure_ascii=False)
+
+    @override
     def _decode_loaded_text(self, *, text: str) -> StoredValue:
         """The stored JSON, decoded by its MIME type: a JSON type, or none declared, is parsed back into its object.
 
@@ -76,21 +86,21 @@ class JSONContent(StoredValueContent):
         """
         if self.mime_type is not None and not is_json_mime_type(mime_type=self.mime_type):
             msg = f"A stored JSON value declares the MIME type '{self.mime_type}', which is not JSON."
-            raise StoredValueUnreadableError(msg)
+            raise StoredValueUnreadableError(msg, file_type=JSON_FILE_TYPE, reason=StoredTextUnreadableReason.MIME_TYPE_MISMATCH)
         try:
             # JSON has no NaN nor infinities, which Python's decoder accepts by default: refused, as an inline value is.
             decoded: Any = json.loads(text, parse_constant=_refuse_non_standard_constant)
         except json.JSONDecodeError as exc:
             msg = f"A stored JSON value is not valid JSON: {exc.msg} at line {exc.lineno}, column {exc.colno}."
-            raise StoredValueUnreadableError(msg) from exc
+            raise StoredValueUnreadableError(msg, file_type=JSON_FILE_TYPE, reason=StoredTextUnreadableReason.INVALID_JSON) from exc
         if not isinstance(decoded, dict):
             msg = f"A stored JSON value is a JSON {type(decoded).__name__}, and a JSON content holds an object."
-            raise StoredValueUnreadableError(msg)
+            raise StoredValueUnreadableError(msg, file_type=JSON_FILE_TYPE, reason=StoredTextUnreadableReason.NOT_A_JSON_OBJECT)
         json_obj = cast("dict[str, Any]", decoded)
         invalidity = json_obj_invalidity(json_obj=json_obj)
         if invalidity is not None:
             msg = f"A stored JSON value is not valid JSON: {invalidity}"
-            raise StoredValueUnreadableError(msg)
+            raise StoredValueUnreadableError(msg, file_type=JSON_FILE_TYPE, reason=StoredTextUnreadableReason.INVALID_JSON)
         return json_obj
 
     def require_json_obj(self) -> dict[str, Any]:
@@ -132,6 +142,8 @@ class JSONContent(StoredValueContent):
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        if not self.is_loaded:
+            return self.rendered_reference_pretty()
         require_rich_for_rendering()
         from rich.json import JSON
 

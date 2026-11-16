@@ -1,6 +1,6 @@
 import datetime
 import inspect
-from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
+from typing import Any, Literal, NamedTuple, TypeAlias, cast, get_args, get_origin
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
@@ -11,6 +11,7 @@ from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.non_null_any import field_admits_none
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
@@ -37,6 +38,14 @@ NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date | dateti
 # The exact native scalar target types (no subclass matching: datetime is a date subclass
 # and bool is an int subclass, and neither cross-kind conversion is wanted).
 NATIVE_SCALAR_TARGET_TYPES: tuple[type[Any], ...] = (str, float, int, bool, datetime.date, datetime.time)
+
+
+def _is_str_choice(*, expected_type: Any) -> bool:
+    """Whether a type annotation is a choice among strings, a `Literal` whose every value is a `str`: a `str` target."""
+    if get_origin(expected_type) is not Literal:
+        return False
+    choices = get_args(expected_type)
+    return bool(choices) and all(isinstance(choice, str) for choice in choices)
 
 
 class NativeScalarExtraction(NamedTuple):
@@ -86,6 +95,64 @@ class StructuredContentComposer:
         # Shape per entry: {"method": ConstructFieldMethod, "rendered": str (templates only)}.
         # Nested fields record only their method; their sub-fields are not surfaced.
         self.field_resolutions: dict[str, dict[str, Any]] = {}
+
+    def from_paths_extracting_values(self) -> frozenset[str]:
+        """The `from` paths, nested constructs included, whose field extracts a value from the content it reads.
+
+        A stored `Text`, `Markdown`, `Html` or `JSON` value must be loaded before its value is extracted, which a field
+        does when it expects a native value (a `str`, a number, a list of them) or when its path walks into a content,
+        where it may end on a stored content's value field, such as `pages.text`. A field expecting a content copies the
+        content as it is, a stored one keeping its reference, so its path is left out and nothing is loaded for it.
+
+        Raises:
+            StructuredContentComposerTypeError: A nested field's class cannot be determined from the output class.
+        """
+        read_paths: set[str] = set()
+        for field_name, field_blueprint in self.construct_blueprint.fields.items():
+            match field_blueprint.method:
+                case ConstructFieldMethod.FROM_VAR:
+                    from_path = field_blueprint.from_path
+                    if from_path and self._from_path_extracts_a_value(
+                        from_path=from_path, expected_type=self._get_field_expected_type(field_name=field_name)
+                    ):
+                        read_paths.add(from_path)
+                case ConstructFieldMethod.NESTED:
+                    if field_blueprint.nested:
+                        nested_composer = StructuredContentComposer(
+                            construct_blueprint=field_blueprint.nested,
+                            working_memory=self.working_memory,
+                            output_class=self._get_nested_field_class(field_name=field_name),
+                            templating_style=self.templating_style,
+                            runtime_params=self.runtime_params,
+                            extra_context=self.extra_context,
+                        )
+                        read_paths.update(nested_composer.from_paths_extracting_values())
+                case ConstructFieldMethod.TEMPLATE | ConstructFieldMethod.FIXED:
+                    pass
+        return frozenset(read_paths)
+
+    def _from_path_extracts_a_value(self, *, from_path: str, expected_type: type[Any] | None) -> bool:
+        """Whether a `from` field reads a value out of the content its path reaches, rather than copying the content.
+
+        The decision mirrors `_convert_for_target_type`: a content-typed target keeps the content, a native scalar
+        target or a list of native scalars extracts each value, and a dotted path walks into a content.
+        """
+        if expected_type is not None:
+            if self._expects_type(expected_type=expected_type, target_type=StuffContent) or self._expects_list_content_type(
+                expected_type=expected_type
+            ):
+                return False
+            if self._expects_native_scalar(expected_type=expected_type):
+                return True
+            if self._expects_list_type(expected_type=expected_type):
+                expected_item_type = self._get_list_item_type(expected_type=expected_type)
+                if expected_item_type is not None and self._expects_native_scalar(expected_type=expected_item_type):
+                    return True
+        return "." in from_path
+
+    def _expects_native_scalar(self, *, expected_type: type[Any]) -> bool:
+        """Whether the expected type is one a scalar content wrapper is unwrapped into (`NATIVE_SCALAR_TARGET_TYPES`), or a subclass of one."""
+        return any(self._expects_type(expected_type=expected_type, target_type=native_type) for native_type in NATIVE_SCALAR_TARGET_TYPES)
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -307,6 +374,9 @@ class StructuredContentComposer:
 
         Returns:
             The value at the end of the attribute path, converted as appropriate
+
+        Raises:
+            StoredValueNotLoadedError: The path reads the value of a stored content that was never loaded.
         """
         # The blueprint refuses these at load; the walk below is raw `getattr`, so it refuses them again.
         if private_segment := find_private_path_segment(path=path):
@@ -319,10 +389,13 @@ class StructuredContentComposer:
         stuff = self.working_memory.get_stuff(base_name)
         stuff_content: StuffContent = stuff.content
 
-        # Navigate the attribute path - this is dynamic attribute access at runtime
+        # Navigate the attribute path - this is dynamic attribute access at runtime. A stored content's value field holds
+        # `None`, its value living at its URL, so the value is read through the content, as the template sandbox does.
         current_value: Any = stuff_content
         for attr in attr_path.split("."):
-            if hasattr(current_value, attr):  # pyright: ignore[reportUnknownArgumentType]
+            if isinstance(current_value, StoredValueContent) and current_value.is_value_field(field_name=attr):
+                current_value = current_value.require_value()
+            elif hasattr(current_value, attr):  # pyright: ignore[reportUnknownArgumentType]
                 current_value = getattr(current_value, attr)  # pyright: ignore[reportUnknownArgumentType]
             elif isinstance(current_value, dict) and attr in current_value:  # pyright: ignore[reportUnknownVariableType]
                 current_value = current_value[attr]  # pyright: ignore[reportUnknownVariableType]
@@ -410,7 +483,7 @@ class StructuredContentComposer:
         """Extract the native scalar value from a scalar content wrapper when the target expects it.
 
         Conversion matrix (wrapper -> native target):
-        - TextContent -> str (or str subclass): extract .text
+        - TextContent -> str (or str subclass, or a choice field's `Literal` of strings): extract the text, loaded when stored
         - NumberContent -> float or int (never bool, an int subclass): extract .number
         - YesNoContent -> bool: extract .yes_no
         - DateContent -> date (exactly, never datetime, a date subclass): extract .date,
@@ -519,9 +592,13 @@ class StructuredContentComposer:
             target_type: The type to match against (e.g., str, TextContent, StuffContent)
 
         Returns:
-            True if expected_type is target_type or a subclass of it
+            True if expected_type is target_type or a subclass of it; for `str`, also a choice field, a `Literal` of strings
         """
         if expected_type is target_type:
+            return True
+        if target_type is str and _is_str_choice(expected_type=expected_type):
+            # A `choices` field is generated as a `Literal` of its strings: a Text copied into it is its text, which
+            # pydantic then checks against the choices. A `str`-based Enum is a `str` subclass, matched below.
             return True
         try:
             return issubclass(expected_type, target_type)

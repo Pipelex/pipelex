@@ -116,11 +116,31 @@ def typed_by_run_concepts(*, crate_fingerprint: str, concepts_crate: Mapping[str
         crate_fingerprint: The fingerprint of the run's whole crate, by which a process holding it renders in it.
         concepts_crate: The concepts and domains of the run's crate, with none of its pipes, as JSON.
     """
-    library_manager = get_library_manager()
-    current_library_id = get_current_library_id_or_none()
-    if current_library_id is not None and library_manager.is_crate_loaded(library_id=current_library_id, fingerprint=crate_fingerprint):
+    if _is_run_library_current(crate_fingerprint=crate_fingerprint):
         yield
         return
     concepts_only_crate = LibraryCrate.model_validate(concepts_crate)
     with CONCEPTS_LIBRARIES.library_for(concepts_crate=concepts_only_crate) as library_id, scoped_current_library(library_id=library_id):
         yield
+
+
+@contextmanager
+def typed_by_crate_concepts(*, crate: LibraryCrate) -> Generator[None, None, None]:
+    """Make current a library whose concepts type the data of the run whose whole crate is given, as `typed_by_run_concepts` does.
+
+    For a process holding the run's whole crate, such as one handling a transported PipeFunc call, which carries it.
+
+    Args:
+        crate: The run's whole crate.
+    """
+    if _is_run_library_current(crate_fingerprint=crate.fingerprint):
+        yield
+        return
+    with CONCEPTS_LIBRARIES.library_for(concepts_crate=crate.concepts_only()) as library_id, scoped_current_library(library_id=library_id):
+        yield
+
+
+def _is_run_library_current(*, crate_fingerprint: str) -> bool:
+    """Whether the current library is the run's own, holding the crate of this fingerprint."""
+    current_library_id = get_current_library_id_or_none()
+    return current_library_id is not None and get_library_manager().is_crate_loaded(library_id=current_library_id, fingerprint=crate_fingerprint)

@@ -168,6 +168,8 @@ A `from` path and a `list_to_dict_keyed_by` name read public fields only: valida
 
 A `from` path reaching a field that holds nothing, such as an optional `order.note` left unset, gives the target field nothing. A target field with a `default_value` is left unset and takes its default, since it never holds nothing; an optional one holds nothing; and a required one is refused. A Python class field typed `X | None` holds nothing whether it is required or defaulted. With `list_to_dict_keyed_by`, a path holding nothing is refused, since the modifier needs a list.
 
+A `Text`, `Markdown`, `Html` or `JSON` input whose value is held in storage, as a large text is, is read in full by a `from` field that takes its value: a whole `Text` copied into a `text` field, or a path ending on the value, such as `{ from = "report.text" }`. A `from` field copying the input into a field typed by its concept keeps it as it is, its value still in storage.
+
 ### Copying Whole Inputs Into Native Fields
 
 The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, `Time`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
@@ -177,6 +179,7 @@ Conversion matrix:
 | Source input | Native target field | Composed value |
 |---|---|---|
 | `Text` | `type = "text"` | the text string |
+| `Text` | a `choices` field | the text string, which must be one of the choices |
 | `Number` | `type = "number"` | the number |
 | `YesNo` | `type = "boolean"` | the boolean |
 | `Date` | `type = "date"` | the date |

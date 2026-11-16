@@ -170,7 +170,7 @@ class TestPipeParallelAbsence:
         # add_each_output: the present branch is exposed by name; the absent one is a ledger note.
         base_stuff = result_memory.get_optional_stuff("base_result")
         assert base_stuff is not None
-        assert base_stuff.as_text.text == "base:penalties"
+        assert base_stuff.as_text.require_text() == "base:penalties"
         assert result_memory.get_optional_stuff("found_result") is None
         note = result_memory.get_optional_absence("found_result")
         assert note is not None
@@ -195,7 +195,7 @@ class TestPipeParallelAbsence:
         combined = main_stuff.content
         assert isinstance(combined, ParAbsReport)
         assert combined.found_result is None
-        assert combined.base_result.text == "base:penalties"
+        assert combined.base_result.require_text() == "base:penalties"
         # The taint terminates at the combine boundary: the combined output is a real value.
         assert isinstance(pipe_output.working_memory.resolve_main_stuff(), Stuff)
 
@@ -241,7 +241,7 @@ class TestPipeParallelAbsence:
         result_memory = pipe_output.working_memory
         surviving = result_memory.get_optional_stuff("found_result")
         assert surviving is not None
-        assert surviving.as_text.text == "pre-existing unrelated value"
+        assert surviving.as_text.require_text() == "pre-existing unrelated value"
         assert result_memory.get_optional_absence("found_result") is None
 
     async def test_all_branches_present_combines_as_before(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
@@ -264,5 +264,5 @@ class TestPipeParallelAbsence:
         combined = pipe_output.main_stuff.content
         assert isinstance(combined, ParAbsReport)
         assert combined.found_result is not None
-        assert combined.found_result.text == "found:clause 12"
-        assert combined.base_result.text == "base:penalties"
+        assert combined.found_result.require_text() == "found:clause 12"
+        assert combined.base_result.require_text() == "base:penalties"

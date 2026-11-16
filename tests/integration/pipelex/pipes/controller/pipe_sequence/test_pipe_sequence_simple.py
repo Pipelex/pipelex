@@ -82,7 +82,7 @@ class TestPipeSequenceSimple:
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
         assert isinstance(input_text.content, TextContent)
-        assert input_text.content.text == "hello world"
+        assert input_text.content.require_text() == "hello world"
 
         # Log the initial setup for debugging
         pretty_print(pipe_sequence, title="PipeSequence instance")
@@ -109,7 +109,7 @@ class TestPipeSequenceSimple:
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" -> "HELLO WORLD" -> "PROCESSED: HELLO WORLD"
         if pipe_run_mode.is_live:
-            assert final_result.content.text in {"PROCESSED: HELLO WORLD", "PROCESSED: hello world"}
+            assert final_result.content.require_text() in {"PROCESSED: HELLO WORLD", "PROCESSED: hello world"}
 
         # Verify working memory contains all intermediate results
         final_working_memory = pipe_output.working_memory
@@ -118,21 +118,21 @@ class TestPipeSequenceSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        assert original_input.content.text == "hello world"
+        assert original_input.content.require_text() == "hello world"
 
         # Intermediate result (capitalized_text) should be there
         capitalized_result = final_working_memory.get_stuff("capitalized_text")
         assert capitalized_result is not None
         assert isinstance(capitalized_result.content, TextContent)
         if pipe_run_mode.is_live:
-            assert capitalized_result.content.text == "HELLO WORLD"
+            assert capitalized_result.content.require_text() == "HELLO WORLD"
 
         # Final result should be there (stored as final_text, which is the last SubPipe's output_name)
         final_result_in_memory = final_working_memory.get_stuff("final_text")
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode.is_live:
-            assert final_result_in_memory.content.text == "PROCESSED: HELLO WORLD"
+            assert final_result_in_memory.content.require_text() == "PROCESSED: HELLO WORLD"
 
         # Verify working memory structure
         assert len(final_working_memory.root) == 3  # input, intermediate, final

@@ -120,7 +120,7 @@ class TestOptionalsShowcaseE2E:
         response = await runner.execute(pipe_code="oshow_force_flow", inputs={"clause": "clause 12"})
 
         assert response.state == RunState.COMPLETED
-        assert response.pipe_output.main_stuff.as_text.text == "extracted: clause 12"
+        assert response.pipe_output.main_stuff.as_text.require_text() == "extracted: clause 12"
 
     async def test_cli_run_core_writes_absence_artifact(self, tmp_path: Path):
         """The unmocked plain-CLI run core (`run pipe <code> -L <dir>` shape), with the optional

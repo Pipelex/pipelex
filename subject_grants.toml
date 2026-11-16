@@ -2396,6 +2396,10 @@ rationale = "Noun-named derivation: the pinned description for the native code; 
 param = "native_code"
 rationale = "Noun-named derivation: the pinned structure for the native code; single operand."
 
+["pipelex/core/concepts/native/pinned_blueprints.py::make_native_value_structure"]
+param = "native_code"
+rationale = "The native code is the single obvious operand, like make_pinned_native_value_blueprint(native_code); the structure it reads is named."
+
 ["pipelex/core/concepts/native/pinned_blueprints.py::make_pinned_native_blueprint"]
 param = "native_code"
 rationale = "Factory from source: builds the blueprint for the native code; single operand."
@@ -2891,6 +2895,10 @@ rationale = "Type-directed accessor: the target item type; single operand."
 ["pipelex/core/stuffs/stored_value_loader.py::load_stored_value"]
 param = "content"
 rationale = "Loads the stored value of the one content it is given."
+
+["pipelex/core/stuffs/stored_value_storer.py::store_value_if_large"]
+param = "content"
+rationale = "Reads as a verb-object sentence on the one content it stores, as load_stored_value reads on the one it loads; the call sites pass a self-labelling content."
 
 ["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_with_images"]
 param = "value"

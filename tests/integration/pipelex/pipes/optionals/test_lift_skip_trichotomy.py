@@ -42,7 +42,7 @@ def optionals_absorbing_sink(working_memory: WorkingMemory) -> TextContent:
     source_stuff = working_memory.get_optional_stuff(name="source")
     if source_stuff is None:
         return TextContent(text="report:source-absent")
-    return TextContent(text=f"report:{source_stuff.as_text.text}")
+    return TextContent(text=f"report:{source_stuff.as_text.require_text()}")
 
 
 @pipe_func()
@@ -171,7 +171,7 @@ class TestLiftSkipTrichotomy:
             output_name="report",
         )
 
-        assert pipe_output.main_stuff.as_text.text == "report:source-absent"
+        assert pipe_output.main_stuff.as_text.require_text() == "report:source-absent"
         assert pipe_output.working_memory.get_optional_absence("report") is None
 
     async def test_force_input_absent_raises_typed_error(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
@@ -211,7 +211,7 @@ class TestLiftSkipTrichotomy:
             working_memory=working_memory,
             pipe_run_params=_make_live_run_params(),
         )
-        assert pipe_output.main_stuff.as_text.text == "echo:hello"
+        assert pipe_output.main_stuff.as_text.require_text() == "echo:hello"
 
     async def test_missing_without_record_still_raises_inputs_error(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Absent with no record is a genuine miss: PipeRunInputsError, whose live-path message

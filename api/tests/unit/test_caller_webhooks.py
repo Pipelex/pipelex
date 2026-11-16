@@ -76,6 +76,7 @@ class _DeliveringOrchestrator:
             await DeliveryExecutor().execute(
                 pipe_output=pipe_output,
                 storage_scope="caller-webhooks-scope",
+                read_scope=None,
                 pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id,
                 delivery_assignment=delivery_assignment,
                 status=DeliveryStatus.COMPLETED,

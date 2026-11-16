@@ -13,7 +13,7 @@ guesses it itself, from the URI or the bytes, because only it knows what it need
 
 import base64
 from pathlib import Path
-from typing import NamedTuple
+from typing import Final, NamedTuple
 
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
@@ -27,6 +27,10 @@ from pipelex.tools.uri.resolved_uri import (
     ResolvedPipelexStorage,
 )
 from pipelex.tools.uri.uri_resolver import resolve_uri
+
+# How many URIs a reader of several loads at once: the stored values a prompt reads, the images and documents it holds.
+# The reads overlap rather than costing a round trip each in sequence, and a list of many does not open as many at once.
+MAX_CONCURRENT_URI_READS: Final[int] = 8
 
 
 class UriBytes(NamedTuple):

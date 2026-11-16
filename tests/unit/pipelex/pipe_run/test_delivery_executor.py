@@ -141,6 +141,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=mock_output,
             storage_scope="tenant/plr-123",
+            read_scope=None,
             pipeline_run_id="plr-123",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -173,6 +174,7 @@ class TestDeliveryExecutor:
         await DeliveryExecutor().execute(
             pipe_output=mock_output,
             storage_scope="tenant/plr-123",
+            read_scope=None,
             pipeline_run_id="plr-123",
             delivery_assignment=DeliveryAssignment(storage=StorageTarget()),
             status=DeliveryStatus.COMPLETED,
@@ -207,6 +209,7 @@ class TestDeliveryExecutor:
         await DeliveryExecutor().execute(
             pipe_output=mock_output,
             storage_scope="tenant/plr-123",
+            read_scope=None,
             pipeline_run_id="plr-123",
             delivery_assignment=DeliveryAssignment(storage=StorageTarget(key_prefix="attempt-2")),
             status=DeliveryStatus.COMPLETED,
@@ -237,6 +240,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-456",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -268,6 +272,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-789",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -288,6 +293,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-fail",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -303,6 +309,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-noop",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -328,6 +335,7 @@ class TestDeliveryExecutor:
             await executor.execute(
                 pipe_output=mock_output,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-err",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -348,7 +356,7 @@ class TestDeliveryExecutor:
         mock_output.graph_spec = None
 
         with pytest.raises(WorkingMemoryStuffNotFoundError):
-            await DeliveryExecutor().generate_result_files(mock_output)
+            await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
     async def test_generate_result_files_raises_without_main_stuff_raw(self, mocker: MockerFixture) -> None:
         """Same contract on the raw (cross-process) path: neither a raw main stuff nor a recorded absence fails loudly."""
@@ -357,7 +365,7 @@ class TestDeliveryExecutor:
         mock_output.graph_spec = None
 
         with pytest.raises(PipeJobError):
-            await DeliveryExecutor().generate_result_files(mock_output)
+            await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
     async def test_generate_result_files_absent_main_typed(self, mocker: MockerFixture) -> None:
         """An absent main output is a first-class success: the typed arm delivers an explicit
@@ -377,7 +385,7 @@ class TestDeliveryExecutor:
         mock_output.working_memory = working_memory
         mock_output.graph_spec = None
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         assert "working_memory.json" in files
         json_text = files["main_stuff.json"].data.decode("utf-8")
@@ -409,7 +417,7 @@ class TestDeliveryExecutor:
         }
         mock_output.graph_spec = None
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         json_text = files["main_stuff.json"].data.decode("utf-8")
         assert '"absent": true' in json_text
@@ -441,7 +449,7 @@ class TestDeliveryExecutor:
             )
         ]
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         assert files["tokens_usages.json"].content_type == "application/json"
         usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
@@ -468,7 +476,7 @@ class TestDeliveryExecutor:
         mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
         assert usage_doc == {"tokens_usages": None, "usage_assembly_error": None}
@@ -482,7 +490,7 @@ class TestDeliveryExecutor:
         mock_output.graph_spec = None
         mock_output.usage_assembly_error = "usage event read failed"
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
         assert usage_doc == {"tokens_usages": None, "usage_assembly_error": "usage event read failed"}
@@ -499,7 +507,7 @@ class TestDeliveryExecutor:
         artifacts = make_pipe_io_artifacts()
         mock_output.pipe_io_artifacts = artifacts
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         assert "graphspec.json" in files
         expected = render_pipe_io_artifact_files(artifacts)
@@ -516,7 +524,7 @@ class TestDeliveryExecutor:
         mock_output.graph_spec = _make_graph_spec()
         mock_output.pipe_io_artifacts = make_pipe_io_artifacts()
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         assert "graphspec.json" in files
         for file_name in _COMPANION_FILE_NAMES:
@@ -529,7 +537,7 @@ class TestDeliveryExecutor:
         mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = _make_graph_spec()
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         assert "graphspec.json" in files
         for file_name in _COMPANION_FILE_NAMES:
@@ -544,7 +552,7 @@ class TestDeliveryExecutor:
         mock_output.graph_spec = None
         mock_output.pipe_io_artifacts = make_pipe_io_artifacts()
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         assert "graphspec.json" not in files
         for file_name in _COMPANION_FILE_NAMES:
@@ -842,7 +850,7 @@ class TestDeliveryExecutor:
         }
         mock_output.graph_spec = None
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         html_text = files["main_stuff.html"].data.decode("utf-8")
         assert html_text.startswith("<pre>")
@@ -896,7 +904,7 @@ class TestDeliveryExecutor:
         }
         mock_output.graph_spec = None
 
-        files = await DeliveryExecutor().generate_result_files(mock_output)
+        files = await DeliveryExecutor().generate_result_files(mock_output, read_scope=None)
 
         json_text = files["working_memory.json"].data.decode("utf-8")
         assert "Page 1 contents" in json_text
@@ -927,6 +935,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-failed",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -973,6 +982,7 @@ class TestDeliveryExecutor:
         await DeliveryExecutor().execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-failed",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -1004,6 +1014,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-success",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -1035,6 +1046,7 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-failed-no-problem",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -1065,6 +1077,7 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().execute(
                 pipe_output=mock_output,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-storage-req",
                 delivery_assignment=DeliveryAssignment(storage=StorageTarget()),
                 status=DeliveryStatus.COMPLETED,
@@ -1101,6 +1114,7 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().execute(
                 pipe_output=None,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-webhook-req",
                 delivery_assignment=DeliveryAssignment(webhooks=[WebhookTarget(url=webhook_url)]),
                 status=status,
@@ -1124,6 +1138,7 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().execute(
                 pipe_output=None,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-no-req",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -1132,6 +1147,7 @@ class TestDeliveryExecutor:
                 await DeliveryExecutor().execute(
                     pipe_output=None,
                     storage_scope="test-user",
+                    read_scope=None,
                     pipeline_run_id="plr-no-req",
                     delivery_assignment=assignment,
                     status=DeliveryStatus.COMPLETED,
@@ -1163,6 +1179,7 @@ class TestDeliveryExecutor:
             await executor.execute(
                 pipe_output=None,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-ssrf",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -1187,6 +1204,7 @@ class TestDeliveryExecutor:
             await executor.execute(
                 pipe_output=None,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-err",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -1211,6 +1229,7 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().execute(
                 pipe_output=None,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-host-down",
                 delivery_assignment=DeliveryAssignment(
                     webhooks=[WebhookTarget(url="https://completion.example.com/runs")],
@@ -1254,6 +1273,7 @@ class TestDeliveryExecutor:
         await DeliveryExecutor().execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-two-hops",
             delivery_assignment=DeliveryAssignment(
                 webhooks=[WebhookTarget(url="https://completion.example.com/runs", headers={"X-Completion-Signature": "abc123"})],
@@ -1278,6 +1298,7 @@ class TestDeliveryExecutor:
         await DeliveryExecutor().execute(
             pipe_output=None,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-none",
             delivery_assignment=DeliveryAssignment(),
             status=DeliveryStatus.COMPLETED,
@@ -1317,6 +1338,7 @@ class TestDeliveryExecutor:
         await DeliveryExecutor().execute(
             pipe_output=mock_output,
             storage_scope="test-user",
+            read_scope=None,
             pipeline_run_id="plr-in-order",
             delivery_assignment=DeliveryAssignment(
                 storage=StorageTarget(),
@@ -1352,6 +1374,7 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().execute(
                 pipe_output=mock_output,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-store-down",
                 delivery_assignment=DeliveryAssignment(
                     storage=StorageTarget(),
@@ -1403,6 +1426,7 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().execute(
                 pipe_output=None,
                 storage_scope="test-user",
+                read_scope=None,
                 pipeline_run_id="plr-notice-down",
                 delivery_assignment=DeliveryAssignment(
                     webhooks=[WebhookTarget(url="https://completion.example.com/runs")],

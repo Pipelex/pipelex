@@ -137,6 +137,16 @@ SINGLE_TENANT_USER_ID = "single-tenant"
 # usually an input to a later step rather than an output of the pipeline.
 GENERATED_CONTENT_LEAF = "generated"
 
+# The leaf what a caller supplied lands under when the run stores it at setup: a file input relocated from a data URL
+# or a local path, and a text, HTML or JSON input past the inline threshold. It is what the run received, kept apart
+# from what it generated for the reason `GENERATED_CONTENT_LEAF` gives.
+INPUT_ASSETS_LEAF = "assets"
+
+
+def is_storage_scope_real(*, storage_scope: str) -> bool:
+    """Whether values may be stored under a storage scope: every scope but a dry run's, which must never reach storage."""
+    return storage_scope != DRY_RUN_STORAGE_SCOPE
+
 
 def validate_storage_scope(*, value: str) -> str:
     """Return `value` if it is a usable storage scope, else raise `RunParameterError`.

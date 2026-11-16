@@ -419,10 +419,18 @@ Read the markup in Python with `require_inner_html()`.
 A `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, exactly as an image or a document does, so that a long page, a fetched web page or a large JSON document need not be copied into every step, trace event and result that carries it. The value field is then absent, and the content carries `url`, `size`, `mime_type` and `preview` instead:
 
 ```json
-{"url": "pipelex-storage://…/generated/…/text.txt", "size": 48213, "mime_type": "text/plain", "preview": "Page 1. The parties agree…"}
+{"url": "pipelex-storage://…/generated/…/value.txt", "size": 48213, "mime_type": "text/plain", "preview": "Page 1. The parties agree…"}
 ```
 
-A value holds exactly one of the two forms. In this release Pipelex accepts and keeps the stored form, and can load a stored value under the same read rules as an image, so a run never reads a stored value another run owns; it loads a stored value where a `PipeLLM` or `PipeStructure` prompt or a `PipeCondition` expression reads it, so the step sees the full value. It does not yet store a value past the size threshold by itself, nor load one that another step's template reads, which is refused rather than read; both arrive in later releases. The threshold is `inline_text_max_bytes` under `[runtime.storage]`, 4096 bytes by default, and nothing reads it yet (see [Cloud Storage](../../features/cloud-storage.md#large-texts)).
+A value holds exactly one of the two forms. Pipelex stores a value past the size threshold by itself, where it is produced or received: a run's inputs when it starts, a `PipeLLM`'s text, the pages a `PipeExtract` step returns and the values a `PipeFunc` returns (see [Cloud Storage](../../features/cloud-storage.md#large-texts)). The threshold is `inline_text_max_bytes` under `[runtime.storage]`, 4096 bytes by default. A stored value is loaded where a step reads it, under the same read rules as an image, so a run never reads a stored value another run owns: a `PipeLLM` or `PipeStructure` prompt, a `PipeCondition` expression, a `PipeCompose` template and the other templates a step renders, a `PipeDocGen` step, which prints every input whole, and a `PipeFunc`, whose function gets every stored value of its inputs loaded before it runs. A value is read up to `max_fetch_bytes` under `[runtime.network]`, and a larger one fails the run with `input.too_large`.
+
+A caller may give a text input as a URL rather than as its text, a `pipelex-storage://` reference to a text it uploaded, an `https://` URL or a `data:` URL:
+
+```json
+{"notes": {"concept": "Text", "content": {"url": "pipelex-storage://…/uploads/notes.txt"}}}
+```
+
+The URL is kept as given and read where a step reads it, its bytes decoded as UTF-8. On a hosted run, a storage reference the run may not read is refused when the run starts, naming the input. Bytes that are not UTF-8, or a JSON value that is not an object, fail the run with `input.file_unreadable`, naming the input.
 
 In Python, `require_text()`, `require_inner_html()` and `require_json_obj()` return the value in either form, once a stored one has been loaded. Code that can read storage loads it with `load_stored_value` (`pipelex.core.stuffs.stored_value_loader`); reading or rendering a stored value that was never loaded raises `StoredValueNotLoadedError` rather than printing nothing.
 

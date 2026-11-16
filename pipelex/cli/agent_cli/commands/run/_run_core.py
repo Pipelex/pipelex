@@ -15,8 +15,15 @@ from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown, build_absence_payload
+from pipelex.core.stuffs.stored_value_output import (
+    load_stored_values_of_output,
+    render_reference_form_json,
+    render_unloaded_output_html,
+    render_unloaded_output_markdown,
+)
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
@@ -140,11 +147,23 @@ async def run_pipeline_core(
         compact_result = build_absence_payload(main_resolved)
     else:
         main_stuff = main_resolved
-        main_stuff_json = {
-            "json": await main_stuff.content.rendered_json_async(),
-            "markdown": await main_stuff.content.rendered_markdown_async(),
-            "html": await main_stuff.content.rendered_html_async(),
-        }
+        # The output's stored values are loaded before it renders, under the run's own read scope; one that cannot be
+        # loaded, such as a local file that is gone, renders as its description, and its JSON keeps the reference.
+        is_main_output_loaded = await load_stored_values_of_output(
+            content=main_stuff.content, read_scope=runner.read_scope, storage_provider=get_storage_provider()
+        )
+        if is_main_output_loaded:
+            main_stuff_json = {
+                "json": await main_stuff.content.rendered_json_async(),
+                "markdown": await main_stuff.content.rendered_markdown_async(),
+                "html": await main_stuff.content.rendered_html_async(),
+            }
+        else:
+            main_stuff_json = {
+                "json": render_reference_form_json(content=main_stuff.content),
+                "markdown": render_unloaded_output_markdown(content=main_stuff.content),
+                "html": render_unloaded_output_html(content=main_stuff.content),
+            }
         compact_result = json.loads(main_stuff_json["json"])
 
     result = build_run_output(

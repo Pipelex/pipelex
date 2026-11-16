@@ -50,7 +50,7 @@ def optionals_comp_sink(working_memory: WorkingMemory) -> TextContent:
     a_out_stuff = working_memory.get_optional_stuff(name="a_out")
     if a_out_stuff is None:
         return TextContent(text="no findings")
-    return TextContent(text=f"findings: {a_out_stuff.as_text.text}")
+    return TextContent(text=f"findings: {a_out_stuff.as_text.require_text()}")
 
 
 def _make_live_run_params() -> PipeRunParams:
@@ -151,7 +151,7 @@ class TestLiftedParallelCompanionSlots:
             pipe_run_params=_make_live_run_params(),
         )
 
-        assert pipe_output.main_stuff.as_text.text == "no findings"
+        assert pipe_output.main_stuff.as_text.require_text() == "no findings"
 
         result_memory = pipe_output.working_memory
         # Singular branch slot: recorded absent with provenance chaining to the source record.

@@ -44,4 +44,4 @@ class TestDateDryRun:
         departure_stuff = response.pipe_output.working_memory.get_stuff("departure")
         assert departure_stuff.is_date
         assert departure_stuff.as_date.time is not None
-        assert response.pipe_output.main_stuff.as_text.text
+        assert response.pipe_output.main_stuff.as_text.require_text()

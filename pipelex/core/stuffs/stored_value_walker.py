@@ -33,6 +33,11 @@ class StoredValueAtPath(NamedTuple):
     segments: tuple[str, ...]
 
     @property
+    def input_name(self) -> str:
+        """The name the value's path starts from: the stuff, as the reader's step calls it, which a refusal names as its input."""
+        return self.segments[0]
+
+    @property
     def position(self) -> str:
         """Where the value sits, in the words a refusal to read it names."""
         return f"the stored value '{self.path}'"
@@ -74,6 +79,29 @@ def find_unloaded_stored_values(*, roots: Mapping[str, Any], read_paths: Collect
             if stored_value.content.is_loaded or id(stored_value.content) in seen_ids:
                 continue
             if read_paths is not None and not stored_value.is_read_through(read_paths=read_paths):
+                continue
+            seen_ids.add(id(stored_value.content))
+            found.append(stored_value)
+    return found
+
+
+def find_stored_value_contents(*, roots: Mapping[str, Any]) -> list[StoredValueAtPath]:
+    """Every `Text`, `Markdown`, `Html` or `JSON` content under the given roots, inline or stored, each listed once.
+
+    It is what code storing the large values of a tree walks (`store_large_values` in
+    `pipelex.core.stuffs.stored_value_storer`), which stores the inline ones past the threshold.
+
+    Args:
+        roots: The values to walk, each keyed by the name its path starts with.
+
+    Returns:
+        The contents, in the order a depth-first walk of the roots meets them.
+    """
+    found: list[StoredValueAtPath] = []
+    seen_ids: set[int] = set()
+    for root_name, root_value in roots.items():
+        for stored_value in _walk(value=root_value, path=root_name, segments=(root_name,)):
+            if id(stored_value.content) in seen_ids:
                 continue
             seen_ids.add(id(stored_value.content))
             found.append(stored_value)

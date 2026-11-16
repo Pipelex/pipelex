@@ -203,6 +203,7 @@ class TestProtocolConformance:
             await DeliveryExecutor().execute(
                 pipe_output=None,
                 storage_scope="conformance-caller",
+                read_scope=None,
                 pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id,
                 delivery_assignment=delivery_assignment,
                 status=DeliveryStatus.COMPLETED,

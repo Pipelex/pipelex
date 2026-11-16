@@ -42,4 +42,4 @@ class TestYesNoDryRun:
         assert verdict_stuff.is_yes_no
         assert verdict_stuff.as_yes_no.yes_no is True
         # The downstream Text output was produced (the guarded render completed).
-        assert response.pipe_output.main_stuff.as_text.text
+        assert response.pipe_output.main_stuff.as_text.require_text()

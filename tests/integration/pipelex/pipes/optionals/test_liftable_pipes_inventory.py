@@ -37,7 +37,7 @@ def optionals_inv_echo_a_out(working_memory: WorkingMemory) -> TextContent:
 @pipe_func()
 def optionals_inv_sink(working_memory: WorkingMemory) -> TextContent:
     b_out_stuff = working_memory.get_optional_stuff(name="b_out")
-    return TextContent(text="ok" if b_out_stuff is None else b_out_stuff.as_text.text)
+    return TextContent(text="ok" if b_out_stuff is None else b_out_stuff.as_text.require_text())
 
 
 @pipe_func()

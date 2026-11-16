@@ -6,6 +6,7 @@ from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import SecurityError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.errors.problem import make_location
 from pipelex.errors.security_target import SecurityTargetClass
@@ -82,12 +83,72 @@ class UriReadRefusedError(SecurityError):
         return make_location(input_name=self.input_name, field=self.field)
 
 
+# The kind of file a stored value is read as, the `file_type` of `input.file_unreadable`.
+STORED_TEXT_FILE_TYPE = "text"
+
+
+class StoredTextUnreadableReason(StrEnum):
+    """Why the text behind a stored value's URL could not be read as one, the `reason` of `input.file_unreadable`."""
+
+    # The bytes do not decode as UTF-8, the encoding every stored text is written in.
+    NOT_UTF8 = "not_utf8"
+    # The stored text is not valid JSON, for a JSON value.
+    INVALID_JSON = "invalid_json"
+    # The stored JSON is valid but is not an object, which a JSON value holds.
+    NOT_A_JSON_OBJECT = "not_a_json_object"
+    # The stored value declares a MIME type that is not of its kind, such as a JSON value declared `text/plain`.
+    MIME_TYPE_MISMATCH = "mime_type_mismatch"
+
+
 class UriTextNotUtf8Error(ToolError):
     """Raised when the bytes behind a URL read as a text are not UTF-8.
 
-    A stored text, HTML or JSON value is written as UTF-8 by the code that stores it, so bytes that do not decode are
-    either a stored object damaged since, or a URL a caller or a method pointed at a file that is not a text. The
-    message names where the URL sat, never the URL itself, which can be a signed link holding a credential.
+    A stored text, HTML or JSON value is written as UTF-8 by the code that stores it, so bytes that do not decode are a
+    URL a caller or a method pointed at a file that is not a text, or, far more rarely, a stored object damaged since.
+    It is the caller's to fix, so it is ``input.file_unreadable``, naming the input whose value it is when the reader
+    knows it. The message names where the URL sat, never the URL itself, which can be a signed link holding a credential.
     """
 
-    error_code = CoreCode.RUNTIME_UNEXPECTED
+    error_code = CoreCode.INPUT_FILE_UNREADABLE
+
+    def __init__(self, message: str, *, input_name: str | None = None):
+        super().__init__(message)
+        self.input_name = input_name
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name, "file_type": STORED_TEXT_FILE_TYPE, "reason": StoredTextUnreadableReason.NOT_UTF8}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name, field=None)
+
+
+class UriTextTooLargeError(ToolError):
+    """Raised when the text behind a URL is larger than a text the runtime reads.
+
+    A stored value is read whole, so it is bounded by `[runtime.network] max_fetch_bytes`, the most bytes any read of a
+    URL takes, whatever kind of URL it is: a stored object is sized before it is read, a data URL by the length of its
+    text, and an http(s) URL's body as the fetch streams it, which raises the fetch's own `RemoteFileTooLargeError`. The
+    URL is the caller's or a method's, so it is ``input.too_large``, naming the input whose value it is when known.
+    """
+
+    error_code = CoreCode.INPUT_TOO_LARGE
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Use a smaller text, or raise [runtime.network] max_fetch_bytes if you run the runtime yourself.",
+    )
+
+    def __init__(self, message: str, *, limit: int, size: int, input_name: str | None = None):
+        super().__init__(message)
+        self.limit = limit
+        self.size = size
+        self.input_name = input_name
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name, "limit": self.limit, "size": self.size}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name, field=None)

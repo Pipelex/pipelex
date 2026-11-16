@@ -98,7 +98,7 @@ class TestPipeBatchSimple:
         # Verify each item in the list
         for i, item in enumerate(text_list.items):
             assert isinstance(item, TextContent)
-            assert item.text == ["hello", "world", "test"][i]
+            assert item.require_text() == ["hello", "world", "test"][i]
 
         # Log the initial setup for debugging
         pretty_print(pipe_batch, title="PipeBatch instance")
@@ -129,7 +129,7 @@ class TestPipeBatchSimple:
         for i, item in enumerate(output_list.items):
             assert isinstance(item, TextContent)
             if pipe_run_mode.is_live:
-                assert item.text == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.text}'"
+                assert item.require_text() == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.require_text()}'"
 
         # Verify working memory contains all the expected elements
         final_working_memory = pipe_output.working_memory
@@ -138,9 +138,9 @@ class TestPipeBatchSimple:
         original_list = final_working_memory.get_stuff_as_list("text_list", item_type=TextContent)
         assert original_list is not None
         assert len(original_list.items) == 3
-        assert original_list.items[0].text == "hello"
-        assert original_list.items[1].text == "world"
-        assert original_list.items[2].text == "test"
+        assert original_list.items[0].require_text() == "hello"
+        assert original_list.items[1].require_text() == "world"
+        assert original_list.items[2].require_text() == "test"
 
         # New result should be added
         batch_result = final_working_memory.get_stuff("batch_result")
@@ -153,9 +153,9 @@ class TestPipeBatchSimple:
         result_list = batch_result.as_list_of_fixed_content_type(item_type=TextContent)
         assert len(result_list.items) == 3
         if pipe_run_mode.is_live:
-            assert result_list.items[0].text == "UPPER: HELLO"
-            assert result_list.items[1].text == "UPPER: WORLD"
-            assert result_list.items[2].text == "UPPER: TEST"
+            assert result_list.items[0].require_text() == "UPPER: HELLO"
+            assert result_list.items[1].require_text() == "UPPER: WORLD"
+            assert result_list.items[2].require_text() == "UPPER: TEST"
 
         # Verify working memory structure
         assert len(final_working_memory.root) == 2

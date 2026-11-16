@@ -74,7 +74,7 @@ class TestPipeParallelSimple:
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
         assert isinstance(input_text.content, TextContent)
-        assert input_text.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
+        assert input_text.content.require_text() == "The weather is beautiful today. I love sunny days and outdoor activities."
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
@@ -97,7 +97,7 @@ class TestPipeParallelSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        assert original_input.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
+        assert original_input.content.require_text() == "The weather is beautiful today. I love sunny days and outdoor activities."
 
         # Verify sentiment analysis result
         sentiment_result = final_working_memory.get_stuff("sentiment_result")
@@ -131,9 +131,9 @@ class TestPipeParallelSimple:
         assert keywords_result.concept.domain_code == "native"
 
         # Verify that all results are different (pipes ran independently)
-        assert sentiment_result.content.text != word_count_result.content.text
-        assert sentiment_result.content.text != keywords_result.content.text
-        assert word_count_result.content.text != keywords_result.content.text
+        assert sentiment_result.content.require_text() != word_count_result.content.require_text()
+        assert sentiment_result.content.require_text() != keywords_result.content.require_text()
+        assert word_count_result.content.require_text() != keywords_result.content.require_text()
 
         # The parallel always combines: the main stuff is the composite of the branch outputs
         final_result = pipe_output.main_stuff
@@ -193,7 +193,7 @@ class TestPipeParallelSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        assert original_input.content.text == "Hello world"
+        assert original_input.content.require_text() == "Hello world"
 
         # Verify all three parallel results exist
         sentiment_result = final_working_memory.get_stuff("sentiment_result")

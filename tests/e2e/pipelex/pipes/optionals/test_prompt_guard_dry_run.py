@@ -28,7 +28,7 @@ class TestPromptGuardDryRun:
         response = await runner.execute(pipe_code="draft_notice", inputs={"subject": "the bus timetable change"})
 
         assert response.state == RunState.COMPLETED
-        assert response.pipe_output.main_stuff.as_text.text
+        assert response.pipe_output.main_stuff.as_text.require_text()
         memory = response.pipe_output.working_memory
         style_hint_record = memory.get_optional_absence("style_hint")
         assert style_hint_record is not None
@@ -47,4 +47,4 @@ class TestPromptGuardDryRun:
         assert response.state == RunState.COMPLETED
         memory = response.pipe_output.working_memory
         assert memory.absences == {}
-        assert memory.get_stuff("style_hint").as_text.text == "keep it formal"
+        assert memory.get_stuff("style_hint").as_text.require_text() == "keep it formal"

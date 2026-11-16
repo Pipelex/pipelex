@@ -15,7 +15,7 @@ An emitter then walks the `ResolvedLibrary` and renders text. Emitters live in `
 
 ## Targets
 
-The `types` projection ranges over the crate's concept set (one type per qualified concept). Three targets ship today:
+The `types` projection ranges over the crate's concept set: one type per qualified concept, and a second one, its wire shape, for a concept reaching a value the runtime may store (see [Stored values](#stored-values-the-loaded-shape-and-the-wire-shape)). Three targets ship today:
 
 - **`python-structures`** — Pipelex runtime `StuffContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted. Each concept lands on the same content class the runtime would resolve it to: a structured concept on `StructuredContent`, a concept refining a native on that native's content class, a structureless one on `TextContent`.
 - **`python-pydantic`** — plain `pydantic.BaseModel` types with no Pipelex imports. Every concept is emitted uniformly, including the materialized natives, so the module depends only on `pydantic` and the standard library.
@@ -47,6 +47,44 @@ On the TypeScript side the consequence is that a parsed optional field types as 
 A concept that refines another keeps its `refines` link when the base is **native-backed** (the refinement chain bottoms out at a native such as `Text` or `Number`), because the native is materialized into the crate and the base carries real runtime behavior; the emitter then renders inheritance (`class Summary(TextContent)` / `class Summary(Text)` / `z.lazy(() => TextSchema)`), which round-trips to the correct base class. A concept that refines an **in-crate structured** base has that base's effective structure flattened in during normalization.
 
 Native materialization itself is faithful-or-absent per native: a content-class field maps when it has an unambiguous blueprint form — primitives, dicts, lists, references to other natives, and nested non-native models, which serialize as JSON objects and therefore map to a `dict` blueprint with unspecified value types (declared imprecision the emitters surface, e.g. `native.JSON`'s `json_obj` map). A field with no honest blueprint form at all (for example, a non-optional union) leaves the whole native structureless rather than guessing a partial shape.
+
+### Stored values: the loaded shape and the wire shape
+
+`Text`, `Markdown`, `Html` and `JSON` may hold their value in the run's storage. A value past the runtime's inline threshold (`[runtime.storage] inline_text_max_bytes`, 4 KiB by default) travels as a **reference** in place of the value: a `url` with the value's `size` in bytes, its `mime_type` and a `preview`, its first few hundred characters. The two forms never mix: a value is inline or referenced, never both. The crate states both forms on the native, every field optional, because the structure language has no way to say "exactly one of these".
+
+Our clients load every stored value before they hand a result back, so most callers never see a reference, while a raw HTTP caller, or a client caller who opts out of loading, sees whichever form the run produced. Codegen therefore emits two shapes for `python-pydantic` and `ts-zod`:
+
+- **The loaded shape**, under the concept's own name, is what a loading client hands back. A storable native holds its value alone, required: `Text` and `Markdown` are `text: str`, `Html` is `inner_html: str` beside its optional `css_class`, `JSON` is `json_obj`. It refuses a reference, so parsing a raw result that holds one fails loudly rather than reading `None` for the text.
+- **The wire shape**, under the name with `Wire` appended, is what the wire carries: a storable native with its value and the reference's four fields, all optional, so it parses either form. Every concept reaching a storable native gets one, through a field, a list or dict item, or a refinement: `Report { label: Text }` has `ReportWire { label: TextWire }`, `Summary` refining `Text` has `SummaryWire` refining `TextWire`, and `native.Page`, whose text sits inside its `TextAndImages`, has `PageWire`. A concept reaching none, such as one holding only numbers or images, has a single shape, which is both.
+
+```python
+class Text(BaseModel):
+    text: str = Field(..., description="The text")
+
+class TextWire(BaseModel):
+    text: str | None = Field(default=None, ...)
+    url: str | None = Field(default=None, ...)
+    size: int | None = Field(default=None, ...)
+    mime_type: str | None = Field(default=None, ...)
+    preview: str | None = Field(default=None, ...)
+```
+
+```typescript
+export const TextSchema = z.object({ text: z.string() });
+export const TextWireSchema = z.object({
+  text: z.string().nullish(),
+  url: z.string().nullish(),
+  size: z.number().int().nullish(),
+  mime_type: z.string().nullish(),
+  preview: z.string().nullish(),
+});
+```
+
+The `ts-zod` binder pairs both (`parseText` and `parseTextWire`). The wire shapes follow every loaded type in the emitted file, and their documentation says whose wire shape they are. When an authored concept already holds a `Wire` name, the authored concept keeps it and the wire shape takes the next numeric suffix (`ReportWire2`); the loaded names never depend on whether a wire shape exists. The exactly-one rule stays a rule of values, enforced by the runtime when a content is built: the wire shape accepts a payload carrying neither form, as the crate's native does.
+
+`python-structures` emits no wire shape: its classes are the runtime's own content classes (`TextContent`, …), which hold either form and load a reference through the runtime.
+
+The two shapes are decided once, in the resolved layer (`pipelex/codegen/resolved_concepts.py`): `ResolvedLibrary.concepts` holds the loaded shapes, a storable native reduced to its value by `make_native_value_structure` (`pipelex/core/concepts/native/pinned_blueprints.py`, the same reduction the input-form descriptor reads), and `ResolvedLibrary.wire_shapes` holds the wire shapes, whose references to other wire-shaped concepts point at their wire shapes. The emitters only name and render them.
 
 ## The CLI surface
 

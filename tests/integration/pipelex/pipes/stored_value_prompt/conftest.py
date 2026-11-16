@@ -10,13 +10,30 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration, LLMTextGeneration
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.interpreter_hub import get_native_concept, get_pipe_router
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.runtime_hub import scoped_content_generator
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import READ_SCOPE, STORAGE_SCOPE, STORED_TEXT, STORED_TEXT_KEY
+from tests.integration.pipelex.pipes.stored_value_prompt.test_data import (
+    READ_SCOPE,
+    STORAGE_SCOPE,
+    STORED_TEXT,
+    STORED_TEXT_KEY,
+    StoredValuePromptTestData,
+)
 
 
 class CrossedPrompt(NamedTuple):
@@ -65,10 +82,15 @@ class RecordingContentGenerator(ContentGenerator):
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         unrendered_prompt: UnrenderedLLMPrompt,
+        output_mime_type: str,
     ) -> LLMTextGeneration:
         self._record(entry_point="make_llm_text", unrendered_prompt=unrendered_prompt)
         return await super().make_llm_text(
-            job_metadata=job_metadata, cogt_run_params=cogt_run_params, llm_setting_main=llm_setting_main, unrendered_prompt=unrendered_prompt
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            llm_setting_main=llm_setting_main,
+            unrendered_prompt=unrendered_prompt,
+            output_mime_type=output_mime_type,
         )
 
     @override
@@ -135,3 +157,33 @@ def scoped_job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     return JobMetadata(
         run_metadata=RunMetadata(storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, user_id="pytest", pipeline_run_id=f"{test_id}-stored-prompt")
     )
+
+
+def stored_pages() -> TextContent:
+    """A fresh referenced form of the stored text: a load keeps the text on the instance, so each test builds its own."""
+    return TextContent.model_validate(StoredValuePromptTestData.TEXT_REFERENCE)
+
+
+def make_text_memory(*, texts: dict[str, TextContent]) -> WorkingMemory:
+    """A working memory holding each text as a `Text` stuff under its name, the first one main."""
+    stuffs = [
+        StuffFactory.make_stuff(concept=get_native_concept(NativeConceptCode.TEXT), content=text_content, name=text_name)
+        for text_name, text_content in texts.items()
+    ]
+    return WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=stuffs, main_name=next(iter(texts)))
+
+
+async def run_pipe_dry(*, pipe: PipeAbstract, working_memory: WorkingMemory, job_metadata: JobMetadata) -> PipeOutput:
+    """Run the pipe in dry mode through the router, over the given memory, as a step of a direct run, and return its output."""
+    pipe_job = PipeJobFactory.make_pipe_job(
+        pipe=pipe,
+        pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+        job_metadata=job_metadata,
+        working_memory=working_memory,
+    )
+    return await get_pipe_router().run(pipe_job=pipe_job)
+
+
+def text_inputs_read_by(*, templates: list[str | None], names: tuple[str, ...] = ("subject", "pages")) -> dict[str, str]:
+    """The `Text` inputs a step declares: each of the names its templates read, since a declared input left unread is refused."""
+    return {input_name: NativeConceptCode.TEXT for input_name in names if any(f"{input_name}." in (template or "") for template in templates)}
