@@ -21,7 +21,8 @@ by the activity. :func:`assemble_llm_prompt` does both halves in one process, ov
 stored values are already loaded.
 """
 
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from typing import Any, Self
 
 from pydantic import BaseModel, Field, model_validator
@@ -36,6 +37,7 @@ from pipelex.kernel.prompt_assembly import PromptFiles
 from pipelex.kernel.prompt_references import DocumentReference, ImageReference
 from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -165,6 +167,9 @@ async def render_llm_prompt(
         output_structure_prompt=unrendered_prompt.output_structure_prompt,
         extra_params=unrendered_prompt.extra_params,
         templating_style=unrendered_prompt.templating_style,
+        system_template_field=unrendered_prompt.system_template_field,
+        user_template_field=unrendered_prompt.user_template_field,
+        template_owner=unrendered_prompt.template_owner,
     )
 
 
@@ -191,6 +196,9 @@ async def assemble_llm_prompt(
         output_structure_prompt=output_structure_prompt,
         extra_params=extra_params,
         templating_style=templating_style,
+        system_template_field="system_prompt",
+        user_template_field="prompt",
+        template_owner=TemplateOwner.METHOD,
     )
 
 
@@ -235,27 +243,32 @@ async def _render_llm_prompt(
     output_structure_prompt: str | None,
     extra_params: dict[str, Any] | None,
     templating_style: TemplatingStyle,
+    system_template_field: str | None,
+    user_template_field: str | None,
+    template_owner: TemplateOwner,
 ) -> LLMPrompt:
     template_params = prompt_files.template_params(extra_params=extra_params)
 
     system_text: str | None = None
     if system_template:
-        with locating_template_refusal(template_field="system_prompt"):
+        with _locating_refusal_on(template_field=system_template_field):
             system_text = await prompt_files.render(
                 template_blueprint=system_template,
                 context_provider=context_provider,
                 extra_params=template_params,
                 templating_style=templating_style,
+                template_owner=template_owner,
             )
 
     user_text: str | None
     if user_template:
-        with locating_template_refusal(template_field="prompt"):
+        with _locating_refusal_on(template_field=user_template_field):
             user_text = await prompt_files.render(
                 template_blueprint=user_template,
                 context_provider=context_provider,
                 extra_params=template_params,
                 templating_style=templating_style,
+                template_owner=template_owner,
             )
         if output_structure_prompt:
             user_text += output_structure_prompt
@@ -269,3 +282,17 @@ async def _render_llm_prompt(
         user_images=prompt_files.prompt_images(),
         user_documents=prompt_files.prompt_documents(),
     )
+
+
+@contextmanager
+def _locating_refusal_on(*, template_field: str | None) -> Generator[None]:
+    """Locate a refusal of the template sandbox on the pipe's field the template is written in, when it is written in one.
+
+    A template written in no field of the pipe, such as the structuring prompt, which is Pipelex's own, is located on
+    none rather than on a field the pipe does not have.
+    """
+    if template_field is None:
+        yield
+        return
+    with locating_template_refusal(template_field=template_field):
+        yield

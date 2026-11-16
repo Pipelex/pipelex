@@ -1,9 +1,11 @@
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.document.prompt_document import PromptDocumentUri
 from pipelex.cogt.image.prompt_image import PromptImageUri
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.templating.prompt_file_registrations import PromptFileRegistrations
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -18,9 +20,12 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import ProblemView
 from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt, prepare_llm_prompt, render_llm_prompt
 from pipelex.kernel.prompt_references import DocumentReference, DocumentReferenceKind, ImageReference, ImageReferenceKind
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSecurityError
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
@@ -176,3 +181,34 @@ class TestLlmPromptRenderInLeaf:
 
         assert rendered.user_text == "Read: B-TEXT"
         assert not unread_value.is_loaded
+
+    @pytest.mark.builds_problems_without_required_params(reason="renders outside any pipe, whose failure location names the pipe")
+    @pytest.mark.parametrize(
+        ("topic", "user_template_field", "template_owner", "expected_field", "expected_code"),
+        [
+            ("a PipeLLM prompt", "prompt", TemplateOwner.METHOD, "prompt", CoreCode.SECURITY_TEMPLATE_REFUSED),
+            ("Pipelex's structuring prompt", None, TemplateOwner.PIPELEX, None, CoreCode.RUNTIME_UNEXPECTED),
+        ],
+    )
+    async def test_a_refusal_is_located_and_owned_as_the_prompt_says(
+        self,
+        topic: str,
+        user_template_field: str | None,
+        template_owner: TemplateOwner,
+        expected_field: str | None,
+        expected_code: CoreCode,
+    ) -> None:
+        """A sandbox refusal names the field the prompt carries, none for a template no field holds, and its owner's code."""
+        unrendered_prompt = UnrenderedLLMPrompt(
+            user_template=_template("{{ lane.__class__ }}"),
+            templating_style=_STYLE,
+            extra_params={"lane": "express"},
+            user_template_field=user_template_field,
+            template_owner=template_owner,
+        )
+
+        with pytest.raises(Jinja2TemplateSecurityError) as exc_info:
+            await render_llm_prompt(unrendered_prompt=unrendered_prompt, read_scope=None, storage_provider=None)
+
+        assert exc_info.value.template_field == expected_field, topic
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == expected_code, topic

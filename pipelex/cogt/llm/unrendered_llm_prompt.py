@@ -21,6 +21,7 @@ from pipelex.cogt.templating.prompt_file_registrations import PromptFileRegistra
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
@@ -38,6 +39,12 @@ class UnrenderedLLMPrompt(BaseModel):
         output_structure_prompt: The description of the output structure appended to the user text, already rendered:
             it is Pipelex's own text about the output class and reads no run data.
         files: The images and documents the operator registered, which the rendered text numbers.
+        system_template_field: The field of the pipe the system template is written in, which a refusal of the template
+            sandbox is located on, ``None`` when the pipe has no such field.
+        user_template_field: The same for the user template: ``prompt`` for a `PipeLLM`, ``None`` for the structuring
+            prompt a `PipeStructure` renders, which is Pipelex's own and written in no field of the pipe.
+        template_owner: Who wrote the templates, which decides whose fault their failure is: the method's for a
+            `PipeLLM`'s prompts, Pipelex's for the structuring prompt.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -50,6 +57,9 @@ class UnrenderedLLMPrompt(BaseModel):
     extra_params: dict[str, Any] = Field(default_factory=dict)
     output_structure_prompt: str | None = None
     files: PromptFileRegistrations = Field(default_factory=PromptFileRegistrations)
+    system_template_field: str | None = "system_prompt"
+    user_template_field: str | None = "prompt"
+    template_owner: TemplateOwner = Field(default=TemplateOwner.METHOD, strict=False)
 
     @classmethod
     def make_from_texts(cls, *, user_text: str, system_text: str | None = None, templating_style: TemplatingStyle) -> Self:

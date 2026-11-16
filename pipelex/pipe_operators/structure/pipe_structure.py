@@ -33,6 +33,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_
 from pipelex.runtime_hub import get_class_registry, get_content_generator
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.tabular.csv_codec import flat_field_names
 from pipelex.tools.tabular.exceptions import CsvError, CsvFlatnessError
 from pipelex.tools.tabular.table_reader import locate_table_error, table_subject
@@ -455,6 +456,10 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             templating_style=templating_style,
             context=WorkingMemory(root={STRUCTURING_PROMPT_SOURCE_NAME: source_text_stuff}),
             output_structure_prompt=output_structure_prompt,
+            # Pipelex's own template, written in no field of the pipe: its failure is ours, and is located on no field.
+            system_template_field=None,
+            user_template_field=None,
+            template_owner=TemplateOwner.PIPELEX,
         )
 
         try:

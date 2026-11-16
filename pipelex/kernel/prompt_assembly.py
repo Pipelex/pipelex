@@ -52,6 +52,7 @@ from pipelex.kernel.exceptions import PromptContentError
 from pipelex.kernel.prompt_references import DocumentReference, DocumentReferenceKind, ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.exceptions import ContextProviderError
@@ -237,8 +238,12 @@ class PromptFiles:
         context_provider: ContextProviderAbstract,
         extra_params: dict[str, Any],
         templating_style: TemplatingStyle,
+        template_owner: TemplateOwner = TemplateOwner.METHOD,
     ) -> str:
         """Render one template against the context, its references substituted by `extra_params`.
+
+        ``template_owner`` says who wrote the template, the method unless it is one of Pipelex's own, such as the
+        structuring prompt, whose failure is then Pipelex's.
 
         A style declared on the blueprint wins over the resolved one, and is kept as a local: writing it
         onto the blueprint would mutate an object the pipe library holds and hands out.
@@ -261,6 +266,7 @@ class PromptFiles:
             context=context,
             templating_style=effective_style,
             finalize=finalize,
+            template_owner=template_owner,
         )
 
     def prompt_images(self) -> list[PromptImage]:
