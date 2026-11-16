@@ -142,7 +142,7 @@ The verbatim form is not always possible, and then the docstring is escaped onto
 
 The last case is about reading the docstring back. `inspect.getdoc` strips the indentation shared by the lines after the first, so a summary-first docstring would lose the relative indentation of such a body. The escaped form then opens with an escaped newline, which leaves `getdoc` no first line to set apart, and the body reads back with its relative indentation. An escaped docstring trips `D301`, but ruff classes that fix as unsafe, so `ruff check --fix` leaves the bytes alone, and on one physical line it trips no `D212`.
 
-So `__doc__` carries the class-body indentation, exactly as a hand-written docstring does. What holds exactly is the value you actually read:
+So `__doc__` is not byte-identical to the authored description. On Python 3.11 and 3.12 it keeps the class-body indentation, exactly as a hand-written docstring does; from Python 3.13 the compiler strips that shared indentation. `inspect.getdoc` reads back the same text on every version, and that is the value that holds exactly:
 
 ```python
 inspect.getdoc(GeneratedClass) == inspect.cleandoc(normalized_description)

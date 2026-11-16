@@ -119,8 +119,9 @@ def class_docstring(description: str, *, extra_line: str | None = None, indent: 
     consumer's `ruff check --fix` leaves the bytes — and the stamp — alone; on one physical line, it trips no
     `D212`, whose fix is safe.
 
-    So `__doc__` is deliberately *not* byte-identical to the authored description: it carries the
-    indentation every hand-written docstring carries. The invariant that does hold is the one consumers
+    So `__doc__` is deliberately *not* byte-identical to the authored description: on Python 3.11 and 3.12
+    it keeps the class-body indentation every hand-written docstring carries, and from 3.13 the compiler
+    strips that shared indentation. The invariant that does hold, on every version, is the one consumers
     read through — `inspect.getdoc(cls) == normalized_docstring_text(description)`. Exact bytes survive
     where they are consumed programmatically: `Field(description=...)`, and the crate itself.
 
