@@ -195,7 +195,7 @@ The read scope leaves `https://` URLs alone because they are not the process's t
 
 ### Prompts render in the leaf
 
-Large texts take the same path as binary data in the other direction: a `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, so a prompt that reads one can only be rendered where storage may be read, which is the leaf, never workflow code. The LLM entries of `ContentGeneratorProtocol` therefore take the prompt unrendered and return what they rendered beside what they generated:
+Large texts take the same path as binary data in the other direction: a `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, so a prompt that reads one can only be rendered where storage may be read, which is the leaf, never workflow code. The LLM entries of `ContentGeneratorProtocol` therefore take the prompt unrendered and return what they rendered beside what they generated, a change of plugin API 12 (`PLUGIN_API_VERSION` in `pipelex/plugins/contract.py`), so a content generator written against 11 is refused when its plugin is discovered:
 
 | Entry | Takes | Returns |
 |-------|-------|---------|
