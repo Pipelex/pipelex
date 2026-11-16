@@ -144,7 +144,7 @@ spec = {
 }
 ```
 
-A step that asks for `append` from an engine that does not declare it is refused when its method loads, so an engine written before the field never receives a job it would fill as a replacement. The field arrived with plugin API 11: an engine reads it, and its plugin targets the runtime's plugin API version (`targets_api = 12` today), since a plugin targeting an earlier version is refused at boot.
+A step that asks for `append` from an engine that does not declare it is refused when its method loads, so an engine written before the field never receives a job it would fill as a replacement. The field arrived with plugin API 11: an engine reads it, and its plugin targets the runtime's plugin API version (`targets_api = 13` today), since a plugin targeting an earlier version is refused at boot.
 
 #### Updating a Table's rows
 

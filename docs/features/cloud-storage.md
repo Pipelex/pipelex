@@ -41,13 +41,21 @@ When an image-generation provider returns a URL rather than bytes and `is_fetch_
 
 ## Large texts
 
-A `Text`, `Markdown`, `Html` or `JSON` value past a size threshold is meant to live in storage and travel as a reference, as an image does, so that a long extracted page or a large JSON document is not copied into every step, trace event and result that carries it. The threshold is a byte count under `[runtime.storage]`:
+A `Text`, `Markdown`, `Html` or `JSON` value past a size threshold lives in storage and travels as a reference, as an image does, so that a long extracted page or a large JSON document is not copied into every step, trace event and result that carries it. The threshold is a byte count under `[runtime.storage]`:
 
 ```toml
 [runtime.storage]
 inline_text_max_bytes = 4096
 ```
 
-A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form will be exercised everywhere once values are stored. The value must not be negative.
+A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form is exercised everywhere. The value must not be negative.
 
-The setting is read by the code that stores values as they are produced, which arrives in a later release; until then it changes nothing. How a stored value looks, and what a run does with one today, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).
+A value is stored where it enters the run or is produced:
+
+- a run's inputs, when the run starts, under `{storage_scope}/assets/`, as long as `is_normalize_data_urls_to_storage` is on, the switch that also uploads data URLs and local files;
+- a `PipeLLM`'s text or markdown output, and the text of each page a `PipeExtract` step returns, under `{storage_scope}/generated/`;
+- the text, HTML and JSON values a `PipeFunc` function returns, under `{storage_scope}/generated/`.
+
+Each is stored as `{hash}/value.txt`, `value.md`, `value.html` or `value.json` under its folder, the hash being the first 16 hexadecimal digits of the value's SHA-256. A dry run stores nothing. A `PipeCompose` output, a search's answer and the text fields of a structured output stay inline.
+
+A stored value is read back where a step reads it, and never past `[runtime.network] max_fetch_bytes`: a larger one fails the run with `input.too_large`. How a stored value looks, and how a caller gives one, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).

@@ -34,7 +34,7 @@ Runs a pipe by code from your project's pipe library.
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
 - `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
-- `--no-pretty-print` - Skip pretty printing the main output
+- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
@@ -97,7 +97,7 @@ The run prints the digest of the tree it read with its recap, listed once, befor
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
 - `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
-- `--no-pretty-print` - Skip pretty printing the main output
+- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
@@ -152,7 +152,7 @@ Runs a pipeline from a method package: an installed one, one in a local director
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
 - `--save-csv` - Write the main stuff to this literal CSV path (**not** under `--output-dir`; absolute or `~`/relative paths all work). Requires a flat list output. See [CSV Input & Output](../../building-methods/pipes/csv-input-and-output.md)
-- `--no-pretty-print` - Skip pretty printing the main output
+- `--no-pretty-print` - Skip pretty printing the main output. On a local run, a text, HTML or JSON output large enough to be [stored](../../features/cloud-storage.md#large-texts) is loaded from storage to be printed, and is printed as its size, location and start when it cannot be read
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
