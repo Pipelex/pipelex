@@ -1,8 +1,9 @@
 """Rendering helpers shared by the two Python types emitters (structures + plain pydantic).
 
-Only the target-agnostic pieces live here: string / default-value escaping, the generated-file
-header (carrying the extension-file subclassing story), the class docstring, the `= Field(...)`
-assignment, the `Literal[...]` annotation, and the import block. Each Python emitter keeps its own
+Only the target-agnostic pieces live here: default-value formatting, the generated-file header
+(carrying the extension-file subclassing story), the `= Field(...)` assignment, the `Literal[...]`
+annotation, and the import block. String escaping and the class docstring are rendered by
+`pipelex.tools.misc.python_literals`, which the structure generator shares. Each Python emitter keeps its own
 resolved-type -> annotation walker, because the concept spelling (runtime content classes vs.
 generated models) differs.
 """
@@ -10,11 +11,11 @@ generated models) differs.
 import sys
 from collections import defaultdict
 from datetime import date, datetime, time
-from inspect import cleandoc
 from typing import Any, cast
 
 from pipelex.codegen.resolved_concepts import ResolvedConcept
 from pipelex.core.concepts.resolved_fields import ResolvedField, iter_imprecision_reasons
+from pipelex.tools.misc.python_literals import escape_py_string
 
 # Ruff's own default `line-length`, and deliberately not this repo's 150. It is the *tightest* width a
 # consumer is likely to lint at, and the threshold has to be the tightest one to be safe: anything we
@@ -50,30 +51,6 @@ def python_header(*, target: str) -> str:
     )
 
 
-def escape_py_string(value: str) -> str:
-    """Escape a string as the Python literal `ruff format` would leave alone.
-
-    Double quotes by default, and single quotes only where that **strictly reduces** the escape count —
-    which is ruff's (and black's) own normalization rule, verified across the mixed and tied cases. Always
-    double-quoting was the tempting simplification and it broke the stamp: a description or choice
-    carrying a `"` came out double-quoted with both quotes escaped, which ruff rewrites to the
-    escape-free `'say "hi"'` on a consumer's very first format run — at any line width, reporting an
-    untouched artifact as hand-edited.
-
-    `repr` does the escaping of everything else — backslashes, newlines, control characters — and picks its
-    own quote by a different rule, so its choice is converted when it disagrees.
-    """
-    quote = "'" if value.count("'") < value.count('"') else '"'
-    escaped = repr(value)
-    if escaped[0] == quote:
-        return escaped
-    # Only repr-single -> double is reachable: repr picks `"` solely for a value carrying `'` and no `"`,
-    # which is exactly the shape this rule also wants double-quoted.
-    other = escaped[0]
-    inner = escaped[1:-1].replace(f"\\{other}", other).replace(quote, f"\\{quote}")
-    return f"{quote}{inner}{quote}"
-
-
 def format_default_value(value: Any) -> str:
     """Format a default value as Python source. Temporal values rebuild via `fromisoformat` so they
     use the bare `date` / `datetime` names the generated module imports (repr module-qualifies them).
@@ -94,74 +71,6 @@ def format_default_value(value: Any) -> str:
         rendered = [f"{format_default_value(key)}: {format_default_value(pairs[key])}" for key in sorted(pairs)]
         return f"{{{', '.join(rendered)}}}"
     return repr(value)
-
-
-def normalized_docstring_text(text: str) -> str:
-    """The authored text as it reads back out of `inspect.getdoc` once rendered as a docstring.
-
-    Two normalizations compose, neither of them chosen. Per-line trailing whitespace goes because
-    `ruff format` strips it inside docstrings (and `D210` trims the edges), both as auto-applied fixes
-    that would otherwise rewrite the stamped bytes. Then `cleandoc` — the same call `inspect.getdoc`
-    makes — expands tabs, drops the common indentation, and trims blank edges. Composing them here is
-    what makes the contract exact rather than approximate: the emitter indents continuation lines to the
-    class body, and `cleandoc` takes that indentation straight back off.
-
-    This is the emitter's half of the fidelity contract, and the exact expression tests assert against:
-    `inspect.getdoc(cls) == normalized_docstring_text(description)`.
-    """
-    return cleandoc("\n".join(line.rstrip() for line in text.splitlines()))
-
-
-def _docstring_delimiter(text: str) -> str | None:
-    """The triple-quote delimiter `text` can sit inside verbatim, or `None` when it must be escaped.
-
-    Falling back to `'''` for a description containing `\"\"\"` is what keeps the docstring **backslash-free**,
-    and that is the whole point: any backslash trips ruff's `D301` ("use `r\"\"\"`"), and the `r` prefix it asks
-    for would then render the escapes literally, corrupting the text. `ruff format` rewrites `'''` to `\"\"\"`
-    only when that needs no escaping, so a `'''` chosen here is left alone.
-
-    `None` means no verbatim rendering exists — the text carries both triple-quote styles, a control
-    character, or a trailing backslash that would glue onto the closing delimiter.
-    """
-    if text.endswith("\\") or any(char not in {"\n", "\t"} and not char.isprintable() for char in text):
-        return None
-    return next((delimiter for delimiter in ('"""', "'''") if delimiter not in text and not text.endswith(delimiter[0])), None)
-
-
-def class_docstring(description: str, *, extra_line: str | None = None, indent: str = "    ") -> str:
-    """Render a class docstring; append `extra_line` (e.g. an imprecision caveat) as a second paragraph.
-
-    Shaped the way a human writes one — summary on the first line, continuation lines indented to the class
-    body, closing delimiter on its own line — because that is the only shape the pydocstyle rules and
-    `ruff format` both leave untouched. Every rewrite they would otherwise apply (`D207` under-indented,
-    `D209` closing quotes, `D210` edge whitespace) is an auto-applied fix, and each one changes the body
-    bytes the codegen stamp hashes, which is precisely the drift this module exists to prevent.
-
-    So `__doc__` is deliberately *not* byte-identical to the authored description: it carries the
-    indentation every hand-written docstring carries. The invariant that does hold is the one consumers
-    read through — `inspect.getdoc(cls) == normalized_docstring_text(description)`. Exact bytes survive
-    where they are consumed programmatically: `Field(description=...)`, and the crate itself.
-    """
-    parts = [normalized_docstring_text(part) for part in (description or "", extra_line or "") if part.strip()]
-    if not parts:
-        return f'{indent}""""""'
-
-    body = "\n\n".join(parts)
-    delimiter = _docstring_delimiter(body)
-    if delimiter is None:
-        # No verbatim rendering exists, so escape. This trips `D301`, but ruff classes that fix as *unsafe*,
-        # so a consumer's `ruff check --fix` still leaves the bytes — and the stamp — alone.
-        # Each rendered break carries the body indent, exactly as the verbatim branches do, so `cleandoc`
-        # takes the same margin back off either way and the fidelity contract holds across both.
-        escaped = f"\\n\\n{indent}".join(f"\\n{indent}".join(escape_py_string(line)[1:-1] for line in part.split("\n")) for part in parts)
-        return f'{indent}"""{escaped}"""'
-
-    prefix = "r" if "\\" in body else ""
-    lines = body.split("\n")
-    if len(lines) == 1:
-        return f"{indent}{prefix}{delimiter}{lines[0]}{delimiter}"
-    continuation = "\n".join(f"{indent}{line}" if line else "" for line in lines[1:])
-    return f"{indent}{prefix}{delimiter}{lines[0]}\n{continuation}\n{indent}{delimiter}"
 
 
 def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> str:

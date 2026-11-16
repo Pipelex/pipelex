@@ -951,15 +951,19 @@ class InvalidModel(StructuredContent):
     def test_code_validation_missing_class(self):
         """Test that code without the expected class fails validation."""
         generator = StructureGenerator()
-        code_without_expected_class = """
+        code_without_expected_class = '''
+"""A header docstring, as every generated module opens with."""
+
 from pydantic import Field
 from pipelex.core.stuffs.structured_content import StructuredContent
 
 class WrongClassName(StructuredContent):
-    name: str = Field(..., description="Name field")
-"""
+    """A class of another name."""
 
-        with pytest.raises(ConceptStructureValidationError):
+    name: str = Field(..., description="Name field")
+'''
+
+        with pytest.raises(ConceptStructureValidationError, match="does not end with the class 'ExpectedClassName'"):
             generator.validate_generated_code(python_code=code_without_expected_class, expected_class_name="ExpectedClassName")
 
     def test_inheritance_from_text_content(self):
