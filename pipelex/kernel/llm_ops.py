@@ -22,7 +22,7 @@ from typing import Any, NamedTuple
 from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError, ModelChoiceNotFoundError, ModelNotFoundError
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
@@ -239,10 +239,10 @@ async def derive_structure_prompt(*, output_class: type[StuffContent], templatin
 
 
 class GeneratedObjectContent(NamedTuple):
-    """The object a step generated, and the prompt its leaf rendered to generate it."""
+    """The object a step generated, and the trace of the prompt its leaf rendered to generate it."""
 
     content: StuffContent
-    rendered_prompt: LLMPrompt
+    rendered_prompt: LLMPromptTrace
 
 
 async def generate_object_content(

@@ -22,7 +22,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -51,7 +51,7 @@ class LlmTextResult(BaseModel):
 
     memory: WorkingMemory
     text: str
-    rendered_prompt: LLMPrompt
+    rendered_prompt: LLMPromptTrace
     llm_setting: LLMSetting
     structuring_path: StructuringPath
 
@@ -66,6 +66,6 @@ class LlmObjectResult(BaseModel):
 
     memory: WorkingMemory
     content: StuffContent
-    rendered_prompt: LLMPrompt
+    rendered_prompt: LLMPromptTrace
     llm_setting: LLMSetting
     structuring_path: StructuringPath

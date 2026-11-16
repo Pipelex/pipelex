@@ -73,7 +73,7 @@ class TestContentGenerator:
         pretty_print(text_generation.text, title="make_llm_text")
 
         assert text_generation.text
-        assert text_generation.rendered_prompt.user_text == USER_TEXT_FOR_BASE
+        assert text_generation.rendered_prompt.traced_user_text == USER_TEXT_FOR_BASE
 
     @pytest.mark.llm
     @pytest.mark.inference

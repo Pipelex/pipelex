@@ -489,8 +489,8 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         execution_data_dict: dict[str, Any] = {
             "resolved_model": concrete_llm_model_handle(llm_setting_for_object.model),
             "is_multiple_output": is_multiple_output,
-            # Rendered by the leaf, which returned it with the object.
-            "rendered_user_prompt": generated.rendered_prompt.user_text,
+            # Rendered by the leaf, which returned it with the object, a text past the trace's bound as its preview.
+            "rendered_user_prompt": generated.rendered_prompt.traced_user_text,
             "structuring_path": "structure",
         }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)

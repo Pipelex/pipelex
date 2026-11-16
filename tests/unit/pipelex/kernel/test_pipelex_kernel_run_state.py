@@ -14,7 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.cogt.llm.llm_generation import LLMTextGeneration
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -209,7 +209,7 @@ class TestPipelexKernelRunState:
 
         async def make_llm_text(**kwargs: object) -> LLMTextGeneration:  # ruff: ignore[unused-function-argument, unused-async]
             seen.append(get_log_context())
-            return LLMTextGeneration(text="generated text", rendered_prompt=LLMPrompt(user_text="rendered by the leaf"))
+            return LLMTextGeneration(text="generated text", rendered_prompt=LLMPromptTrace(user_text="rendered by the leaf"))
 
         content_generator = mocker.MagicMock()
         content_generator.make_llm_text = make_llm_text

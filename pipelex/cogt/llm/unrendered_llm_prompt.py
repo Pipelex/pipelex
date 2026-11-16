@@ -8,9 +8,11 @@ parameters, and the registrations. The leaf loads every stored value the memory 
 the shared prompt assembly (`pipelex.kernel.llm_prompt_content.render_llm_prompt`), and returns the rendered prompt
 with what it generated, which is what the trace records.
 
-What crosses the boundary is therefore small: the stored values cross as their references, and the memory carries only
-the stuffs the templates read. A Jinja2 filter applied to a stored text (`truncate`, `upper`) acts on the real text,
-since the text is loaded before anything renders.
+What crosses the boundary into the leaf is therefore small: the stored values cross as their references, and the memory
+carries only the stuffs the templates read. What crosses back is kept small too: the rendered prompt holds the loaded
+texts in full, so the leaf hands it back as an `LLMPromptTrace` (`pipelex.cogt.llm.llm_prompt_trace`), each text past
+its bound cut to a preview with its size and hash. A Jinja2 filter applied to a stored text (`truncate`, `upper`) acts
+on the real text, since the text is loaded before anything renders.
 """
 
 from typing import Any, Self

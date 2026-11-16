@@ -24,7 +24,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, YesNoAnswer, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration, LLMTextGeneration
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.search.search_setting import SearchSetting
@@ -59,7 +59,7 @@ REQUEST_ID = "req-kernel-step"
 #: Named but never resolved: the probe replaces the content generator, so no worker is looked up.
 LLM_SETTING = LLMSetting(model="kernel-log-context-model", temperature=0.5)
 #: What the probe answers it rendered: it renders nothing, the leaf being replaced.
-RENDERED_PROMPT = LLMPrompt(user_text="Pick a number.")
+RENDERED_PROMPT = LLMPromptTrace(user_text="Pick a number.")
 
 
 class ContentGeneratorProbe:

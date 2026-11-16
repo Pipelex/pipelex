@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:2b50c889a815db0c7dc130d4e297e8ddcc2ee8e2d8c957ca8a05364bdb5f1668"
+digest = "sha256:8362b9ae5a2c2076f941357f24fd78eb15576b7a78a3b2df58d1784c444e8d65"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-16T00:31:54Z"
-rationale = "real-catch: UnrenderedLLMPrompt carries the templates' fields and owner and PromptFiles.render takes template_owner; docs/under-the-hood/pipelex-kernel.md says so."
+reviewed_at = "2026-11-16T01:32:17Z"
+rationale = "real-catch: pipelex-kernel.md now says the leaf returns an LLMPromptTrace, each large text cut to a preview with its size and SHA-256"
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -19,9 +19,9 @@ rationale = "real-catch: UnrenderedLLMPrompt carries the templates' fields and o
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:edb81f9748748d537381a3e39e81463c1213db42"
 "pipelex/kernel/judgment_results.py" = "blob:4dbbcb204309265999de59a179f4420a0f83be93"
-"pipelex/kernel/llm_ops.py" = "blob:460a0d66e9c01e09466f99a2e7c2ee8bf0110eee"
+"pipelex/kernel/llm_ops.py" = "blob:0661dd1955c1cd1bc3e304d42f369538f93d4d80"
 "pipelex/kernel/llm_prompt_content.py" = "blob:99a4cb8b0a14fc5358317a71f7e50db7e904ff61"
-"pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
+"pipelex/kernel/llm_results.py" = "blob:bedb254445561946acee88890d08a2ead107580a"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
 "pipelex/kernel/pipelex_kernel.py" = "blob:c7d40db1572aaca00d1c04a1039f5e3e564d6f87"
 "pipelex/kernel/prompt_assembly.py" = "blob:0393511808b621f33be8ac848d8c352336d08a04"

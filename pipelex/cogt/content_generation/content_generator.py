@@ -41,6 +41,7 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration, LLMTextGeneration
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_trace import LLMPromptTrace
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.config import get_config
@@ -100,7 +101,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_prompt=rendered_prompt,
         )
         generated_text = await llm_gen_text(llm_assignment=llm_assignment)
-        return LLMTextGeneration(text=generated_text, rendered_prompt=rendered_prompt)
+        return LLMTextGeneration(text=generated_text, rendered_prompt=LLMPromptTrace.make_from_prompt(llm_prompt=rendered_prompt))
 
     @override
     @update_job_metadata
@@ -126,7 +127,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
         generated_object = revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
-        return LLMObjectGeneration(generated_object=generated_object, rendered_prompt=rendered_prompt)
+        return LLMObjectGeneration(generated_object=generated_object, rendered_prompt=LLMPromptTrace.make_from_prompt(llm_prompt=rendered_prompt))
 
     @override
     @update_job_metadata
@@ -156,7 +157,9 @@ class ContentGenerator(ContentGeneratorProtocol):
         generated_objects = [
             revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list
         ]
-        return LLMObjectListGeneration(generated_objects=generated_objects, rendered_prompt=rendered_prompt)
+        return LLMObjectListGeneration(
+            generated_objects=generated_objects, rendered_prompt=LLMPromptTrace.make_from_prompt(llm_prompt=rendered_prompt)
+        )
 
     @override
     @update_job_metadata
