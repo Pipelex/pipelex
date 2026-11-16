@@ -64,6 +64,29 @@ class TestCodegenRoute:
         assert body["lock_filename"] == "codegen.lock"
         assert body["crate_fingerprint"] in body["lock"]
 
+    @pytest.mark.parametrize(
+        ("target", "loaded_text", "wire_text"),
+        [
+            ("python-pydantic", 'text: str = Field(..., description="The text")', "class TextWire(BaseModel):"),
+            (
+                "ts-zod",
+                "export const TextSchema = z.object({\n  /** The text */\n  text: z.string(),\n});",
+                "export const TextWireSchema = z.object({",
+            ),
+        ],
+    )
+    def test_a_text_is_projected_loaded_and_as_the_wire_carries_it(self, target: str, loaded_text: str, wire_text: str):
+        """A run carries a large text as its reference, so the types state the loaded text and, beside it, the wire's either form."""
+        response = _build_client().post(
+            "/v1/codegen",
+            json={"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": target},
+        )
+        assert response.status_code == 200, response.text
+        contents = "\n".join(artifact["content"] for artifact in response.json()["artifacts"])
+        assert loaded_text in contents
+        assert wire_text in contents
+        assert "url: z.string().nullish()," in contents or "url: str | None = Field(" in contents
+
     def test_artifacts_written_verbatim_pass_the_offline_check(self, tmp_path: Path):
         # The trust-chain guarantee over HTTP: a client that writes the artifacts and the lock
         # verbatim reproduces a local projection — the offline drift check reports it current.

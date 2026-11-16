@@ -20,7 +20,18 @@ An **input entry** carries the `concept_ref`, the JSON Schema of its content (`j
 - `presence` — the authored marker, verbatim: `plain`, `optional` (`?`, the caller may omit it and the pipe handles absence itself), or `force` (`!`, must be provided, and the author asserted so). `plain` and `force` are both required; the distinction is the assertion, which lint and graph surfaces read.
 - `multiplicity` — `single`, `variable` (`Concept[]`, unbounded), or `fixed` (`Concept[N]`), with `item_count` carrying the exact N on the `fixed` arm and `null` otherwise. `Concept[1]` is `single`: no list framing.
 
-An **output entry** carries `concept_ref`, the same `multiplicity` / `item_count` pair, and a two-valued `optional` — `!` is rejected on outputs, so there is nothing three-valued to report. It carries **no `json_schema`**: the schema render runs per input only. A consumer that wants the output's payload shape gets it from [`build output --format schema`](../tools/cli/build/output.md), not from this contract.
+An **output entry** carries `concept_ref`, the same `multiplicity` / `item_count` pair, and a two-valued `optional` — `!` is rejected on outputs, so there is nothing three-valued to report. Its `json_schema` is the schema of the payload the pipe resolves to, the concept's content model, which departs from an input's on the plural arm: a `Concept[]` output resolves to a list content, an object holding its elements under `items`, never a bare array. On the single arm an output's schema and an input's are the same bytes.
+
+## A value the runtime may store
+
+`native.Text`, `native.Markdown`, `native.Html` and `native.JSON` may hold their value in the run's storage: past the inline threshold, the value travels as its reference, a `url` with its `size`, `mime_type` and `preview`, in place of the value field (`text`, `inner_html` or `json_obj`). A contract's schema for such a concept, or for a concept refining one, states both forms, every field optional, exactly as the standard pins the native, so it validates the payload a run produces in either form. A raw HTTP caller reads an output this way: a `main_stuff` whose content carries `text` holds its value, and one whose content carries `url` holds a reference to it, to be read from storage. The same shape reaches a nested value, such as a `Page`'s text.
+
+```json
+{ "text": "A short answer." }
+{ "url": "pipelex-storage://…/generated/9f2c41…/value.txt", "size": 48213, "mime_type": "text/plain", "preview": "The first few hundred characters…" }
+```
+
+The rule that a value carries **exactly one** of its value field and `url`, and carries `size`, `mime_type` and `preview` only beside `url`, is a rule of values, which the runtime enforces when it builds a content. The schema does not state it with a `oneOf`: the standard's structure language has no cross-field form, so a schema carrying one would describe more than the pinned native says, and every consumer that renders or derives from these schemas would have to read a combinator for three natives alone. The [input-form descriptor](input-form-descriptor.md) states the inline form only, since a caller supplies the value itself, and a schema a model generates from asks for the value alone.
 
 ## Where the concept identity sits on the schema
 

@@ -13,7 +13,7 @@ requestable, so `/execute` has no fire-and-forget refusal — that axis is `/sta
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytest
 from fastapi import FastAPI
@@ -30,6 +30,7 @@ from mthds.protocol.pipe_io_contracts import (
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.unsupported_reasons import METHOD_FILES_UNSUPPORTED_REASON
 from pipelex.graph.graphspec import GraphSpec
@@ -51,6 +52,23 @@ from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
+
+
+class StoredTextReference(NamedTuple):
+    """Where a stored text lives and what describes it, as the code that stores it writes them."""
+
+    url: str
+    size: int
+    mime_type: str
+    preview: str
+
+
+_STORED_MAIN_TEXT = StoredTextReference(
+    url="pipelex-storage://single-tenant/run-1/generated/0123456789abcdef/value.txt",
+    size=5,
+    mime_type="text/plain",
+    preview="hello",
+)
 
 
 def _assert_the_files_map_refusal(*, error: PipelexRequestError) -> None:
@@ -78,8 +96,10 @@ class _StubOrchestrator:
         pipe_io_artifacts: PipeIOArtifacts | None = None,
         pipe_io_artifacts_error: str | None = None,
         supports_fire_and_forget: bool = False,
+        stored_main_text: StoredTextReference | None = None,
     ) -> None:
         self.calls: list[dict[str, Any]] = []
+        self._stored_main_text = stored_main_text
         self._graph_spec = graph_spec
         self._pipe_io_artifacts = pipe_io_artifacts
         self._pipe_io_artifacts_error = pipe_io_artifacts_error
@@ -100,6 +120,11 @@ class _StubOrchestrator:
         # `main_stuff` alias, so the serialize -> rehydrate round-trip yields a valid completed memory.
         working_memory = pipe_job.get_working_memory()
         working_memory.set_alias(alias=MAIN_STUFF_NAME, target=next(iter(working_memory.root)))
+        if self._stored_main_text is not None:
+            # What a leaf does to a text past the threshold: it stores the value and turns the content into its reference.
+            main_content = working_memory.get_stuff(name=MAIN_STUFF_NAME).content
+            assert isinstance(main_content, TextContent)
+            main_content.accept_storage(**self._stored_main_text._asdict())
         return serialize_completed_output(
             pipe_output=PipeOutput(
                 working_memory=working_memory,
@@ -193,6 +218,38 @@ class TestExecuteDispatch:
         # synchronous, so no delivery target (never the caller's to choose).
         assert len(stub.calls) == 1
         assert stub.calls[0]["delivery_assignment"] is None
+
+    def test_a_stored_main_text_reaches_the_caller_as_its_reference(self, mocker: MockerFixture) -> None:
+        """A text the run stored travels to a raw HTTP caller as its reference: `url`, `size`, `mime_type`, `preview`, no `text`.
+
+        The wire never loads a stored value: the response stays small whatever the output, and the clients load it.
+        """
+        stub = _StubOrchestrator(stored_main_text=_STORED_MAIN_TEXT)
+        _register_stub(mocker, mode="direct", stub=stub)
+
+        response = _build_client().post(
+            "/v1/execute",
+            json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hello"}},
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        main_stuff = body["pipe_output"]["working_memory"]["root"][body["main_stuff_name"]]
+        assert main_stuff["concept"] == "native.Text"
+        assert main_stuff["content"] == _STORED_MAIN_TEXT._asdict()
+
+    def test_an_inline_main_text_reaches_the_caller_as_its_value_alone(self, mocker: MockerFixture) -> None:
+        """A text the run kept inline carries its `text` and none of the reference's fields, not even as nulls."""
+        _register_stub(mocker, mode="direct", stub=_StubOrchestrator())
+
+        response = _build_client().post(
+            "/v1/execute",
+            json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hello"}},
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["pipe_output"]["working_memory"]["root"][body["main_stuff_name"]]["content"] == {"text": "hello"}
 
     def test_the_result_reports_the_crate_the_job_was_built_from(self, mocker: MockerFixture) -> None:
         """`crate_fingerprint` is the fingerprint the dispatched job's `RunMetadata` carries, which a host records."""

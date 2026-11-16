@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -39,6 +40,7 @@ from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import (
     generate_projection_corpus,
 )
 from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS
 
 CORPUS_BUNDLES = [
     Path("tests/data/input_semantics/hinted_bundle.mthds"),
@@ -63,6 +65,10 @@ Write a haiku about an empty form.
 """
 
 NO_INPUT_PIPE_REF = "no_input_probe.no_input_pipe"
+
+# The natives that may hold their value in storage, and the corpus pipe holding them and concepts refining them at slots.
+STORABLE_NATIVE_REFS = {"native.Text", "native.Markdown", "native.Html", "native.JSON"}
+STORED_NATIVES_PIPE_REF = "input_semantics_scaffold.scaffold_stored_natives"
 
 
 def _corpus_files(*, corpus_dir: Path) -> dict[str, str]:
@@ -153,3 +159,50 @@ class TestGenerateProjectionCorpus:
             assert (templates_dir / f"{NO_INPUT_PIPE_REF}.{shape}.json").read_text(encoding="utf-8") == "{}"
             assert (templates_dir / f"{NO_INPUT_PIPE_REF}.{shape}.toml").read_text(encoding="utf-8") == ""
         assert not list((output_dir / ENGINE_DIR_NAME).glob(f"{NO_INPUT_PIPE_REF}.*"))
+
+    async def test_a_value_the_runtime_may_store_is_asked_for_inline_only(self, tmp_path: Path) -> None:
+        """No descriptor node or template asks a caller for a stored value's reference (L-261115-34cef9).
+
+        `Text`, `Markdown`, `Html` and `JSON` may travel as a reference to their value in storage, and their pinned
+        structures carry `url`, `size`, `mime_type` and `preview` for it. A caller supplies the value itself, so the
+        descriptor states the value form alone, whether the slot names the native or a concept refining it, and the
+        projection, which renders every field the descriptor states, never renders a reference's field beside the value.
+        """
+        manifest = await generate_projection_corpus(bundle_paths=CORPUS_BUNDLES, output_dir=tmp_path)
+        input_forms = json.loads((tmp_path / INPUT_FORM_FILE_NAME).read_text(encoding="utf-8"))
+
+        def storable_nodes(node: dict[str, Any]) -> list[dict[str, Any]]:
+            found: list[dict[str, Any]] = []
+            identity = {node.get("concept_ref"), *node.get("refines", [])}
+            if identity & STORABLE_NATIVE_REFS:
+                found.append(node)
+            for child in [*node.get("fields", []), *([node["item"]] if "item" in node else [])]:
+                found.extend(storable_nodes(child))
+            return found
+
+        storable = [found for descriptor in input_forms.values() for field in descriptor["fields"] for found in storable_nodes(field)]
+        # The corpus reaches every storable native, at a slot and nested, named and refined.
+        assert {node["concept_ref"] for node in storable} >= STORABLE_NATIVE_REFS | {
+            "input_semantics_scaffold.Webpage",
+            "input_semantics_scaffold.Payload",
+            "input_semantics_scaffold.Memo",
+        }
+        for node in storable:
+            field_names = {child["name"] for child in node.get("fields", [])}
+            assert not field_names & set(STORED_VALUE_REFERENCE_FIELDS), f"{node['concept_ref']} states {field_names}"
+
+        stored_natives_slots = input_forms[STORED_NATIVES_PIPE_REF]["fields"]
+        assert [(slot["name"], slot["kind"], [child["name"] for child in slot.get("fields", [])]) for slot in stored_natives_slots] == [
+            ("markdown_in", "prose", []),
+            ("webpage_in", "object", ["inner_html", "css_class"]),
+            ("payload_in", "object", ["json_obj"]),
+            ("memo_in", "prose", []),
+        ]
+        explicit = json.loads((tmp_path / TEMPLATES_DIR_NAME / f"{STORED_NATIVES_PIPE_REF}.explicit.json").read_text(encoding="utf-8"))
+        assert {slot_name: envelope["content"] for slot_name, envelope in explicit.items()} == {
+            "markdown_in": {"text": "text_value"},
+            "webpage_in": {"inner_html": "inner_html_value", "css_class": "css_class_value"},
+            "payload_in": {"json_obj": {}},
+            "memo_in": {"text": "text_value"},
+        }
+        assert STORED_NATIVES_PIPE_REF in manifest.pipes

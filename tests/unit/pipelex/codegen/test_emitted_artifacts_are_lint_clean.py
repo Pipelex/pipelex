@@ -451,3 +451,27 @@ class TestEmittedArtifactsAreLintClean:
             check=False,
         )
         assert checked.returncode == 0, f"emitted ts-zod artifact is not prettier-clean:\n{checked.stdout}{checked.stderr}"
+
+    @pytest.mark.parametrize(("target", "emit"), _EMITTERS)
+    def test_wire_shapes_are_lint_clean(
+        self, stored_values_crate: LibraryCrate, tmp_path: Path, target: str, emit: Callable[[ResolvedLibrary], list[EmittedFile]]
+    ):
+        """A crate reaching every storable native emits wire shapes beside the loaded types: their bases, their
+        references to other wire shapes and their multi-line documentation must leave ruff nothing to rewrite too.
+        """
+        _assert_ruff_clean(emitted=emit(resolve_concepts_from_crate(stored_values_crate)), tmp_path=tmp_path, target=target)
+
+    def test_emitted_wire_shapes_are_prettier_clean(self, stored_values_crate: LibraryCrate, tmp_path: Path):
+        """The wire shapes and their binder pairs leave prettier nothing to change, as the loaded types do."""
+        prettier = resolve_prettier()
+
+        for emitted_file in emit_ts_zod(resolve_concepts_from_crate(stored_values_crate)):
+            (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")
+
+        checked = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+            [prettier, "--check", str(tmp_path / "*.ts")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert checked.returncode == 0, f"emitted ts-zod artifact is not prettier-clean:\n{checked.stdout}{checked.stderr}"

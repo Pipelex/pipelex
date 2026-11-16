@@ -56,19 +56,40 @@ def make_pinned_native_value_blueprint(native_code: NativeConceptCode) -> Concep
     content class's own `value_field_name`. Every other native is its pinned blueprint as is.
     """
     blueprint = make_pinned_native_blueprint(native_code)
-    structure_class = native_code.structure_class
-    if structure_class is None or not issubclass(structure_class, StoredValueContent) or not isinstance(blueprint.structure, dict):
+    if not isinstance(blueprint.structure, dict):
         return blueprint
+    value_structure = make_native_value_structure(native_code, structure=blueprint.structure)
+    if value_structure is None:
+        return blueprint
+    return ConceptBlueprint(source=None, description=blueprint.description, structure=value_structure)
+
+
+def make_native_value_structure(
+    native_code: NativeConceptCode,
+    *,
+    structure: dict[str, ConceptStructureBlueprintType],
+) -> dict[str, ConceptStructureBlueprintType] | None:
+    """A storable native's structure as its value alone: without `url`, `size`, `mime_type` and `preview`, its value field required.
+
+    It reads the structure it is given, the pinned one or a crate's copy of it, so a reader of a crate takes the value
+    form from the crate itself. A field written as a bare description is kept as it is.
+
+    Returns:
+        The value form, or None for a native that never holds its value in storage.
+    """
+    structure_class = native_code.structure_class
+    if structure_class is None or not issubclass(structure_class, StoredValueContent):
+        return None
     value_field_name = structure_class.value_field_name
     value_structure: dict[str, ConceptStructureBlueprintType] = {}
-    for field_name, field_blueprint in blueprint.structure.items():
+    for field_name, field_blueprint in structure.items():
         if field_name in STORED_VALUE_REFERENCE_FIELDS:
             continue
         if field_name == value_field_name and isinstance(field_blueprint, ConceptStructureBlueprint):
             value_structure[field_name] = field_blueprint.model_copy(update={"required": True})
         else:
             value_structure[field_name] = field_blueprint
-    return ConceptBlueprint(source=None, description=blueprint.description, structure=value_structure)
+    return value_structure
 
 
 def _pinned_description(native_code: NativeConceptCode) -> str:

@@ -15,6 +15,11 @@ if camelCase ergonomics are later wanted they must ride a *schema-aware* transfo
 key remap.) Concept references use `z.lazy(() => XSchema)` so schema
 declaration order is irrelevant and reference cycles are handled.
 
+**Two shapes of a stored value.** A concept reaching a native that may hold its value in storage (`Text`,
+`Markdown`, `Html`, `JSON`) gets two schemas: its loaded shape under its own name (`TextSchema`, `text: z.string()`),
+and its wire shape under the name with `Wire` appended (`TextWireSchema`), where the value is inline or replaced by
+its reference in storage. The binder pairs both. The wire shapes follow every loaded schema.
+
 TypeScript customization is by declaration merging (augment the generated `interface`/module from a
 sibling file), the TS analog of the Python subclassing story; the generated files are never edited.
 """
@@ -24,6 +29,7 @@ import re
 from typing import Any, cast
 
 from pipelex.codegen.emitters.naming import allocate_ts_type_names
+from pipelex.codegen.emitters.stored_value_shapes import wire_shape_note
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
@@ -41,7 +47,8 @@ TS_PRINT_WIDTH = 80
 
 def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     """Emit the pure `types.ts` file and its `binder.ts` companion (wire<->domain parse/serialize)."""
-    concepts = sorted(library.concepts, key=lambda concept: concept.concept_ref)
+    # The wire shapes keep the order of their loaded concepts, after every loaded schema.
+    concepts = sorted(library.concepts, key=lambda concept: concept.concept_ref) + list(library.wire_shapes)
     by_ref = library.by_ref()
     type_name_by_ref = allocate_ts_type_names(library)
     recursive_refs = _find_recursive_concept_refs(concepts)
@@ -80,7 +87,11 @@ def _render_schema(
     recursive_refs: set[str],
 ) -> str:
     type_name = type_name_by_ref[concept.concept_ref]
-    doc = _jsdoc(concept.description, imprecise=concept.imprecision_reason if concept.structureless else None)
+    description = concept.description
+    if concept.wire_shape_of is not None:
+        note = wire_shape_note(loaded_name=type_name_by_ref[concept.wire_shape_of])
+        description = f"{description}\n\n{note}" if description else note
+    doc = _jsdoc(description, imprecise=concept.imprecision_reason if concept.structureless else None)
 
     schema_expr = _schema_expr(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
     if concept.concept_ref in recursive_refs:

@@ -157,6 +157,46 @@ def materialized_image_crate() -> LibraryCrate:
 
 
 @pytest.fixture
+def stored_values_crate() -> LibraryCrate:
+    """A crate reaching every native that may hold its value in storage, directly and through other concepts.
+
+    `Text`, `Html` and `JSON` at fields, `Markdown` refined, `Page` (whose text sits two levels down) in a
+    list, a concept refining `Text`, and `Score`, which reaches none of them. `ReportWire` is an authored
+    concept whose code is the name `Report`'s wire shape would take, so the wire shape needs another name.
+    """
+    authored = LibraryCrate(
+        concepts={
+            "stored.Report": ConceptBlueprint(
+                description="A report holding texts that may be stored",
+                structure={
+                    "label": ConceptStructureBlueprint(description="a label", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Text"),
+                    "body": ConceptStructureBlueprint(
+                        description="the body", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Html", required=True
+                    ),
+                    "data": ConceptStructureBlueprint(description="the data", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="JSON"),
+                    "pages": ConceptStructureBlueprint(
+                        description="the pages", type=ConceptStructureBlueprintFieldType.LIST, item_type="concept", item_concept_ref="Page"
+                    ),
+                    "score": ConceptStructureBlueprint(description="the score", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Score"),
+                },
+            ),
+            "stored.Score": ConceptBlueprint(
+                description="A score",
+                structure={"value": ConceptStructureBlueprint(description="the value", type=ConceptStructureBlueprintFieldType.NUMBER)},
+            ),
+            "stored.Summary": ConceptBlueprint(description="A short summary", refines="Text"),
+            "stored.Notes": ConceptBlueprint(description="Notes written in Markdown", refines="Markdown"),
+            "stored.ReportWire": ConceptBlueprint(
+                description="An authored concept named like a wire shape",
+                structure={"channel": ConceptStructureBlueprint(description="the channel", type=ConceptStructureBlueprintFieldType.TEXT)},
+            ),
+        },
+        domains={"stored": DomainBlueprint(code="stored", description="Stored values domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
 def natives_only_crate() -> LibraryCrate:
     """A crate holding nothing but natives — what an ordinary method that declares no concepts of its
     own normalizes to (a `Text -> Text` pipe materializes `native.Text` and nothing else).
