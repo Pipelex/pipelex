@@ -54,6 +54,6 @@ class TestPipeExtract:
             first_page = pages[0]
             page_text_content = first_page.text_and_images.text
             assert page_text_content is not None, f"Expected markdown text for {variant}"
-            page_text = page_text_content.text
+            page_text = page_text_content.require_text()
             assert len(page_text.strip()) > 0, f"Expected non-empty markdown text for {variant}"
             pretty_print(page_text[:500], title=f"Extracted markdown ({variant})")

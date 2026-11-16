@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator
 from typing_extensions import override
 
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
@@ -73,8 +74,16 @@ def _public_extra_fields(*, content: StuffContent) -> dict[str, Any]:
 
 
 def _content_field_names(*, content: StuffContent) -> list[str]:
-    """The content fields a template reads: the declared ones, then the public extra fields."""
-    declared_names: list[str] = list(type(content).model_fields)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    """The content fields a template reads: the declared ones, then the public extra fields.
+
+    A content whose value may be stored lists the fields of its inline form, whichever form it holds: a template
+    iterating a text reads its text, never the reference that stands for it.
+    """
+    declared_names: list[str]
+    if isinstance(content, StoredValueContent):
+        declared_names = list(content.value_form_field_names)
+    else:
+        declared_names = list(type(content).model_fields)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     return [*declared_names, *_public_extra_fields(content=content)]
 
 
@@ -85,6 +94,9 @@ def _get_template_value(*, stuff: Stuff, key: str) -> Any:
     anything else (the wrapped Stuff, the artefact's own methods) raises KeyError.
     """
     content = stuff.content
+    if isinstance(content, StoredValueContent) and key == content.value_field_name:
+        # A stored value reads as its value once loaded, and refuses to render as nothing when it was not.
+        return content.require_value()
     if key in type(content).model_fields:
         return getattr(content, key)
     extra_fields = _public_extra_fields(content=content)

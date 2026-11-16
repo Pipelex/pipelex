@@ -498,8 +498,8 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         return self.get_stuff(name=name).as_text
 
     def get_stuff_as_str(self, name: str) -> str:
-        """Get stuff content as string if applicable."""
-        return self.get_stuff_as_text(name=name).text
+        """Get stuff content as string if applicable, a stored text having been loaded."""
+        return self.get_stuff_as_text(name=name).require_text()
 
     def get_stuff_as_image(self, name: str) -> ImageContent:
         """Get stuff content as ImageContent if applicable."""

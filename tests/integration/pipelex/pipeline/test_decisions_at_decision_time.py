@@ -185,7 +185,9 @@ class TestDecisionsAtDecisionTime:
             )
 
         prefix = "Escalated" if chosen_pipe_code == "escalate" else "Filed"
-        assert response.pipe_output.main_stuff.as_text.text.startswith(f"Short: {prefix}: {request_text} / Long: {prefix}: {request_text} / ")
+        assert response.pipe_output.main_stuff.as_text.require_text().startswith(
+            f"Short: {prefix}: {request_text} / Long: {prefix}: {request_text} / "
+        )
         lines = _read_trace_lines(tmp_path)
 
         # Every line states the run's mode, and so does the graph built from them.

@@ -240,7 +240,7 @@ class TestInvocationPaths:
         assert len(item_node_ids) == len(InvocationPathsTestData.DOSSIER["filings"])
         contained_by_batch = {edge.target for edge in graph_spec.edges if edge.kind.is_contains and edge.source == batch_node_id}
         assert item_node_ids <= contained_by_batch
-        main_text = pipe_output.main_stuff.as_text.text
+        main_text = pipe_output.main_stuff.as_text.require_text()
         for filing in InvocationPathsTestData.DOSSIER["filings"]:
             assert f"Condensed: Read {filing['title']}" in main_text
 

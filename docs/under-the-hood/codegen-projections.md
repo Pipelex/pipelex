@@ -132,15 +132,30 @@ The threshold is 88 columns — ruff's own default, chosen because it is the *ti
 
 #### Docstrings
 
-A concept description becomes the generated class's docstring, rendered the way a human writes one: summary on the first line, continuation lines indented to the class body, closing delimiter on its own line. That shape is not cosmetic — it is the only one that `ruff format` and the pydocstyle rules both leave alone. Rendered flat, a multi-line description trips `D207`/`D209` and edge whitespace trips `D210`, all of which ruff fixes automatically, rewriting the bytes.
+A concept description becomes the generated class's docstring. Where the text allows it, the docstring is verbatim and shaped the way a human writes one: summary on the first line, continuation lines indented to the class body, closing delimiter on its own line. That shape is not cosmetic — it is the only one that `ruff format` and the pydocstyle rules both leave alone. Rendered flat, a multi-line description trips `D207`/`D209`, edge whitespace trips `D210`, and a summary moved off the first line trips `D212`, all of which ruff fixes automatically, rewriting the bytes. The delimiter is `"""`, or `'''` for a text holding `"""`, and the docstring is raw when the text holds a backslash.
 
-So `__doc__` carries the class-body indentation, exactly as a hand-written docstring does. What holds exactly is the value you actually read:
+The verbatim form is not always possible, and then the docstring is escaped onto one physical line, every quote and backslash escaped. That happens when:
+
+- the text holds a control character or another character that does not print, or both triple-quote styles;
+- a quote at the edge of the text would make `ruff format` pad it with a space, or a backslash ends a line or stands beside a triple quote;
+- the text holds a shape that a safe fix of the pydocstyle rules rewrites whatever its layout: two or more blank lines right after the summary, which `D205` collapses to one, or a line after the summary that a docstring-section parser reads as a section header — a section name such as `Args`, `Notes`, `Returns` or `See Also` alone on its line, in any case, with or without a colon — which the section rules (`D214`, `D215`, `D405` to `D407`, `D409` to `D413`, `D416`) reshape under one convention or another;
+- the lines after the first share an indentation, as in a text that opens on a blank line and indents its whole body.
+
+The section and blank-line case holds under every pydocstyle convention a consumer may pick, and with none. The test for a section header is wider than ruff's, which also weighs the lines around it, so a text it flags only costs the verbatim rendering, never a rewritten byte.
+
+The last case is about reading the docstring back. `inspect.getdoc` strips the indentation shared by the lines after the first, so a summary-first docstring would lose the relative indentation of such a body. The escaped form then opens with an escaped newline, which leaves `getdoc` no first line to set apart, and the body reads back with its relative indentation. An escaped docstring trips `D301`, but ruff classes that fix as unsafe, so `ruff check --fix` leaves the bytes alone, and on one physical line it trips no `D212`, no `D205` and no section rule.
+
+So `__doc__` is not byte-identical to the authored description. On Python 3.11 and 3.12 it keeps the class-body indentation, exactly as a hand-written docstring does; from Python 3.13 the compiler strips that shared indentation. `inspect.getdoc` reads back the same text on every version, and that is the value that holds exactly:
 
 ```python
-inspect.getdoc(GeneratedClass) == inspect.cleandoc(authored_description)
+inspect.getdoc(GeneratedClass) == inspect.cleandoc(normalized_description)
 ```
 
+where `normalized_description` is the authored description with each line's trailing spaces and tabs removed (`ruff format` strips them inside a docstring) and with `\r\n` and `\r` read as `\n`. No other character breaks a line, and the docstring is never wrapped: it is the model's JSON schema description, so a line break added to it would change the text every consumer reads.
+
 Exact bytes survive wherever they are consumed programmatically rather than read as prose — `Field(description=...)` keeps the description verbatim, and so does the crate.
+
+The runtime structure generator, which builds the class of a concept with a `structure` when a bundle loads, renders class docstrings through the same renderer, under the same contract, and never wraps them either. A field description too long for one line is split into adjacent string literals that concatenate back to the authored text, character for character. Before running the module it generated, the structure generator checks its shape: a header docstring, `from … import` statements, and one undecorated class of the expected name whose body is its docstring followed by annotated fields. A module of any other shape is refused rather than run.
 
 #### TypeScript assumes Prettier's defaults
 
@@ -164,7 +179,7 @@ The remaining findings are artifacts of *how* you lint, not of file content. Non
 
 - `INP001` ("implicit namespace package") fires when you point ruff at a bare directory with no `__init__.py`. Add one, or lint the package that contains it.
 - `E501` on a single long string literal, as described above.
-- `D301` ("use `r\"\"\"`") on the rare description that carries both `\"\"\"` and `'''`, or a control character — the only inputs with no verbatim rendering, which therefore have to be escaped. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
+- `D301` ("use `r\"\"\"`") on a description rendered as an escaped docstring, in any of the cases listed under Docstrings above. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
 - Import grouping for the `python-structures` target assumes `pipelex` is a third-party dependency — which it is in your tree. The Pipelex repo itself, where `pipelex` is first-party, is the one place ruff wants the opposite order; no generated artifact is committed there, so the consumer's grouping is the one the emitter targets.
 
 ## Serving the engine over HTTP

@@ -84,18 +84,24 @@ The simplest native concept:
 
 ```python
 class TextContent(StuffContent):
-    text: str
+    text: str | None = None
+    url: str | None = None
+    size: int | None = None
+    mime_type: str | None = None
+    preview: str | None = None
 ```
+
+A text is held in one of two forms. **Inline**, `text` holds it. **Stored**, it lives in the run's storage and `url` points at it, as an image's URL points at its bytes; `size` (its length in bytes), `mime_type` (`text/plain` or `text/markdown`) and `preview` (the first few hundred characters, always the true start of the text) describe it without reading it. A text holds exactly one of `text` and `url`, and the three others only beside `url`. Read it in Python with `require_text()`, which returns the text in either form; see [Stored values](#stored-values) below.
 
 **Use for:** Plain text outputs, summaries, descriptions, etc.
 
 ### MarkdownContent
 
-A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the single field of `TextContent`, which holds the Markdown source:
+A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the fields of `TextContent`, its value holding the Markdown source:
 
 ```python
 class MarkdownContent(TextContent):
-    text: str
+    text: str | None = None  # the Markdown source, or None when it is stored at `url`
 ```
 
 What sets it apart from `Text` is how it is shown: the HTML view, an HTML template and a PDF laid out without a template format a `Markdown` value and show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list there. The terminal's pretty view is the exception: it renders both through Markdown.
@@ -115,7 +121,7 @@ Write these site notes up as an inspection report in Markdown, with a heading fo
 """
 ```
 
-Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.text`.
+Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.require_text()`.
 
 **Refinement.** A `Markdown` value is accepted wherever a `Text` is: a pipe whose input is `Text` takes a `Markdown` report, and its prompt receives the source. The reverse does not hold: a `Text` value, or a concept that refines `Text`, is not accepted where a `Markdown` is required, since nothing says it was written as Markdown. To name a specific kind of report, declare a concept with `refines = "Markdown"`.
 
@@ -126,7 +132,7 @@ Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.tex
 - In a prompt, and in the plain and Markdown views, it is its source as it is. `pipelex run --save-main-stuff` writes that source verbatim as `main_stuff.md`.
 - Its HTML view converts the Markdown to HTML rather than escaping it, so `main_stuff.html` and the HTML tab of `main_stuff_viewer.html` show the formatted report. Raw HTML inside the source is shown as text rather than passed through, and only URLs with a scheme, such as `https://example.com`, become links, so a file name like `README.md` stays text.
 - The pretty view in the terminal renders it as Markdown.
-- Its JSON form is `{"text": "..."}`, the same as a `Text`.
+- Its JSON form is `{"text": "..."}`, the same as a `Text`, or its stored form, `{"url": "...", "size": ..., "mime_type": "text/markdown", "preview": "..."}`.
 
 **Inside an HTML template**, such as a `PipeCompose` template with `category = "html"`, `{{ report }}` prints a `Markdown` value as its converted HTML with no filter, while a `Text` value keeps being escaped. A `Markdown` field of a structure converts the same way, as in `{{ digest.summary }}`. `{{ report.text }}` is the Markdown source, escaped like any string. The `$report` sigil and `{{ report | format }}` print the converted HTML too, unless the template names another format, as in `{{ report | format("plain") }}`, which prints the Markdown source, escaped. The `@report` sigil wraps the source in tags for a prompt and is not meant for HTML templates.
 
@@ -371,8 +377,14 @@ A concept that represents a JSON object. This enables pipes to receive as input 
 
 ```python
 class JSONContent(StuffContent):
-    json_obj: dict[str, Any]
+    json_obj: dict[str, Any] | None = None
+    url: str | None = None
+    size: int | None = None
+    mime_type: str | None = None
+    preview: str | None = None
 ```
+
+Like a text, a JSON object is held inline in `json_obj`, or stored at `url` as its serialized form, with `mime_type` `application/json`; read it in Python with `require_json_obj()`. See [Stored values](#stored-values).
 
 A `JSON` input takes a JSON object as it is, `{"a": 1}`, and its inputs template shows the bare object; `JSON[]` takes a list of objects. `JSON` is a JSON object, not any JSON value, so a string or a number there is refused. The explicit form carries the content form: `{"concept": "JSON", "content": {"json_obj": {"a": 1}}}`.
 
@@ -384,16 +396,35 @@ Represents HTML content with styling:
 
 ```python
 class HtmlContent(StuffContent):
-    inner_html: str
+    inner_html: str | None = None
     css_class: str | None = None
+    url: str | None = None
+    size: int | None = None
+    mime_type: str | None = None
+    preview: str | None = None
 ```
 
 **Fields:**
 
-- `inner_html`: The inner HTML of the content
-- `css_class`: The CSS class applied to the wrapping element, optional — content that needs no wrapper simply omits it, and the HTML rendering then returns the raw `inner_html` with no wrapping `div`
+- `inner_html`: The inner HTML of the content, when it is held inline
+- `css_class`: The CSS class applied to the wrapping element, optional — content that needs no wrapper simply omits it, and the HTML rendering then returns the raw `inner_html` with no wrapping `div`. It stays inline in both forms.
+- `url`, `size`, `mime_type` (`text/html`) and `preview`: the stored form, as for a [text](#stored-values)
+
+Read the markup in Python with `require_inner_html()`.
 
 **Use for:** Rendered HTML fragments, styled content blocks, HTML-based reports.
+
+### Stored values
+
+A `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, exactly as an image or a document does, so that a long page, a fetched web page or a large JSON document need not be copied into every step, trace event and result that carries it. The value field is then absent, and the content carries `url`, `size`, `mime_type` and `preview` instead:
+
+```json
+{"url": "pipelex-storage://…/generated/…/text.txt", "size": 48213, "mime_type": "text/plain", "preview": "Page 1. The parties agree…"}
+```
+
+A value holds exactly one of the two forms. In this release Pipelex accepts and keeps the stored form, and can load a stored value under the same read rules as an image, so a run never reads a stored value another run owns; it does not yet store a value past the size threshold by itself, nor load a stored value where a step reads it, so a stored value given to a step that renders it is refused rather than read. Both arrive in later releases. The threshold is `inline_text_max_bytes` under `[runtime.storage]`, 4096 bytes by default, and nothing reads it yet (see [Cloud Storage](../../features/cloud-storage.md#large-texts)).
+
+In Python, `require_text()`, `require_inner_html()` and `require_json_obj()` return the value in either form, once a stored one has been loaded. Code that can read storage loads it with `load_stored_value` (`pipelex.core.stuffs.stored_value_loader`); reading or rendering a stored value that was never loaded raises `StoredValueNotLoadedError` rather than printing nothing.
 
 ### SearchResultContent
 

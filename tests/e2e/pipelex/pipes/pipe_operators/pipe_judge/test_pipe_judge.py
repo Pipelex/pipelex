@@ -91,7 +91,7 @@ class TestPipeJudge:
         assert pipe_output is not None
         acknowledgement = pipe_output.main_stuff_as_text
         if pipe_run_mode.is_live:
-            assert acknowledgement.text.startswith("Sent to billing:")
+            assert acknowledgement.require_text().startswith("Sent to billing:")
 
     async def test_rating_question_on_a_labelled_scale(self, pipe_run_mode: PipeRunMode) -> None:
         runner = PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode)

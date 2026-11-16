@@ -117,18 +117,27 @@ class TestLoadConfigLayering:
 
         assert merged["section"]["key"] == "from_global"
 
-    def test_unit_testing_run_mode_replaces_both_layers(self, fake_dirs: tuple[Path, Path], tmp_path: Path, mocker: MockerFixture) -> None:
-        """Under unit testing, only ./tests/pipelex_unit_test.toml feeds the run_mode slot.
+    @pytest.mark.parametrize("test_run_mode", [RunMode.UNIT_TEST, RunMode.CI_TEST, RunMode.CODEX_CLOUD_TEST])
+    def test_unit_testing_run_mode_replaces_both_layers(
+        self,
+        fake_dirs: tuple[Path, Path],
+        tmp_path: Path,
+        mocker: MockerFixture,
+        test_run_mode: RunMode,
+    ) -> None:
+        """Under every test run mode, only ./tests/pipelex_unit_test.toml feeds the run_mode slot.
 
-        Global and project pipelex_unit_test.toml files must be ignored to keep
-        test runs hermetic regardless of machine-wide overrides.
+        Global and project run-mode files must be ignored to keep test runs hermetic regardless of
+        machine-wide overrides, and CI and Codex Cloud read the same test layer a developer's machine
+        does, so a test setting cannot apply locally and lapse on CI.
         """
         global_dir, project_dir = fake_dirs
-        # Override the fixture's RunMode patch — we want unit testing here.
-        mocker.patch.object(RuntimeManager, "run_mode", new=RunMode.UNIT_TEST)
+        # Override the fixture's RunMode patch — we want a test run mode here.
+        mocker.patch.object(RuntimeManager, "run_mode", new=test_run_mode)
 
-        (global_dir / "pipelex_unit_test.toml").write_text('[section]\nfrom_layer = "global"\n')
-        (project_dir / "pipelex_unit_test.toml").write_text('[section]\nfrom_layer = "project"\n')
+        for config_dir in (global_dir, project_dir):
+            (config_dir / "pipelex_unit_test.toml").write_text(f'[section]\nfrom_layer = "{config_dir.parent.name}"\n')
+            (config_dir / f"pipelex_{test_run_mode}.toml").write_text(f'[section]\nfrom_layer = "{config_dir.parent.name}"\n')
 
         tests_dir = tmp_path / "project" / "tests"
         tests_dir.mkdir()

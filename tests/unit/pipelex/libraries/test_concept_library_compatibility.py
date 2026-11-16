@@ -16,9 +16,9 @@ from pydantic import Field
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptStructureClassNotFoundError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 
@@ -224,13 +224,8 @@ class TestConceptLibraryCompatibility:
             domain_code="test_structure_equiv",
             blueprint_or_string_description=ConceptBlueprint(
                 description="A concept with the exact same structure as TextContent",
-                structure={
-                    "text": ConceptStructureBlueprint(
-                        type=ConceptStructureBlueprintFieldType.TEXT,
-                        description="The text content",
-                        required=True,
-                    ),
-                },
+                # Text's pinned fields: its inline `text`, or the `url` of a stored text with its size, MIME type and preview.
+                structure=make_pinned_native_blueprint(NativeConceptCode.TEXT).structure,
             ),
         )
         text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)

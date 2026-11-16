@@ -400,7 +400,7 @@ class TestWhatTheWarningSays:
         """The mixed case is reachable, and a single remedy would be wrong for one of them.
 
         A load merges tiers from several directories at once — under unit testing it also merges
-        this repository's own `tests/pipelex_{run_mode}.toml`, which is outside the walk by design.
+        this repository's own `tests/pipelex_unit_test.toml`, which is outside the walk by design.
         So each file carries its own reach rather than the load picking one remedy for all of them.
         """
         walked = tmp_path / "walked"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast, get_args
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, TypeAlias, TypeVar, cast, get_args, runtime_checkable
 from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -629,6 +629,31 @@ class FieldVisibility(StrEnum):
     ONLY_HIDDEN_FIELDS = "only_hidden_fields"
 
 
+@runtime_checkable
+class ValueFormRenderable(Protocol):
+    """A model whose fields are not what a reader renders: it gives the dict a rendering reads in their place.
+
+    A `Text`, `Html` or `JSON` content held in storage is the one case: its fields are a reference, while a rendering
+    reads its value, so it answers the dict its inline form holds, the stored value read in place of the reference.
+    """
+
+    def rendered_value_form(self) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class ValueFieldReadable(Protocol):
+    """A model one of whose fields may hold nothing while its value lives elsewhere: a reader of that field reads `require_value`.
+
+    A `Text`, `Html` or `JSON` content held in storage keeps `None` in its value field (`text`, `inner_html`, `json_obj`)
+    and its value at `url`. A template or a binding reading that field by name reads `require_value` instead, which
+    answers the value loaded from storage, or refuses a reference never loaded rather than reading `None`.
+    """
+
+    def is_value_field(self, *, field_name: str) -> bool: ...
+
+    def require_value(self) -> object: ...
+
+
 def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
     dict_dump = serialize_model(
         obj=obj,
@@ -658,6 +683,10 @@ def serialize_model(
         # Might be a primitive type, list, dict, etc.
         # We only handle nesting if it's inside BaseModels
         return obj
+
+    # A model that renders as another dict than its fields, such as a stored text, answers that dict.
+    if isinstance(obj, ValueFormRenderable):
+        return obj.rendered_value_form()
 
     # Identify which fields should be excluded
     fields_to_exclude: set[str] = set()

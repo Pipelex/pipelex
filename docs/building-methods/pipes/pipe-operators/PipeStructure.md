@@ -192,3 +192,4 @@ For the common case where the text is freshly produced by an LLM and you want a 
 - [PipeExtract](./PipeExtract.md) — produces text from PDFs and images, a natural upstream step.
 - [Understanding Multiplicity](../understanding-multiplicity.md) — single vs list outputs.
 - [CSV Input & Output](../csv-input-and-output.md) — a CSV file or a workbook given directly as a method's list input, and CSV output.
+- [Editing a User's Workbook](../../editing-a-users-workbook.md) — reading a workbook's rows, then writing an edited copy of it with `PipeDocGen`.

@@ -278,3 +278,7 @@ class StorageProviderConfig(ConfigModel):
 class StorageConfig(StorageProviderConfig):
     is_fetch_remote_content_enabled: bool
     is_upload_local_content_enabled: bool
+    # The largest `Text`, `Markdown`, `Html` or `JSON` value kept inline, in bytes: a value past it lives in the run's
+    # storage and travels as a reference. Measured on a text's UTF-8 encoding and on a JSON value's serialized form.
+    # 0 stores every non-empty value, which the unit tests set so the reference path runs everywhere.
+    inline_text_max_bytes: int = Field(ge=0)

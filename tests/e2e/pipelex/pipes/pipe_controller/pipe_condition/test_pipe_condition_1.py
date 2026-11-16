@@ -66,4 +66,4 @@ class TestPipeConditionExpressionTemplate:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         if pipe_run_mode.is_live:
-            assert category in pipe_output.main_stuff_as_text.text
+            assert category in pipe_output.main_stuff_as_text.require_text()

@@ -21,7 +21,7 @@ Within each tier, the base `pipelex.toml` is followed by an override sequence, m
 
 - `pipelex_local.toml` — git-ignored, for machine-specific values
 - `pipelex_{environment}.toml` — e.g. `pipelex_dev.toml`, `pipelex_prod.toml`. The environment is selected by the `PIPELEX_ENV` environment variable (accepted values: `local`, `dev`, `staging`, `prod`; defaults to `dev`).
-- `pipelex_{run_mode}.toml` — e.g. `pipelex_unit_test.toml`, `pipelex_ci_test.toml`. The run mode is selected by the `RUN_MODE` environment variable (defaults to `normal`).
+- `pipelex_{run_mode}.toml` — e.g. `pipelex_normal.toml`, `pipelex_codex_cloud.toml`. The run mode is selected by the `RUN_MODE` environment variable (defaults to `normal`). Under a test run mode no run-mode file is read from a `.pipelex/` directory: the tests read `tests/pipelex_unit_test.toml` instead.
 - `pipelex_override.toml` — general-purpose overrides
 - `pipelex_temporary_override.toml` — last-resort, highest-precedence overrides within the tier
 

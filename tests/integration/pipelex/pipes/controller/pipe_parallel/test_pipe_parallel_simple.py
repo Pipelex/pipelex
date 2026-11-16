@@ -105,7 +105,7 @@ class TestPipeParallelSimple:
         assert isinstance(sentiment_result.content, TextContent)
         # Should return one of: positive, negative, neutral
         if pipe_run_mode.is_live:
-            assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}
+            assert sentiment_result.content.require_text().lower() in {"positive", "negative", "neutral"}
         assert f"{sentiment_result.concept.domain_code}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
 
         # Verify word count result
@@ -113,7 +113,7 @@ class TestPipeParallelSimple:
         assert word_count_result is not None
         assert isinstance(word_count_result.content, TextContent)
         # Should be a number (as text)
-        word_count_text = word_count_result.content.text.strip()
+        word_count_text = word_count_result.content.require_text().strip()
         if pipe_run_mode.is_live:
             assert word_count_text.isdigit() or word_count_text in {"12", "thirteen", "twelve"}  # Allow for some variation
         assert word_count_result.concept.code == "Text"
@@ -124,7 +124,7 @@ class TestPipeParallelSimple:
         assert keywords_result is not None
         assert isinstance(keywords_result.content, TextContent)
         # Should contain comma-separated keywords
-        keywords_text = keywords_result.content.text.strip()
+        keywords_text = keywords_result.content.require_text().strip()
         if pipe_run_mode.is_live:
             assert "," in keywords_text or len(keywords_text.split()) >= 2  # Should have multiple keywords
         assert keywords_result.concept.code == "Text"
@@ -210,10 +210,10 @@ class TestPipeParallelSimple:
         assert isinstance(keywords_result.content, TextContent)
 
         # For "Hello world" - word count should be around 2
-        word_count_text = word_count_result.content.text.strip()
+        word_count_text = word_count_result.content.require_text().strip()
         if pipe_run_mode.is_live:
             assert word_count_text in {"2", "two"} or word_count_text.isdigit()
 
         # Sentiment should be one of the valid values
         if pipe_run_mode.is_live:
-            assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}
+            assert sentiment_result.content.require_text().lower() in {"positive", "negative", "neutral"}

@@ -724,21 +724,9 @@ rationale = "Single-operand transformation: derives the name mapping over the wh
 param = "name"
 rationale = "Single-operand conversion of the name."
 
-["pipelex/codegen/emitters/python_common.py::_docstring_delimiter"]
-param = "text"
-rationale = "Single-operand derivation: picks the delimiter that fits the text."
-
 ["pipelex/codegen/emitters/python_common.py::_split_top_level"]
 param = "inner"
 rationale = "Verb-object: splits the bracket inner text; single operand."
-
-["pipelex/codegen/emitters/python_common.py::class_docstring"]
-param = "description"
-rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
-
-["pipelex/codegen/emitters/python_common.py::escape_py_string"]
-param = "value"
-rationale = "Single-operand conversion of the value."
 
 ["pipelex/codegen/emitters/python_common.py::explode_bracket"]
 param = "text"
@@ -751,10 +739,6 @@ rationale = "Noun-named derivation: the source line for the field; annotation st
 ["pipelex/codegen/emitters/python_common.py::format_default_value"]
 param = "value"
 rationale = "Single-operand formatting of the value."
-
-["pipelex/codegen/emitters/python_common.py::normalized_docstring_text"]
-param = "text"
-rationale = "Single-operand normalization of the text into its docstring-canonical form."
 
 ["pipelex/codegen/emitters/python_common.py::order_by_base"]
 param = "concepts"
@@ -2416,6 +2400,10 @@ rationale = "Noun-named derivation: the pinned structure for the native code; si
 param = "native_code"
 rationale = "Factory from source: builds the blueprint for the native code; single operand."
 
+["pipelex/core/concepts/native/pinned_blueprints.py::make_pinned_native_value_blueprint"]
+param = "native_code"
+rationale = "Reads as build-the-value-blueprint-of a native code, the same verb-object call as make_pinned_native_blueprint beside it."
+
 ["pipelex/core/concepts/resolved_fields.py::_resolve_concept"]
 param = "concept_ref"
 rationale = "Verb-object: resolves the concept_ref; local_domain is context."
@@ -2444,14 +2432,6 @@ rationale = "Verb-object: resolves the structure blueprint's fields; local_domai
 param = "syntax_error"
 rationale = "Factory from source: builds from the syntax error; single operand."
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._escape_string_for_python"]
-param = "value"
-rationale = "Transforms the value; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_class_docstring"]
-param = "docstring"
-rationale = "Transforms the docstring; single operand."
-
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_default_value"]
 param = "value"
 rationale = "Transforms the value; context stays keyword."
@@ -2463,6 +2443,10 @@ rationale = "Transforms the description; single operand."
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_line"]
 param = "resolved_field"
 rationale = "Noun-named derivation: the source line for the resolved field; single operand."
+
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._is_string_statement"]
+param = "statement"
+rationale = "Predicate on the statement; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_for_concept"]
 param = "resolved_type"
@@ -2903,6 +2887,10 @@ rationale = "parse_iso_time(text) reads as the verb-object sentence it is: one s
 ["pipelex/core/stuffs/list_content.py::ListContent.get_items"]
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
+
+["pipelex/core/stuffs/stored_value_loader.py::load_stored_value"]
+param = "content"
+rationale = "Loads the stored value of the one content it is given."
 
 ["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_with_images"]
 param = "value"
@@ -6204,6 +6192,26 @@ rationale = "Renders the content; single operand."
 param = "url"
 rationale = "Renders the url; single operand."
 
+["pipelex/tools/misc/python_literals.py::_docstring_delimiter"]
+param = "text"
+rationale = "Single-operand derivation: picks the delimiter that fits the text."
+
+["pipelex/tools/misc/python_literals.py::_double_quoted_inner"]
+param = "value"
+rationale = "Single-operand conversion of the value."
+
+["pipelex/tools/misc/python_literals.py::class_docstring"]
+param = "description"
+rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
+
+["pipelex/tools/misc/python_literals.py::escape_py_string"]
+param = "value"
+rationale = "Single-operand conversion of the value."
+
+["pipelex/tools/misc/python_literals.py::normalized_docstring_text"]
+param = "text"
+rationale = "Single-operand normalization of the text into its docstring-canonical form."
+
 ["pipelex/tools/misc/semver.py::parse_constraint"]
 param = "constraint_str"
 rationale = "Parses/reads the constraint_str; single operand."
@@ -6751,6 +6759,10 @@ rationale = "Verb-object: resolves the uri; base_dir is context."
 ["pipelex/tools/uri/uri_resolver.py::resolve_uri"]
 param = "uri"
 rationale = "Parses/reads the uri; single operand."
+
+["pipelex/tools/uri/uri_text.py::load_text_from_any_uri"]
+param = "uri"
+rationale = "Loads the text one URI names."
 
 ["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.get_or_create"]
 param = "tracing_config"

@@ -442,7 +442,7 @@ from pipelex.core.stuffs.text_content import TextContent
 async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
     input_data = working_memory.get_stuff("input_name")
     # Process data
-    return TextContent(text=f"Processed: {input_data.content.text}")
+    return TextContent(text=f"Processed: {input_data.content.require_text()}")
 ```
 
 The step then reads `function_name = "funcs.processing.my_custom_function"`. See [PipeFunc](../../building-methods/pipes/pipe-operators/PipeFunc.md) for the rules, and `pipelex fix function-names` to migrate a method still naming its functions by flat names.
