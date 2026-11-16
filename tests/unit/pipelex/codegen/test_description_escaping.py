@@ -28,7 +28,7 @@ class TestDescriptionEscaping:
     @pytest.mark.parametrize(
         "description",
         [
-            pytest.param(DescriptionEscapingCases.MALICIOUS_DESCRIPTION, id="verbatim-docstring"),
+            pytest.param(DescriptionEscapingCases.TRIPLE_QUOTE_DESCRIPTION, id="verbatim-docstring"),
             pytest.param(DescriptionEscapingCases.ESCAPED_DOCSTRING_DESCRIPTION, id="escaped-docstring"),
         ],
     )
@@ -48,14 +48,16 @@ class TestDescriptionEscaping:
         # indentation — the shape that survives `ruff format` and the pydocstyle rules, and therefore the
         # only shape that keeps the stamp valid. `inspect.getdoc` takes that indentation straight back
         # off, which is what `normalized_docstring_text` describes and what consumers actually read.
-        assert getdoc(module.Payload) == normalized_docstring_text(description)
-        assert not hasattr(module.Payload, "injected")
+        assert getdoc(module.Described) == normalized_docstring_text(description)
+        # A statement the description spelled would sit in the class body, which pydantic refuses or reads as a field: the
+        # class loads, and its one field is the declared one.
+        assert set(module.Described.model_fields) == {"value"}
         # The field description is a plain single-line literal, so it stays byte-identical — exact bytes
         # survive wherever they are consumed programmatically rather than read as documentation.
-        assert module.Payload.model_fields["value"].description == description
+        assert module.Described.model_fields["value"].description == description
 
     def test_typescript_descriptions_cannot_escape_jsdoc(self):
-        description = DescriptionEscapingCases.MALICIOUS_DESCRIPTION
+        description = DescriptionEscapingCases.TRIPLE_QUOTE_DESCRIPTION
         library = resolve_concepts_from_crate(self._make_crate(description=description))
 
         content = emit_ts_zod(library)[0].content
@@ -75,7 +77,7 @@ class TestDescriptionEscaping:
         return LibraryCrate(
             mthds_version="1.0.0-test",
             concepts={
-                "security.Payload": ConceptBlueprint(
+                "escaping.Described": ConceptBlueprint(
                     description=description,
                     structure={
                         "value": ConceptStructureBlueprint(
