@@ -9,11 +9,11 @@ import inspect
 import random
 import types
 import typing
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
+from pydantic.dataclasses import dataclass
 
 from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
