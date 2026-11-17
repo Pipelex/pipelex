@@ -1,6 +1,6 @@
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, ValidationInfo, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
@@ -43,6 +43,23 @@ def template_required_roots(*, template_source: str, template_category: Template
     return roots
 
 
+class DocGenSheetRangeBlueprint(BaseModel):
+    """A range of rows on a worksheet that holds no Excel Table, and the list that fills it: `PipeDocGen`'s `sheet_range`.
+
+    `list` names the list of records that fills the range, by its path in the step's data, its input's name first, as
+    `match_row` names a field; that list fills the range and no Table. `sheet` names the worksheet, compared ignoring
+    case, the workbook's only worksheet when it is absent, and `header_row` the sheet row holding the header, counted
+    from 1, the sheet's first row holding a value when it is absent. A worksheet holding one Excel Table is filled as
+    that Table.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    list: str
+    sheet: str | None = None
+    header_row: Annotated[int, Field(ge=1, strict=True)] | None = None
+
+
 class PipeDocGenBlueprint(PipeBlueprint):
     """Generate a document file from a method's structured result: a PDF, an Excel workbook, a Word document or a PowerPoint deck.
 
@@ -59,7 +76,9 @@ class PipeDocGenBlueprint(PipeBlueprint):
     `append`, for `xlsx` only, writes them after its last row, and `update`, for `xlsx` only, writes each record into the
     one row it matches, by the key fields `match_on` names or by the row position the field `match_row` names, exactly
     one of the two. Under `update` a null leaves its cell as it was, and `cells` says which cells may be written:
-    `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a value matches. The output must
+    `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a value matches. `sheet_range`,
+    under `append` or `update`, fills a range on a sheet that holds no Excel Table from the list it names, rather than a
+    Table from the list of its name. The output must
     be a single `Document`, or a concept refining it. `model` names the document engine that prints it, a model of the
     `doc_gen` family such as `reportlab-pdf` or, with the Pipelex document generation plugin, `pipelex-pdf`; without it,
     the model deck's default for the format and source prints it. Which engines a runtime has depends on its plugins:
@@ -79,6 +98,7 @@ class PipeDocGenBlueprint(PipeBlueprint):
     match_on: list[str] | None = None
     match_row: str | None = None
     cells: CellPolicy | None = Field(default=None, strict=False)
+    sheet_range: DocGenSheetRangeBlueprint | None = None
     filename: str | None = None
 
     @model_validator(mode="after")
@@ -128,6 +148,7 @@ class PipeDocGenBlueprint(PipeBlueprint):
             raise ValueError(msg)
         self._validate_table_fill()
         self._validate_table_match()
+        self._validate_sheet_range()
         return self
 
     def _validate_template_input(self) -> None:
@@ -211,6 +232,36 @@ class PipeDocGenBlueprint(PipeBlueprint):
             if repeated:
                 msg = f"PipeDocGen's 'match_on' names each key field once, and it repeats {', '.join(repr(name) for name in repeated)}."
                 raise ValueError(msg)
+
+    def _validate_sheet_range(self) -> None:
+        """A sheet range is an `xlsx` template's, filled by `append` or `update`, from a list it names.
+
+        Whether the list is one of the step's data is checked once the library resolves its concept
+        (`PipeDocGen.validate_inputs_with_library`).
+        """
+        sheet_range = self.sheet_range
+        if sheet_range is None:
+            return
+        if self.template_file is None and self.template_input is None:
+            msg = (
+                "PipeDocGen's 'sheet_range' fills a range on a sheet of a template workbook, and this step has none: name it with "
+                "'template_file' or 'template_input', or remove 'sheet_range'."
+            )
+            raise ValueError(msg)
+        if not self.format.has_table_fills:
+            msg = f"PipeDocGen's 'sheet_range' is for the 'xlsx' format only: a '{self.format}' template has no sheets."
+            raise ValueError(msg)
+        if self.table_fill is None or self.table_fill.is_replace:
+            fill_label = f"'table_fill = \"{self.table_fill}\"'" if self.table_fill is not None else "the default 'table_fill = \"replace\"'"
+            msg = (
+                f"PipeDocGen's 'sheet_range' is filled by 'table_fill = \"append\"' or 'table_fill = \"update\"', and this step uses "
+                f"{fill_label}: a replace shrinks the rows to the list's length, and on a range found by rules rather than declared "
+                "by an Excel Table that could clear the user's rows. Append to or update the range, or fill an Excel Table instead."
+            )
+            raise ValueError(msg)
+        if not sheet_range.list:
+            msg = "PipeDocGen's 'sheet_range' names the list of records that fills the range in 'list', and it names none."
+            raise ValueError(msg)
 
     @property
     @override

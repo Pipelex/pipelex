@@ -21,6 +21,7 @@ from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.plain_data import plain_data
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
 from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
@@ -41,7 +42,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateFileUncheckedError
-from pipelex.pipe_operators.doc_gen.table_match_check import record_lists, table_match_fields_refusal
+from pipelex.pipe_operators.doc_gen.table_match_check import RecordLists, record_lists, table_match_fields_refusal
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -90,6 +91,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     filled, and an engine that does not declare the fill is refused when the method loads. Under `update`, `match_on` or
     `match_row` says how a record finds its row and `cells` which of its cells may be written, resolved here so the
     engine never picks a default; the load checks that some list of records the step's data holds carries those fields.
+    `sheet_range`, under `append` or `update`, names a range on a sheet holding no Table and the list that fills it: the
+    load checks that the list is one of records of the step's data, carrying the update's matching fields, and that the
+    engine declares the `sheet_range` capability.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
@@ -117,6 +121,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     match_row: str | None = Field(default=None, description="Under `update`, the field of the records holding the row's position")
     cells: CellPolicy | None = Field(
         default=None, strict=False, description="Under `update`, which cells of a matched row may be written; None under any other fill"
+    )
+    sheet_range: SheetRangeFill | None = Field(
+        default=None, description="Under `append` or `update`, the range on a sheet holding no Table and the list that fills it"
     )
     filename: str | None = None
 
@@ -196,6 +203,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             source=self.source,
             pipe_code=self.code,
             table_fill=self.table_fill,
+            fills_sheet_range=self.sheet_range is not None,
         )
 
     @override
@@ -239,8 +247,11 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         # The template input's file is filled as the step's template, so its concept must be a document.
         if self.template_input is not None:
             self._validate_template_input_concept(template_input=self.template_input)
+        # A sheet range's list is a list of records of the step's data, which an update matches to rows by its fields.
+        if self.sheet_range is not None:
+            self._validate_sheet_range_list(sheet_range=self.sheet_range)
         # An update matches each record to its row by fields some list of records of the step's data must carry.
-        if self.table_fill.is_update:
+        elif self.table_fill.is_update:
             self._validate_table_match_fields()
         # A step built from a crate by digest alone holds no text of its HTML template file, so no check of it ran: the
         # validation refuses rather than reach a verdict the template could contradict. A load that skips validation,
@@ -308,8 +319,39 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             field_name, finding = refusal
             self._refuse_table_match(field_name=field_name, finding=finding)
 
+    def _validate_sheet_range_list(self, *, sheet_range: SheetRangeFill) -> None:
+        """Refuse a sheet range whose `list` names no list of records of the step's data, or, under an update, one lacking its matching fields.
+
+        A value whose shape is undeclared, such as a JSON input, may hold the list unseen, so a path under one passes.
+
+        Raises:
+            PipeValidationError: The list is not one of records of the step's data, or, under an update, its records
+                lack a field the update matches rows by, or hold one of a kind that cannot match.
+        """
+        found = record_lists(input_shapes=self.input_shapes())
+        named_list = next((record_list for record_list in found.lists if record_list.path == sheet_range.list), None)
+        if named_list is None:
+            if any(sheet_range.list == path or sheet_range.list.startswith(f"{path}.") for path in found.undeclared_paths):
+                return
+            available = ", ".join(f"'{record_list.path}'" for record_list in found.lists) or "none"
+            self._refuse_table_match(
+                field_name="sheet_range",
+                finding=(
+                    f"'sheet_range' fills its range from the list '{sheet_range.list}', which is no list of records of the step's "
+                    f"data (its lists of records: {available})"
+                ),
+            )
+        if not self.table_fill.is_update:
+            return
+        refusal = table_match_fields_refusal(
+            found=RecordLists(lists=[named_list], undeclared_paths=[]), match_on=self.match_on, match_row=self.match_row
+        )
+        if refusal is not None:
+            field_name, finding = refusal
+            self._refuse_table_match(field_name=field_name, finding=finding)
+
     def _refuse_table_match(self, *, field_name: str, finding: str) -> NoReturn:
-        """Refuse the step's `match_on` or `match_row`, located at the field's key path."""
+        """Refuse the step's `match_on`, `match_row` or `sheet_range`, located at the field's key path."""
         msg = f"PipeDocGen '{self.code}': {finding}."
         raise PipeValidationError(
             message=msg,
@@ -462,6 +504,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     match_on=self.match_on,
                     match_row=self.match_row,
                     cells=self.cells,
+                    sheet_range=self.sheet_range,
                 )
 
     def _inline_template_url_base(self) -> RelativeUrlBase | None:
@@ -621,6 +664,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 "match_on": self.match_on,
                 "match_row": self.match_row,
                 "cells": self.cells,
+                "sheet_range": self.sheet_range.model_dump() if self.sheet_range is not None else None,
                 "resolved_model": doc_gen_setting.model,
                 "filename": document.filename,
                 "url": document.url,

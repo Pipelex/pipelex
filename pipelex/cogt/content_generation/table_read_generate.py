@@ -29,10 +29,12 @@ _TABLE_FORMATS_READ = "an Excel workbook (.xlsx) or a CSV file (.csv)"
 async def read_table_of_document(*, table_read_assignment: TableReadAssignment) -> TableRecords:
     """Read the table a `PipeStructure` step names from its spreadsheet input, as records keyed by field.
 
+    The step's selector, `TableReadAssignment.table_selector`, chooses the Table, named range or sheet range of a workbook.
+
     Raises:
         UriReadRefusedError: The run's read scope does not allow reading the document.
         TableFileTypeUnsupportedError: The document is neither an Excel workbook nor a CSV file.
-        CsvError: The table cannot be chosen or read, or its header does not match the fields, naming the input.
+        CsvError: The table cannot be chosen or read, its range is unclear, or its header does not match the fields, naming the input.
         MissingDependencyError: The document is a workbook and openpyxl, the `tabular` extra, is not installed.
         RemoteFileFetchError: The document could not be fetched.
     """
@@ -67,7 +69,7 @@ async def read_table_of_document(*, table_read_assignment: TableReadAssignment) 
             table_format=table_format,
             field_names=table_read_assignment.field_names,
             row_field=table_read_assignment.row_field,
-            table_name=table_read_assignment.table_name,
+            table_selector=table_read_assignment.table_selector,
             binding=TableBinding.STEP,
             limits=table_reading_limits(),
             input_name=input_name,

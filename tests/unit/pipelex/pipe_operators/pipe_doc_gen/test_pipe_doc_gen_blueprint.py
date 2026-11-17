@@ -232,3 +232,53 @@ class TestPipeDocGenBlueprint:
         kwargs.update(overrides)
         with pytest.raises(ValidationError, match=re.escape(expected_message)):
             _blueprint(inputs=_WORKBOOK_INPUTS, **kwargs)
+
+
+class TestPipeDocGenSheetRangeBlueprint:
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {"table_fill": "append", "sheet_range": {"list": "rows"}},
+            {"table_fill": "update", "match_on": ["id"], "sheet_range": {"list": "rows", "sheet": "Expenses", "header_row": 3}},
+            {"table_fill": "update", "match_row": "row", "sheet_range": {"list": "rows"}},
+        ],
+        ids=["append", "update-by-key", "update-by-row"],
+    )
+    def test_accepted_sheet_ranges(self, overrides: dict[str, Any]) -> None:
+        blueprint = _blueprint(inputs=_WORKBOOK_INPUTS, format="xlsx", template_input="workbook", **overrides)
+
+        assert blueprint.sheet_range is not None
+        assert blueprint.sheet_range.list == "rows"
+
+    def test_a_template_file_takes_a_sheet_range(self) -> None:
+        blueprint = _blueprint(
+            inputs=_WORKBOOK_INPUTS, format="xlsx", template_file="expenses.xlsx", table_fill="append", sheet_range={"list": "rows"}
+        )
+
+        assert blueprint.sheet_range is not None
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected_message"),
+        [
+            ({"template_input": "workbook", "sheet_range": {"list": "rows"}}, "this step uses the default 'table_fill = \"replace\"'"),
+            (
+                {"template_input": "workbook", "table_fill": "replace", "sheet_range": {"list": "rows"}},
+                "this step uses 'table_fill = \"replace\"': a replace shrinks the rows to the list's length",
+            ),
+            ({"table_fill": "append", "sheet_range": {"list": "rows"}}, "fills the Tables of a template file, and this step has none"),
+            (
+                {"format": "docx", "template_input": "workbook", "table_fill": "append", "sheet_range": {"list": "rows"}},
+                "is for the 'xlsx' format only",
+            ),
+            ({"template_input": "workbook", "table_fill": "append", "sheet_range": {}}, "list"),
+            ({"template_input": "workbook", "table_fill": "append", "sheet_range": {"list": ""}}, "fills the range in 'list', and it names none"),
+            ({"template_input": "workbook", "table_fill": "append", "sheet_range": {"list": "rows", "header_row": 0}}, "greater than or equal to 1"),
+            ({"template_input": "workbook", "table_fill": "append", "sheet_range": {"list": "rows", "table": "T"}}, "Extra inputs are not permitted"),
+        ],
+        ids=["default-replace", "replace", "no-template", "docx", "no-list", "empty-list", "row-zero", "unknown-field"],
+    )
+    def test_refused_sheet_ranges(self, overrides: dict[str, Any], expected_message: str) -> None:
+        kwargs: dict[str, Any] = {"format": "xlsx"}
+        kwargs.update(overrides)
+        with pytest.raises(ValidationError, match=re.escape(expected_message)):
+            _blueprint(inputs=_WORKBOOK_INPUTS, **kwargs)

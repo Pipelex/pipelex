@@ -31,6 +31,7 @@ from pipelex.tools.tabular.table_records import (
     build_table_records,
     list_content_from_table_records,
 )
+from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.tools.tabular.xlsx_codec import is_xlsx_archive, read_xlsx_raw_table, xlsx_subject
 
 # The type a sniffer gives a zip archive whose contents it does not recognise, and the format key it has.
@@ -97,7 +98,7 @@ def read_table_records(
     table_format: TableFormat,
     field_names: list[str],
     row_field: str | None,
-    table_name: str | None,
+    table_selector: TableSelector,
     binding: TableBinding,
     limits: TableReadingConfig,
     input_name: str | None,
@@ -109,13 +110,15 @@ def read_table_records(
         table_format: The file's format.
         field_names: The fields of the row concept, which must be flat.
         row_field: The field that receives each row's position, which no column may match; None for none.
-        table_name: The Excel Table to read; None for a workbook's only Table, and always None for a CSV file.
+        table_selector: The Table, named range or sheet range to read in a workbook; neither for a workbook's only Table,
+            and always neither for a CSV file.
         binding: Whose rules the table is read under.
         limits: How large a workbook, and a Table, may be read.
         input_name: The input the file was given as, which messages name it by.
 
     Raises:
-        TableSelectionError: A Table is named for a CSV file, or the workbook's Table cannot be chosen.
+        TableSelectionError: A Table or a sheet range is named for a CSV file, or the workbook's region cannot be chosen.
+        TableRangeUnclearError: The workbook's sheet range or named range is not one whose extent is certain.
         CsvError: The file cannot be read, or its header does not match the fields.
         MissingDependencyError: The file is a workbook and openpyxl is not installed.
         TableTooLargeError: The workbook, its Table, or the CSV file is larger than `limits` allow.
@@ -124,12 +127,18 @@ def read_table_records(
     raw_table: RawTable
     match table_format:
         case TableFormat.CSV:
-            if table_name is not None:
-                msg = f"The step reads the Table '{table_name}', and {subject} has no Tables: give an Excel workbook (.xlsx) holding that Table."
+            if table_selector.table is not None:
+                msg = (
+                    f"The step reads the Table '{table_selector.table}', and {subject} has no Tables: give an Excel workbook (.xlsx) "
+                    "holding that Table."
+                )
+                raise TableSelectionError(msg)
+            if table_selector.sheet_range is not None:
+                msg = f"The step reads a range on a sheet (`sheet_range`), and {subject} has no sheets: give an Excel workbook (.xlsx)."
                 raise TableSelectionError(msg)
             raw_table = read_csv_raw_table(raw_bytes=raw_bytes, binding=binding, limits=limits, subject=subject)
         case TableFormat.XLSX:
-            raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=table_name, limits=limits, subject=subject)
+            raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=table_selector, limits=limits, subject=subject)
     return build_table_records(
         raw_table=raw_table,
         table_format=table_format,
@@ -169,7 +178,7 @@ def list_content_from_table_file(
         table_format=TableFormat.XLSX,
         field_names=field_names,
         row_field=None,
-        table_name=None,
+        table_selector=TableSelector(),
         binding=TableBinding.RUN_INPUT,
         limits=table_reading_limits(),
         input_name=input_name,

@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PipeStructure` reads a range on a sheet and a named range**: `sheet_range = { sheet = "...", header_row = 3 }` reads the rows of a worksheet that holds no Excel Table, found by the MTHDS standard's rules for a sheet range, which refuse a sheet they cannot settle as `input.invalid` with the new `TableRangeUnclearError`, naming the sheet and the cell; a worksheet holding one Table reads as that Table, and the range's totals line is not a row. `table` names a named range when the workbook holds no Table of that name, and the refusal of a workbook holding no Table now suggests `sheet_range`.
+- **`PipeDocGen` fills a range on a sheet**: under `table_fill = "append"` or `"update"`, `sheet_range = { list = "...", sheet = "...", header_row = 3 }` fills the range found by the same rules from the list it names, which the method's load checks is a list of records of the step's data carrying the update's matching fields; it is refused under `replace`, without an `xlsx` office template, and with an engine that does not declare the `sheet_range` capability, `model.capability_unsupported`. `RenderJob`, `TemplateCheckRequest` and `DocumentComposition` carry it as a `SheetRangeFill`, and a range the engine's checker finds unclear refuses the run as `pipelex.docgen.template_input_unfit`.
+- **The shared range finder for document engines**: `pipelex.cogt.doc_gen.sheet_range` finds a sheet range, a worksheet's Table and a named range as a `SheetRegion` (`resolve_sheet_range`, `find_sheet_range`, `resolve_named_range`, `table_region`), so the rows the reader numbers are the rows an engine writes.
+
+### Changed
+
+- **`read_table` takes the step's selector (Breaking)**: `ContentGeneratorProtocol.read_table` and `TableReadAssignment` take `table_selector`, a `TableSelector` naming the Table or named range (`table`) or the sheet range (`sheet_range`), in place of `table_name`. Plugin API is now 14: a plugin targeting 13 is refused when it is discovered.
+
 ## [v0.107.0] - 2026-11-16
 
 ### Changed

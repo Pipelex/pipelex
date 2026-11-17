@@ -25,7 +25,7 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.tabular.exceptions import CsvCoercionError, TableFileTypeUnsupportedError
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.helpers.xlsx_workbooks import single_table_workbook
+from tests.helpers.xlsx_workbooks import sheet_workbook, single_table_workbook
 
 DOMAIN = "budget_read"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -68,10 +68,13 @@ def _structure_pipe(
     inputs: dict[str, str] | None = None,
     output: str = "BudgetLine[]",
     table: str | None = None,
+    sheet_range: dict[str, Any] | None = None,
     row_field: str | None = "line",
     model: str | None = None,
 ) -> PipeStructure:
     blueprint_fields: dict[str, Any] = {"model": model} if model is not None else {}
+    if sheet_range is not None:
+        blueprint_fields["sheet_range"] = sheet_range
     blueprint = PipeStructureBlueprint(
         description="Read the budget lines",
         inputs=inputs or {"budget": "Workbook"},
@@ -144,6 +147,7 @@ class TestPipeStructureSpreadsheet:
             pytest.param({"row_field": "missing"}, "output", "row_field", None, id="row-field-not-a-field"),
             pytest.param({"row_field": "label"}, "output", "row_field", None, id="row-field-not-a-number"),
             pytest.param({"inputs": {"text": "Text"}, "table": "Budget"}, "inputs", "table", None, id="table-on-text-path"),
+            pytest.param({"inputs": {"text": "Text"}, "sheet_range": {}}, "inputs", "sheet_range", None, id="sheet-range-on-text-path"),
             pytest.param({"inputs": {"text": "Text"}}, "inputs", "row_field", None, id="row-field-on-text-path"),
             pytest.param({"inputs": {"picture": "Image"}}, "inputs", None, PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH, id="image-input"),
             # A concept holding a Document in a field is no Document: only lineage makes the input a spreadsheet.
@@ -169,6 +173,20 @@ class TestPipeStructureSpreadsheet:
             assert exc_info.value.given_params.get("field_path") == f"pipe.read_budget.{expected_field}"
         if expected_error_type is not None:
             assert exc_info.value.error_type == expected_error_type
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_range_on_a_sheet_is_read_into_the_output_list(self, job_metadata: JobMetadata) -> None:
+        cells = {"A1": "Budget 2026", "A3": "Item", "B3": "Amount", "A4": "Paper", "B4": 12.5, "A5": "Ink", "B5": 3, "B6": "=SUM(B4:B5)"}
+        workbook = sheet_workbook(cells=cells, sheet_title="Budget")
+        document = DocumentContent(url=_data_url(data=workbook, mime_type=XLSX_MIME), mime_type=XLSX_MIME, filename="budget.xlsx")
+
+        pipe = _structure_pipe(sheet_range={"sheet": "budget", "header_row": 3})
+        items = await _run(pipe=pipe, document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE)
+
+        assert [item.model_dump(include={"item", "amount", "line"}) for item in items] == [
+            {"item": "Paper", "amount": 12.5, "line": 1},
+            {"item": "Ink", "amount": 3, "line": 2},
+        ]
 
     @pytest.mark.parametrize("pipe_run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY])
     @pytest.mark.asyncio(loop_scope="class")

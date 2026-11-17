@@ -6,6 +6,7 @@ from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
 from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.method_trees.building_bundle import get_building_tree_bundle
@@ -134,6 +135,15 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             match_row=blueprint.match_row,
             # Resolved here, so an engine never picks the default: an update writes only empty cells unless told otherwise.
             cells=(blueprint.cells or CellPolicy.FILL_EMPTY) if table_fill.is_update else None,
+            sheet_range=(
+                SheetRangeFill(
+                    list=blueprint.sheet_range.list,
+                    sheet=blueprint.sheet_range.sheet,
+                    header_row=blueprint.sheet_range.header_row,
+                )
+                if blueprint.sheet_range is not None
+                else None
+            ),
             filename=blueprint.filename,
         )
         if template_file_text is not None:

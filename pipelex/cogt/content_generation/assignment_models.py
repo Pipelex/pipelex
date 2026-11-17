@@ -21,6 +21,7 @@ from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.core.stuffs.stored_value_content import generation_schema
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.uri.uri_read_scope import UriReference
 
@@ -198,8 +199,9 @@ class TableReadAssignment(BaseModel):
 
     ``mime_type`` and ``file_name`` are what the document declares, which judge its format when its bytes do not;
     ``input_name`` is the step's input, which a refusal names. ``field_names`` are the row concept's flat fields, which
-    the columns are matched to, ``row_field`` the one that receives each row's position, and ``table_name`` the Excel
-    Table to read, ``None`` for the workbook's only one.
+    the columns are matched to, ``row_field`` the one that receives each row's position, and ``table_selector`` the
+    step's choice of the rows of a workbook: an Excel Table or a named range by its name, a range on a sheet, or neither,
+    for the workbook's only Table.
     """
 
     job_metadata: JobMetadata
@@ -210,7 +212,7 @@ class TableReadAssignment(BaseModel):
     input_name: str | None = None
     field_names: list[str]
     row_field: str | None = None
-    table_name: str | None = None
+    table_selector: TableSelector = Field(default_factory=TableSelector)
 
     def referenced_uris(self) -> list[UriReference]:
         """The URL the leaf reads for this assignment: the spreadsheet it reads the table from."""

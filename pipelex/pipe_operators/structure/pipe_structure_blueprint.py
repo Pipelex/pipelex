@@ -1,5 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal, Self
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
@@ -9,17 +10,45 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
+class SheetRangeBlueprint(BaseModel):
+    """A range of rows on a worksheet that holds no Excel Table: `PipeStructure`'s `sheet_range`.
+
+    `sheet` names the worksheet, compared ignoring case; without it the workbook must hold exactly one worksheet.
+    `header_row` is the sheet row holding the header, counted from 1 as the spreadsheet numbers its rows; without it the
+    header is the sheet's first row holding a value. `sheet_range = {}` reads the only worksheet and finds its header. A
+    worksheet holding one Excel Table reads as that Table. The rules the runtime finds the range by, and refuses an
+    unclear one by, are those of the standard's "Finding a Sheet Range".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sheet: str | None = None
+    header_row: Annotated[int, Field(ge=1, strict=True)] | None = None
+
+
 class PipeStructureBlueprint(PipeBlueprint):
     type: Literal["PipeStructure"] = "PipeStructure"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
 
     model: LLMModelChoice | None = None
-    # The spreadsheet path, when the single input is a `Document` or refines it: the Excel Table to read, `None` for the
-    # workbook's only one, and the output field that receives each row's position among the table's data rows. Both
-    # are refused on the Text path; the blueprint cannot tell the two paths apart from the input's concept string, so
-    # `PipeStructure.validate_inputs_with_library` checks them once the concepts resolve.
+    # The spreadsheet path, when the single input is a `Document` or refines it: the Excel Table or named range to read,
+    # or the range on a sheet, at most one of the two, neither for the workbook's only Table; and the output field that
+    # receives each row's position among the table's data rows. All three are refused on the Text path; the blueprint
+    # cannot tell the two paths apart from the input's concept string, so `PipeStructure.validate_inputs_with_library`
+    # checks them once the concepts resolve.
     table: str | None = None
+    sheet_range: SheetRangeBlueprint | None = None
     row_field: str | None = None
+
+    @model_validator(mode="after")
+    def validate_one_region(self) -> Self:
+        if self.table is not None and self.sheet_range is not None:
+            msg = (
+                "PipeStructure's 'table' names an Excel Table or a named range, and 'sheet_range' a range on a sheet: "
+                "a step reads one of them, so use 'table' or 'sheet_range', not both."
+            )
+            raise ValueError(msg)
+        return self
 
     @override
     def validate_inputs(self):

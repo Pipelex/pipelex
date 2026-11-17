@@ -214,7 +214,15 @@ class TestPluginDiscovery:
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
             _build_registrar_with(mocker=mocker, plugins=[v12_plugin])
         assert "written_against_v12" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 13
+        assert PLUGIN_API_VERSION > 12
+
+    def test_a_plugin_written_before_the_table_selector_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v13 content generators read a table by `table_name`, where `read_table` now takes `table_selector`."""
+        v13_plugin = _InferencePlugin(name="written_against_v13", sdk="v13_sdk", targets_api=13)
+        with pytest.raises(PluginApiVersionMismatchError) as exc_info:
+            _build_registrar_with(mocker=mocker, plugins=[v13_plugin])
+        assert "written_against_v13" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 14
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:

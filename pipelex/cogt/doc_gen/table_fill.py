@@ -12,9 +12,18 @@ cells it may write: `match_on`, the fields whose columns are the Table's key, or
 row's position among the Table's data rows, and `cells`, the `CellPolicy`. The render job and the template check
 request carry the three beside `table_fill`, set under `update` and absent under any other fill, a rule
 `table_match_refusal` states once for every model that carries them.
+
+An `append` or an `update` may fill a range on a sheet that holds no Table instead, the step's `sheet_range`
+(`SheetRangeFill`), whose region the shared range finder decides (`pipelex.cogt.doc_gen.sheet_range`). Filling one is a
+capability of its own, `sheet_range`, which an engine's model declares beside the fill's, and the render job and the
+template check request carry the range under those two fills only, a rule `sheet_range_refusal` states once.
 """
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
 
 #: The token a `doc_gen` model lists among its `inputs` to declare that it appends records after a Table's last row.
 TABLE_APPEND_CAPABILITY = "table_append"
@@ -22,6 +31,10 @@ TABLE_APPEND_CAPABILITY = "table_append"
 #: The token a `doc_gen` model lists among its `inputs` to declare that it updates the rows a Table holds, by key or by
 #: row position, honouring the update's rules (`RenderJob`).
 TABLE_UPDATE_CAPABILITY = "table_update"
+
+#: The token a `doc_gen` model lists among its `inputs` to declare that it appends to and updates a range on a sheet
+#: holding no Table, found by the shared range finder, as well as a Table: a step's `sheet_range`.
+SHEET_RANGE_CAPABILITY = "sheet_range"
 
 
 class TableFill(StrEnum):
@@ -109,3 +122,14 @@ def table_match_refusal(*, table_fill: TableFill, match_on: list[str] | None, ma
     if cells is None:
         return "an update carries its cell policy, cells"
     return None
+
+
+def sheet_range_refusal(*, table_fill: TableFill, sheet_range: "SheetRangeFill | None") -> str | None:
+    """Why a job's or a request's sheet range does not fit its fill, as a clause of a message, or None when it fits.
+
+    A sheet range is filled by `append` or `update`; `replace`, which shrinks the rows to the list's length, would clear
+    the user's rows past a boundary the rules found rather than one a Table declares, so it fills Tables only.
+    """
+    if sheet_range is None or not table_fill.is_replace:
+        return None
+    return f"its fill '{table_fill}' fills Tables only, so it carries no sheet_range"

@@ -57,6 +57,7 @@ from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, Docu
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError, TemplateUrlRefusedError
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_relative_url, template_asset_refusal
 from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderJob, RenderResources, is_method_file_url
+from pipelex.cogt.doc_gen.sheet_range import SHEET_RANGE_REFUSALS, SheetRangeFill
 from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding, TemplateFindingSeverity
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
@@ -65,6 +66,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.runtime_hub import get_report_delegate, get_template_file_stage
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.tabular.exceptions import TableRangeUnclearError
 from pipelex.tools.uri.uri_bytes import load_bytes_and_mime_type_from_any_uri
 
 if TYPE_CHECKING:
@@ -325,6 +327,7 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment, s
         match_on=composition.match_on,
         match_row=composition.match_row,
         cells=composition.cells,
+        sheet_range=composition.sheet_range,
     )
 
 
@@ -339,12 +342,15 @@ async def check_office_template(
     match_on: list[str] | None,
     match_row: str | None,
     cells: CellPolicy | None,
+    sheet_range: SheetRangeFill | None,
 ) -> None:
     """Hand an office template's bytes to its engine's template checker, and have the template file stage report the findings.
 
     The checker is the engine's code, so anything it raises beyond a Pipelex error is a check that failed on this
     template, reported as the template's refusal: a run input's file is the caller's to replace, and a method's file the
-    method's to fix.
+    method's to fix. A refusal of the shared range finder (`SHEET_RANGE_REFUSALS`), which a checker may let propagate,
+    is reported as an error finding with the finder's message, naming the sheet and the cell, so a run input's unclear
+    range refuses the run as `pipelex.docgen.template_input_unfit`.
 
     Args:
         worker: The step's engine's worker, which the print builds once for the check and the fill.
@@ -356,6 +362,7 @@ async def check_office_template(
         match_on: Under `update`, the fields of the records whose columns are the Table's key.
         match_row: Under `update`, the field of the records holding the row's position.
         cells: Under `update`, which cells of a matched row may be written.
+        sheet_range: Under `append` or `update`, the range on a sheet one list fills.
 
     Raises:
         PipeDocGenTemplateCheckError: the checker reported errors in the method's template file (raised by the stage).
@@ -372,9 +379,14 @@ async def check_office_template(
         match_on=match_on,
         match_row=match_row,
         cells=cells,
+        sheet_range=sheet_range,
     )
     try:
         findings = await asyncio.to_thread(worker.check_template, request=request)
+    except SHEET_RANGE_REFUSALS as exc:
+        # The range finder's refusal is a finding about the file: the sheet and the cell that make its range unclear.
+        location = f"the sheet '{exc.sheet}'" if isinstance(exc, TableRangeUnclearError) and exc.sheet is not None else None
+        findings = [TemplateFinding(severity=TemplateFindingSeverity.ERROR, message=exc.message, location=location)]
     except PipelexError:
         # Already classified, such as a refusal the checker raised on purpose.
         raise
@@ -474,6 +486,7 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
                 match_on=composition.match_on,
                 match_row=composition.match_row,
                 cells=composition.cells,
+                sheet_range=composition.sheet_range,
             )
         render_job = _render_job_of(composition=composition, read_template=read_template)
         resources = RunRenderResources(

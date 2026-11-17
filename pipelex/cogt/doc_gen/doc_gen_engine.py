@@ -9,7 +9,9 @@ the step runs, where the resolved handle rides into the print stage as its routi
 
 A step that fills a template file's Tables other than by replacing their rows, such as one appending to them, asks
 for a capability its engine declares among its `inputs` too (`TableFill.engine_capability`): an engine that does not
-declare it would ignore the fill and replace the rows, so such a step is refused when it resolves.
+declare it would ignore the fill and replace the rows, so such a step is refused when it resolves. A step filling a
+range on a sheet that holds no Table (`sheet_range`) asks for the `sheet_range` capability too: an engine that predates
+it would ignore the range and refuse the list as reaching no Table, once the run has started and blaming the method.
 
 A missing engine is refused naming its remedy. Core knows the name of the built-in engine, `reportlab-pdf`, and the
 names of the engines the Pipelex document generation plugin declares when it loads, so a step that asks for one
@@ -22,7 +24,7 @@ from functools import partial
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.doc_gen.exceptions import KNOWN_DOC_GEN_MODEL_NAMES, DocGenEngineGap, DocGenEngineMissingError, DocGenModelCapabilityError
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import SHEET_RANGE_CAPABILITY, TableFill
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import resolve_deck_choice
@@ -43,6 +45,11 @@ def fills_tables(*, inference_model: InferenceModelSpec, table_fill: TableFill) 
     """
     engine_capability = table_fill.engine_capability
     return engine_capability is None or engine_capability in inference_model.inputs
+
+
+def fills_sheet_ranges(*, inference_model: InferenceModelSpec) -> bool:
+    """Whether a `doc_gen` model fills a range on a sheet holding no Table, by the `sheet_range` capability among its `inputs`."""
+    return SHEET_RANGE_CAPABILITY in inference_model.inputs
 
 
 def require_doc_gen_engine_installed(
@@ -147,10 +154,12 @@ def resolve_doc_gen_setting(
     source: DocGenSource,
     pipe_code: str | None,
     table_fill: TableFill,
+    fills_sheet_range: bool,
 ) -> DocGenSetting:
     """The engine that prints a step, pinned to the model handle it resolves to, checked to print the step here.
 
-    `table_fill` is how the step fills its template file's Tables, `replace` for a step with no template file.
+    `table_fill` is how the step fills its template file's Tables, `replace` for a step with no template file, and
+    `fills_sheet_range` whether it fills a range on a sheet holding no Table, its `sheet_range`.
 
     Raises:
         DocGenEngineMissingError: the deck names no default for the step and the step names no engine, the engine is
@@ -161,7 +170,7 @@ def resolve_doc_gen_setting(
             the deck does not define.
         ModelNotFoundError: the reference resolves to no model served here.
         DocGenModelCapabilityError: the engine does not print the step's format from its source, or does not declare the
-            step's fill of its Tables.
+            step's fill of its Tables, or the step fills a sheet range and the engine does not declare `sheet_range`.
     """
     model_deck = get_model_deck()
     doc_gen_setting: DocGenSetting
@@ -188,6 +197,10 @@ def resolve_doc_gen_setting(
     if not fills_tables(inference_model=inference_model, table_fill=table_fill):
         raise DocGenModelCapabilityError(
             doc_gen_format=doc_gen_format, source=source, model=inference_model.name, pipe_code=pipe_code, table_fill=table_fill
+        )
+    if fills_sheet_range and not fills_sheet_ranges(inference_model=inference_model):
+        raise DocGenModelCapabilityError(
+            doc_gen_format=doc_gen_format, source=source, model=inference_model.name, pipe_code=pipe_code, fills_sheet_range=True
         )
     require_doc_gen_engine_installed(inference_model=inference_model, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code)
     # Pinned as a reference that parses back to the resolved handle, whatever its spelling, since every lookup reads it again.

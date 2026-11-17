@@ -109,12 +109,33 @@ class CsvCoercionError(CsvError):
 class TableSelectionError(CsvError):
     """Raised when the table a step reads cannot be chosen in the file it was given.
 
-    A workbook holding no Table of the name the step gives, or, when the step names none, a workbook holding several
-    Tables or none, and a CSV file given to a step that names a Table, which a CSV file has none of. The refusal names
-    the Tables the workbook holds, so the caller can fix the file or the author the step.
+    A workbook holding no Table or named range of the name the step gives, or, when the step names none, a workbook
+    holding several Tables or none; a workbook holding no worksheet of the name a sheet range gives, or, when it names
+    none, several worksheets, and a worksheet holding several Tables; a name defined more than once; and a CSV file given
+    to a step that names a Table or a sheet range, which a CSV file has none of. The refusal names what the workbook
+    holds, so the caller can fix the file or the author the step.
     """
 
     error_code = CoreCode.INPUT_INVALID
+
+
+class TableRangeUnclearError(CsvError):
+    """Raised when the rows a step names in a workbook do not form one range whose extent is certain.
+
+    A sheet range whose header row, columns or end the rules of `pipelex.cogt.doc_gen.sheet_range` cannot settle, such as
+    a value below the blank row that ends the data or a merged header cell, and a named range that refers to anything but
+    one rectangular range of cells. The input's fault, ``input.invalid``: the file is the caller's to fix, or to turn into
+    an Excel Table. The refusal names the sheet and the cell by its address, never a cell's value, which is the run's data.
+    """
+
+    error_code = CoreCode.INPUT_INVALID
+
+    def __init__(self, message: str, *, sheet: str | None, cell: str | None):
+        super().__init__(message)
+        # The worksheet the range lies on, when one is known, and the cell, by its address on that sheet, that made the
+        # range unclear, when one cell did.
+        self.sheet = sheet
+        self.cell = cell
 
 
 class TableFileTypeUnsupportedError(CsvError):

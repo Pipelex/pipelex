@@ -1,0 +1,156 @@
+"""Reading a workbook's rows from a named range or a range on a sheet, as well as from an Excel Table."""
+
+from typing import Any
+
+import pytest
+
+from pipelex.cogt.doc_gen.sheet_range import SheetRange
+from pipelex.config import TABLE_READING_FALLBACK
+from pipelex.tools.tabular.exceptions import TableRangeUnclearError, TableSelectionError, TableTooLargeError
+from pipelex.tools.tabular.table_reader import read_table_records
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
+from pipelex.tools.tabular.table_records import TableBinding, TableFormat, TableRecords
+from pipelex.tools.tabular.table_selector import TableSelector
+from pipelex.tools.tabular.xlsx_codec import read_xlsx_raw_table
+from tests.helpers.xlsx_workbooks import add_table, empty_workbook, sheet_workbook, with_defined_name, workbook_bytes
+
+SUBJECT = "the workbook given for input 'expenses'"
+
+EXPENSE_CELLS: dict[str, Any] = {
+    "A1": "March expenses",
+    "A3": "Merchant",
+    "B3": "Amount",
+    "A4": "Rail Co",
+    "B4": 84.5,
+    "A5": "Cafe Nord",
+    "B5": 12,
+    "A6": "Total",
+    "B6": "=SUM(B4:B5)",
+}
+
+
+def _read(*, raw_bytes: bytes, table_selector: TableSelector, limits: TableReadingConfig = TABLE_READING_FALLBACK) -> TableRecords:
+    return read_table_records(
+        raw_bytes=raw_bytes,
+        table_format=TableFormat.XLSX,
+        field_names=["merchant", "amount", "line"],
+        row_field="line",
+        table_selector=table_selector,
+        binding=TableBinding.STEP,
+        limits=limits,
+        input_name="expenses",
+    )
+
+
+class TestXlsxRegions:
+    def test_a_sheet_range_is_read_without_the_title_above_and_the_totals_line_below(self) -> None:
+        raw_table = read_xlsx_raw_table(
+            raw_bytes=sheet_workbook(cells=EXPENSE_CELLS),
+            table_selector=TableSelector(sheet_range=SheetRange(header_row=3)),
+            limits=TABLE_READING_FALLBACK,
+            subject=SUBJECT,
+        )
+
+        assert raw_table.header == ["Merchant", "Amount"]
+        assert [row.cells for row in raw_table.rows] == [["Rail Co", 84.5], ["Cafe Nord", 12]]
+        assert [row.label for row in raw_table.rows] == ["row 4 of the sheet 'Expenses'", "row 5 of the sheet 'Expenses'"]
+
+    @pytest.mark.parametrize("with_totals_line", [True, False], ids=["with-totals-line", "without"])
+    def test_the_row_position_counts_the_data_rows_alone(self, with_totals_line: bool) -> None:
+        cells = dict(EXPENSE_CELLS)
+        if not with_totals_line:
+            del cells["A6"], cells["B6"]
+
+        table_records = _read(
+            raw_bytes=sheet_workbook(cells=cells), table_selector=TableSelector(sheet_range=SheetRange(sheet="expenses", header_row=3))
+        )
+
+        assert [record.position for record in table_records.records] == [1, 2]
+
+    def test_an_uncached_formula_of_a_sheet_range_is_reported(self) -> None:
+        cells = {"A1": "merchant", "B1": "amount", "A2": "Rail Co", "B2": "=40+44.5"}
+
+        raw_table = read_xlsx_raw_table(
+            raw_bytes=sheet_workbook(cells=cells),
+            table_selector=TableSelector(sheet_range=SheetRange()),
+            limits=TABLE_READING_FALLBACK,
+            subject=SUBJECT,
+        )
+
+        assert raw_table.rows[0].cells == ["Rail Co", None]
+        assert raw_table.uncached_formula_columns == frozenset({1})
+
+    def test_an_unclear_sheet_range_is_refused_naming_the_cell(self) -> None:
+        cells = {**EXPENSE_CELLS, "A9": "Approved by Ana"}
+
+        with pytest.raises(TableRangeUnclearError) as exc_info:
+            _read(raw_bytes=sheet_workbook(cells=cells), table_selector=TableSelector(sheet_range=SheetRange(header_row=3)))
+
+        assert exc_info.value.cell == "Expenses!A9"
+        assert SUBJECT in exc_info.value.message
+        assert "Approved" not in exc_info.value.message
+
+    def test_a_sheet_range_past_the_cell_cap_is_refused(self) -> None:
+        limits = TableReadingConfig(max_workbook_uncompressed_bytes=10_000_000, max_table_cells=5)
+
+        with pytest.raises(TableTooLargeError, match=r"The range on the sheet 'Expenses' of .* spans 6 cells, more than the 5"):
+            _read(raw_bytes=sheet_workbook(cells=EXPENSE_CELLS), table_selector=TableSelector(sheet_range=SheetRange(header_row=3)), limits=limits)
+
+    def test_a_sheet_range_on_a_sheet_holding_one_table_reads_the_table(self) -> None:
+        workbook = empty_workbook()
+        add_table(workbook=workbook, sheet_title="Sheet1", table_name="Lines", header=["Merchant", "Amount"], rows=[["Rail Co", 84.5]], top_row=2)
+
+        table_records = _read(raw_bytes=workbook_bytes(workbook), table_selector=TableSelector(sheet_range=SheetRange()))
+
+        assert table_records.records[0].label == "row 3 of Table 'Lines'"
+        assert table_records.records[0].plain_values() == {"merchant": "Rail Co", "amount": 84.5}
+        assert table_records.records[0].position == 1
+
+    def test_a_table_is_read_before_a_named_range_and_a_named_range_when_no_table_has_the_name(self) -> None:
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=EXPENSE_CELLS), name="Lines", definition="Expenses!$A$3:$B$6")
+
+        table_records = _read(raw_bytes=xlsx_bytes, table_selector=TableSelector(table="lines"))
+
+        # The name declares its extent: the finder's totals line is a data row of a named range.
+        assert [record.label for record in table_records.records] == [f"row {row} of the named range 'Lines'" for row in (4, 5, 6)]
+        assert [record.position for record in table_records.records] == [1, 2, 3]
+
+    def test_a_named_range_s_empty_header_cell_names_no_column(self) -> None:
+        cells = {"A1": "merchant", "C1": "amount", "A2": "Rail Co", "B2": "ignored", "C2": 84.5}
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=cells), name="Lines", definition="Expenses!$A$1:$C$2")
+
+        raw_table = read_xlsx_raw_table(
+            raw_bytes=xlsx_bytes, table_selector=TableSelector(table="Lines"), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
+
+        assert raw_table.header == ["merchant", "amount"]
+        assert raw_table.rows[0].cells == ["Rail Co", 84.5]
+
+    def test_the_default_counts_tables_only(self) -> None:
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=EXPENSE_CELLS), name="Lines", definition="Expenses!$A$3:$B$5")
+
+        with pytest.raises(TableSelectionError, match=r"holds no Excel Table: .* or read them from a range on a sheet with `sheet_range`"):
+            _read(raw_bytes=xlsx_bytes, table_selector=TableSelector())
+
+    def test_a_name_that_is_not_a_named_range_is_refused(self) -> None:
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=EXPENSE_CELLS), name="Rate", definition="Expenses!$B$4")
+
+        with pytest.raises(TableRangeUnclearError, match="refers to the one cell Expenses!B4"):
+            _read(raw_bytes=xlsx_bytes, table_selector=TableSelector(table="Rate"))
+
+    def test_a_csv_file_is_refused_with_a_sheet_range(self) -> None:
+        with pytest.raises(TableSelectionError, match="reads a range on a sheet"):
+            read_table_records(
+                raw_bytes=b"merchant,amount\nRail Co,84.5\n",
+                table_format=TableFormat.CSV,
+                field_names=["merchant", "amount"],
+                row_field=None,
+                table_selector=TableSelector(sheet_range=SheetRange()),
+                binding=TableBinding.STEP,
+                limits=TABLE_READING_FALLBACK,
+                input_name="expenses",
+            )
+
+    def test_a_selector_names_a_table_or_a_sheet_range_not_both(self) -> None:
+        with pytest.raises(ValueError, match="not both"):
+            TableSelector(table="Lines", sheet_range=SheetRange())

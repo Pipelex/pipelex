@@ -7,7 +7,8 @@ which is before any model is called: this check runs then, beside the check of t
 reached through no condition and no liftable step, whose template input is a run input, it reads the file under the
 run's read scope, refuses one that is not of the step's format, and hands it to the step's engine's template checker
 with the shapes of the step's other inputs. An error finding refuses the run as the caller's
-(`PipeDocGenTemplateInputUnfitError`), and a warning is logged with the run. A template an earlier step produces is
+(`PipeDocGenTemplateInputUnfitError`), and so does a refusal of the shared range finder the checker lets propagate, such
+as an unclear sheet range, reported with the finder's message; a warning is logged with the run. A template an earlier step produces is
 checked at that step's print instead, since nothing exists to check before then.
 """
 
@@ -103,6 +104,7 @@ async def _check_template_input(
         match_on=pipe_doc_gen.match_on,
         match_row=pipe_doc_gen.match_row,
         cells=pipe_doc_gen.cells,
+        sheet_range=pipe_doc_gen.sheet_range,
     )
 
 

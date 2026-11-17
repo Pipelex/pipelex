@@ -5,6 +5,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.dry_mock import build_mock_object
+from pipelex.cogt.doc_gen.sheet_range import SheetRange
 from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
@@ -38,6 +39,7 @@ from pipelex.tools.tabular.csv_codec import flat_field_names
 from pipelex.tools.tabular.exceptions import CsvError, CsvFlatnessError
 from pipelex.tools.tabular.table_reader import locate_table_error, table_subject
 from pipelex.tools.tabular.table_records import TableBinding, admits_integer, list_content_from_table_records
+from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # The structure class each row of a spreadsheet is bound to, named outside the class, whose `type` field shadows the builtin.
@@ -60,8 +62,9 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
     - **The spreadsheet path**, when the input is `Document` or refines it: the runtime reads one table of the file, an
       Excel workbook or a CSV file, into the output list, one item per data row, calling no model. The read is a leaf of
       the content generator (`ContentGeneratorProtocol.read_table`), since it reads storage, and its records are bound
-      to the output concept here (`pipelex.tools.tabular.table_records`). `table_name` names the Excel Table, and
-      `row_field` the output field that receives each row's position. The output must be a variable list of a flat
+      to the output concept here (`pipelex.tools.tabular.table_records`). `table_name` names the Excel Table or the named
+      range, `sheet_range` a range on a sheet, at most one of the two, and `row_field` the output field that receives
+      each row's position. The output must be a variable list of a flat
       concept, and `model` is refused. A dry run reads nothing and mocks the records.
     """
 
@@ -69,6 +72,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
     llm_choice: LLMModelChoice | None = None
     source_input_name: str
     table_name: str | None = None
+    sheet_range: SheetRange | None = None
     row_field: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
 
@@ -104,7 +108,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 )
             return
         if get_concept_library().is_compatible(tested_concept=the_single_input.concept, wanted_concept=text_concept, strict=False):
-            for field_name, field_value in (("table", self.table_name), ("row_field", self.row_field)):
+            for field_name, field_value in (("table", self.table_name), ("sheet_range", self.sheet_range), ("row_field", self.row_field)):
                 if field_value is not None:
                     self._refuse_field(
                         field_name=field_name,
@@ -155,6 +159,16 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             pipe_code=self.code,
             field_name=field_name,
         ).with_params(field_path=f"pipe.{self.code}.{field_name}", finding=finding)
+
+    @property
+    def table_selector(self) -> TableSelector:
+        """The step's choice of the rows of a workbook it reads, as the content generator's leaf carries it."""
+        return TableSelector(table=self.table_name, sheet_range=self.sheet_range)
+
+    @property
+    def _sheet_range_data(self) -> dict[str, Any] | None:
+        """The sheet range as the node's execution data records it."""
+        return self.sheet_range.model_dump() if self.sheet_range is not None else None
 
     def row_model(self) -> RowModel:
         """The structure class of the output concept, which each row of a spreadsheet is bound to."""
@@ -293,7 +307,12 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         )
         self._register_execution_data(
             job_metadata=job_metadata,
-            execution_data={"is_multiple_output": True, "structuring_path": SPREADSHEET_STRUCTURING_PATH, "table": self.table_name},
+            execution_data={
+                "is_multiple_output": True,
+                "structuring_path": SPREADSHEET_STRUCTURING_PATH,
+                "table": self.table_name,
+                "sheet_range": self._sheet_range_data,
+            },
         )
         return PipeStructureOutput(
             working_memory=working_memory,
@@ -362,7 +381,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 input_name=self.source_input_name,
                 field_names=field_names,
                 row_field=self.row_field,
-                table_name=self.table_name,
+                table_selector=self.table_selector,
             )
             if table_records.uncached_formula_fields:
                 log.warning(
@@ -394,6 +413,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 "is_multiple_output": True,
                 "structuring_path": SPREADSHEET_STRUCTURING_PATH,
                 "table": self.table_name,
+                "sheet_range": self._sheet_range_data,
                 "table_format": table_records.table_format,
                 "nb_records": len(list_content.items),
                 "uncached_formula_fields": table_records.uncached_formula_fields,
