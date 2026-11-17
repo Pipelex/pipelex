@@ -18,6 +18,7 @@ from jinja2.exceptions import TemplateSyntaxError
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_parsing import parse_jinja2_template
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
@@ -42,7 +43,7 @@ def detect_private_name_references(
     """
     jinja2_env = make_jinja2_env_without_loader(template_category=template_category)
     try:
-        parsed_ast = jinja2_env.parse(template_source)
+        parsed_ast = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except TemplateSyntaxError as syntax_error:
         msg = (
             f"Jinja2 private-name lint — syntax error: '{syntax_error}', template_category: {template_category}, template_source:\n{template_source}"

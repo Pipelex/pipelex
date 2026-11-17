@@ -271,6 +271,16 @@ class TestBundleResourcesRoutes:
         assert problem["diagnostics"]["error_class"] == "BundleResourceNotNamedError"
         assert "'templates/logo.png'" in problem["diagnostics"]["message"]
 
+    def test_a_python_file_beside_inline_contents_is_refused_by_validate_off_a_sandbox(self, mocker: MockerFixture) -> None:
+        """`/v1/validate` holds the inline path to the custom-code policy too: a 501 before the bundle is read."""
+        mocker.patch("pipelex_api.method_tree_request.is_pipe_func_sandbox_hosted", return_value=False)
+        body = {"mthds_contents": [_INVOICE_MTHDS], "resources": {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES), "funcs/step.py": _b64(b"x = 1\n")}}
+
+        response = _build_client().post("/v1/validate", json=body)
+
+        problem = assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
+        assert problem["params"] == {"origin": "bundle"}
+
     @pytest.mark.parametrize(
         ("path", "code", "params"),
         [

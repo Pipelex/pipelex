@@ -761,10 +761,10 @@ def with_resources(*, request_method: RequestMethod, resources: Mapping[str, byt
     return merged
 
 
-def _python_sources(*, tree: RequestTree) -> dict[str, str]:
-    """A tree's Python sources by tree path, skipping a file that is not UTF-8, which no interpreter could import."""
+def _python_sources(*, contents: Mapping[str, bytes]) -> dict[str, str]:
+    """The Python sources among `contents` by path, skipping a file that is not UTF-8, which no interpreter could import."""
     sources: dict[str, str] = {}
-    for tree_path, data in tree.contents.items():
+    for tree_path, data in contents.items():
         if not tree_path.endswith(PYTHON_SUFFIX):
             continue
         try:
@@ -788,7 +788,26 @@ def ensure_python_allowed(*, request_method: RequestMethod, label: str, origin: 
     if not is_pipe_func_sandbox_hosted():
         msg = f"{label} ships custom Python (.py); running it requires a sandbox-hosted deployment."
         raise CustomCodeRequiresSandboxError(msg, origin=origin)
-    ensure_no_structured_content_in_library_sources(sources_by_dir={Path(): _python_sources(tree=request_method.tree)})
+    ensure_no_structured_content_in_library_sources(sources_by_dir={Path(): _python_sources(contents=request_method.tree.contents)})
+
+
+def ensure_submitted_python_allowed(*, submitted_files: Mapping[str, bytes] | None, label: str) -> None:
+    """The custom-code gate of the inline path, `mthds_contents` with the files `resources` sends.
+
+    It is to the inline path what `ensure_python_allowed` is to a method tree.
+
+    A submitted `.py` file is refused on a deployment that is not sandbox-hosted (501
+    `pipelex.deployment.custom_code_requires_sandbox`, origin `bundle`), and one declaring a Python structure class is
+    refused on a sandbox-hosted one (422 `pipelex.deployment.python_structures_refused`), exactly as when the same
+    files arrive in `files` or `bundle_b64`. The inline path never puts a submitted file on `sys.path`, but the policy
+    is the request's to answer, whatever shape the request takes, and not a consequence of how the runtime reads it.
+    """
+    if not submitted_files or not any(path.endswith(PYTHON_SUFFIX) for path in submitted_files):
+        return
+    if not is_pipe_func_sandbox_hosted():
+        msg = f"{label} ships custom Python (.py); running it requires a sandbox-hosted deployment."
+        raise CustomCodeRequiresSandboxError(msg, origin=CustomCodeOrigin.BUNDLE)
+    ensure_no_structured_content_in_library_sources(sources_by_dir={Path(): _python_sources(contents=submitted_files)})
 
 
 async def record_request_method(*, request_method: RequestMethod, blob_store: RunnerBlobStore) -> None:

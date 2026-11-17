@@ -9,6 +9,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import (
     ConceptRepresentationFormat,
     ConceptRepresentationGenerator,
+    PythonClassCall,
     generate_json_representation,
     generate_python_representation,
 )
@@ -209,7 +210,7 @@ class TestGenerateFieldValueComplexTypes:
         """List[StuffContent] generates list with instantiation (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_field_value(list[NestedChild], field_name="children")
-        expected = ['NestedChild(value="value_value")']
+        expected = [PythonClassCall(class_name="NestedChild", fields={"value": "value_value"})]
         assert result == expected
 
     def test_dict_field(self) -> None:
@@ -230,7 +231,7 @@ class TestGenerateFieldValueComplexTypes:
         """Nested StuffContent generates instantiation (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_field_value(NestedChild, field_name="child")
-        expected = 'NestedChild(value="value_value")'
+        expected = PythonClassCall(class_name="NestedChild", fields={"value": "value_value"})
         assert result == expected
 
     def test_optional_field_unwrapped(self) -> None:

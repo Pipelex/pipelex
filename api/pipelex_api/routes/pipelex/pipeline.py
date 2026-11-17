@@ -45,6 +45,7 @@ from pipelex_api.method_tree_request import (
     RequestMethod,
     ensure_method_holds_a_bundle,
     ensure_python_allowed,
+    ensure_submitted_python_allowed,
     read_archive_method,
     read_request_method,
     record_request_method,
@@ -933,7 +934,8 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
     the runtime's `submitted_files`.
 
     Security gate: a method shipping custom Python (`.py`) is only honored on a sandbox-hosted deployment, refused with
-    a 501 before anything is written (`ensure_python_allowed`).
+    a 501 before anything is written, on every request shape: `ensure_python_allowed` for a method tree,
+    `ensure_submitted_python_allowed` for the files the inline path's `resources` sends.
     """
     method_provenance: MethodProvenance | None = None
     method_label = REQUEST_METHOD_LABEL
@@ -947,6 +949,8 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
     else:
         request_method = await _request_method_of(run_request=run_request, body=body, blob_store=RunnerBlobStore.make_for_scope(scope=blob_scope))
     if request_method is None:
+        submitted_files = decode_bundle_resources(resources=run_request.resources)
+        ensure_submitted_python_allowed(submitted_files=submitted_files, label="This method")
         yield _ResolvedRunSource(
             mthds_contents=run_request.mthds_contents,
             library_dirs=None,
@@ -954,7 +958,7 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
             methods_dirs=None,
             pipe_code=run_request.pipe_code,
             method_provenance=None,
-            submitted_files=decode_bundle_resources(resources=run_request.resources),
+            submitted_files=submitted_files,
         )
         return
     pipe_code = run_request.pipe_code or select_tree_entry(tree=request_method.tree, method_label=method_label).pipe_ref

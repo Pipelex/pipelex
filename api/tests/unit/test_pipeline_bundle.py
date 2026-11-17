@@ -288,6 +288,49 @@ class TestPipelineBundle:
         assert fields["error.code"] == "pipelex.deployment.custom_code_requires_sandbox"
         assert ERROR_FRAMES_FIELD not in fields
 
+    @pytest.mark.parametrize("shape", ["files", "bundle_b64", "mthds_contents"])
+    @pytest.mark.parametrize("path", ["/v1/execute", "/v1/start"])
+    def test_python_is_forbidden_when_not_hosted_on_every_request_shape(self, mocker: MockerFixture, shape: str, path: str):
+        """A `.py` file is refused with the same 501 whether it arrives in a tree, an archive, or beside inline contents."""
+        mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=False)
+        client, snapshot = _build_client(mocker)
+        files = {"main.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY}
+        body: dict[str, Any]
+        match shape:
+            case "files":
+                body = {"files": files}
+            case "bundle_b64":
+                body = {"bundle_b64": _zip_b64(files)}
+            case _:
+                body = {
+                    "pipe_code": "echo",
+                    "mthds_contents": [VALID_MTHDS],
+                    "resources": {"funcs/pipe_func.py": base64.b64encode(_PIPE_FUNC_PY.encode()).decode("ascii")},
+                }
+
+        response = client.post(path, json={**body, "inputs": {"text": "hi"}})
+
+        problem = assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
+        assert problem["params"] == {"origin": "bundle"}
+        assert snapshot == {}, "the runner was reached"
+
+    def test_inline_python_declaring_a_structure_class_is_refused_when_hosted(self, mocker: MockerFixture):
+        """On a sandbox-hosted deployment the inline path holds a submitted `.py` to the tree's rule: no structure class."""
+        mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)
+        client, snapshot = _build_client(mocker)
+        structure_py = "from pipelex.core.stuffs.structured_content import StructuredContent\n\nclass Thing(StructuredContent):\n    name: str\n"
+        body = {
+            "pipe_code": "echo",
+            "mthds_contents": [VALID_MTHDS],
+            "resources": {"models/thing.py": base64.b64encode(structure_py.encode()).decode("ascii")},
+            "inputs": {"text": "hi"},
+        }
+
+        response = client.post("/v1/execute", json=body)
+
+        assert_problem(response, status=422, code="pipelex.deployment.python_structures_refused")
+        assert snapshot == {}, "the runner was reached"
+
     def test_python_bundle_is_written_with_its_tree_when_hosted(self, mocker: MockerFixture):
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)
         client, snapshot = _build_client(mocker)

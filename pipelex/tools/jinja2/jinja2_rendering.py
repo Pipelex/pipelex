@@ -20,6 +20,8 @@ from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import (
+    TEMPLATE_NESTING_ERRORS,
+    TEMPLATE_NESTING_FAULT,
     Jinja2ContextError,
     Jinja2StuffError,
     Jinja2TemplateBudgetError,
@@ -27,12 +29,14 @@ from pipelex.tools.jinja2.exceptions import (
     Jinja2TemplateRenderError,
     Jinja2TemplateSecurityError,
     SandboxRefusalError,
+    TemplateNestingError,
 )
 from pipelex.tools.jinja2.jinja2_environment import (
     make_jinja2_env_from_registry,
     make_jinja2_env_without_loader,
 )
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.jinja2_parsing import parse_jinja2_template
 from pipelex.tools.jinja2.jinja2_render_budget import RenderBudgetExceededError
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
@@ -101,11 +105,18 @@ def _compile_jinja2_template(
         )
 
     try:
-        return jinja2_env.from_string(template_source)
+        # Parsed through the bounded parse, so that a template nested too deeply is refused before Jinja2 compiles it.
+        return jinja2_env.from_string(parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source))
+    except TemplateNestingError as exc:
+        raise Jinja2TemplateInvalidError.make_for_owner(fault=TEMPLATE_NESTING_FAULT, template_owner=template_owner) from exc
     except TemplateSyntaxError as exc:
         # A filter or test the environment does not define, outside any branch, is a `TemplateAssertionError`
         # that compiling finds; a method's template is only parsed at load, so this is where it surfaces.
         raise _make_invalid_template_error(template_error=exc, template_source=template_source, template_owner=template_owner) from exc
+    except TEMPLATE_NESTING_ERRORS as exc:
+        # Nested past what Python's compiler can follow, such as more `{% for %}` blocks inside one another than it
+        # nests statically: the template cannot render as written.
+        raise Jinja2TemplateInvalidError.make_for_owner(fault=TEMPLATE_NESTING_FAULT, template_owner=template_owner) from exc
 
 
 def _prepare_templating_context(
@@ -238,7 +249,7 @@ def template_spelled_names(*, template_source: str) -> SpelledNames:
     """
     jinja2_env = make_jinja2_env_without_loader(template_category=TemplateCategory.BASIC, enable_async=False)
     try:
-        parsed_template = jinja2_env.parse(template_source)
+        parsed_template = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except TemplateSyntaxError:
         return SpelledNames(references=frozenset(), filters_and_tests=frozenset())
     references: set[str] = set()

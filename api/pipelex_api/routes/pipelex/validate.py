@@ -21,7 +21,7 @@ from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.exception_handlers import problem_response
 from pipelex_api.exceptions import RequestFieldConflictError
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method_async
+from pipelex_api.method_tree_request import RequestMethod, ensure_submitted_python_allowed, select_tree_entry, written_method_async
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
 from pipelex_api.problem_view import problem_view_of
@@ -399,11 +399,15 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     # a backend, configuration or runtime fault is answered as its problem, like a raised one.
     validated_method: RequestMethod | None = None
     if request_data.mthds_contents is not None:
+        submitted_files = decode_bundle_resources(resources=request_data.resources)
+        # The custom-Python policy holds on the inline path as on a method tree (`select_request_method`): a 501 off a
+        # sandbox-hosted deployment, before anything of the method is read.
+        ensure_submitted_python_allowed(submitted_files=submitted_files, label="This method")
         verdict = await ApiRunner(
             user_id=user_id,
             extras=request_data.analytics_groups,
             read_scope=read_scope,
-            submitted_files=decode_bundle_resources(resources=request_data.resources),
+            submitted_files=submitted_files,
         ).validate_verdict(
             mthds_contents=request_data.mthds_contents,
             mthds_sources=request_data.mthds_sources,
