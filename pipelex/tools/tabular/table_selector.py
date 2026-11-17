@@ -31,8 +31,3 @@ class TableSelector(BaseModel):
             msg = "A step reads a Table or a named range by its name, or a range on a sheet, not both."
             raise ValueError(msg)
         return self
-
-    @property
-    def is_default(self) -> bool:
-        """Whether the step names nothing, and so reads a workbook's only Table."""
-        return self.table is None and self.sheet_range is None

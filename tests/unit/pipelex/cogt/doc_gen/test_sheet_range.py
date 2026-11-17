@@ -7,6 +7,7 @@ import pytest
 from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table
 
+from pipelex.cogt.doc_gen import sheet_range as sheet_range_module
 from pipelex.cogt.doc_gen.sheet_range import (
     RegionKind,
     SheetRange,
@@ -223,7 +224,14 @@ class TestFindSheetRange:
         [
             pytest.param("=SUM(B2:B3)", id="sum"),
             pytest.param("=SUBTOTAL(109,$B$2:$B$3)", id="subtotal-absolute"),
-            pytest.param("=SUM(Expenses!B2:B3)*1", id="same-sheet-qualified"),
+            pytest.param("=SUM(Expenses!B2:B3)", id="same-sheet-qualified"),
+            pytest.param("=SUM( B2 : B3 )", id="spaced"),
+            pytest.param("=AVERAGE(B2:B3)", id="average"),
+            pytest.param("=_xlfn.AGGREGATE(9,6,B2:B3)", id="aggregate"),
+            pytest.param("=SUM($B$2:$B$3)", id="absolute"),
+            pytest.param("=SUM(Expenses!$B$2:$B$3)", id="same-sheet-qualified-absolute"),
+            pytest.param("=SUM('Expenses'!B2:B3)", id="same-sheet-quoted"),
+            pytest.param("=sum(b2:b3)", id="lower-case"),
         ],
     )
     def test_a_formula_totalling_its_column_above_is_a_totals_line(self, totals_formula: str) -> None:
@@ -242,6 +250,9 @@ class TestFindSheetRange:
             pytest.param("=SUM(B:B)", id="a-whole-column"),
             pytest.param("=SUM(B2:B2)", id="not-through-the-row-above"),
             pytest.param("=SUM(A2:A3)", id="another-column"),
+            pytest.param("=SUM(B2:B3)*1", id="more-than-the-aggregate"),
+            pytest.param("=SUM(B2:B3)+B2", id="the-aggregate-plus-a-cell"),
+            pytest.param('=SUMIF(B2:B3,">1")', id="another-function"),
         ],
     )
     def test_any_other_formula_on_the_last_row_leaves_it_a_data_row(self, last_row_formula: str) -> None:
@@ -498,6 +509,297 @@ class TestFindSheetRange:
         assert cell_address(sheet_title="March 2026", row=12, column=3) == "'March 2026'!C12"
         assert cell_address(sheet_title="O'Neil", row=1, column=1) == "'O''Neil'!A1"
         assert cell_address(sheet_title="Expenses", row=1, column=1) == "Expenses!A1"
+
+
+# A header in A1, two data rows, and a totals line in row 4 storing its sum, as Excel saves it.
+TOTALLED_CELLS: dict[str, Any] = {
+    "A1": "item",
+    "B1": "amount",
+    "A2": "Paper",
+    "B2": 2,
+    "A3": "Ink",
+    "B3": 3,
+    "A4": "Total",
+    "B4": "=SUM(B2:B3)",
+}
+TOTALLED_VALUES: dict[str, Any] = {"B4": 5}
+
+
+class TestTotalsLineAndFooter:
+    def test_a_note_right_after_a_totals_line_storing_its_sum_is_refused_as_below_it(self) -> None:
+        refusal = _refusal({**TOTALLED_CELLS, "A5": "Approved by"}, cached_values=TOTALLED_VALUES)
+
+        assert refusal.cell == "Expenses!A5"
+        assert refusal.message == (
+            "The sheet 'Expenses' of the workbook given for input 'expenses' holds a value in Expenses!A5, below the totals line on "
+            "row 4, which Expenses!B4 (`=SUM(B2:B3)`) makes a totals line of the range under the header Expenses!A1:B1. It reads "
+            "as a note, which a blank row above it does not set apart: move that cell out of the columns, clear it, or turn the "
+            "range into an Excel Table (Insert > Table)."
+        )
+
+    def test_a_note_below_a_blank_row_after_the_totals_line_is_refused_too(self) -> None:
+        refusal = _refusal({**TOTALLED_CELLS, "A6": "Approved by"}, cached_values=TOTALLED_VALUES)
+
+        assert refusal.cell == "Expenses!A6"
+        assert "below the totals line on row 4" in refusal.message
+        assert "which a blank row above it does not set apart" in refusal.message
+
+    def test_a_note_out_of_the_columns_below_the_totals_line_is_another_part_of_the_sheet(self) -> None:
+        region = _find({**TOTALLED_CELLS, "C5": "Approved by", "E9": "Signed"}, cached_values=TOTALLED_VALUES)
+
+        assert list(region.data_rows) == [2, 3]
+        assert list(region.totals_rows) == [4]
+
+    def test_a_note_right_after_an_uncached_total_is_refused_as_below_it(self) -> None:
+        refusal = _refusal({**TOTALLED_CELLS, "A4": None, "A5": "Approved by"})
+
+        assert refusal.cell == "Expenses!A5"
+        assert "below the totals line on row 4" in refusal.message
+
+    @pytest.mark.parametrize(
+        "vat_formula",
+        [
+            pytest.param("=B4*0.2", id="relative"),
+            pytest.param("=$B$4*0.2", id="absolute"),
+            pytest.param("=ROUND(Expenses!B4*0.2,2)", id="same-sheet-qualified"),
+        ],
+    )
+    def test_a_vat_line_after_the_totals_line_is_a_footer_row(self, vat_formula: str) -> None:
+        region = _find({**TOTALLED_CELLS, "A5": "VAT", "B5": vat_formula}, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert list(region.data_rows) == [2, 3]
+        assert list(region.totals_rows) == [4, 5]
+        assert (region.totals_row_count, region.last_sheet_row, region.nb_cells) == (2, 5, 6)
+
+    def test_a_vat_line_and_a_grand_total_are_footer_rows(self) -> None:
+        cells = {**TOTALLED_CELLS, "A5": "VAT", "B5": "=B4*0.2", "A6": "Grand total", "B6": "=B4+B5"}
+
+        region = _find(cells, cached_values={**TOTALLED_VALUES, "B5": 1, "B6": 6})
+
+        assert list(region.data_rows) == [2, 3]
+        assert list(region.totals_rows) == [4, 5, 6]
+
+    def test_a_footer_formula_in_another_column_of_the_range_refers_to_the_totals_line(self) -> None:
+        cells = {**TOTALLED_CELLS, "C1": "note", "C2": "a", "C3": "b", "C5": '=IF(B4>4,"over","")', "A5": "Check"}
+
+        region = _find(cells, cached_values={**TOTALLED_VALUES, "C5": "over"})
+
+        assert list(region.totals_rows) == [4, 5]
+
+    def test_a_labelled_vat_line_storing_no_value_is_a_footer_row_not_a_pre_filled_row(self) -> None:
+        region = _find({**TOTALLED_CELLS, "A5": "VAT", "B5": "=B4*0.2"}, cached_values=TOTALLED_VALUES)
+
+        assert list(region.totals_rows) == [4, 5]
+        assert region.prefilled_row_count == 0
+
+    def test_an_unlabelled_vat_line_is_a_row_of_data_below_the_totals_line(self) -> None:
+        refusal = _refusal({**TOTALLED_CELLS, "B5": "=B4*0.2"}, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert refusal.cell == "Expenses!B5"
+        assert "below the totals line on row 4" in refusal.message
+
+    def test_a_note_after_the_footer_rows_is_refused_as_below_the_totals_line(self) -> None:
+        cells = {**TOTALLED_CELLS, "A5": "VAT", "B5": "=B4*0.2", "A6": "Approved by"}
+
+        refusal = _refusal(cells, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert refusal.cell == "Expenses!A6"
+        assert "below the totals line on row 4" in refusal.message
+
+    @pytest.mark.parametrize(
+        "following_formula",
+        [
+            pytest.param("=B3*2", id="a-data-row"),
+            pytest.param("=SUM(B2:B4)", id="the-data-rows-and-the-total"),
+            pytest.param("=Other!B4*0.2", id="another-sheet"),
+            pytest.param("=D4*0.2", id="outside-the-columns"),
+        ],
+    )
+    def test_a_row_whose_formula_refers_to_no_totals_row_alone_is_refused(self, following_formula: str) -> None:
+        cells = {**TOTALLED_CELLS, "A5": "Extra", "B5": following_formula}
+
+        refusal = _refusal(cells, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert refusal.cell == "Expenses!A5"
+
+    def test_a_subtotal_inside_the_rows_ends_the_data_rows_and_the_rows_after_it_are_refused(self) -> None:
+        cells = {**TOTALLED_CELLS, "A5": "Pens", "B5": 4}
+
+        refusal = _refusal(cells, cached_values=TOTALLED_VALUES)
+
+        assert refusal.cell == "Expenses!A5"
+        assert "below the totals line on row 4, which Expenses!B4 (`=SUM(B2:B3)`) makes a totals line" in refusal.message
+        assert "The range ends at that subtotal, and the records after it cannot be read" in refusal.message
+        assert "remove the subtotal row or move it below the records" in refusal.message
+        assert "Pens" not in refusal.message
+
+    def test_records_of_formulas_only_after_a_subtotal_are_refused_not_footer_rows(self) -> None:
+        """Rows mirrored from another sheet, with a running balance referring to the subtotal on row 10."""
+        cells: dict[str, Any] = {"A1": "date", "B1": "item", "C1": "amount", "D1": "balance"}
+        cached: dict[str, Any] = {}
+        for row in [*range(2, 10), *range(11, 21)]:
+            cells |= {f"A{row}": f"=Source!A{row}", f"B{row}": f"=Source!B{row}", f"C{row}": f"=Source!C{row}"}
+            cells[f"D{row}"] = f"=D{row - 1}+C{row}" if row > 2 else f"=C{row}"
+            cached |= {f"A{row}": f"2026-01-{row:02d}", f"B{row}": f"item{row}", f"C{row}": row, f"D{row}": row}
+        cells |= {"A10": "Subtotal", "C10": "=SUM(C2:C9)", "D10": "=D9"}
+        cached |= {"C10": 44, "D10": 44}
+
+        refusal = _refusal(cells, cached_values=cached, other_sheets=("Source",))
+
+        assert refusal.cell == "Expenses!A11"
+        assert "which Expenses!C10 (`=SUM(C2:C9)`) makes a totals line" in refusal.message
+        assert "The range ends at that subtotal" in refusal.message
+
+    @pytest.mark.parametrize(
+        ("column", "formula_template"),
+        [
+            pytest.param("A", "=MAX($A$2:A{above})+1", id="numbering"),
+            pytest.param("D", "=SUM($D$2:D{above})+C{row}", id="running-sum-plus-the-row"),
+            pytest.param("D", "=SUM($D$2:D{above})", id="plain-cumulative-sum"),
+        ],
+    )
+    def test_a_column_filled_down_over_the_rows_above_reads_every_record(self, column: str, formula_template: str) -> None:
+        cells: dict[str, Any] = {"A1": "no", "B1": "item", "C1": "amount", "D1": "cumul"}
+        cached: dict[str, Any] = {}
+        for row in range(2, 8):
+            cells |= {f"A{row}": row - 1, f"B{row}": f"item{row}", f"C{row}": row * 10, f"D{row}": row}
+        for row in range(3, 8):
+            cells[f"{column}{row}"] = formula_template.format(row=row, above=row - 1)
+            cached[f"{column}{row}"] = 100 + row
+
+        region = _find(cells, cached_values=cached)
+
+        assert list(region.data_rows) == [2, 3, 4, 5, 6, 7]
+        assert region.totals_row_count == 0
+
+    def test_a_total_after_five_records_is_a_totals_line(self) -> None:
+        cells: dict[str, Any] = {"A1": "item", "B1": "qty", "C1": "price", "D1": "amount"}
+        for row in range(2, 7):
+            cells |= {f"A{row}": f"item{row}", f"B{row}": row, f"C{row}": 2, f"D{row}": f"=B{row}*C{row}"}
+        cells |= {"A7": "Total", "D7": "=SUM(D2:D6)"}
+
+        region = _find(cells, cached_values={**{f"D{row}": row * 2 for row in range(2, 7)}, "D7": 40})
+
+        assert list(region.data_rows) == [2, 3, 4, 5, 6]
+        assert list(region.totals_rows) == [7]
+
+    def test_two_stacked_totals_end_the_data_at_the_first(self) -> None:
+        """Two totals are no cumulative column: the first is the totals line, and the second, holding no label, is refused."""
+        refusal = _refusal({**TOTALLED_CELLS, "B5": "=SUM(B2:B4)"}, cached_values={**TOTALLED_VALUES, "B5": 10})
+
+        assert refusal.cell == "Expenses!B5"
+
+    @staticmethod
+    def _find_with_total(*, totals_formula: str) -> SheetRegion:
+        """The range of a header, two data rows and `totals_formula` in B4, written straight onto the worksheet."""
+        worksheet = formula_workbook(sheet_workbook(cells={"A1": "item", "B1": "amount", "A2": "Paper", "B2": 2, "A3": "Ink", "B3": 3})).worksheets[0]
+        worksheet.cell(row=4, column=2, value=totals_formula)
+        return find_sheet_range(worksheet=worksheet, value_worksheet=worksheet, header_row=None, subject=SUBJECT)
+
+    def test_a_long_run_of_spaces_in_a_formula_that_totals_nothing_costs_its_length(self) -> None:
+        """A cell holds 32,767 characters at most, which openpyxl truncates to: the formula stays under it, its end kept."""
+        started = time.perf_counter()
+        region = self._find_with_total(totals_formula="=SUM(" + " " * 32_000 + "B2:B3x)")
+
+        assert time.perf_counter() - started < 0.5
+        assert region.totals_row_count == 0
+
+    def test_the_aggregate_pattern_fails_a_long_run_of_spaces_in_linear_time(self) -> None:
+        formula = "=SUM(" + " " * 100_000 + "A1:A2x)"
+
+        started = time.perf_counter()
+        totals = sheet_range_module._aggregates_column(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+            formula=formula, sheet_title="Expenses", column=1, first_row=1, last_row=2
+        )
+
+        assert time.perf_counter() - started < 0.1
+        assert not totals
+
+    def test_spaces_around_a_total_s_range_are_read(self) -> None:
+        region = self._find_with_total(totals_formula="= SUM(" + " " * 1_000 + "B2 : B3" + " " * 1_000 + ") ")
+
+        assert list(region.totals_rows) == [4]
+
+    def test_a_wide_sparse_header_costs_the_cells_the_sheet_stores(self) -> None:
+        workbook = formula_workbook(sheet_workbook(cells={"A1": "item"}))
+        worksheet = workbook.worksheets[0]
+        for column in range(2, 16_385):
+            worksheet.cell(row=1, column=column, value=f"h{column}")
+        for row in range(2, 5_002):
+            worksheet.cell(row=row, column=1, value=row)
+
+        started = time.perf_counter()
+        region = find_sheet_range(worksheet=worksheet, value_worksheet=worksheet, header_row=None, subject=SUBJECT)
+
+        assert time.perf_counter() - started < 1
+        assert (region.last_column, region.last_row) == (16_384, 5_001)
+
+    def test_a_data_row_whose_running_balance_refers_to_a_subtotal_is_refused_not_a_footer_row(self) -> None:
+        cells: dict[str, Any] = {"A1": "item", "B1": "qty", "C1": "price", "D1": "balance"}
+        cells |= {"A2": "Pens", "B2": 2, "C2": 5, "D2": "=C2", "A3": "Ink", "B3": 1, "C3": 7, "D3": "=D2+C3"}
+        cells |= {"A4": "Subtotal", "D4": "=SUM(D2:D3)", "A5": "Paper", "B5": 3, "C5": 2, "D5": "=D4+C5"}
+
+        refusal = _refusal(cells, cached_values={"D2": 5, "D3": 12, "D4": 17, "D5": 19})
+
+        assert refusal.cell == "Expenses!A5"
+        assert "below the totals line on row 4" in refusal.message
+
+    def test_a_running_balance_going_on_for_rows_after_a_subtotal_is_refused(self) -> None:
+        cells: dict[str, Any] = {"A1": "item", "B1": "price", "C1": "balance", "A2": "Pens", "B2": 5, "C2": "=B2", "A3": "Ink", "B3": 7}
+        cells |= {"C3": "=C2+B3", "A4": "Subtotal", "C4": "=SUM(C2:C3)"}
+        cells |= {f"A{row}": f"Item {row}" for row in range(5, 25)}
+        cells |= {f"B{row}": row for row in range(5, 25)}
+        cells |= {f"C{row}": f"=C{row - 1}+B{row}" for row in range(5, 25)}
+
+        refusal = _refusal(cells)
+
+        assert refusal.cell == "Expenses!A5"
+
+    def test_a_footer_row_holding_a_typed_rate_is_a_row_of_data(self) -> None:
+        """A number typed in the row, even beside a formula over the totals line, makes it a row of data."""
+        cells = {**TOTALLED_CELLS, "A5": 0.2, "B5": "=B4*A5"}
+
+        refusal = _refusal(cells, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert refusal.cell == "Expenses!A5"
+
+    def test_a_value_beside_a_footer_row_is_a_column_with_no_header(self) -> None:
+        cells = {**TOTALLED_CELLS, "A5": "VAT", "B5": "=B4*0.2", "C5": "20%"}
+
+        refusal = _refusal(cells, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert refusal.cell == "Expenses!C5"
+        assert "in the column just right of the columns" in refusal.message
+
+    def test_a_totals_line_and_its_footer_after_the_pre_filled_rows(self) -> None:
+        cells: dict[str, Any] = {"A1": "item", "B1": "amount", "A2": "Paper", "B2": 2}
+        cells |= {f"B{row}": f'=IF(A{row}="","",1)' for row in range(3, 6)}
+        cells |= {"A6": "Total", "B6": "=SUM(B2:B5)", "A7": "VAT", "B7": "=B6*0.2"}
+
+        region = _find(cells, cached_values={"B3": "", "B4": "", "B5": "", "B6": 2, "B7": 0.4})
+
+        assert list(region.data_rows) == [2]
+        assert list(region.prefilled_rows) == [3, 4, 5]
+        assert list(region.totals_rows) == [6, 7]
+        assert region.totals_placement == TotalsPlacement.AFTER_PREFILLED_ROWS
+        assert region.last_sheet_row == 7
+
+    def test_pre_filled_rows_after_the_totals_line_and_its_footer(self) -> None:
+        cells: dict[str, Any] = {**TOTALLED_CELLS, "A5": "VAT", "B5": "=B4*0.2"}
+        cells |= {f"B{row}": f'=IF(A{row}="","",1)' for row in range(6, 9)}
+
+        region = _find(cells, cached_values={**TOTALLED_VALUES, "B5": 1, "B6": "", "B7": "", "B8": ""})
+
+        assert list(region.totals_rows) == [4, 5]
+        assert list(region.prefilled_rows) == [6, 7, 8]
+
+    def test_a_total_over_a_single_data_row_is_a_data_row(self) -> None:
+        cells = {"A1": "item", "B1": "amount", "A2": "Paper", "B2": 2, "A3": "Sub", "B3": "=SUM(B2:B2)"}
+
+        region = _find(cells, cached_values={"B3": 2})
+
+        assert list(region.data_rows) == [2, 3]
+        assert region.totals_row_count == 0
 
 
 class TestResolveSheetRange:
