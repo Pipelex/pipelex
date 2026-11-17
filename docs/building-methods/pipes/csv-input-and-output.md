@@ -94,7 +94,7 @@ A cell that cannot be coerced raises a clear error naming the 1-based row, the c
 
 ## Reading an Excel workbook as input
 
-A `.xlsx` path is read the same way, from an Excel Table of the workbook: the named table object created with Insert > Table. The workbook must hold exactly one Table, since an input names none; a workbook with several Tables or none is refused, naming the Tables found. The Table's header row names the columns under the same header and column rules as a CSV file, its totals row is not read, and every other row of the Table is an item of the list, an empty row included. Reading a workbook needs the `tabular` extra:
+A `.xlsx` path is read the same way, from an Excel Table of the workbook: the named table object created with Insert > Table. The workbook must hold exactly one Table, since an input names none; a workbook with several Tables or none is refused, naming the Tables found. A workbook whose rows are typed on a plain sheet, with no Table, or held by a named range, is read by a [`PipeStructure`](pipe-operators/PipeStructure.md#reading-a-spreadsheet) step instead, which names the range with `sheet_range` or the name with `table`. The Table's header row names the columns under the same header and column rules as a CSV file, its totals row is not read, and every other row of the Table is an item of the list, an empty row included. Reading a workbook needs the `tabular` extra:
 
 ```bash
 pip install "pipelex[tabular]"

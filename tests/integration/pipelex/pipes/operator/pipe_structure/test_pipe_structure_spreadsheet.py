@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, MethodOutputMultiplicityMismatchExpected
+from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -16,6 +17,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipe_operators.structure import pipe_structure as pipe_structure_module
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_run.exceptions import PipeRouterError
@@ -23,9 +25,9 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.tools.tabular.exceptions import CsvCoercionError, TableFileTypeUnsupportedError
+from pipelex.tools.tabular.exceptions import CsvCoercionError, TableFileTypeUnsupportedError, TableRangeUnclearError
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.helpers.xlsx_workbooks import single_table_workbook
+from tests.helpers.xlsx_workbooks import sheet_workbook, single_table_workbook, with_cached_values
 
 DOMAIN = "budget_read"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -68,10 +70,13 @@ def _structure_pipe(
     inputs: dict[str, str] | None = None,
     output: str = "BudgetLine[]",
     table: str | None = None,
+    sheet_range: dict[str, Any] | None = None,
     row_field: str | None = "line",
     model: str | None = None,
 ) -> PipeStructure:
     blueprint_fields: dict[str, Any] = {"model": model} if model is not None else {}
+    if sheet_range is not None:
+        blueprint_fields["sheet_range"] = sheet_range
     blueprint = PipeStructureBlueprint(
         description="Read the budget lines",
         inputs=inputs or {"budget": "Workbook"},
@@ -144,6 +149,7 @@ class TestPipeStructureSpreadsheet:
             pytest.param({"row_field": "missing"}, "output", "row_field", None, id="row-field-not-a-field"),
             pytest.param({"row_field": "label"}, "output", "row_field", None, id="row-field-not-a-number"),
             pytest.param({"inputs": {"text": "Text"}, "table": "Budget"}, "inputs", "table", None, id="table-on-text-path"),
+            pytest.param({"inputs": {"text": "Text"}, "sheet_range": {}}, "inputs", "sheet_range", None, id="sheet-range-on-text-path"),
             pytest.param({"inputs": {"text": "Text"}}, "inputs", "row_field", None, id="row-field-on-text-path"),
             pytest.param({"inputs": {"picture": "Image"}}, "inputs", None, PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH, id="image-input"),
             # A concept holding a Document in a field is no Document: only lineage makes the input a spreadsheet.
@@ -169,6 +175,53 @@ class TestPipeStructureSpreadsheet:
             assert exc_info.value.given_params.get("field_path") == f"pipe.read_budget.{expected_field}"
         if expected_error_type is not None:
             assert exc_info.value.error_type == expected_error_type
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_range_on_a_sheet_is_read_into_the_output_list(self, job_metadata: JobMetadata) -> None:
+        cells = {"A1": "Budget 2026", "A3": "Item", "B3": "Amount", "A4": "Paper", "B4": 12.5, "A5": "Ink", "B5": 3, "B6": "=SUM(B4:B5)"}
+        workbook = sheet_workbook(cells=cells, sheet_title="Budget")
+        document = DocumentContent(url=_data_url(data=workbook, mime_type=XLSX_MIME), mime_type=XLSX_MIME, filename="budget.xlsx")
+
+        pipe = _structure_pipe(sheet_range={"sheet": "budget", "header_row": 3})
+        items = await _run(pipe=pipe, document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE)
+
+        assert [item.model_dump(include={"item", "amount", "line"}) for item in items] == [
+            {"item": "Paper", "amount": 12.5, "line": 1},
+            {"item": "Ink", "amount": 3, "line": 2},
+        ]
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_note_right_after_the_totals_line_refuses_the_run(self, job_metadata: JobMetadata) -> None:
+        cells = {"A1": "Item", "B1": "Amount", "A2": "Paper", "B2": 12.5, "A3": "Ink", "B3": 3, "A4": "Total", "B4": "=SUM(B2:B3)"}
+        cells["A5"] = "Approved by"
+        workbook = with_cached_values(xlsx_bytes=sheet_workbook(cells=cells, sheet_title="Budget"), cached_values={"B4": 15.5})
+        document = DocumentContent(url=_data_url(data=workbook, mime_type=XLSX_MIME), mime_type=XLSX_MIME, filename="budget.xlsx")
+
+        pipe = _structure_pipe(sheet_range={"sheet": "budget"})
+        with pytest.raises(PipeRouterError) as exc_info:
+            await _run(pipe=pipe, document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE)
+
+        refusal = exc_info.value.__cause__
+        assert isinstance(refusal, TableRangeUnclearError)
+        assert refusal.cell == "Budget!A5"
+        assert "below the totals line on row 4" in refusal.message
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_rows_of_formulas_storing_no_value_are_not_read_and_warned_of(self, job_metadata: JobMetadata, mocker: MockerFixture) -> None:
+        """A workbook saved without its calculated values: rows of formulas may hold data nobody calculated."""
+        cells = {"A1": "Item", "B1": "Amount", "A2": "=Source!A2", "B2": "=Source!B2", "A3": "=Source!A3", "B3": "=Source!B3"}
+        workbook = sheet_workbook(cells=cells, sheet_title="Budget")
+        document = DocumentContent(url=_data_url(data=workbook, mime_type=XLSX_MIME), mime_type=XLSX_MIME, filename="budget.xlsx")
+        warning = mocker.patch.object(pipe_structure_module.log, "warning")
+
+        pipe = _structure_pipe(sheet_range={"sheet": "budget"})
+        items = await _run(pipe=pipe, document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE)
+
+        assert items == []
+        warning.assert_called_once()
+        assert warning.call_args.args == ("Rows of uncalculated formulas were not read",)
+        assert warning.call_args.kwargs["fields"]["nb_rows"] == 2
+        assert warning.call_args.kwargs["fields"]["user_action"].startswith("Open the workbook in Excel or LibreOffice and save it")
 
     @pytest.mark.parametrize("pipe_run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY])
     @pytest.mark.asyncio(loop_scope="class")

@@ -70,6 +70,9 @@ EXPECTED_THIRD_PARTY_ROOTS: frozenset[str] = frozenset(
         "jinja2",
         # The MTHDS standard's own library, not a vendor: a document's relative URLs resolve in its method tree by its rules.
         "mthds",
+        # The spreadsheet library the `tabular` extra installs, not a vendor: the range finder a workbook's reader and a
+        # document engine share reads its worksheets, imported only when present.
+        "openpyxl",
         "opentelemetry",
         "polyfactory",
         "pydantic",

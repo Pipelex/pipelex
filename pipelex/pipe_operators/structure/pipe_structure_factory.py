@@ -2,6 +2,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex.cogt.doc_gen.sheet_range import SheetRange
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
@@ -43,6 +44,11 @@ class PipeStructureFactory(PipeFactoryProtocol[PipeStructureBlueprint, PipeStruc
             llm_choice=blueprint.model,
             source_input_name=source_input_name,
             table_name=blueprint.table,
+            sheet_range=(
+                SheetRange(sheet=blueprint.sheet_range.sheet, header_row=blueprint.sheet_range.header_row)
+                if blueprint.sheet_range is not None
+                else None
+            ),
             row_field=blueprint.row_field,
             output_multiplicity=output_multiplicity,
         )

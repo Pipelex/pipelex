@@ -1,17 +1,26 @@
-"""The `update` fill as the document engine contract carries it: the matching fields, the cell policy and the capability."""
+"""The `update` fill and the sheet range as the document engine contract carries them: their fields and their capabilities."""
 
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from pipelex.cogt.doc_gen.doc_gen_engine import fills_tables
+from pipelex.cogt.doc_gen.doc_gen_engine import fills_sheet_ranges, fills_tables
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateInputFile
 from pipelex.cogt.doc_gen.exceptions import DocGenModelCapabilityError
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.cogt.doc_gen.table_fill import TABLE_APPEND_CAPABILITY, TABLE_UPDATE_CAPABILITY, CellPolicy, TableFill, table_match_refusal
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
+from pipelex.cogt.doc_gen.table_fill import (
+    SHEET_RANGE_CAPABILITY,
+    TABLE_APPEND_CAPABILITY,
+    TABLE_UPDATE_CAPABILITY,
+    CellPolicy,
+    TableFill,
+    sheet_range_refusal,
+    table_match_refusal,
+)
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -177,3 +186,55 @@ class TestTableUpdate:
         assert 'table_fill = "update"' in error.message
         assert "'table_update'" in error.message
         assert error.problem_params() == {"model": "pipelex-xlsx", "capability": "table_update"}
+
+
+_SHEET_RANGE = SheetRangeFill(list="completions", sheet="Expenses", header_row=3)
+
+
+class TestSheetRangeContract:
+    @pytest.mark.parametrize("fields", [{"table_fill": TableFill.APPEND}, _UPDATE_BY_ROW], ids=["append", "update"])
+    def test_the_composition_hands_the_job_its_sheet_range(self, fields: dict[str, Any]) -> None:
+        composition = _composition(sheet_range=_SHEET_RANGE, **fields)
+        job = composition.make_render_job(template=b"PK")
+
+        assert job.sheet_range == _SHEET_RANGE
+        assert DocumentComposition.model_validate_json(composition.model_dump_json()).sheet_range == _SHEET_RANGE
+        assert _check_request(sheet_range=_SHEET_RANGE, **fields).sheet_range == _SHEET_RANGE
+
+    def test_the_job_the_composition_and_the_check_request_refuse_a_sheet_range_under_replace(self) -> None:
+        expected_message = "its fill 'replace' fills Tables only, so it carries no sheet_range"
+        assert sheet_range_refusal(table_fill=TableFill.REPLACE, sheet_range=_SHEET_RANGE) == expected_message
+        with pytest.raises(ValidationError, match=expected_message):
+            _render_job(sheet_range=_SHEET_RANGE)
+        with pytest.raises(ValidationError, match=expected_message):
+            _composition(sheet_range=_SHEET_RANGE)
+        with pytest.raises(ValidationError, match=expected_message):
+            _check_request(sheet_range=_SHEET_RANGE)
+
+    def test_a_sheet_range_fill_names_a_list(self) -> None:
+        with pytest.raises(ValidationError):
+            SheetRangeFill(list="")
+
+    @pytest.mark.parametrize(
+        ("inputs", "expected"),
+        [
+            (["layout", "template_file", TABLE_APPEND_CAPABILITY, TABLE_UPDATE_CAPABILITY], False),
+            (["layout", "template_file", TABLE_APPEND_CAPABILITY, SHEET_RANGE_CAPABILITY], True),
+        ],
+        ids=["undeclared", "declared"],
+    )
+    def test_an_engine_fills_sheet_ranges_only_when_its_model_declares_it(self, inputs: list[str], expected: bool) -> None:
+        assert fills_sheet_ranges(inference_model=_doc_gen_model(inputs=inputs)) is expected
+
+    def test_the_capability_refusal_names_the_sheet_range(self) -> None:
+        error = DocGenModelCapabilityError(
+            doc_gen_format=DocGenFormat.XLSX,
+            source=DocGenSource.TEMPLATE_FILE,
+            model="pipelex-xlsx",
+            pipe_code="complete_rows",
+            table_fill=TableFill.APPEND,
+            fills_sheet_range=True,
+        )
+        assert "PipeDocGen 'complete_rows' asks the engine 'pipelex-xlsx' to fill a range on a sheet holding no Excel Table" in error.message
+        assert "'sheet_range'" in error.message
+        assert error.problem_params() == {"model": "pipelex-xlsx", "capability": "sheet_range"}

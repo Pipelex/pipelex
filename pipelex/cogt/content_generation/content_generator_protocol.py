@@ -24,6 +24,7 @@ from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.tabular.exceptions import TableReaderMisconfiguredError
 from pipelex.tools.tabular.table_records import TableRecords
+from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.tools.uri.uri_read_scope import UriReference
@@ -220,15 +221,16 @@ class ContentGeneratorProtocol(Protocol):
         input_name: str | None,  # ruff: ignore[unused-method-argument]
         field_names: list[str],  # ruff: ignore[unused-method-argument]
         row_field: str | None,  # ruff: ignore[unused-method-argument]
-        table_name: str | None,  # ruff: ignore[unused-method-argument]
+        table_selector: TableSelector,  # ruff: ignore[unused-method-argument]
     ) -> Coroutine[Any, Any, TableRecords]:
         """The records a `PipeStructure` step reads from one table of a spreadsheet `Document`, as plain data.
 
         A leaf operation, since it reads storage: a host runtime's content generator dispatches it as it dispatches every
         other leaf, and returns the records, never the file's bytes. ``mime_type`` and ``file_name`` are the document's
         declarations, which judge its format when its bytes do not; ``field_names`` are the row concept's fields the
-        columns match, ``row_field`` the one that receives each row's position, and ``table_name`` the Excel Table to
-        read, ``None`` for the workbook's only one. This body is what a content generator gets that does not implement
+        columns match, ``row_field`` the one that receives each row's position, and ``table_selector`` the step's choice
+        of the rows of a workbook: an Excel Table or a named range by its name, a range on a sheet, or neither, for the
+        workbook's only Table. This body is what a content generator gets that does not implement
         it, a host runtime's included until it does: the step asked for a read its orchestrator cannot run, a fault of
         the deployment, whose orchestrator plugin predates the read.
 
