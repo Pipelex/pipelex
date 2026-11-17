@@ -305,7 +305,7 @@ class _HintLinter:
                     case ConceptStructureBlueprintFieldType.CONCEPT:
                         return self._concept_site_kind(field.item_concept_ref) if field.item_concept_ref else HintSiteValueKind.OTHER
                     case _:
-                        # item_type is a free string on the blueprint; anything unrecognized is OTHER.
+                        # Any other item type (a nested list or dict, a scalar of another kind, the `Any` sentinel, none) is OTHER.
                         return HintSiteValueKind.OTHER
             case (
                 ConceptStructureBlueprintFieldType.DICT

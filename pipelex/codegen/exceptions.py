@@ -23,6 +23,17 @@ class CodegenStampError(CodegenError):
     error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
+class CodegenEmissionError(CodegenError):
+    """Raised when an emitted Python module is not of the shape its emitter writes, a fault of the emitter.
+
+    Authored text reaches an emitted module only inside string literals and comments, so a module that does not parse,
+    or holds a statement other than its imports and its classes of docstrings and fields, means a text was rendered as
+    code. It is refused before anyone can import it.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
 class CodegenLockError(CodegenError):
     """Raised when a `codegen.lock` cannot be read or parsed.
 

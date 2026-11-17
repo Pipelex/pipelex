@@ -8,14 +8,17 @@ resolved-type -> annotation walker, because the concept spelling (runtime conten
 generated models) differs.
 """
 
+import ast
 import sys
 from collections import defaultdict
 from datetime import date, datetime, time
 from typing import Any, cast
 
+from pipelex.codegen.exceptions import CodegenEmissionError
 from pipelex.codegen.resolved_concepts import ResolvedConcept
 from pipelex.core.concepts.resolved_fields import ResolvedField, iter_imprecision_reasons
-from pipelex.tools.misc.python_literals import escape_py_string
+from pipelex.tools.misc.generated_module_shape import generated_module_shape_refusal
+from pipelex.tools.misc.python_literals import comment_lines, escape_py_string
 
 # Ruff's own default `line-length`, and deliberately not this repo's 150. It is the *tightest* width a
 # consumer is likely to lint at, and the threshold has to be the tightest one to be safe: anything we
@@ -26,6 +29,10 @@ PY_EXPLODE_WIDTH = 88
 
 # One level of the generated class body. Emitted code is always 4-space indented.
 _PY_INDENT = "    "
+
+# The class attributes an emitted class assigns without an annotation: the `model_config` that keeps an opaque concept's
+# fields on validation.
+_CLASS_ATTRIBUTE_ASSIGNMENTS = frozenset({"model_config"})
 
 
 def python_header(*, target: str) -> str:
@@ -93,13 +100,12 @@ def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> s
         params = ["default=None"]
     params.append(f"description={escape_py_string(field.description)}")
 
-    reasons = list(dict.fromkeys(iter_imprecision_reasons(field.resolved_type)))
-    comment = f"  # imprecise: {'; '.join(reasons)}" if reasons else ""
+    comment, comment_continuation = _imprecision_comment(field)
 
     flat = f"    {field.name}: {annotation} = Field({', '.join(params)})"
     # The trailing comment counts toward the width: ruff splits the call to fit `)  # imprecise: …` too.
     if len(flat) + len(comment) <= PY_EXPLODE_WIDTH:
-        return flat + comment
+        return flat + comment + comment_continuation
 
     # Too long to be left alone: hand the formatter an already-exploded call with a magic trailing comma,
     # which pins the shape at *any* line-length (verified 60..200). A long authored description or choice
@@ -109,7 +115,21 @@ def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> s
     head_overhead = len(opening) + len(" = Field(")
     head = f"{opening}{explode_bracket(annotation, budget=PY_EXPLODE_WIDTH - head_overhead)} = Field("
     body = "".join(f"        {param},\n" for param in params)
-    return f"{head}\n{body}    ){comment}"
+    return f"{head}\n{body}    ){comment}{comment_continuation}"
+
+
+def _imprecision_comment(field: ResolvedField) -> tuple[str, str]:
+    """The `# imprecise:` comment of a field, as its trailing part and the comment lines that continue it, or two empty strings.
+
+    The reasons quote authored names, so the comment is written through `comment_lines`: each line of it is led by its
+    own `#`, and no line break in a reason can end the comment and leave the rest of the reason to be read as code.
+    Its first line trails the field; any further one sits on its own line below it, at the field's indentation.
+    """
+    reasons = list(dict.fromkeys(iter_imprecision_reasons(field.resolved_type)))
+    if not reasons:
+        return "", ""
+    first_line, *continuation = comment_lines(f"imprecise: {'; '.join(reasons)}")
+    return f"  # {first_line}", "".join(f"\n{_PY_INDENT}# {line}".rstrip() for line in continuation)
 
 
 def _split_top_level(inner: str) -> list[str]:
@@ -248,10 +268,43 @@ def python_module_body(*, header: str, imports: set[str], blocks: list[str]) -> 
 
     This is reachable without a degenerate crate: `python-structures` skips natives, so an ordinary
     method that declares no concepts of its own leaves that emitter with nothing to write.
+
+    Every module both Python emitters write is assembled here, so this is where it is gated: the assembled module
+    goes through `refuse_unexpected_python_module_shape` before it is returned.
     """
-    if not blocks:
-        return header
-    return f"{header}from __future__ import annotations\n\n{render_import_block(imports)}\n\n\n" + "\n\n\n".join(blocks) + "\n"
+    body = header
+    if blocks:
+        body = f"{header}from __future__ import annotations\n\n{render_import_block(imports)}\n\n\n" + "\n\n\n".join(blocks) + "\n"
+    refuse_unexpected_python_module_shape(body)
+    return body
+
+
+def refuse_unexpected_python_module_shape(body: str) -> None:
+    """Refuse an emitted Python module of any shape other than the one the Python emitters write.
+
+    They write only imports and plain classes whose body is a docstring followed by annotated fields, plus the
+    `model_config` of an opaque concept, and authored text reaches the module only inside string literals and comments.
+    A module of any other shape means a text was rendered as code: it is refused here, before it is stamped, written or
+    served, because the developer who imports it would run that code. The check is the one the runtime structure
+    generator applies to the module it executes, `generated_module_shape_refusal`.
+
+    Raises:
+        CodegenEmissionError: When the module does not parse, or holds a statement the emitters never write.
+    """
+    try:
+        module = ast.parse(body)
+    except SyntaxError as syntax_error:
+        msg = f"The emitted Python module does not parse: {syntax_error}"
+        raise CodegenEmissionError(msg) from syntax_error
+    refusal = generated_module_shape_refusal(
+        module=module,
+        module_label="emitted Python module",
+        opens_with_docstring=False,
+        expected_class_names=None,
+        class_attribute_assignments=_CLASS_ATTRIBUTE_ASSIGNMENTS,
+    )
+    if refusal is not None:
+        raise CodegenEmissionError(refusal)
 
 
 def order_by_base(concepts: list[ResolvedConcept], *, in_module: set[str]) -> list[ResolvedConcept]:
