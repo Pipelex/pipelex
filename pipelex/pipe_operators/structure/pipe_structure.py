@@ -30,6 +30,7 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
+from pipelex.pipe_operators.shared.schema_mismatch_params import filling_schema_mismatch_params
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.runtime_hub import get_class_registry, get_content_generator, get_memory_transport
 from pipelex.system.job_metadata import JobMetadata
@@ -496,21 +497,23 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             template_owner=TemplateOwner.PIPELEX,
         )
 
-        try:
-            generated = await generate_object_content(
-                job_metadata=job_metadata,
-                cogt_run_params=pipe_run_params.cogt_run_params,
-                unrendered_prompt=unrendered_prompt,
-                llm_setting=llm_setting_for_object,
-                output_class=content_class,
-                is_multiple_output=is_multiple_output,
-                fixed_nb_output=fixed_nb_output,
-            )
-        except LLMCompletionError as exc:
-            location = self._format_error_location(pipe_run_params=pipe_run_params)
-            what_failed = "object list" if is_multiple_output else "single object"
-            msg = f"Error generating {what_failed} in PipeStructure {location}: {exc}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+        resolved_model = concrete_llm_model_handle(llm_setting_for_object.model)
+        with filling_schema_mismatch_params(concept_ref=self.output.concept.concept_ref, model_handle=resolved_model):
+            try:
+                generated = await generate_object_content(
+                    job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
+                    unrendered_prompt=unrendered_prompt,
+                    llm_setting=llm_setting_for_object,
+                    output_class=content_class,
+                    is_multiple_output=is_multiple_output,
+                    fixed_nb_output=fixed_nb_output,
+                )
+            except LLMCompletionError as exc:
+                location = self._format_error_location(pipe_run_params=pipe_run_params)
+                what_failed = "object list" if is_multiple_output else "single object"
+                msg = f"Error generating {what_failed} in PipeStructure {location}: {exc}"
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
         working_memory = store_result(
             memory=working_memory,
@@ -521,7 +524,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         )
 
         execution_data_dict: dict[str, Any] = {
-            "resolved_model": concrete_llm_model_handle(llm_setting_for_object.model),
+            "resolved_model": resolved_model,
             "is_multiple_output": is_multiple_output,
             # Rendered by the leaf, which returned it with the object, a text past the trace's bound as its preview.
             "rendered_user_prompt": generated.rendered_prompt.traced_user_text,
