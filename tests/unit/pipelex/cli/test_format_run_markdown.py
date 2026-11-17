@@ -7,6 +7,7 @@ import json
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING, Any
 
+import pytest
 from kajson import kajson
 
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
@@ -120,15 +121,27 @@ class TestFormatRunMarkdown:
         assert not marker_file.exists()
         assert '"answer": 42' in markdown
 
-    def test_malformed_datetime_marker_is_rendered_as_data(self) -> None:
-        """A datetime marker whose value does not parse is left as plain data rather than failing the render."""
-        payload = json.dumps({"when": {"__class__": "datetime", "__module__": "datetime", "datetime": "not a date"}})
+    @pytest.mark.parametrize(
+        "marker",
+        [
+            {"__class__": "datetime", "__module__": "datetime", "datetime": "not a date"},
+            {"__class__": "time", "__module__": "datetime", "time": "12:00:00"},
+            {"__class__": "time", "__module__": "datetime", "time": "12:00:00.000000", "tzinfo": None, "utcoffset": 1e20},
+            {"__class__": "datetime", "__module__": "datetime", "datetime": "2020-01-01 00:00:00.000000", "tzinfo": "UTC", "utcoffset": 1e20},
+            {"__class__": "datetime", "__module__": "datetime", "datetime": "2020-01-01 00:00:00.000000", "tzinfo": "a" * 256, "utcoffset": None},
+        ],
+        ids=["unparseable_datetime", "time_without_fraction", "time_offset_overflow", "datetime_offset_overflow", "zone_name_too_long"],
+    )
+    def test_malformed_date_marker_is_rendered_as_data(self, marker: dict[str, Any]) -> None:
+        """A date, datetime or time marker whose values kajson cannot parse is left as plain data rather than failing the render."""
+        payload = json.dumps({"when": marker})
         result: dict[str, Any] = {
             "main_stuff": {"json": payload, "markdown": "", "html": ""},
             "working_memory": {},
         }
         markdown = format_run_markdown(result, with_memory=True)
-        assert '"datetime": "not a date"' in markdown
+        assert "## Result" in markdown
+        assert "__class__" not in markdown
 
     def test_compact_result_keeps_fields_colliding_with_envelope_keys(self) -> None:
         """In compact mode the result IS the concept JSON; a concept field whose name collides with

@@ -72,7 +72,9 @@ def _revive_safe_marker(obj: dict[str, Any]) -> Any:
         return obj
     try:
         return decoder(obj)
-    except (KajsonException, ValueError, TypeError, KeyError, AttributeError):
+    # Everything kajson's three parsers raise on a malformed marker, a value the payload chose: a time with no fraction
+    # (`IndexError`), an offset no timedelta holds (`OverflowError`), a zone name the zone database cannot open (`OSError`).
+    except (KajsonException, ValueError, TypeError, KeyError, AttributeError, IndexError, OverflowError, OSError):
         return obj
 
 

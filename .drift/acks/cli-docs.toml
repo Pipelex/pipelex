@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:0975afb43119e73e974c3de431cede313ccd0e75de659510a0ae9ba7fdd40e35"
+digest = "sha256:c3f0b9c680dffd71abbe117db6653ba4f925b299bc3c9a0fa1ea13b8776f30b6"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-17T18:23:32Z"
-rationale = "clean-pass: the run renderer now decodes a string result with plain JSON instead of kajson.loads; the rendered Markdown is unchanged for every real result and no CLI doc describes the decoder."
+reviewed_at = "2026-11-17T19:00:57Z"
+rationale = "clean-pass: the run renderer also falls back to plain data on IndexError, OverflowError and OSError from kajson's date parsers; no CLI doc describes the decoder and the rendered output is unchanged for every real result."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -36,7 +36,7 @@ rationale = "clean-pass: the run renderer now decodes a string result with plain
 "pipelex/cli/agent_cli/commands/models_cmd.py" = "blob:f6365858100ccedb5e85afe5c6c689d9018adfdb"
 "pipelex/cli/agent_cli/commands/plxt_passthrough.py" = "blob:dc4916d28a5e83e18c9c59cc7e81191ea7869646"
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:eba95469f7906fda545387026881f921ccfb44ef"
+"pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:d78e4a28a779d2d4fb94e003ebdd25178a55399a"
 "pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:50850037a884659c90f9b98a1ac4697303df1fb2"
 "pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:d59b4443069e3479e4f40089f96ee698550469f5"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:7546d9b31ea2dc22b1ddae538edfbc8e7f7d08df"
