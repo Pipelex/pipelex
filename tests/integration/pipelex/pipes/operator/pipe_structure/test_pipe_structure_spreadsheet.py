@@ -25,9 +25,9 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.tools.tabular.exceptions import CsvCoercionError, TableFileTypeUnsupportedError
+from pipelex.tools.tabular.exceptions import CsvCoercionError, TableFileTypeUnsupportedError, TableRangeUnclearError
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.helpers.xlsx_workbooks import sheet_workbook, single_table_workbook
+from tests.helpers.xlsx_workbooks import sheet_workbook, single_table_workbook, with_cached_values
 
 DOMAIN = "budget_read"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -189,6 +189,22 @@ class TestPipeStructureSpreadsheet:
             {"item": "Paper", "amount": 12.5, "line": 1},
             {"item": "Ink", "amount": 3, "line": 2},
         ]
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_note_right_after_the_totals_line_refuses_the_run(self, job_metadata: JobMetadata) -> None:
+        cells = {"A1": "Item", "B1": "Amount", "A2": "Paper", "B2": 12.5, "A3": "Ink", "B3": 3, "A4": "Total", "B4": "=SUM(B2:B3)"}
+        cells["A5"] = "Approved by"
+        workbook = with_cached_values(xlsx_bytes=sheet_workbook(cells=cells, sheet_title="Budget"), cached_values={"B4": 15.5})
+        document = DocumentContent(url=_data_url(data=workbook, mime_type=XLSX_MIME), mime_type=XLSX_MIME, filename="budget.xlsx")
+
+        pipe = _structure_pipe(sheet_range={"sheet": "budget"})
+        with pytest.raises(PipeRouterError) as exc_info:
+            await _run(pipe=pipe, document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE)
+
+        refusal = exc_info.value.__cause__
+        assert isinstance(refusal, TableRangeUnclearError)
+        assert refusal.cell == "Budget!A5"
+        assert "below the totals line on row 4" in refusal.message
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_rows_of_formulas_storing_no_value_are_not_read_and_warned_of(self, job_metadata: JobMetadata, mocker: MockerFixture) -> None:

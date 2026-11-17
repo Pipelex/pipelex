@@ -93,6 +93,32 @@ class TestXlsxRegions:
         assert SUBJECT in exc_info.value.message
         assert "Approved" not in exc_info.value.message
 
+    def test_a_note_right_after_the_totals_line_is_refused_rather_than_read_as_a_row(self) -> None:
+        xlsx_bytes = with_cached_values(xlsx_bytes=sheet_workbook(cells={**EXPENSE_CELLS, "A7": "Approved by"}), cached_values={"B6": 96.5})
+
+        with pytest.raises(TableRangeUnclearError) as exc_info:
+            read_xlsx_raw_table(
+                binding=TableBinding.STEP,
+                raw_bytes=xlsx_bytes,
+                table_selector=TableSelector(sheet_range=SheetRange(header_row=3)),
+                limits=TABLE_READING_FALLBACK,
+                subject=SUBJECT,
+            )
+
+        assert exc_info.value.cell == "Expenses!A7"
+        assert "below the totals line on row 6" in exc_info.value.message
+
+    def test_a_vat_line_and_a_grand_total_after_the_totals_line_are_not_read(self) -> None:
+        cells = {**EXPENSE_CELLS, "A7": "VAT", "B7": "=B6*0.2", "A8": "Grand total", "B8": "=B6+B7"}
+        xlsx_bytes = with_cached_values(xlsx_bytes=sheet_workbook(cells=cells), cached_values={"B6": 96.5, "B7": 19.3, "B8": 115.8})
+
+        table_records = _read(raw_bytes=xlsx_bytes, table_selector=TableSelector(sheet_range=SheetRange(header_row=3)))
+
+        assert [(record.position, record.plain_values()) for record in table_records.records] == [
+            (1, {"merchant": "Rail Co", "amount": 84.5}),
+            (2, {"merchant": "Cafe Nord", "amount": 12}),
+        ]
+
     def test_a_sheet_range_past_the_cell_cap_is_refused(self) -> None:
         limits = TableReadingConfig(max_workbook_uncompressed_bytes=10_000_000, max_table_cells=5)
 
