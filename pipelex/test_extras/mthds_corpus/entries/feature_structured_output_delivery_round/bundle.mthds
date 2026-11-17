@@ -16,7 +16,7 @@ description = "A day's round as the depot files it"
 [concept.DeliveryRound.structure]
 round_date = { type = "text", description = "The day the round was driven, as written on the sheet", required = true }
 driver     = { type = "text", description = "Who drove the round", required = true }
-stops      = { type = "list", item_type = "Stop", description = "Every stop on the round, in the order they were driven", required = true }
+stops      = { type = "list", item_type = "concept", item_concept_ref = "Stop", description = "Every stop on the round, in the order they were driven", required = true }
 depot_note = { type = "text", description = "Anything the depot added afterwards", required = false }
 
 [pipe.read_round_sheet]

@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.109.0] - 2026-11-18
+
+### Fixed
+
+- **A model's answer that does not fit names the model and the concept**: `model.output_schema_mismatch` now carries its `concept` parameter, the concept the step resolved for the run, a dynamic output's included, and its `model` on `PipeLLM`'s text path too, so the caller reads the registry's sentence naming both where it read the code's generic title. `PipeLLM`, `PipeStructure` and `PipeJudge` fill them, whether the failure reaches them wrapped or not.
+- **A deeply nested template is the method's fault**: a template nested past what Jinja2 can parse, walk or compile, such as a hundred nested parentheses, attribute reads, filters or `{% if %}` blocks, is refused at load as a template that does not parse, and at render as `method.template_invalid` on a method's template, where it failed as `runtime.unexpected` with a `RecursionError`, `SyntaxError` or `IndentationError`. Every template parse in `pipelex.tools.jinja2` goes through the new `parse_jinja2_template`, which refuses a tree deeper than `MAX_TEMPLATE_NESTING_DEPTH` with `TemplateNestingError`, a `TemplateSyntaxError`.
+
+### Security
+
+- **`pipelex-agent run` never revives classes from a run's result**: rendering a result whose `main_stuff.json` is a string decodes it as plain JSON, where it went through `kajson.loads`, which imports the module and calls the class that a `__module__` and `__class__` pair names, so a hostile or self-hosted `--base-url` could start a process on the developer's machine. Only the date, datetime and time markers the local runner writes are read back, as ISO strings.
+- **`pipelex build output --format python` writes every value as a literal (Breaking)**: a structure field's choice, or any other string, is written through Python's own escaping, so a choice holding quotes, parentheses, an equals sign or a line break stays a string in the generated example instead of being emitted as code. `ConceptRepresentationGenerator.generate_field_value` returns a nested class as a `PythonClassCall` node in the Python format, where it returned the instantiation as a string.
+- **A structure field's nested type name never becomes code in a generated module (Breaking)**: a list's `item_type` and a dict's `value_type` are refused at load, as `method.schema_violation`, unless they name a field type (`text`, `integer`, `number`, `boolean`, `date`, `datetime`, `time`, `list`, `dict`, `concept`) or `Any`, where any other name loaded and projected as `Any`; a list of concepts is `item_type = "concept"` with its `item_concept_ref`. A line break in such a name ended the `# imprecise:` comment the `python-pydantic` and `python-structures` targets wrote and turned the rest of it into a statement of `models.py` or `structures.py`, which ran when the module was imported: the comment now quotes the name with `repr` and leads every line with its own `#`, and every emitted Python module is parsed and refused with `CodegenEmissionError`, `runtime.unexpected`, when it holds any statement other than its imports and its classes of docstrings and fields.
+- **The server refuses custom Python on the inline request shape too**: `POST /v1/execute`, `/v1/start` and `/v1/validate` answer `501 pipelex.deployment.custom_code_requires_sandbox` to a `.py` file sent in `resources` beside `mthds_contents` on a deployment that is not sandbox-hosted, and refuse one declaring a structure class with `422 pipelex.deployment.python_structures_refused` on a sandbox-hosted one, as they already did for `files`, `bundle_b64` and `method_ref`.
+
 ## [v0.108.0] - 2026-11-17
 
 ### Added

@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.108.0
+  version: 0.109.0
 paths:
   /health:
     get:
@@ -2457,11 +2457,35 @@ components:
         value_type:
           anyOf:
           - type: string
+            enum:
+            - text
+            - list
+            - dict
+            - integer
+            - boolean
+            - number
+            - date
+            - datetime
+            - time
+            - concept
+            - Any
           - type: 'null'
           title: Value Type
         item_type:
           anyOf:
           - type: string
+            enum:
+            - text
+            - list
+            - dict
+            - integer
+            - boolean
+            - number
+            - date
+            - datetime
+            - time
+            - concept
+            - Any
           - type: 'null'
           title: Item Type
         concept_ref:

@@ -33,7 +33,7 @@ from pipelex.core.concepts.annotation_shapes import (
     strip_optional,
 )
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_structure_blueprint import ANY_NESTED_FIELD_TYPE, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 
@@ -124,7 +124,11 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
         # with unspecified value types — declared imprecision, not a guess. (No pinned native uses
         # this today — a hit here means a runtime class drifted from its pinned blueprint.)
         return ConceptStructureBlueprint(
-            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="Any", required=required
+            description=description,
+            type=ConceptStructureBlueprintFieldType.DICT,
+            key_type="text",
+            value_type=ANY_NESTED_FIELD_TYPE,
+            required=required,
         )
 
     raise _UnmappableAnnotationError
@@ -134,14 +138,14 @@ def _dict_value_type(*, dict_annotation: Any) -> str:
     """A dict's value type in the spec vocabulary: a scalar it maps, else the reserved `Any` marker (declared imprecision)."""
     args = get_args(dict_annotation)
     if len(args) != 2:
-        return "Any"
+        return ANY_NESTED_FIELD_TYPE
     value_annotation = args[1]
     if get_origin(value_annotation) is Annotated:
         # A constrained value type (`UnitInterval`) is its base type: the blueprint vocabulary states no range.
         value_annotation = get_args(value_annotation)[0]
     scalar_type = scalar_field_type(annotation=value_annotation)
     if scalar_type is None:
-        return "Any"
+        return ANY_NESTED_FIELD_TYPE
     return scalar_type.value
 
 

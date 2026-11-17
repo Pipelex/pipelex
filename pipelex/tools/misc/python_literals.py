@@ -1,4 +1,4 @@
-"""Render authored text as Python source: a string literal, or a class docstring.
+"""Render authored text as Python source: a string literal, a class docstring, or the lines of a comment.
 
 Every place that writes generated Python source with authored text in it goes through here — the codegen
 emitters and the structure generator, whose modules are executed — so that one escaping decides how text
@@ -40,6 +40,20 @@ def escape_py_string(value: str) -> str:
     if value.count("'") < value.count('"'):
         return repr(value)
     return f'"{_double_quoted_inner(value)}"'
+
+
+def comment_lines(text: str) -> list[str]:
+    """The lines of `text` once written as a Python comment, each to be led by its own `#`; never an empty list.
+
+    A comment ends at the end of its line, so text written into one is split on every line break first: a line
+    break left in it would end the comment, and whatever followed it would be read as code. The split is
+    `str.splitlines`, which knows every line break Python does and more: the carriage return, the line feed, the
+    vertical tab, the form feed, the file, group and record separators, the next line, and the line and paragraph
+    separators. The tokenizer only breaks a line at the first two, but an editor, a diff or a reviewer may break it
+    at any of them, and a line they show as code has to be code. Trailing spaces are dropped, as `ruff format`
+    drops them from a comment.
+    """
+    return [line.rstrip() for line in text.splitlines()] or [""]
 
 
 def normalized_docstring_text(text: str) -> str:

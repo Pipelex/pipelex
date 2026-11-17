@@ -21,7 +21,7 @@ above `V`, and this is the only one there is.
 """
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_structure_blueprint import ANY_NESTED_FIELD_TYPE, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 
@@ -281,7 +281,7 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
                     description="The JSON object",
                     type=ConceptStructureBlueprintFieldType.DICT,
                     key_type="text",
-                    value_type="Any",
+                    value_type=ANY_NESTED_FIELD_TYPE,
                 ),
                 **_stored_value_fields(stored_desc="JSON object", measured_desc="JSON object's serialized form", mime_types_desc="application/json"),
             }

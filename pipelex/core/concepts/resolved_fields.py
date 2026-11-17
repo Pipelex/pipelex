@@ -22,7 +22,12 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType, field_may_hold_nothing
+from pipelex.core.concepts.concept_structure_blueprint import (
+    ANY_NESTED_FIELD_TYPE,
+    ConceptStructureBlueprint,
+    ConceptStructureBlueprintFieldType,
+    field_may_hold_nothing,
+)
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.qualified_ref import QualifiedRef
 
@@ -182,10 +187,14 @@ def _resolve_scalar_type_name(type_name: str | None, *, local_domain: str | None
     """Resolve a nested type named by a string (a list `item_type` / dict `value_type`).
 
     These positions carry a `ConceptStructureBlueprintFieldType` value as a string, never a concept
-    ref (concept nesting uses the dedicated `concept` / `item_concept_ref` path). An unset or
-    unrecognized name is genuine source imprecision, surfaced as ANY rather than guessed.
+    ref (concept nesting uses the dedicated `concept` / `item_concept_ref` path). An unset name is
+    genuine source imprecision, surfaced as ANY rather than guessed.
+
+    The blueprint refuses an unrecognized name at load (`NESTED_FIELD_TYPE_NAMES`), so the arm that
+    reports one only meets a blueprint built around that validation. It quotes the name with `repr`
+    all the same: the reason reaches an emitted comment, where a line break in it would end the comment.
     """
-    if type_name is None or type_name == "Any":
+    if type_name is None or type_name == ANY_NESTED_FIELD_TYPE:
         # "Any" is the explicit unspecified-value sentinel (dict blueprints require a value_type,
         # so native expansion writes "Any" where the values are genuinely untyped).
         return ResolvedType(kind=ResolvedTypeKind.ANY, imprecise=True, imprecision_reason=f"{context} type unspecified")
@@ -193,7 +202,7 @@ def _resolve_scalar_type_name(type_name: str | None, *, local_domain: str | None
         field_type = ConceptStructureBlueprintFieldType(type_name)
     except ValueError:
         return ResolvedType(
-            kind=ResolvedTypeKind.ANY, imprecise=True, imprecision_reason=f"{context} type '{type_name}' is not a recognized field type"
+            kind=ResolvedTypeKind.ANY, imprecise=True, imprecision_reason=f"{context} type {type_name!r} is not a recognized field type"
         )
 
     match field_type:

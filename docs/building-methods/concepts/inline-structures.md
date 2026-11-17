@@ -64,6 +64,8 @@ Each field can specify:
 - **concept_ref** and **item_concept_ref**: For `concept` fields (and `list` fields whose items are concepts), the concept being referenced
 - **hints**: Non-normative presentation intent for this field — see [Intent Hints](intent-hints.md)
 
+`item_type` and `value_type` take one of the field types above (`text`, `integer`, `number`, `boolean`, `date`, `datetime`, `time`, `list`, `dict`, `concept`) or `Any`, for values whose type is genuinely unspecified. Any other name is refused when the method loads, a concept's name included: a list of concepts is `item_type = "concept"` with its `item_concept_ref`.
+
 Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
 
 A field may share its name with a Python type or with a name the generated class uses, such as `date = { type = "date", ... }`, `str`, `list` or `Field`: the structure class Pipelex builds for the concept when it loads the method imports every such name under an alias (`date: _date = Field(...)`), so the field neither hides its own type nor the types of the fields after it. The Python targets of [`pipelex codegen`](../../under-the-hood/codegen-projections.md), `python-structures` and `python-pydantic`, do not alias these names yet, so for a structure with such a field they write Python types that fail at import; the `ts-zod` target, which writes each field as an object key, is unaffected. The one name a structure cannot take is the name Pipelex gives the Python class of a concept the structure refers to, `<domain>__<Concept>` (a field named `shop__Item` in a structure that holds a `shop.Item`): validation refuses it with a `method.concept_invalid` error naming the concept and the field.

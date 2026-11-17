@@ -35,6 +35,7 @@ from pipelex.pipe_machinery.validation import is_input_used_by_variables
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
+from pipelex.pipe_operators.shared.schema_mismatch_params import filling_schema_mismatch_params
 from pipelex.pipe_run.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
@@ -296,6 +297,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             llm_choice_for_text=llm_for_text_choice,
         )
         templating_style = resolve_templating_style(authored=self.templating_style)
+        # Fully resolved, not `llm_setting_*.model`: the deck advances one hop, so a preset lands on another alias and
+        # a DRY run could only ever report a half-resolved handle. Resolving here makes the reported model identical
+        # whether or not the pipe ran, and names it on an answer that does not fit when no worker attributed one.
+        resolved_model = concrete_llm_model_handle(llm_setting_main.model)
+        resolved_model_for_object = concrete_llm_model_handle(llm_setting_for_object.model)
+        # The concept resolved for this run, which an answer that does not fit names: `self.output` stays `Dynamic`.
+        output_concept_ref = output_stuff_spec.concept.concept_ref
 
         llm_prompt_run_params = PipeRunParams.copy_by_injecting_multiplicity(
             pipe_run_params=pipe_run_params,
@@ -322,86 +330,84 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
             and not is_multiple_output
         ):
-            try:
-                text_result = await run_llm_text(
-                    memory=working_memory,
-                    prompt_content=prompt_content,
-                    llm_setting=llm_setting_main,
-                    concept=output_stuff_spec.concept,
-                    output_class=output_class,
-                    job_metadata=job_metadata,
-                    cogt_run_params=pipe_run_params.cogt_run_params,
-                    templating_style=templating_style,
-                    extra_params=llm_prompt_run_params.params,
-                    result_name=output_name,
-                    result_code=pipe_run_params.final_stuff_code,
-                )
-            except Jinja2TemplateInvalidError as exc:
-                if not exc.template_owner.is_method:
-                    # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
-                    # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
-                    raise
-                raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
-            except LLMCompletionError as exc:
-                location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main], output_class=output_class)
-                msg = f"Error generating text with LLM {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-            except ValidationError as exc:
-                # Not classified as the caller's fault, here or on the object path below, where an
-                # output the model could not fit to the structure surfaces as `LLMCompletionError`:
-                # whether a model's output fits depends on what the model produced this time.
-                # The refused value is the model's answer, the run's data: the message names its fields and reasons alone.
-                location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = format_validation_error_without_input(validation_error=exc, validated_type=output_class)
-                msg = f"Error generating text content in PipeLLM {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
-                    CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
-                ) from exc
+            with filling_schema_mismatch_params(concept_ref=output_concept_ref, model_handle=resolved_model):
+                try:
+                    text_result = await run_llm_text(
+                        memory=working_memory,
+                        prompt_content=prompt_content,
+                        llm_setting=llm_setting_main,
+                        concept=output_stuff_spec.concept,
+                        output_class=output_class,
+                        job_metadata=job_metadata,
+                        cogt_run_params=pipe_run_params.cogt_run_params,
+                        templating_style=templating_style,
+                        extra_params=llm_prompt_run_params.params,
+                        result_name=output_name,
+                        result_code=pipe_run_params.final_stuff_code,
+                    )
+                except Jinja2TemplateInvalidError as exc:
+                    if not exc.template_owner.is_method:
+                        # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
+                        # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
+                        raise
+                    raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
+                except LLMCompletionError as exc:
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main], output_class=output_class)
+                    msg = f"Error generating text with LLM {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+                except ValidationError as exc:
+                    # Not classified as the caller's fault, here or on the object path below, where an
+                    # output the model could not fit to the structure surfaces as `LLMCompletionError`:
+                    # whether a model's output fits depends on what the model produced this time.
+                    # The refused value is the model's answer, the run's data: the message names its fields and reasons alone.
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    error_details = format_validation_error_without_input(validation_error=exc, validated_type=output_class)
+                    msg = f"Error generating text content in PipeLLM {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                        CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
+                    ) from exc
             working_memory = text_result.memory
             rendered_llm_prompt = text_result.rendered_prompt
             structuring_path = text_result.structuring_path
         else:
-            try:
-                object_result = await run_llm_object(
-                    memory=working_memory,
-                    prompt_content=prompt_content,
-                    llm_setting=llm_setting_for_object,
-                    concept=output_stuff_spec.concept,
-                    output_class=output_class,
-                    job_metadata=job_metadata,
-                    cogt_run_params=pipe_run_params.cogt_run_params,
-                    is_multiple_output=is_multiple_output,
-                    fixed_nb_output=fixed_nb_output,
-                    templating_style=templating_style,
-                    extra_params=llm_prompt_run_params.params,
-                    result_name=output_name,
-                    result_code=pipe_run_params.final_stuff_code,
-                )
-            except Jinja2TemplateInvalidError as exc:
-                if not exc.template_owner.is_method:
-                    # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
-                    # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
-                    raise
-                raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
-            except LLMCompletionError as exc:
-                location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object], output_class=output_class)
-                what_failed = "list of objects" if is_multiple_output else "single object"
-                msg = f"Error generating {what_failed} with direct method {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            with filling_schema_mismatch_params(concept_ref=output_concept_ref, model_handle=resolved_model_for_object):
+                try:
+                    object_result = await run_llm_object(
+                        memory=working_memory,
+                        prompt_content=prompt_content,
+                        llm_setting=llm_setting_for_object,
+                        concept=output_stuff_spec.concept,
+                        output_class=output_class,
+                        job_metadata=job_metadata,
+                        cogt_run_params=pipe_run_params.cogt_run_params,
+                        is_multiple_output=is_multiple_output,
+                        fixed_nb_output=fixed_nb_output,
+                        templating_style=templating_style,
+                        extra_params=llm_prompt_run_params.params,
+                        result_name=output_name,
+                        result_code=pipe_run_params.final_stuff_code,
+                    )
+                except Jinja2TemplateInvalidError as exc:
+                    if not exc.template_owner.is_method:
+                        # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
+                        # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
+                        raise
+                    raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
+                except LLMCompletionError as exc:
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object], output_class=output_class)
+                    what_failed = "list of objects" if is_multiple_output else "single object"
+                    msg = f"Error generating {what_failed} with direct method {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             working_memory = object_result.memory
             rendered_llm_prompt = object_result.rendered_prompt
             structuring_path = object_result.structuring_path
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
-            # Fully resolved, not `llm_setting_*.model`: the deck advances one hop, so a
-            # preset lands on another alias and a DRY run could only ever report a
-            # half-resolved handle. Resolving here makes the reported model identical
-            # whether or not the pipe ran.
-            "resolved_model": concrete_llm_model_handle(llm_setting_main.model),
-            "resolved_model_for_object": concrete_llm_model_handle(llm_setting_for_object.model),
+            "resolved_model": resolved_model,
+            "resolved_model_for_object": resolved_model_for_object,
             "is_multiple_output": is_multiple_output,
             # As the leaf handed the prompt back: a text past the trace's bound is its preview, with its size and hash.
             "rendered_system_prompt": rendered_llm_prompt.traced_system_text,

@@ -124,6 +124,10 @@ rationale = "Runs the given plxt subcommand; single operand."
 param = "result_payload"
 rationale = "Renders the result_payload; single operand."
 
+["pipelex/cli/agent_cli/commands/run/_output_helpers.py::_revive_safe_marker"]
+param = "obj"
+rationale = "json.loads calls its object_hook positionally with the decoded object, so the one parameter must stay positional"
+
 ["pipelex/cli/agent_cli/commands/run/_output_helpers.py::format_run_markdown"]
 param = "result"
 rationale = "Renders the result; single operand."
@@ -724,6 +728,10 @@ rationale = "Single-operand transformation: derives the name mapping over the wh
 param = "name"
 rationale = "Single-operand conversion of the name."
 
+["pipelex/codegen/emitters/python_common.py::_imprecision_comment"]
+param = "field"
+rationale = "Noun-named derivation: the imprecision comment of the field; single operand."
+
 ["pipelex/codegen/emitters/python_common.py::_split_top_level"]
 param = "inner"
 rationale = "Verb-object: splits the bracket inner text; single operand."
@@ -747,6 +755,10 @@ rationale = "Verb-object: orders the concepts; in_module is context."
 ["pipelex/codegen/emitters/python_common.py::order_by_base.visit"]
 param = "concept"
 rationale = "Visitor: visits the concept; single operand."
+
+["pipelex/codegen/emitters/python_common.py::refuse_unexpected_python_module_shape"]
+param = "body"
+rationale = "Verb-object: refuse the module body of an unexpected shape; single operand."
 
 ["pipelex/codegen/emitters/python_common.py::render_import_block"]
 param = "imports"
@@ -2447,10 +2459,6 @@ rationale = "Transforms the description; single operand."
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_line"]
 param = "resolved_field"
 rationale = "Noun-named derivation: the source line for the resolved field; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._is_string_statement"]
-param = "statement"
-rationale = "Predicate on the statement; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_for_concept"]
 param = "resolved_type"
@@ -6052,6 +6060,10 @@ rationale = "Parses/reads the path; single operand."
 param = "mime_type"
 rationale = "Transforms the mime_type; single operand."
 
+["pipelex/tools/misc/generated_module_shape.py::is_string_statement"]
+param = "statement"
+rationale = "Predicate on the statement; single operand."
+
 ["pipelex/tools/misc/hash_utils.py::hash_md5_to_int"]
 param = "string"
 rationale = "Transforms the string; single operand."
@@ -6211,6 +6223,10 @@ rationale = "Single-operand conversion of the value."
 ["pipelex/tools/misc/python_literals.py::class_docstring"]
 param = "description"
 rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
+
+["pipelex/tools/misc/python_literals.py::comment_lines"]
+param = "text"
+rationale = "Noun-named derivation: the comment lines of the text; single operand."
 
 ["pipelex/tools/misc/python_literals.py::escape_py_string"]
 param = "value"

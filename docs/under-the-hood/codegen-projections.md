@@ -220,6 +220,17 @@ The remaining findings are artifacts of *how* you lint, not of file content. Non
 - `D301` ("use `r\"\"\"`") on a description rendered as an escaped docstring, in any of the cases listed under Docstrings above. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
 - Import grouping for the `python-structures` target assumes `pipelex` is a third-party dependency — which it is in your tree. The Pipelex repo itself, where `pipelex` is first-party, is the one place ruff wants the opposite order; no generated artifact is committed there, so the consumer's grouping is the one the emitter targets.
 
+### Authored text never becomes code
+
+An emitted Python module is imported by the developer's app, tests and CI, so whatever it holds runs there. The method that projects into it may be someone else's, fetched from a catalog or a `method_ref`, so every authored string that reaches emitted code is rendered as one of two things, and never interpolated as source:
+
+- **A literal.** Descriptions, choices, default values and dictionary keys go through `pipelex.tools.misc.python_literals` (`escape_py_string`, `class_docstring`), which writes them with Python's own escaping.
+- **A fully prefixed comment.** Text written into a comment, such as the reasons of an `# imprecise:` comment, is split by `comment_lines` on every line break `str.splitlines` knows, and each line is led by its own `#`, so a line break in the text cannot end the comment and leave the rest of it to be read as code. A reason quotes an authored name with `repr`, which escapes the line break in the first place.
+
+The names that are written as code are checked where they are authored: a field name is a Python identifier, a concept ref is a concept ref, and the nested type names of a list's `item_type` and a dict's `value_type` are refused at load unless they name a field type or the `Any` sentinel (`NESTED_FIELD_TYPE_NAMES`).
+
+Every emitted Python module is then **shape-checked** before it is stamped, written or served: `python_module_body` parses it with `ast` and refuses, with `CodegenEmissionError` (`runtime.unexpected`, a fault of the emitter), a module that does not parse or that holds any statement other than its imports, its classes, their docstrings, their annotated fields and the `model_config` of an opaque concept. The check is `generated_module_shape_refusal` in `pipelex/tools/misc/generated_module_shape.py`, the same one the runtime structure generator applies to the module it executes, so the two generators cannot drift apart on what a generated module may hold.
+
 ## Serving the engine over HTTP
 
 The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen` and `POST /v1/pipe-io` — the route envelopes are documented on the API server's [Resolve & Codegen](../api-server/codegen.md) and [Pipe I/O](../api-server/pipe-io.md) pages). Host-facing cores make that possible without any CLI plumbing:
@@ -231,7 +242,7 @@ The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/co
 
 A deterministic tool that guesses is a liability. Where a resolved type carries an imprecision marker, the emitter surfaces it rather than inventing a shape:
 
-- Python emitters append an inline `# imprecise: <reason>` comment on the field.
+- Python emitters append an inline `# imprecise: <reason>` comment on the field, written one `#` per line (see [Authored text never becomes code](#authored-text-never-becomes-code)).
 - The ts-zod emitter emits `z.unknown()` plus a JSDoc `@imprecise <reason>` tag.
 
 Two concept-level cases are surfaced the same honest way:
