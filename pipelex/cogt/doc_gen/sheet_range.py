@@ -151,13 +151,14 @@ _ONE_AREA = re.compile(rf"(?P<sheet>{_SHEET_PART})!(?P<first>{_CELL_PART})(?::(?
 _SEVERAL_AREAS = re.compile(rf"{_SHEET_PART}!{_CELL_PART}(?::{_CELL_PART})?(?:,{_SHEET_PART}!{_CELL_PART}(?::{_CELL_PART})?)+")
 _WHOLE_LINES = re.compile(rf"{_SHEET_PART}!(?:\$?[A-Za-z]{{1,3}}:\$?[A-Za-z]{{1,3}}|\$?[0-9]+:\$?[0-9]+)")
 # A total: one aggregate of one range written with a colon, and nothing else, as `=SUM(C4:C5)` or `=SUBTOTAL(109,$C$4:$C$5)`.
+# Every run of spaces is possessive, so a formula that fails to match costs its length, never its length squared.
 _RANGE_PART = (
-    r"(?:(?P<sheet>[^'!(),\s]+|'(?:[^']|'')+')\s*!)?\s*\$?(?P<first_letters>[A-Za-z]{1,3})\$?(?P<first_row>[0-9]+)"
-    r"\s*:\s*\$?(?P<last_letters>[A-Za-z]{1,3})\$?(?P<last_row>[0-9]+)"
+    r"(?:(?P<sheet>[^'!(),\s]+|'(?:[^']|'')+')\s*+!)?\s*+\$?(?P<first_letters>[A-Za-z]{1,3})\$?(?P<first_row>[0-9]+)"
+    r"\s*+:\s*+\$?(?P<last_letters>[A-Za-z]{1,3})\$?(?P<last_row>[0-9]+)"
 )
 _AGGREGATE_FORMULA = re.compile(
-    rf"\s*=?\s*(?:(?:SUM|AVERAGE|MIN|MAX|COUNT|COUNTA|PRODUCT)\s*\(\s*|SUBTOTAL\s*\(\s*[0-9]+\s*,\s*"
-    rf"|(?:_xlfn\.)?AGGREGATE\s*\(\s*[0-9]+\s*,\s*[0-9]+\s*,\s*){_RANGE_PART}\s*\)\s*",
+    rf"\s*+=?\s*+(?:(?:SUM|AVERAGE|MIN|MAX|COUNT|COUNTA|PRODUCT)\s*+\(\s*+|SUBTOTAL\s*+\(\s*+[0-9]+\s*+,\s*+"
+    rf"|(?:_xlfn\.)?AGGREGATE\s*+\(\s*+[0-9]+\s*+,\s*+[0-9]+\s*+,\s*+){_RANGE_PART}\s*+\)\s*+",
     re.IGNORECASE,
 )
 

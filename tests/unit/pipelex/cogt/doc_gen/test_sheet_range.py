@@ -7,6 +7,7 @@ import pytest
 from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table
 
+from pipelex.cogt.doc_gen import sheet_range as sheet_range_module
 from pipelex.cogt.doc_gen.sheet_range import (
     RegionKind,
     SheetRange,
@@ -687,6 +688,37 @@ class TestTotalsLineAndFooter:
         refusal = _refusal({**TOTALLED_CELLS, "B5": "=SUM(B2:B4)"}, cached_values={**TOTALLED_VALUES, "B5": 10})
 
         assert refusal.cell == "Expenses!B5"
+
+    @staticmethod
+    def _find_with_total(*, totals_formula: str) -> SheetRegion:
+        """The range of a header, two data rows and `totals_formula` in B4, written straight onto the worksheet."""
+        worksheet = formula_workbook(sheet_workbook(cells={"A1": "item", "B1": "amount", "A2": "Paper", "B2": 2, "A3": "Ink", "B3": 3})).worksheets[0]
+        worksheet.cell(row=4, column=2, value=totals_formula)
+        return find_sheet_range(worksheet=worksheet, value_worksheet=worksheet, header_row=None, subject=SUBJECT)
+
+    def test_a_long_run_of_spaces_in_a_formula_that_totals_nothing_costs_its_length(self) -> None:
+        """A cell holds 32,767 characters at most, which openpyxl truncates to: the formula stays under it, its end kept."""
+        started = time.perf_counter()
+        region = self._find_with_total(totals_formula="=SUM(" + " " * 32_000 + "B2:B3x)")
+
+        assert time.perf_counter() - started < 0.5
+        assert region.totals_row_count == 0
+
+    def test_the_aggregate_pattern_fails_a_long_run_of_spaces_in_linear_time(self) -> None:
+        formula = "=SUM(" + " " * 100_000 + "A1:A2x)"
+
+        started = time.perf_counter()
+        totals = sheet_range_module._aggregates_column(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+            formula=formula, sheet_title="Expenses", column=1, first_row=1, last_row=2
+        )
+
+        assert time.perf_counter() - started < 0.1
+        assert not totals
+
+    def test_spaces_around_a_total_s_range_are_read(self) -> None:
+        region = self._find_with_total(totals_formula="= SUM(" + " " * 1_000 + "B2 : B3" + " " * 1_000 + ") ")
+
+        assert list(region.totals_rows) == [4]
 
     def test_a_wide_sparse_header_costs_the_cells_the_sheet_stores(self) -> None:
         workbook = formula_workbook(sheet_workbook(cells={"A1": "item"}))
