@@ -61,10 +61,10 @@ Each field can specify:
 - **choices**: For `enum`-like fields, a list of valid values
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
-
-`item_type` and `value_type` take one of the field types above (`text`, `integer`, `number`, `boolean`, `date`, `datetime`, `time`, `list`, `dict`, `concept`) or `Any`, for values whose type is genuinely unspecified. Any other name is refused when the method loads, a concept's name included: a list of concepts is `item_type = "concept"` with its `item_concept_ref`.
 - **concept_ref** and **item_concept_ref**: For `concept` fields (and `list` fields whose items are concepts), the concept being referenced
 - **hints**: Non-normative presentation intent for this field — see [Intent Hints](intent-hints.md)
+
+`item_type` and `value_type` take one of the field types above (`text`, `integer`, `number`, `boolean`, `date`, `datetime`, `time`, `list`, `dict`, `concept`) or `Any`, for values whose type is genuinely unspecified. Any other name is refused when the method loads, a concept's name included: a list of concepts is `item_type = "concept"` with its `item_concept_ref`.
 
 Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
 
