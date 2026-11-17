@@ -7,7 +7,8 @@ from pipelex.cogt.doc_gen.input_shape import InputShape
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, table_match_refusal
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, sheet_range_refusal, table_match_refusal
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.tools.uri.uri_read_scope import UriReference
 
@@ -137,6 +138,7 @@ class DocumentComposition(BaseModel):
     match_on: list[str] | None = Field(default=None, description="Under `update`, the fields of the records whose columns are the Table's key")
     match_row: str | None = Field(default=None, description="Under `update`, the field of the records holding the row's position")
     cells: CellPolicy | None = Field(default=None, strict=False, description="Under `update`, which cells of a matched row may be written")
+    sheet_range: SheetRangeFill | None = Field(default=None, description="Under `append` or `update`, the range on a sheet one list fills")
 
     @property
     def template_name(self) -> str | None:
@@ -177,6 +179,10 @@ class DocumentComposition(BaseModel):
         match_refusal = table_match_refusal(table_fill=self.table_fill, match_on=self.match_on, match_row=self.match_row, cells=self.cells)
         if match_refusal is not None:
             msg = f"A document composed this way cannot match its records to rows: {match_refusal}."
+            raise ValueError(msg)
+        range_refusal = sheet_range_refusal(table_fill=self.table_fill, sheet_range=self.sheet_range)
+        if range_refusal is not None:
+            msg = f"A document composed this way cannot fill a range on a sheet: {range_refusal}."
             raise ValueError(msg)
         self._validate_url_base()
         return self
@@ -235,6 +241,7 @@ class DocumentComposition(BaseModel):
             match_on=self.match_on,
             match_row=self.match_row,
             cells=self.cells,
+            sheet_range=self.sheet_range,
             data=self.data,
             base_url=self.url_base.base_url if self.url_base is not None else None,
         )

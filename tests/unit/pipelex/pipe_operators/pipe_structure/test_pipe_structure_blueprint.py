@@ -1,4 +1,8 @@
+import re
+from typing import Any
+
 import pytest
+from pydantic import ValidationError
 
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 
@@ -80,3 +84,37 @@ class TestPipeStructureBlueprint:
             output="Foo",
         )
         assert blueprint.input_names == ["draft_text"]
+
+
+class TestPipeStructureSheetRangeBlueprint:
+    @pytest.mark.parametrize(
+        ("sheet_range", "expected"),
+        [
+            ({}, (None, None)),
+            ({"sheet": "Expenses"}, ("Expenses", None)),
+            ({"sheet": "Expenses", "header_row": 3}, ("Expenses", 3)),
+        ],
+        ids=["the-only-sheet", "a-named-sheet", "a-named-sheet-and-header-row"],
+    )
+    def test_accepted_sheet_ranges(self, sheet_range: dict[str, Any], expected: tuple[str | None, int | None]) -> None:
+        blueprint = PipeStructureBlueprint.model_validate(
+            {"description": "Read", "inputs": {"expenses": "Document"}, "output": "Expense[]", "sheet_range": sheet_range}
+        )
+
+        assert blueprint.sheet_range is not None
+        assert (blueprint.sheet_range.sheet, blueprint.sheet_range.header_row) == expected
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected_message"),
+        [
+            ({"table": "Lines", "sheet_range": {}}, "use 'table' or 'sheet_range', not both"),
+            ({"sheet_range": {"header_row": 0}}, "greater than or equal to 1"),
+            ({"sheet_range": {"header_row": "3"}}, "valid integer"),
+            ({"sheet_range": {"header_row": 2.0}}, "valid integer"),
+            ({"sheet_range": {"range": "A3:D9"}}, "Extra inputs are not permitted"),
+        ],
+        ids=["with-table", "row-zero", "row-as-text", "row-as-number", "unknown-field"],
+    )
+    def test_refused_sheet_ranges(self, overrides: dict[str, Any], expected_message: str) -> None:
+        with pytest.raises(ValidationError, match=re.escape(expected_message)):
+            PipeStructureBlueprint(description="Read", inputs={"expenses": "Document"}, output="Expense[]", **overrides)

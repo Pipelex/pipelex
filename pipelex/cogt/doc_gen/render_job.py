@@ -25,7 +25,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
-from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, table_match_refusal
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, sheet_range_refusal, table_match_refusal
 
 #: The start of every URL that names a file of a document's method tree: the job's `base_url`, and every URL an engine
 #: joins to it, such as a stylesheet's and the URLs it holds. Its host is in the `.invalid` domain, which RFC 2606
@@ -83,6 +84,20 @@ class RenderJob(BaseModel):
     - **A failure names the Table, the column and the row's key or position, and never a cell's value**, which is the
       run's data.
 
+    Under `append` or `update`, the job may carry `sheet_range`, a range on a sheet holding no Table that one list of the
+    step's data fills, which reaches only an engine whose model declares `sheet_range`. An engine that declares it
+    honours these rules:
+
+    - **The range is the shared finder's.** The engine resolves it with `pipelex.cogt.doc_gen.sheet_range`
+      (`resolve_sheet_range`), the function Pipelex's spreadsheet reader resolves it with, so the rows an update
+      matches by `match_row` are the rows a `PipeStructure` read of the same sheet numbered. A worksheet holding one
+      Table is that Table's range, and the finder's refusals fail the fill, naming the sheet and the cell.
+    - **The list named fills the range and no Table.** `sheet_range.list` is the list's path in `data`, and that list is
+      taken out of the binding of lists to Tables by name, so a Table sharing its name is not filled from it too.
+    - **The fills work as on a Table, on the range's rows.** The append writes after the last data row, a cell in the
+      way failing it, a totals line directly under the data included; the update writes into the rows the records
+      match, never into a cell holding a formula.
+
     The template file's bytes are the method's file or a file the run supplied as one of its inputs, which the engine
     cannot tell apart and need not: `template_name` names it for messages either way, the file as the method names it,
     such as `invoice.xlsx`, or the input, such as `the input 'workbook'`, and never the name of a file the run supplied.
@@ -118,6 +133,10 @@ class RenderJob(BaseModel):
         default=None,
         strict=False,
         description="Under `update`, which cells of a matched row may be written: `fill_empty` or `overwrite`; None under any other fill",
+    )
+    sheet_range: SheetRangeFill | None = Field(
+        default=None,
+        description="Under `append` or `update`, the range on a sheet holding no Table that one list fills; None for Tables alone",
     )
     data: dict[str, Any] = Field(
         default_factory=dict,
@@ -156,6 +175,10 @@ class RenderJob(BaseModel):
         match_refusal = table_match_refusal(table_fill=self.table_fill, match_on=self.match_on, match_row=self.match_row, cells=self.cells)
         if match_refusal is not None:
             msg = f"A render job cannot match its records to rows this way: {match_refusal}."
+            raise ValueError(msg)
+        range_refusal = sheet_range_refusal(table_fill=self.table_fill, sheet_range=self.sheet_range)
+        if range_refusal is not None:
+            msg = f"A render job cannot fill a range on a sheet this way: {range_refusal}."
             raise ValueError(msg)
         if self.base_url is not None:
             if not self.source.is_html:

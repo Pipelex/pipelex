@@ -13,6 +13,7 @@ from pipelex.tools.tabular.exceptions import CsvColumnError, TableSelectionError
 from pipelex.tools.tabular.table_reader import read_table_records, table_format_key_of, table_format_of
 from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 from pipelex.tools.tabular.table_records import TableBinding, TableFormat, TableRecords
+from pipelex.tools.tabular.table_selector import TableSelector
 from tests.helpers.xlsx_workbooks import single_table_workbook, with_entries_reordered
 
 FIELD_NAMES = ["line", "item", "amount"]
@@ -32,7 +33,7 @@ def _read_csv(text: str, *, table_name: str | None = None, limits: TableReadingC
         table_format=TableFormat.CSV,
         field_names=FIELD_NAMES,
         row_field="line",
-        table_name=table_name,
+        table_selector=TableSelector(table=table_name),
         binding=TableBinding.STEP,
         limits=limits,
         input_name="budget",
@@ -169,7 +170,7 @@ class TestTableReader:
             table_format=table_format,
             field_names=FIELD_NAMES,
             row_field="line",
-            table_name=None,
+            table_selector=TableSelector(),
             binding=TableBinding.STEP,
             limits=TABLE_READING_FALLBACK,
             input_name="budget",
@@ -187,7 +188,7 @@ class TestTableReader:
             table_format=TableFormat.XLSX,
             field_names=FIELD_NAMES,
             row_field="line",
-            table_name="budget",
+            table_selector=TableSelector(table="budget"),
             binding=TableBinding.STEP,
             limits=TABLE_READING_FALLBACK,
             input_name="budget",

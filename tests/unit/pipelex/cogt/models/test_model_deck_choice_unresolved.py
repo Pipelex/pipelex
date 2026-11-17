@@ -115,7 +115,12 @@ def _use_deck(mocker: MockerFixture, *, model_deck: ModelDeck) -> None:
 
 def _resolve_doc_gen_default() -> Any:
     return resolve_doc_gen_setting(
-        doc_gen_choice=None, doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT, pipe_code=None, table_fill=TableFill.REPLACE
+        doc_gen_choice=None,
+        doc_gen_format=DocGenFormat.PDF,
+        source=DocGenSource.LAYOUT,
+        pipe_code=None,
+        table_fill=TableFill.REPLACE,
+        fills_sheet_range=False,
     )
 
 

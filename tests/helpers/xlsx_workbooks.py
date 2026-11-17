@@ -1,4 +1,4 @@
-"""Excel workbooks built in code for the tests of the spreadsheet readers: Tables of rows, no binary fixture committed.
+"""Excel workbooks built in code for the tests of the spreadsheet readers: Tables, named ranges and plain ranges of rows.
 
 A workbook openpyxl writes stores no cached value for a formula, which is what `formula_with_cached_value` patches in.
 """
@@ -8,9 +8,11 @@ import re
 import zipfile
 from collections.abc import Callable
 from typing import Any
+from xml.sax.saxutils import escape
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.table import Table
 
 
@@ -84,6 +86,31 @@ def formula_with_cached_value(*, xlsx_bytes: bytes, cached_value: str) -> bytes:
     return buffer.getvalue()
 
 
+def with_cached_values(*, xlsx_bytes: bytes, cached_values: dict[str, Any]) -> bytes:
+    """Give formulas of the first sheet, by cell address, the value Excel stores for each when it saves.
+
+    A text is stored as a formula's text result (`t="str"`), the empty text included, as `=IF(A3="","",1)` stores in a
+    row still to fill; a number is stored as a number. A formula left out keeps no stored value.
+    """
+
+    def rewrite(content: bytes) -> bytes:
+        text = content.decode("utf-8")
+        for address, cached_value in cached_values.items():
+            type_attribute = ' t="str"' if isinstance(cached_value, str) else ""
+            stored = escape(cached_value) if isinstance(cached_value, str) else str(cached_value)
+            text, nb_replaced = re.subn(
+                rf'<c r="{address}"([^>]*?)(?: t="[^"]*")?><f>(.*?)</f>(?:<v\s*/>|<v>[^<]*</v>)?</c>',
+                rf'<c r="{address}"\1{type_attribute}><f>\2</f><v>{stored}</v></c>',
+                text,
+            )
+            if nb_replaced != 1:
+                msg = f"The first sheet holds no formula cell {address}."
+                raise ValueError(msg)
+        return text.encode("utf-8")
+
+    return with_part_rewritten(xlsx_bytes=xlsx_bytes, part_name="xl/worksheets/sheet1.xml", rewrite=rewrite)
+
+
 def with_part_rewritten(*, xlsx_bytes: bytes, part_name: str, rewrite: Callable[[bytes], bytes]) -> bytes:
     """The bytes of a workbook whose part `part_name` is rewritten, the other parts kept as they are."""
     source = zipfile.ZipFile(io.BytesIO(xlsx_bytes))
@@ -133,3 +160,52 @@ def with_entries_reordered(*, xlsx_bytes: bytes, leading_names: list[str]) -> by
             content = source.read(name) if name in existing_names else b""
             target.writestr(name, content)
     return buffer.getvalue()
+
+
+def sheet_workbook(
+    *,
+    cells: dict[str, Any],
+    sheet_title: str = "Expenses",
+    merged: tuple[str, ...] = (),
+    filter_ref: str | None = None,
+    other_sheets: tuple[str, ...] = (),
+) -> bytes:
+    """The bytes of a workbook whose first worksheet holds `cells`, by address, and no Table: a plain range of rows.
+
+    `merged` are ranges to merge, `filter_ref` the range the sheet's filter covers, and `other_sheets` the titles of
+    further, empty worksheets.
+    """
+    workbook = Workbook()
+    worksheet = workbook.active
+    assert worksheet is not None
+    worksheet.title = sheet_title
+    for address, cell_value in cells.items():
+        worksheet[address] = cell_value
+    for merged_range in merged:
+        worksheet.merge_cells(merged_range)
+    if filter_ref is not None:
+        worksheet.auto_filter.ref = filter_ref
+    for other_title in other_sheets:
+        workbook.create_sheet(title=other_title)
+    return workbook_bytes(workbook)
+
+
+def with_defined_name(*, xlsx_bytes: bytes, name: str, definition: str, sheet_title: str | None = None) -> bytes:
+    """The bytes of a workbook that also defines `name` as `definition`, for the whole workbook or, given `sheet_title`, for that sheet."""
+    workbook = load_workbook(io.BytesIO(xlsx_bytes))
+    defined_name = DefinedName(name, attr_text=definition)
+    if sheet_title is None:
+        workbook.defined_names[name] = defined_name
+    else:
+        workbook[sheet_title].defined_names[name] = defined_name
+    return workbook_bytes(workbook)
+
+
+def formula_workbook(xlsx_bytes: bytes) -> Workbook:
+    """A workbook's bytes opened with its formulas, as the range finder reads them."""
+    return load_workbook(io.BytesIO(xlsx_bytes), data_only=False)
+
+
+def value_workbook(xlsx_bytes: bytes) -> Workbook:
+    """A workbook's bytes opened with the values it stores, which the range finder reads beside its formulas."""
+    return load_workbook(io.BytesIO(xlsx_bytes), data_only=True)

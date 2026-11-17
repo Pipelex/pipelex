@@ -14,16 +14,25 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation import table_read_generate
 from pipelex.cogt.content_generation.assignment_models import TableReadAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.table_read_generate import read_table_of_document
+from pipelex.cogt.doc_gen.sheet_range import SheetRange
 from pipelex.errors.problem import ProblemView
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
-from pipelex.tools.tabular.exceptions import CsvColumnError, TableFileTypeUnsupportedError, TableReaderMisconfiguredError, TableTooLargeError
+from pipelex.tools.tabular.exceptions import (
+    CsvColumnError,
+    TableFileTypeUnsupportedError,
+    TableRangeUnclearError,
+    TableReaderMisconfiguredError,
+    TableTooLargeError,
+)
 from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 from pipelex.tools.tabular.table_records import TableFormat, TableRecords
-from tests.helpers.xlsx_workbooks import single_table_workbook
+from pipelex.tools.tabular.table_selector import TableSelector
+from tests.helpers.xlsx_workbooks import sheet_workbook, single_table_workbook
 
 _MODULE = "pipelex.cogt.content_generation.table_read_generate"
 STORAGE_SCOPE = "org/method/run"
@@ -35,7 +44,7 @@ def _job_metadata() -> JobMetadata:
     return JobMetadata(run_metadata=RunMetadata(storage_scope=STORAGE_SCOPE, read_scope=None, user_id="u", pipeline_run_id="run"))
 
 
-def _assignment(*, key: str, mime_type: str | None, file_name: str | None, table_name: str | None = None) -> TableReadAssignment:
+def _assignment(*, key: str, mime_type: str | None, file_name: str | None, table_selector: TableSelector | None = None) -> TableReadAssignment:
     return TableReadAssignment(
         job_metadata=_job_metadata(),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
@@ -45,7 +54,7 @@ def _assignment(*, key: str, mime_type: str | None, file_name: str | None, table
         input_name="budget",
         field_names=["line", "item", "amount"],
         row_field="line",
-        table_name=table_name,
+        table_selector=table_selector or TableSelector(),
     )
 
 
@@ -144,6 +153,39 @@ class TestTableReadGenerate:
         wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
         assert wire.get("params") == {"input": "budget", "field": "item"}, wire
 
+    async def test_the_direct_content_generator_reads_the_range_the_step_s_selector_names(self, mocker: MockerFixture) -> None:
+        key = f"{STORAGE_SCOPE}/assets/budget.xlsx"
+        cells = {"A1": "Budget 2026", "A3": "Item", "B3": "Amount", "A4": "Paper", "B4": 2.5, "A5": "Ink", "B5": 3, "B6": "=SUM(B4:B5)"}
+        await _stored(mocker=mocker, key=key, data=sheet_workbook(cells=cells, sheet_title="Budget"))
+
+        table_records = await ContentGenerator(generated_content_factory=mocker.MagicMock()).read_table(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
+            source_uri=f"pipelex-storage://{key}",
+            mime_type=XLSX_MIME,
+            file_name="budget.xlsx",
+            input_name="budget",
+            field_names=["line", "item", "amount"],
+            row_field="line",
+            table_selector=TableSelector(sheet_range=SheetRange(sheet="budget", header_row=3)),
+        )
+
+        assert [record.plain_values() for record in table_records.records] == [{"item": "Paper", "amount": 2.5}, {"item": "Ink", "amount": 3}]
+        assert [record.position for record in table_records.records] == [1, 2]
+
+    async def test_an_unclear_sheet_range_is_refused_as_the_input_s_naming_the_cell(self, mocker: MockerFixture) -> None:
+        key = f"{STORAGE_SCOPE}/assets/budget.xlsx"
+        await _stored(mocker=mocker, key=key, data=sheet_workbook(cells={"A1": "Item", "A2": "Paper", "A4": "note"}))
+        assignment = _assignment(key=key, mime_type=XLSX_MIME, file_name="budget.xlsx", table_selector=TableSelector(sheet_range=SheetRange()))
+
+        with pytest.raises(TableRangeUnclearError) as exc_info:
+            await read_table_of_document(table_read_assignment=assignment)
+
+        assert "Expenses!A4" in str(exc_info.value)
+        wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("code") == CoreCode.INPUT_INVALID
+        assert wire.get("params") == {"input": "budget", "field": "budget"}, wire
+
     async def test_a_content_generator_without_the_read_refuses_as_misconfigured(self) -> None:
         generator = cast("ContentGeneratorProtocol", _ContentGeneratorPredatingTheRead())
 
@@ -158,7 +200,7 @@ class TestTableReadGenerate:
                 input_name="budget",
                 field_names=["item"],
                 row_field=None,
-                table_name=None,
+                table_selector=TableSelector(),
             )
 
         wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()

@@ -386,6 +386,7 @@ StuffError | abstract
 StuffFactoryError | one of input.invalid, input.wrong_concept, pipe.output_invalid, pipe.output_multiplicity
 StuffSpecFactoryError | method.schema_violation
 TableFileTypeUnsupportedError | input.file_type_unsupported
+TableRangeUnclearError | input.invalid
 TableReaderMisconfiguredError | runtime.misconfigured
 TableSelectionError | input.invalid
 TableTooLargeError | input.too_large

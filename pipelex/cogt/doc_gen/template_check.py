@@ -17,7 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.input_shape import InputShape
-from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, table_match_refusal
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, sheet_range_refusal, table_match_refusal
 
 
 class TemplateFindingSeverity(StrEnum):
@@ -55,6 +56,10 @@ class TemplateCheckRequest(BaseModel):
     judges the template's structure alone. A Table filled from a list whose records lack a `match_on` or `match_row`
     field is an error finding, which fails the step: the method's load holds only some list of the step's data to those
     fields, since only the engine knows which list fills which Table.
+
+    Under `append` or `update` it may carry `sheet_range`, the range on a sheet one list fills, as the render job does. A
+    checker resolves it with the shared range finder (`pipelex.cogt.doc_gen.sheet_range`) and may let the finder's
+    refusals (`SHEET_RANGE_REFUSALS`) propagate: Pipelex reports each as an error finding, naming the sheet and the cell.
     """
 
     model_config = ConfigDict(extra="forbid", ser_json_bytes="base64", val_json_bytes="base64")
@@ -75,11 +80,16 @@ class TemplateCheckRequest(BaseModel):
     match_on: list[str] | None = Field(default=None, description="Under `update`, the fields of the records whose columns are the Table's key")
     match_row: str | None = Field(default=None, description="Under `update`, the field of the records holding the row's position")
     cells: CellPolicy | None = Field(default=None, strict=False, description="Under `update`, which cells of a matched row may be written")
+    sheet_range: SheetRangeFill | None = Field(default=None, description="Under `append` or `update`, the range on a sheet one list fills")
 
     @model_validator(mode="after")
     def validate_table_match(self) -> Self:
         match_refusal = table_match_refusal(table_fill=self.table_fill, match_on=self.match_on, match_row=self.match_row, cells=self.cells)
         if match_refusal is not None:
             msg = f"A template check request cannot match records to rows this way: {match_refusal}."
+            raise ValueError(msg)
+        range_refusal = sheet_range_refusal(table_fill=self.table_fill, sheet_range=self.sheet_range)
+        if range_refusal is not None:
+            msg = f"A template check request cannot fill a range on a sheet this way: {range_refusal}."
             raise ValueError(msg)
         return self

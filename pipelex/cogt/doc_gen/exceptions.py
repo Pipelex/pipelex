@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import SHEET_RANGE_CAPABILITY, TableFill
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.errors.problem import make_location
@@ -132,7 +132,8 @@ class DocGenModelCapabilityError(PipelexError):
     that names one outside them is refused when the method loads. A fill of a template file's Tables other than
     `replace` is a capability the model lists among its `inputs` too (`TableFill.engine_capability`), and a step asking
     for one its engine does not declare is refused the same way, naming the fill: an engine that predates it would
-    replace the Table's rows instead.
+    replace the Table's rows instead. So is a step filling a range on a sheet holding no Table (`sheet_range`) with an
+    engine that does not declare the `sheet_range` capability, which would refuse the list as reaching no Table.
     """
 
     error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
@@ -145,14 +146,22 @@ class DocGenModelCapabilityError(PipelexError):
         model: str,
         pipe_code: str | None = None,
         table_fill: TableFill | None = None,
+        fills_sheet_range: bool = False,
     ):
         self.doc_gen_format = doc_gen_format
         self.source = source
         self.model = model
         self.pipe_code = pipe_code
         self.table_fill = table_fill
+        self.fills_sheet_range = fills_sheet_range
         message: str
-        if table_fill is None:
+        if fills_sheet_range:
+            message = (
+                f"{_step_label(pipe_code=pipe_code)} asks the engine '{model}' to fill a range on a sheet holding no Excel Table "
+                f"(sheet_range), which it does not do. Name an engine that declares '{SHEET_RANGE_CAPABILITY}' in the step's 'model', "
+                "or fill an Excel Table of the template instead."
+            )
+        elif table_fill is None:
             message = (
                 f"{_step_label(pipe_code=pipe_code)} asks the engine '{model}' for {doc_gen_format.with_article} {source.desc}, "
                 "which it does not print. Name an engine that does in the step's 'model', or leave 'model' out for the model deck's default."
@@ -168,7 +177,9 @@ class DocGenModelCapabilityError(PipelexError):
     @override
     def problem_params(self) -> dict[str, Any]:
         capability = f"printing {self.doc_gen_format.with_article} {self.source.desc}"
-        if self.table_fill is not None:
+        if self.fills_sheet_range:
+            capability = SHEET_RANGE_CAPABILITY
+        elif self.table_fill is not None:
             capability = self.table_fill.engine_capability or capability
         return {"model": self.model, "capability": capability}
 

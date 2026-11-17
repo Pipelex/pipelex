@@ -75,6 +75,15 @@ class TableBinding(StrEnum):
                 return False
 
     @property
+    def names_its_region(self) -> bool:
+        """Whether the reader can name the region of a workbook it reads, with `table` or `sheet_range`, as a step can."""
+        match self:
+            case TableBinding.RUN_INPUT:
+                return False
+            case TableBinding.STEP:
+                return True
+
+    @property
     def nulls_absent_nullable_fields(self) -> bool:
         """Whether a nullable field no column matches, or an empty cell under it, reads as null whatever its default."""
         match self:
@@ -100,6 +109,8 @@ class RawTable(NamedTuple):
     rows: list[RawTableRow]
     uncached_formula_columns: frozenset[int] = frozenset()
     """The 0-based indexes of the columns holding a formula with no cached value in some row, which read as empty."""
+    uncached_prefilled_row_count: int = 0
+    """The rows after a sheet range's data rows holding formulas the workbook stores no value of, which were not read."""
 
 
 class CellKind(StrEnum):
@@ -209,6 +220,9 @@ class TableRecords(BaseModel):
     uncached_formula_fields: list[str] = Field(
         default_factory=list, description="The fields whose column holds a formula with no cached value, read as empty"
     )
+    uncached_prefilled_row_count: int = Field(
+        default=0, ge=0, description="The rows after a sheet range's data rows holding formulas with no cached value, which were not read"
+    )
 
 
 def build_table_records(
@@ -278,6 +292,7 @@ def build_table_records(
         matched_fields=matched_fields,
         records=records,
         uncached_formula_fields=uncached_formula_fields,
+        uncached_prefilled_row_count=raw_table.uncached_prefilled_row_count,
     )
 
 

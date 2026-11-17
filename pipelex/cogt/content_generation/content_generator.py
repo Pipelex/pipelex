@@ -56,6 +56,7 @@ from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.tabular.table_records import TableRecords
+from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.tools.uri.uri_bytes import MAX_CONCURRENT_URI_READS
@@ -359,7 +360,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         input_name: str | None,
         field_names: list[str],
         row_field: str | None,
-        table_name: str | None,
+        table_selector: TableSelector,
     ) -> TableRecords:
         table_read_assignment = TableReadAssignment(
             job_metadata=job_metadata,
@@ -370,7 +371,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             input_name=input_name,
             field_names=field_names,
             row_field=row_field,
-            table_name=table_name,
+            table_selector=table_selector,
         )
         return await read_table_of_document(table_read_assignment=table_read_assignment)
 

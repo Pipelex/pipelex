@@ -89,6 +89,7 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 | `match_on` | array of strings | Under `table_fill = "update"`, the fields of the records whose columns are the Table's key, such as `["invoice_number"]`. Exactly one of `match_on` and `match_row` is required under `update`, and both are refused under any other fill. | No |
 | `match_row` | string | Under `table_fill = "update"`, the field of the records holding each record's row position among the Table's data rows, an integer or number field, such as the `row_field` a `PipeStructure` step filled when it read the Table. | No |
 | `cells` | string | Under `table_fill = "update"`, which cells of a matched row may be written: `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a non-null value matches. Refused under any other fill. | No |
+| `sheet_range` | table | Under `table_fill = "append"` or `"update"`, a range of rows on a worksheet that holds no Excel Table, and the list of records that fills it: `{ list = "expenses", sheet = "Expenses", header_row = 3 }`. `list` is required; `sheet` and `header_row` are as on [`PipeStructure`](PipeStructure.md#a-range-on-a-sheet). Needs an `xlsx` office template and an engine that declares it. See [Filling a range on a sheet](#filling-a-range-on-a-sheet). | No |
 | `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code, or, with a `template_input`, to the name of the input's file. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
 
 ### The file's name
@@ -230,6 +231,30 @@ match_on       = ["invoice_number"]
 - **The engine must declare `update`.** A step with `table_fill = "update"` is refused when the method loads if its engine does not declare that it updates a Table's rows, `model.capability_unsupported`.
 
 The engine's side of the update, how it compares a key and what its template check refuses, is documented with the plugin's Excel templates.
+
+### Filling a range on a sheet
+
+Many workbooks keep their rows on a plain sheet, with no Excel Table. With `sheet_range`, an `xlsx` step appends to or updates such a range, found by the same rules [`PipeStructure`](PipeStructure.md#a-range-on-a-sheet) reads it by, so the rows a read numbers 1 to n are the rows an update by `match_row` writes:
+
+```toml
+[pipe.record_expenses]
+type           = "PipeDocGen"
+description    = "Append the extracted expenses under the rows of the caller's expense sheet"
+inputs         = { workbook = "Document", expenses = "ExpenseRow[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "append"
+sheet_range    = { list = "expenses", sheet = "Expenses", header_row = 3 }
+```
+
+- **`list` names the list that fills the range**, by its path in the step's data, its input's name first, as `match_row` names a field, so a list held by a structured input is named `report.lines`. That list fills the range and no Table. When the method loads, it must be a list of records of the step's data, and under `update` its records must carry the `match_on` fields or the `match_row` field; only that list is held to them.
+- **Only `append` and `update` fill a range on a sheet.** `replace` shrinks the rows to the list's length, and on a range found by rules rather than declared by a Table, a wrong boundary would clear the user's rows rather than fail, so a step with `sheet_range` under `replace`, the default, is refused when the method loads. A template that is the method's own can always hold a Table.
+- **A worksheet holding one Excel Table is filled as that Table**, so a user who turns the range into a Table keeps the method working.
+- **A range the rules cannot settle refuses the run as the caller's.** Run setup hands the workbook to the engine's template check, which finds the range: a value below the data, a column with no header, a merged header cell or a filter that disagrees refuses the run, as `pipelex.docgen.template_input_unfit`, naming the sheet and the cell, and never a cell's value.
+- **The engine must declare `sheet_range`.** A step with `sheet_range` is refused when the method loads if its engine does not declare that it fills a range on a sheet, `model.capability_unsupported`.
+
+The engine's side, how an append grows the range, what it does with a totals line under the data and with the formulas that refer to the range by address, is documented with the plugin's Excel templates.
 
 ### Template files sent with a bundle
 

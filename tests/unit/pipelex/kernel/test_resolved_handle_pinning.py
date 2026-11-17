@@ -95,7 +95,12 @@ def _pinned_model(*, mocker: MockerFixture, model_deck: ModelDeck, model_type: M
                 "pipelex.cogt.doc_gen.doc_gen_engine.get_inference_backend_registry", return_value=mocker.Mock(has=mocker.Mock(return_value=True))
             )
             return resolve_doc_gen_setting(
-                doc_gen_choice=choice, doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT, pipe_code="print", table_fill=TableFill.REPLACE
+                doc_gen_choice=choice,
+                doc_gen_format=DocGenFormat.PDF,
+                source=DocGenSource.LAYOUT,
+                pipe_code="print",
+                table_fill=TableFill.REPLACE,
+                fills_sheet_range=False,
             ).model
         case ModelType.LLM | ModelType.TEXT_EXTRACTOR | ModelType.IMG_GEN:
             pytest.fail(f"{model_type} has no op pinning its resolved handle")

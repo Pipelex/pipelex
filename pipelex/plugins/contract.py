@@ -147,7 +147,20 @@ if TYPE_CHECKING:
 # the leaf stored when it is past ``[runtime.storage] inline_text_max_bytes`` (``GeneratedContentFactory.make_text_content``),
 # where it carried the bare ``text``. A content generator written against v12 would be called with a keyword it does not
 # accept on its first text step; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 13
+#
+# v14 changed the table read of the content generator an orchestrator plugin provides, now that a step reads a workbook's
+# rows from a named range or a range on a sheet as well as from an Excel Table. ``read_table`` takes ``table_selector``,
+# a ``TableSelector`` (``pipelex.tools.tabular.table_selector``), the step's ``table`` or ``sheet_range``, where it took
+# ``table_name``, and ``TableReadAssignment`` carries it as ``table_selector``. A content generator written against v13
+# would be called with a keyword it does not accept on its first spreadsheet read; the bump turns that into a
+# discovery-time mismatch naming the plugin.
+#
+# The sheet range joined the document engine contract under v14 as an addition, which alone would have needed no bump:
+# the render job's and the template check request's ``sheet_range`` (``SheetRangeFill``), set only under ``append`` and
+# ``update``, the ``sheet_range`` capability an engine declares among its model's ``inputs``, and the shared range finder
+# (``pipelex.cogt.doc_gen.sheet_range``). An engine that does not declare the capability is never handed a sheet range,
+# since a step asking it for one is refused when the method loads.
+PLUGIN_API_VERSION: int = 14
 
 
 @runtime_checkable

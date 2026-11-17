@@ -1,10 +1,10 @@
 ---
-description: "Return an edited copy of an Excel workbook a user supplies: append rows to one of its Tables, or fill in the empty cells of its rows, with PipeStructure reading the rows and PipeDocGen writing the copy. The user's own file is never changed."
+description: "Return an edited copy of an Excel workbook a user supplies: append rows to one of its Tables or to a range on a plain sheet, or fill in the empty cells of its rows, with PipeStructure reading the rows and PipeDocGen writing the copy. The user's own file is never changed."
 ---
 
 # Editing a User's Workbook
 
-A method can take an Excel workbook a user already keeps, such as an expenses register, and return a copy of it with new rows added to a Table or with the empty cells of some rows filled in. The user's file is never changed: the method returns a new file, named after theirs, and they decide what to do with it.
+A method can take an Excel workbook a user already keeps, such as an expenses register, and return a copy of it with new rows added to a Table, or to the rows typed on a plain sheet, or with the empty cells of some rows filled in. The user's file is never changed: the method returns a new file, named after theirs, and they decide what to do with it.
 
 Two steps do the work, and this guide shows how they fit together:
 
@@ -246,6 +246,40 @@ cells          = "fill_empty"
 
 The position must travel through the method unchanged and never be produced by a model. A batch keeps it, since each branch works on one row and copies its position into its result. No column of the Table may match the `row_field`.
 
+## When the rows live on a plain sheet
+
+Many registers have no Excel Table: a title, a header row, the rows, and sometimes a totals line, typed straight onto a sheet. Both steps name such a range with `sheet_range`, the sheet and the row its header is on, and both find it by the same rules, so the positions `PipeStructure` gives the rows are the rows an update by `match_row` writes:
+
+```toml
+[pipe.read_rows]
+type        = "PipeStructure"
+description = "Read the rows of the register's Expenses sheet, under its title"
+inputs      = { register = "ExpenseRegister" }
+output      = "ExpenseRow[]"
+sheet_range = { sheet = "Expenses", header_row = 3 }
+row_field   = "position"
+
+[pipe.fill_categories]
+type           = "PipeDocGen"
+description    = "Write each category found into its row of the register"
+inputs         = { register = "ExpenseRegister", expenses = "ExpenseCompletion[]" }
+output         = "ExpenseRegister"
+format         = "xlsx"
+template_input = "register"
+table_fill     = "update"
+match_row      = "position"
+sheet_range    = { list = "expenses", sheet = "Expenses", header_row = 3 }
+```
+
+- **`header_row` skips the title.** Without it, the header is the sheet's first row holding a value; a title above the header would be read as the header, and the refusal says to name the header's row.
+- **The range ends at the first row holding no data**, and anything typed below it in the same columns, a note or a further block of rows, refuses the run rather than being read or written over. A formula holds data when the value Excel stored for it when it last saved the file is not empty, so a sheet computed from another sheet reads its rows. Formulas a template fills down ahead of the rows to come, such as `=IF(A5="","",B5*C5)` to row 500, store an empty text, so they are pre-filled rows, not rows of the range, and are not refused. A value in the column just beside the range is a column with no header, refused too, and so is a merged range crossing the edge of the columns.
+- **A totals line is not a row.** A row under the data that totals its column above with a formula written as a range, `=SUM(D4:D20)`, is read as a totals line, not a record, and does not count toward the positions. The totals line may also sit under the pre-filled rows, as a template keeps a `Total` row summing the column through its last pre-filled row; `append` then writes into the pre-filled rows above it.
+- **Save the workbook with Excel or LibreOffice.** A workbook written by a program that calculates nothing stores no value for its formulas. A header cell holding such a formula refuses the run, and rows holding only such formulas are not read, with a warning in the step's log.
+- **`PipeDocGen` names the list.** With `sheet_range`, the list `list` names fills the range, whatever the sheet is called, and only `append` and `update` are allowed: `replace` could clear the user's rows past a boundary the rules found rather than one the workbook declares.
+- **Turning the range into a Table keeps the method working.** A sheet holding one Excel Table is read and filled as that Table.
+
+`PipeStructure` also reads a named range, a block of cells named with Formulas > Define Name, by giving its name in `table`. See [A range on a sheet](pipes/pipe-operators/PipeStructure.md#a-range-on-a-sheet) and [Filling a range on a sheet](pipes/pipe-operators/PipeDocGen.md#filling-a-range-on-a-sheet) for every rule.
+
 ## The rules you will meet
 
 These are the rules a method author runs into first. The [`PipeDocGen`](pipes/pipe-operators/PipeDocGen.md#a-template-the-run-supplies) and [`PipeStructure`](pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet) reference pages hold the rest.
@@ -274,7 +308,7 @@ These are the rules a method author runs into first. The [`PipeDocGen`](pipes/pi
 
 ## Related documentation
 
-- [PipeDocGen](pipes/pipe-operators/PipeDocGen.md): every field, [a template the run supplies](pipes/pipe-operators/PipeDocGen.md#a-template-the-run-supplies) and [updating a Table's rows](pipes/pipe-operators/PipeDocGen.md#updating-a-tables-rows)
+- [PipeDocGen](pipes/pipe-operators/PipeDocGen.md): every field, [a template the run supplies](pipes/pipe-operators/PipeDocGen.md#a-template-the-run-supplies), [updating a Table's rows](pipes/pipe-operators/PipeDocGen.md#updating-a-tables-rows) and [filling a range on a sheet](pipes/pipe-operators/PipeDocGen.md#filling-a-range-on-a-sheet)
 - [PipeStructure](pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet): how a spreadsheet's rows, columns and values are read
 - [Understanding Optionality](pipes/understanding-optionality.md): absent results, and how a batch drops them
 - [Office File Conversion](../features/office-file-conversion.md): the reading direction, when a model reads a Word, Excel or PowerPoint file

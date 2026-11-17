@@ -2883,6 +2883,43 @@ components:
       - model
       title: DocGenSetting
       description: 'The document engine a `PipeDocGen` step prints with: a model of the `doc_gen` family, such as `reportlab-pdf`.'
+    DocGenSheetRangeBlueprint:
+      properties:
+        sheet:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sheet
+          description: The worksheet, compared ignoring case; None for the workbook's only one
+        header_row:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Header Row
+          description: The sheet row holding the header, counted from 1; None for the sheet's first row holding a value
+        list:
+          type: string
+          title: List
+          description: The list of records that fills the range, by its path in the step's data
+      additionalProperties: false
+      type: object
+      required:
+      - list
+      title: DocGenSheetRangeBlueprint
+      description: 'A range of rows on a worksheet that holds no Excel Table, and the list that fills it: `PipeDocGen`''s
+        `sheet_range`.
+
+
+        `list` names the list of records that fills the range, by its path in the step''s data, its input''s name first, as
+
+        `match_row` names a field; that list fills the range and no Table. `sheet` names the worksheet, compared ignoring
+
+        case, the workbook''s only worksheet when it is absent, and `header_row` the sheet row holding the header, counted
+
+        from 1, the sheet''s first row holding a value when it is absent. A worksheet holding one Excel Table is filled as
+
+        that Table.'
     DocumentField:
       properties:
         title:
@@ -5723,6 +5760,10 @@ components:
           anyOf:
           - $ref: '#/components/schemas/CellPolicy'
           - type: 'null'
+        sheet_range:
+          anyOf:
+          - $ref: '#/components/schemas/DocGenSheetRangeBlueprint'
+          - type: 'null'
         filename:
           anyOf:
           - type: string
@@ -5766,8 +5807,12 @@ components:
 
         one of the two. Under `update` a null leaves its cell as it was, and `cells` says which cells may be written:
 
-        `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a value matches. The output
-        must
+        `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a value matches. `sheet_range`,
+
+        under `append` or `update`, fills a range on a sheet that holds no Excel Table from the list it names, rather than
+        a
+
+        Table from the list of its name. The output must
 
         be a single `Document`, or a concept refining it. `model` names the document engine that prints it, a model of the
 
@@ -6906,6 +6951,10 @@ components:
           - type: string
           - type: 'null'
           title: Table
+        sheet_range:
+          anyOf:
+          - $ref: '#/components/schemas/SheetRangeBlueprint'
+          - type: 'null'
         row_field:
           anyOf:
           - type: string
@@ -8316,6 +8365,37 @@ components:
       - message
       title: ServiceIdentity
       description: Body of `GET /` — the service identity banner.
+    SheetRangeBlueprint:
+      properties:
+        sheet:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sheet
+          description: The worksheet, compared ignoring case; None for the workbook's only one
+        header_row:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Header Row
+          description: The sheet row holding the header, counted from 1; None for the sheet's first row holding a value
+      additionalProperties: false
+      type: object
+      title: SheetRangeBlueprint
+      description: 'A range of rows on a worksheet that holds no Excel Table: `PipeStructure`''s `sheet_range`.
+
+
+        `sheet` names the worksheet, compared ignoring case; without it the workbook must hold exactly one worksheet.
+
+        `header_row` is the sheet row holding the header, counted from 1 as the spreadsheet numbers its rows; without it the
+
+        header is the sheet''s first row holding a value. `sheet_range = {}` reads the only worksheet and finds its header.
+        A
+
+        worksheet holding one Excel Table reads as that Table. The rules the runtime finds the range by, and refuses an
+
+        unclear one by, are those of the standard''s "Finding a Sheet Range".'
     SizeTier:
       type: string
       enum:

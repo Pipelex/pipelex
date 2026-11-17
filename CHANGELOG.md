@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PipeStructure` reads a range on a sheet and a named range**: `sheet_range = { sheet = "...", header_row = 3 }` reads the rows of a worksheet that holds no Excel Table, found by the MTHDS standard's rules for a sheet range, which refuse a sheet they cannot settle as `input.invalid` with the new `TableRangeUnclearError`, naming the sheet and the cell; a worksheet holding one Table reads as that Table, the range's totals line is not a row, whether it follows the data rows or a template's pre-filled rows, and pre-filled rows, formulas storing an empty text or no value, are not rows either, while a formula storing a value holds data, so a sheet computed from another reads its rows. Pre-filled rows storing no value at all are not read and the step logs a warning, a header formula storing none is refused, and a cell merged down from a data row reads as the merge's first cell, in a named range too. `table` names a named range when the workbook holds no Table of that name, and the refusal of a workbook holding no Table now suggests `sheet_range`.
+- **`PipeDocGen` fills a range on a sheet**: under `table_fill = "append"` or `"update"`, `sheet_range = { list = "...", sheet = "...", header_row = 3 }` fills the range found by the same rules from the list it names, which the method's load checks is a list of records of the step's data carrying the update's matching fields; it is refused under `replace`, without an `xlsx` office template, and with an engine that does not declare the `sheet_range` capability, `model.capability_unsupported`. `RenderJob`, `TemplateCheckRequest` and `DocumentComposition` carry it as a `SheetRangeFill`, and a range the engine's checker finds unclear refuses the run as `pipelex.docgen.template_input_unfit`.
+- **The shared range finder for document engines**: `pipelex.cogt.doc_gen.sheet_range` finds a sheet range, a worksheet's Table and a named range as a `SheetRegion` (`resolve_sheet_range`, `find_sheet_range`, `resolve_named_range`, `table_region`), reading the workbook's formulas and its stored values, so the rows the reader numbers are the rows an engine writes; `SheetRegion.totals_placement` says whether the totals line sits after the data rows or after the pre-filled rows an append fills.
+
+### Changed
+
+- **A Table with no header row is an unclear range**: a Table whose header row is turned off, or whose reference reaches outside the sheet's grid, from row 1 or column A to its last row or column, is refused with `TableRangeUnclearError`, `input.invalid`, naming its cells, where it was `CsvReadError`, `input.file_unreadable`, since the file opens and its Table states no rows to read.
+- **`read_table` takes the step's selector (Breaking)**: `ContentGeneratorProtocol.read_table` and `TableReadAssignment` take `table_selector`, a `TableSelector` naming the Table or named range (`table`) or the sheet range (`sheet_range`), in place of `table_name`. Plugin API is now 14: a plugin targeting 13 is refused when it is discovered.
+
+### Fixed
+
+- **A list input's workbook refusal no longer names step fields**: a workbook given as a list input that holds several Excel Tables is refused saying to keep the rows in one Table, where it told the caller to name the Table with `table`, a field only a `PipeStructure` step has.
+
 ## [v0.107.0] - 2026-11-16
 
 ### Changed
