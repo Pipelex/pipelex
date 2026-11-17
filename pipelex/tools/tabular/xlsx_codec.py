@@ -23,8 +23,8 @@ reads as that first cell, as the spreadsheet shows it.
 reads one), a boolean as a boolean and a text as a text. A time or a duration, which no row field holds, is read as its
 text. A formula cell is read as the value the workbook last calculated and stored for it. A workbook saved by a program
 that stores none, such as one written by openpyxl itself, has no such value: the cell reads as empty, and the column is
-reported so the step can warn (`RawTable.uncached_formula_columns`). A sheet range ending with pre-filled rows whose
-formulas store no value at all, which may hold data nobody calculated, does not read them, and counts them so the step
+reported so the step can warn (`RawTable.uncached_formula_columns`). A sheet range ending with pre-filled rows holding a
+formula that stores no value at all, which may hold data nobody calculated, does not read them, and counts them so the step
 can warn (`RawTable.uncached_prefilled_row_count`).
 
 **The rows.** Every data row of the region is a row of the table, an empty one of a Table or a named range included,

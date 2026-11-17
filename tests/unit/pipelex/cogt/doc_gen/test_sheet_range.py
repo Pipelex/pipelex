@@ -397,6 +397,16 @@ class TestFindSheetRange:
         assert list(region.data_rows) == []
         assert (region.prefilled_row_count, region.uncached_prefilled_row_count) == (2, 2)
 
+    def test_a_pre_filled_row_mixing_an_empty_text_and_a_formula_storing_nothing_is_counted_as_uncached(self) -> None:
+        """A formula storing no value beside ones storing an empty text may still calculate data."""
+        cells: dict[str, Any] = {"A1": "item", "B1": "amount", "C1": "double", "A2": "Paper", "B2": 2, "C2": 4}
+        cells |= {"A3": '=IF(D3="","",D3)', "B3": '=IF(D3="","",1)', "C3": "=B3*2"}
+
+        region = _find(cells, cached_values={"A3": "", "B3": ""})
+
+        assert list(region.prefilled_rows) == [3]
+        assert region.uncached_prefilled_row_count == 1
+
     def test_a_header_formula_storing_no_value_is_refused_naming_its_cell(self) -> None:
         refusal = _refusal({"A1": "item", "B1": '=LOWER("AMOUNT")', "A2": "Paper", "B2": 2})
 

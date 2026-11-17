@@ -45,9 +45,9 @@ a template's pre-filled rows, and with its stored values (`data_only=True`), whi
    after the data rows or their totals line is `SheetRegion.prefilled_row_count`, the rows an append writes into,
    keeping their formulas. When no totals line follows the data rows, a row right after the pre-filled rows totalling
    its column from the first data row, labelled or not, is the range's totals line, placed after them
-   (`SheetRegion.totals_placement`), so an append fills the pre-filled rows above it. Pre-filled rows whose formulas
-   store no value at all were never calculated and may hold data: `SheetRegion.uncached_prefilled_row_count` counts
-   them, and the reader warns that it did not read them.
+   (`SheetRegion.totals_placement`), so an append fills the pre-filled rows above it. A pre-filled row holding a
+   formula that stores no value at all was never calculated and may hold data: `SheetRegion.uncached_prefilled_row_count`
+   counts such rows, and the reader warns that it did not read them.
 6. **Nothing below.** Data in the columns below the range is refused, naming its cell: a further row of data after a gap
    or a note, which the finder cannot tell apart.
 7. **No column without a header.** A value in the column just left or just right of the columns, on the header row or
@@ -226,7 +226,7 @@ class SheetRegion(BaseModel):
         ge=0, description="A sheet range's pre-filled rows, holding formulas and no data; 0 for a Table and a named range"
     )
     uncached_prefilled_row_count: int = Field(
-        ge=0, description="The pre-filled rows whose formulas have no stored value at all, which may hold data the workbook never calculated"
+        ge=0, description="The pre-filled rows holding a formula with no stored value at all, which may hold data the workbook never calculated"
     )
     totals_placement: TotalsPlacement = Field(strict=False, description="Whether the totals row or line follows the data rows or the pre-filled rows")
 
@@ -690,11 +690,12 @@ def find_sheet_range(*, worksheet: "Worksheet", value_worksheet: "Worksheet", he
     range_last_row = data_last_row + totals_row_count + prefilled_row_count
     first_totals_row = range_last_row if totals_placement == TotalsPlacement.AFTER_PREFILLED_ROWS else data_last_row + 1
     totals_rows = set(range(first_totals_row, first_totals_row + totals_row_count))
-    # A pre-filled row whose formulas the workbook stores no value of was never calculated, and may hold data.
+    # A pre-filled row holding a formula the workbook stores no value of was never wholly calculated, and may hold data,
+    # even beside formulas storing an empty text.
     uncached_prefilled_row_count = sum(
         1
         for row in range(ending_row, ending_row + prefilled_row_count)
-        if all(
+        if any(
             _stores_no_value(stored_cell=stored_values.get((row, column)))
             for column in range(first_column, last_column + 1)
             if (cell := stored_cells.get((row, column))) is not None and cell.data_type == "f"

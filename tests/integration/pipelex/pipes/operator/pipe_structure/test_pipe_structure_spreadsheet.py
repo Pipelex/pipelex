@@ -205,6 +205,7 @@ class TestPipeStructureSpreadsheet:
         warning.assert_called_once()
         assert warning.call_args.args == ("Rows of uncalculated formulas were not read",)
         assert warning.call_args.kwargs["fields"]["nb_rows"] == 2
+        assert warning.call_args.kwargs["fields"]["user_action"].startswith("Open the workbook in Excel or LibreOffice and save it")
 
     @pytest.mark.parametrize("pipe_run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY])
     @pytest.mark.asyncio(loop_scope="class")

@@ -395,7 +395,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                         "pipe_code": self.code,
                         "input_path": self.source_input_name,
                         "nb_rows": table_records.uncached_prefilled_row_count,
-                        "remedy": "the workbook stores no calculated values: open it in Excel or LibreOffice and save it",
+                        "user_action": "Open the workbook in Excel or LibreOffice and save it, so it stores its calculated values.",
                     },
                 )
         try:
