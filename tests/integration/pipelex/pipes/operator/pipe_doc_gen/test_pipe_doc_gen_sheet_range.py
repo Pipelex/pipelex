@@ -193,8 +193,12 @@ class TestPipeDocGenSheetRange:
 
         def _check_with_the_finder(*, request: TemplateCheckRequest) -> list[TemplateFinding]:
             assert request.sheet_range is not None
-            template_workbook = load_workbook(io.BytesIO(request.template), data_only=False)
-            resolve_sheet_range(workbook=template_workbook, sheet_range=request.sheet_range, subject=request.template_name)
+            resolve_sheet_range(
+                workbook=load_workbook(io.BytesIO(request.template), data_only=False),
+                value_workbook=load_workbook(io.BytesIO(request.template), data_only=True),
+                sheet_range=request.sheet_range,
+                subject=request.template_name,
+            )
             return []
 
         mocker.patch.object(sheet_range_xlsx_stub_engines, "check_template", side_effect=_check_with_the_finder)

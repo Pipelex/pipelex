@@ -16,13 +16,16 @@ to a row concept's fields and binding the rows are format-neutral (`pipelex.tool
 
 The region's header row names the columns, and a named range's header cell holding no value names none; the rows
 between the header and the region's last data row are its data rows, and a Table's totals row or a sheet range's
-totals line is not read.
+totals line is not read. A cell inside a merged range whose first cell lies in a data row, within the region's columns,
+reads as that first cell, as the spreadsheet shows it.
 
 **The values.** Each cell is read with its type, a number as a number, a date as a date (a `datetime`, as openpyxl
 reads one), a boolean as a boolean and a text as a text. A time or a duration, which no row field holds, is read as its
 text. A formula cell is read as the value the workbook last calculated and stored for it. A workbook saved by a program
 that stores none, such as one written by openpyxl itself, has no such value: the cell reads as empty, and the column is
-reported so the step can warn (`RawTable.uncached_formula_columns`).
+reported so the step can warn (`RawTable.uncached_formula_columns`). A sheet range ending with pre-filled rows whose
+formulas store no value at all, which may hold data nobody calculated, does not read them, and counts them so the step
+can warn (`RawTable.uncached_prefilled_row_count`).
 
 **The rows.** Every data row of the region is a row of the table, an empty one of a Table or a named range included,
 named in messages by its sheet row, as Excel shows it.
@@ -139,7 +142,9 @@ def read_xlsx_raw_table(
         # The finder tells a cell holding a value, and a totals line, by its formula, which the cached values hide: a
         # formula with no cached value reads as empty there.
         formula_workbook = _load_workbook(raw_bytes=raw_bytes, data_only=False, subject=subject)
-        region = resolve_sheet_range(workbook=formula_workbook, sheet_range=table_selector.sheet_range, subject=subject)
+        region = resolve_sheet_range(
+            workbook=formula_workbook, value_workbook=value_workbook, sheet_range=table_selector.sheet_range, subject=subject
+        )
     else:
         region = _choose_region(workbook=value_workbook, table_name=table_selector.table, binding=binding, subject=subject)
     worksheet = value_workbook[region.sheet_title]
@@ -172,6 +177,7 @@ def read_xlsx_raw_table(
         raise CsvReadError(msg)
 
     header = [_header_text(value=worksheet.cell(row=header_row, column=column).value) for column in columns]
+    merge_anchors = _merge_anchors(worksheet=worksheet, region=region, columns=columns)
     uncached_candidates: list[tuple[int, int]] = []
     rows: list[RawTableRow] = []
     for sheet_row in region.data_rows:
@@ -181,7 +187,8 @@ def read_xlsx_raw_table(
             continue
         cells: list[TableCellValue] = []
         for column_index, column in enumerate(columns):
-            cell = worksheet.cell(row=sheet_row, column=column)
+            anchor_row, anchor_column = merge_anchors.get((sheet_row, column), (sheet_row, column))
+            cell = worksheet.cell(row=anchor_row, column=anchor_column)
             # A formula with no cached value reads as no value of numeric type, as an empty cell does; a formula whose
             # cached value is an empty text reads as no value of type `str`, and was calculated, so it is no candidate.
             if cell.value is None and cell.data_type == "n":
@@ -197,7 +204,33 @@ def read_xlsx_raw_table(
         empty_cells=uncached_candidates,
         subject=subject,
     )
-    return RawTable(header=header, rows=rows, uncached_formula_columns=uncached_formula_columns)
+    return RawTable(
+        header=header,
+        rows=rows,
+        uncached_formula_columns=uncached_formula_columns,
+        uncached_prefilled_row_count=region.uncached_prefilled_row_count,
+    )
+
+
+def _merge_anchors(*, worksheet: "Worksheet", region: SheetRegion, columns: list[int]) -> dict[tuple[int, int], tuple[int, int]]:
+    """The first cell of the merged range each cell of the region's data rows belongs to, by (row, column).
+
+    A cell inside a merged range shows the range's first cell, and the file stores no value for it: a merge whose first
+    cell lies in a data row, within the region's columns, gives that first cell's value to the cells it covers among the
+    data rows and the columns read. A merge starting elsewhere, on the header row or outside the columns, gives none.
+    """
+    data_rows = region.data_rows
+    read_columns = set(columns)
+    anchors: dict[tuple[int, int], tuple[int, int]] = {}
+    for merged_range in worksheet.merged_cells.ranges:
+        anchor = (merged_range.min_row, merged_range.min_col)
+        if merged_range.min_row not in data_rows or merged_range.min_col not in region.columns:
+            continue
+        for row in range(merged_range.min_row, min(merged_range.max_row, data_rows.stop - 1) + 1):
+            for column in range(merged_range.min_col, merged_range.max_col + 1):
+                if column in read_columns and (row, column) != anchor:
+                    anchors[row, column] = anchor
+    return anchors
 
 
 def _refuse_oversized_archive(*, raw_bytes: bytes, max_uncompressed_bytes: int, subject: str) -> None:

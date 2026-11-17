@@ -388,6 +388,16 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                     "Formula cells with no stored value read as empty",
                     fields={"pipe_code": self.code, "input_path": self.source_input_name, "row_fields": table_records.uncached_formula_fields},
                 )
+            if table_records.uncached_prefilled_row_count:
+                log.warning(
+                    "Rows of uncalculated formulas were not read",
+                    fields={
+                        "pipe_code": self.code,
+                        "input_path": self.source_input_name,
+                        "nb_rows": table_records.uncached_prefilled_row_count,
+                        "remedy": "the workbook stores no calculated values: open it in Excel or LibreOffice and save it",
+                    },
+                )
         try:
             list_content: ListContent[StuffContent] = list_content_from_table_records(
                 table_records=table_records,
@@ -417,6 +427,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 "table_format": table_records.table_format,
                 "nb_records": len(list_content.items),
                 "uncached_formula_fields": table_records.uncached_formula_fields,
+                "uncached_prefilled_row_count": table_records.uncached_prefilled_row_count,
             },
         )
         return PipeStructureOutput(

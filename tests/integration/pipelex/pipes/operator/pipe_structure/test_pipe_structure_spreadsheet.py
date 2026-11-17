@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, MethodOutputMultiplicityMismatchExpected
+from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -16,6 +17,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipe_operators.structure import pipe_structure as pipe_structure_module
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_run.exceptions import PipeRouterError
@@ -187,6 +189,22 @@ class TestPipeStructureSpreadsheet:
             {"item": "Paper", "amount": 12.5, "line": 1},
             {"item": "Ink", "amount": 3, "line": 2},
         ]
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_rows_of_formulas_storing_no_value_are_not_read_and_warned_of(self, job_metadata: JobMetadata, mocker: MockerFixture) -> None:
+        """A workbook saved without its calculated values: rows of formulas may hold data nobody calculated."""
+        cells = {"A1": "Item", "B1": "Amount", "A2": "=Source!A2", "B2": "=Source!B2", "A3": "=Source!A3", "B3": "=Source!B3"}
+        workbook = sheet_workbook(cells=cells, sheet_title="Budget")
+        document = DocumentContent(url=_data_url(data=workbook, mime_type=XLSX_MIME), mime_type=XLSX_MIME, filename="budget.xlsx")
+        warning = mocker.patch.object(pipe_structure_module.log, "warning")
+
+        pipe = _structure_pipe(sheet_range={"sheet": "budget"})
+        items = await _run(pipe=pipe, document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE)
+
+        assert items == []
+        warning.assert_called_once()
+        assert warning.call_args.args == ("Rows of uncalculated formulas were not read",)
+        assert warning.call_args.kwargs["fields"]["nb_rows"] == 2
 
     @pytest.mark.parametrize("pipe_run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY])
     @pytest.mark.asyncio(loop_scope="class")

@@ -8,6 +8,7 @@ import re
 import zipfile
 from collections.abc import Callable
 from typing import Any
+from xml.sax.saxutils import escape
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
@@ -83,6 +84,31 @@ def formula_with_cached_value(*, xlsx_bytes: bytes, cached_value: str) -> bytes:
                 content = text.encode("utf-8")
             target.writestr(item, content)
     return buffer.getvalue()
+
+
+def with_cached_values(*, xlsx_bytes: bytes, cached_values: dict[str, Any]) -> bytes:
+    """Give formulas of the first sheet, by cell address, the value Excel stores for each when it saves.
+
+    A text is stored as a formula's text result (`t="str"`), the empty text included, as `=IF(A3="","",1)` stores in a
+    row still to fill; a number is stored as a number. A formula left out keeps no stored value.
+    """
+
+    def rewrite(content: bytes) -> bytes:
+        text = content.decode("utf-8")
+        for address, cached_value in cached_values.items():
+            type_attribute = ' t="str"' if isinstance(cached_value, str) else ""
+            stored = escape(cached_value) if isinstance(cached_value, str) else str(cached_value)
+            text, nb_replaced = re.subn(
+                rf'<c r="{address}"([^>]*?)(?: t="[^"]*")?><f>(.*?)</f>(?:<v\s*/>|<v>[^<]*</v>)?</c>',
+                rf'<c r="{address}"\1{type_attribute}><f>\2</f><v>{stored}</v></c>',
+                text,
+            )
+            if nb_replaced != 1:
+                msg = f"The first sheet holds no formula cell {address}."
+                raise ValueError(msg)
+        return text.encode("utf-8")
+
+    return with_part_rewritten(xlsx_bytes=xlsx_bytes, part_name="xl/worksheets/sheet1.xml", rewrite=rewrite)
 
 
 def with_part_rewritten(*, xlsx_bytes: bytes, part_name: str, rewrite: Callable[[bytes], bytes]) -> bytes:
@@ -178,3 +204,8 @@ def with_defined_name(*, xlsx_bytes: bytes, name: str, definition: str, sheet_ti
 def formula_workbook(xlsx_bytes: bytes) -> Workbook:
     """A workbook's bytes opened with its formulas, as the range finder reads them."""
     return load_workbook(io.BytesIO(xlsx_bytes), data_only=False)
+
+
+def value_workbook(xlsx_bytes: bytes) -> Workbook:
+    """A workbook's bytes opened with the values it stores, which the range finder reads beside its formulas."""
+    return load_workbook(io.BytesIO(xlsx_bytes), data_only=True)

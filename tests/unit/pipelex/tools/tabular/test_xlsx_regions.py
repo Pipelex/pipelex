@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from openpyxl.worksheet.table import Table
 
 from pipelex.cogt.doc_gen.sheet_range import SheetRange
 from pipelex.config import TABLE_READING_FALLBACK
@@ -12,7 +13,7 @@ from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 from pipelex.tools.tabular.table_records import TableBinding, TableFormat, TableRecords
 from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.tools.tabular.xlsx_codec import read_xlsx_raw_table
-from tests.helpers.xlsx_workbooks import add_table, empty_workbook, sheet_workbook, with_defined_name, workbook_bytes
+from tests.helpers.xlsx_workbooks import add_table, empty_workbook, sheet_workbook, with_cached_values, with_defined_name, workbook_bytes
 
 SUBJECT = "the workbook given for input 'expenses'"
 
@@ -224,5 +225,112 @@ class TestXlsxRegionsOfTemplates:
     def test_a_named_range_past_the_sheet_s_grid_is_refused_before_any_cell_is_read(self) -> None:
         xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=EXPENSE_CELLS), name="Lines", definition="Expenses!$A$1048577:$A$1048578")
 
-        with pytest.raises(TableRangeUnclearError, match="past the sheet's last row"):
+        with pytest.raises(TableRangeUnclearError, match="outside the sheet's grid"):
+            _read(raw_bytes=xlsx_bytes, table_selector=TableSelector(table="Lines"))
+
+
+def _raw_sheet_range(*, raw_bytes: bytes, sheet_range: SheetRange | None = None) -> list[list[Any]]:
+    raw_table = read_xlsx_raw_table(
+        binding=TableBinding.STEP,
+        raw_bytes=raw_bytes,
+        table_selector=TableSelector(sheet_range=sheet_range or SheetRange()),
+        limits=TABLE_READING_FALLBACK,
+        subject=SUBJECT,
+    )
+    return [row.cells for row in raw_table.rows]
+
+
+# Paper with its amount merged down over the row under it, then Ink.
+MERGED_AMOUNT_CELLS: dict[str, Any] = {"A1": "merchant", "B1": "amount", "A2": "Paper", "B2": 2, "A4": "Ink", "B4": 3}
+
+
+class TestXlsxCellsOfARegion:
+    def test_a_cell_merged_down_from_a_data_row_reads_as_the_merge_s_first_cell(self) -> None:
+        rows = _raw_sheet_range(raw_bytes=sheet_workbook(cells=MERGED_AMOUNT_CELLS, merged=("B2:B3",)))
+
+        assert rows == [["Paper", 2], [None, 2], ["Ink", 3]]
+
+    def test_a_named_range_reads_a_merged_cell_as_the_merge_s_first_cell(self) -> None:
+        xlsx_bytes = with_defined_name(
+            xlsx_bytes=sheet_workbook(cells=MERGED_AMOUNT_CELLS, merged=("B2:B3",)), name="Lines", definition="Expenses!$A$1:$B$4"
+        )
+
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP,
+            raw_bytes=xlsx_bytes,
+            table_selector=TableSelector(table="Lines"),
+            limits=TABLE_READING_FALLBACK,
+            subject=SUBJECT,
+        )
+
+        assert [row.cells for row in raw_table.rows] == [["Paper", 2], [None, 2], ["Ink", 3]]
+
+    def test_a_merge_down_from_the_header_of_a_named_range_gives_its_rows_no_value(self) -> None:
+        cells = {"A1": "merchant", "B1": "amount", "B2": 2}
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=cells, merged=("A1:A2",)), name="Lines", definition="Expenses!$A$1:$B$2")
+
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP,
+            raw_bytes=xlsx_bytes,
+            table_selector=TableSelector(table="Lines"),
+            limits=TABLE_READING_FALLBACK,
+            subject=SUBJECT,
+        )
+
+        assert [row.cells for row in raw_table.rows] == [[None, 2]]
+
+    def test_a_computed_sheet_whose_formulas_store_their_values_is_read(self) -> None:
+        cells = {"A1": "merchant", "B1": "amount", "A2": "=Source!A2", "B2": "=Source!B2", "A3": "=Source!A3", "B3": "=Source!B3"}
+        xlsx_bytes = with_cached_values(xlsx_bytes=sheet_workbook(cells=cells), cached_values={"A2": "Paper", "B2": 2, "A3": "Ink", "B3": 3})
+
+        assert _raw_sheet_range(raw_bytes=xlsx_bytes) == [["Paper", 2], ["Ink", 3]]
+
+    def test_a_computed_sheet_storing_no_value_reads_no_row_and_counts_the_rows_not_read(self) -> None:
+        cells = {"A1": "merchant", "B1": "amount", "A2": "=Source!A2", "B2": "=Source!B2", "A3": "=Source!A3", "B3": "=Source!B3"}
+
+        table_records = _read(raw_bytes=sheet_workbook(cells=cells), table_selector=TableSelector(sheet_range=SheetRange()))
+
+        assert table_records.records == []
+        assert table_records.uncached_prefilled_row_count == 2
+
+    def test_a_header_formula_storing_no_value_is_refused(self) -> None:
+        cells = {"A1": "merchant", "B1": '=LOWER("AMOUNT")', "A2": "Paper", "B2": 2}
+
+        with pytest.raises(TableRangeUnclearError, match="saved without its calculated values") as exc_info:
+            _read(raw_bytes=sheet_workbook(cells=cells), table_selector=TableSelector(sheet_range=SheetRange()))
+
+        assert exc_info.value.cell == "Expenses!B1"
+
+    def test_a_labelled_total_under_pre_filled_rows_is_not_read(self) -> None:
+        cells: dict[str, Any] = {"A1": "merchant", "B1": "amount", "A2": "Paper", "B2": 2, "A6": "Total", "B6": "=SUM(B2:B5)"}
+        cells |= {f"B{row}": f'=IF(A{row}="","",1)' for row in range(3, 6)}
+        xlsx_bytes = with_cached_values(xlsx_bytes=sheet_workbook(cells=cells), cached_values={"B3": "", "B4": "", "B5": "", "B6": 2})
+
+        assert _raw_sheet_range(raw_bytes=xlsx_bytes) == [["Paper", 2]]
+
+    def test_a_merge_carrying_a_value_into_the_columns_is_refused(self) -> None:
+        cells = {"B1": "merchant", "C1": "amount", "A2": "Paper"}
+
+        with pytest.raises(TableRangeUnclearError, match=r"merges the cells Expenses!A2:B2 across the edge"):
+            _raw_sheet_range(raw_bytes=sheet_workbook(cells=cells, merged=("A2:B2",)))
+
+    def test_a_filter_naming_no_range_of_cells_is_refused(self) -> None:
+        with pytest.raises(TableRangeUnclearError, match="covers no range of cells"):
+            _raw_sheet_range(raw_bytes=sheet_workbook(cells={"A1": "merchant", "B1": "amount", "A2": "Paper"}, filter_ref="A1:C"))
+
+
+class TestXlsxRegionsOutsideTheGrid:
+    def test_a_table_from_row_zero_is_refused(self) -> None:
+        workbook = empty_workbook()
+        worksheet = workbook.create_sheet(title="Expenses")
+        worksheet["A1"], worksheet["B1"], worksheet["A2"], worksheet["B2"] = "merchant", "amount", "Paper", 2
+        worksheet.add_table(Table(displayName="Lines", ref="A0:B3"))
+
+        with pytest.raises(TableRangeUnclearError, match="covers cells outside the sheet's grid"):
+            _read(raw_bytes=workbook_bytes(workbook), table_selector=TableSelector(table="Lines"))
+
+    def test_a_named_range_from_row_zero_is_refused(self) -> None:
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=EXPENSE_CELLS), name="Lines", definition="Expenses!$A$0:$B$3")
+
+        with pytest.raises(TableRangeUnclearError, match="refers to cells outside the sheet's grid"):
             _read(raw_bytes=xlsx_bytes, table_selector=TableSelector(table="Lines"))
