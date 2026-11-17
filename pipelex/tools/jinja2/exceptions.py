@@ -1,6 +1,7 @@
 from typing import Any, Final
 
 from jinja2.exceptions import SecurityError as JinjaSecurityError
+from jinja2.exceptions import TemplateSyntaxError as JinjaTemplateSyntaxError
 from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import Self, override
@@ -10,6 +11,26 @@ from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.errors.problem import PipelexProblem, make_location
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.template_owner import TemplateOwner
+
+# What Python itself raises, rather than Jinja2, on a template nested past what its recursive parser or Python's compiler
+# can follow: about a hundred nested parentheses, brackets, attribute reads, filters or `{% if %}` blocks. Each is the
+# template's fault, never the runtime's: a parse refuses it as a template that does not parse, a compile as one that
+# cannot render as written. `IndentationError`, which compiling deeply nested blocks raises, is a `SyntaxError`.
+TEMPLATE_NESTING_ERRORS: Final[tuple[type[Exception], ...]] = (RecursionError, SyntaxError, MemoryError)
+
+# The fault of a template refused for its nesting, a fixed description that never quotes the template source.
+TEMPLATE_NESTING_FAULT: Final[str] = "the template nests too deeply for Jinja2 to parse or compile it: flatten its nested expressions or blocks."
+
+
+class TemplateNestingError(JinjaTemplateSyntaxError):
+    """A template nested deeper than its parse, its lints or its compile can follow (`MAX_TEMPLATE_NESTING_DEPTH`).
+
+    Jinja2's own `TemplateSyntaxError`, so that every site parsing a template refuses it as the template that does not
+    parse it is, by the handler it already has. Its message is `TEMPLATE_NESTING_FAULT`, which never quotes the source.
+    """
+
+    def __init__(self, *, lineno: int):
+        super().__init__(TEMPLATE_NESTING_FAULT, lineno)
 
 
 class Jinja2TemplateSyntaxError(ToolError):

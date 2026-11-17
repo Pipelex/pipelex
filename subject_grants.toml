@@ -124,6 +124,10 @@ rationale = "Runs the given plxt subcommand; single operand."
 param = "result_payload"
 rationale = "Renders the result_payload; single operand."
 
+["pipelex/cli/agent_cli/commands/run/_output_helpers.py::_revive_safe_marker"]
+param = "obj"
+rationale = "json.loads calls its object_hook positionally with the decoded object, so the one parameter must stay positional"
+
 ["pipelex/cli/agent_cli/commands/run/_output_helpers.py::format_run_markdown"]
 param = "result"
 rationale = "Renders the result; single operand."

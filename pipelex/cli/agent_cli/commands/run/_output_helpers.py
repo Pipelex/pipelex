@@ -5,13 +5,22 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, cast
 
-from kajson import kajson
 from kajson.exceptions import KajsonException
+from kajson.kajson import json_decode_date, json_decode_datetime, json_decode_time
 
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
+
+# The only kajson class markers the renderer revives, each through kajson's own parser for that type, which reads
+# strings and numbers and never imports a module or calls a constructor the payload names. Every other marker stays
+# plain data, and `clean_json_dumps` drops its marker keys.
+_REVIVED_MARKERS: dict[tuple[str, str], Callable[[dict[str, Any]], Any]] = {
+    ("datetime", "datetime"): json_decode_datetime,
+    ("datetime", "date"): json_decode_date,
+    ("datetime", "time"): json_decode_time,
+}
 
 
 def build_run_output(
@@ -52,19 +61,36 @@ def build_run_output(
     return {}
 
 
+def _revive_safe_marker(obj: dict[str, Any]) -> Any:
+    """`json.loads` object hook: turn a kajson date, datetime or time marker back into its value, leave every other object as it is."""
+    module_name = obj.get("__module__")
+    class_name = obj.get("__class__")
+    if not isinstance(module_name, str) or not isinstance(class_name, str):
+        return obj
+    decoder = _REVIVED_MARKERS.get((module_name, class_name))
+    if decoder is None:
+        return obj
+    try:
+        return decoder(obj)
+    except (KajsonException, ValueError, TypeError, KeyError, AttributeError):
+        return obj
+
+
 def _render_json_payload_lines(result_payload: Any) -> list[str]:
     """Render a structured payload as a fenced ``## Result`` json block.
 
-    The local runner stores ``json`` as a kajson-encoded string (kajson.dumps of
-    smart_dump, carrying ``__class__`` metadata for custom types). Decode it with
-    kajson — the symmetric decoder — so custom types are reconstituted and then
-    rendered cleanly by clean_json_dumps; plain json.loads would leave datetimes
-    and the like as raw tagged dicts. A string that does not decode is rendered as-is.
+    The local runner stores ``json`` as a kajson-encoded string (kajson.dumps of smart_dump, carrying ``__class__``
+    metadata for custom types), and a hosted run's ``json`` is whatever the server sent. The string is decoded with plain
+    ``json.loads``, never ``kajson.loads``: kajson imports the module a ``__module__`` key names and calls the class a
+    ``__class__`` key names, so a payload naming ``subprocess.Popen`` would start a process on this machine. Only the
+    date, datetime and time markers are revived, through kajson's parsers for them, so they render as ISO strings; every
+    other marker stays plain data whose marker keys ``clean_json_dumps`` drops. A string that does not decode is
+    rendered as-is.
     """
     if isinstance(result_payload, str):
         try:
-            result_payload = kajson.loads(result_payload)
-        except (json.JSONDecodeError, KajsonException):
+            result_payload = json.loads(result_payload, object_hook=_revive_safe_marker)
+        except (json.JSONDecodeError, RecursionError):
             pass
     return ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
 

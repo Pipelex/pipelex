@@ -40,7 +40,7 @@ pipelex/cogt/models/model_manager.py | ModelManager.routing_profile | RuntimeErr
 pipelex/cogt/templating/prompt_file_registrations.py | PromptFileRegistrations.with_documents | ValueError | invariant
 pipelex/config.py | get_config | TypeError | invariant
 pipelex/core/concepts/concept_representation_generator.py | ConceptRepresentationGenerator._generate_basemodel_representation | ValueError | invariant
-pipelex/core/concepts/concept_representation_generator.py | ConceptRepresentationGenerator.generate_class_representation | ValueError | invariant
+pipelex/core/concepts/concept_representation_generator.py | ConceptRepresentationGenerator._generate_class_value | ValueError | invariant
 pipelex/core/concepts/concept_structure_blueprint.py | ConceptStructureBlueprint._raise_type_mismatch_error | ValueError | validator
 pipelex/core/method_trees/file_references.py | _join_lexically | MethodTreeRefusedError | carrier
 pipelex/core/method_trees/file_references.py | _join_lexically | MethodTreeRefusedError | carrier
@@ -92,6 +92,7 @@ pipelex/migration/surfaces.py | _reject_duplicates | ValueError | validator
 pipelex/migration/surfaces.py | _reject_duplicates_per_directory | ValueError | validator
 pipelex/pipe_controllers/batch/pipe_batch_blueprint.py | PipeBatchBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_controllers/batch/pipe_batch_blueprint.py | PipeBatchBlueprint.validate_inputs | ValueError | validator
+pipelex/pipe_controllers/condition/pipe_condition_blueprint.py | PipeConditionBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_controllers/condition/pipe_condition_blueprint.py | PipeConditionBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_controllers/condition/pipe_condition_blueprint.py | PipeConditionBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_controllers/parallel/pipe_parallel_blueprint.py | PipeParallelBlueprint.validate_output | ValueError | validator
@@ -195,6 +196,8 @@ pipelex/system/error_tracking/error_report.py | make_error_report | ValueError |
 pipelex/system/telemetry/otel_constants.py | make_otel_gen_ai_output_type | ValueError | invariant
 pipelex/system/usage_stats/usage_stats_core.py | UsageStatsState.replace_installation_id | OSError | caught
 pipelex/tools/jinja2/exceptions.py | Jinja2TemplateInvalidError.from_problem | ValueError | invariant
+pipelex/tools/jinja2/jinja2_parsing.py | parse_jinja2_template | TemplateNestingError | carrier
+pipelex/tools/jinja2/jinja2_parsing.py | parse_jinja2_template | TemplateNestingError | carrier
 pipelex/tools/jinja2/jinja2_render_budget.py | RenderBudget._refuse | RenderBudgetExceededError | carrier
 pipelex/tools/jinja2/jinja2_render_budget.py | refuse_int_result | RenderBudgetExceededError | carrier
 pipelex/tools/jinja2/jinja2_render_charging.py | charged_filter | TypeError | invariant

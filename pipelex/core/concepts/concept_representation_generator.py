@@ -9,6 +9,7 @@ import inspect
 import random
 import types
 import typing
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Union, cast, get_args, get_origin
 
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 
 from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.misc.python_literals import escape_py_string
 
 
 class ConceptRepresentationFormat(StrEnum):
@@ -24,6 +26,18 @@ class ConceptRepresentationFormat(StrEnum):
     JSON = "json"
     PYTHON = "python"
     SCHEMA = "schema"
+
+
+@dataclass(frozen=True)
+class PythonClassCall:
+    """A class instantiation in the Python representation, kept as a typed node until it is rendered as source.
+
+    A nested class is carried as this node rather than as a string of code, so the renderer never has to guess
+    whether a string is an expression to emit as-is or a value to quote: every string is a value, and is escaped.
+    """
+
+    class_name: str
+    fields: dict[str, Any]
 
 
 class ConceptRepresentationGenerator:
@@ -37,6 +51,9 @@ class ConceptRepresentationGenerator:
 
     Python format:
         {"concept": "domain.ConceptCode", "content": "MyClass(field1='value1', ...)"}
+
+    Inside the Python format, a nested class is a `PythonClassCall` node until the whole instantiation is rendered,
+    and every string value is rendered through `escape_py_string`.
     """
 
     def __init__(self, output_format: ConceptRepresentationFormat):
@@ -96,6 +113,18 @@ class ConceptRepresentationGenerator:
         Returns:
             Dict (JSON) or string (Python) representing the class
         """
+        class_value = self._generate_class_value(content_class=content_class, include_optional=include_optional)
+        if isinstance(class_value, PythonClassCall):
+            return self._format_python_value(class_value)
+        return class_value
+
+    def _generate_class_value(
+        self,
+        *,
+        content_class: type[StuffContent],
+        include_optional: bool = True,
+    ) -> dict[str, Any] | PythonClassCall:
+        """The representation of a StuffContent class: a dict (JSON) or a `PythonClassCall` node (Python)."""
         class_name = content_class.__name__
         self._imports_needed.add(class_name)
 
@@ -105,7 +134,7 @@ class ConceptRepresentationGenerator:
             case ConceptRepresentationFormat.JSON:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
-                return self._format_as_python(class_name=class_name, fields=fields_dict)
+                return PythonClassCall(class_name=class_name, fields=fields_dict)
             case ConceptRepresentationFormat.SCHEMA:
                 msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
                 raise ValueError(msg)
@@ -153,7 +182,8 @@ class ConceptRepresentationGenerator:
         - StrEnum types (returns first enum value)
         - list[T] types (recursively generates item)
         - dict types (generates placeholder)
-        - Nested StuffContent/BaseModel classes (recursive call)
+        - Nested StuffContent/BaseModel classes (recursive call): a dict in JSON format, a `PythonClassCall` node in
+          Python format
 
         Args:
             field_type: The type annotation of the field
@@ -184,7 +214,7 @@ class ConceptRepresentationGenerator:
 
         # Handle nested StuffContent (recursive)
         if inspect.isclass(actual_type) and issubclass(actual_type, StuffContent):
-            return self.generate_class_representation(actual_type)
+            return self._generate_class_value(content_class=actual_type)
 
         # Handle nested BaseModel that is NOT StuffContent
         if inspect.isclass(actual_type) and issubclass(actual_type, BaseModel):
@@ -226,7 +256,7 @@ class ConceptRepresentationGenerator:
 
         # Handle list of StuffContent (recursive)
         if inspect.isclass(item_type) and issubclass(item_type, StuffContent):
-            item_repr = self.generate_class_representation(item_type)
+            item_repr = self._generate_class_value(content_class=item_type)
             return [item_repr]
 
         # Handle list of BaseModel (not StuffContent)
@@ -276,14 +306,14 @@ class ConceptRepresentationGenerator:
         enum_values = list(enum_type)
         return enum_values[0].value if enum_values else f"{field_name}_enum"
 
-    def _generate_basemodel_representation(self, model_class: type[BaseModel]) -> dict[str, Any] | str:
+    def _generate_basemodel_representation(self, model_class: type[BaseModel]) -> dict[str, Any] | PythonClassCall:
         """Generate representation for a BaseModel that is not StuffContent.
 
         Args:
             model_class: The BaseModel class
 
         Returns:
-            Dict (JSON) or string (Python)
+            Dict (JSON) or `PythonClassCall` node (Python)
         """
         class_name = model_class.__name__
         self._imports_needed.add(class_name)
@@ -298,7 +328,7 @@ class ConceptRepresentationGenerator:
             case ConceptRepresentationFormat.JSON:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
-                return self._format_as_python(class_name=class_name, fields=fields_dict)
+                return PythonClassCall(class_name=class_name, fields=fields_dict)
             case ConceptRepresentationFormat.SCHEMA:
                 msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
                 raise ValueError(msg)
@@ -353,6 +383,9 @@ class ConceptRepresentationGenerator:
     def _format_as_python(self, *, class_name: str, fields: dict[str, Any]) -> str:
         """Format a class instantiation as Python code string.
 
+        The class and field names are Python identifiers, since they name a generated class and its fields; only the
+        values are rendered, each through `_format_python_value`.
+
         Args:
             class_name: Name of the class
             fields: Dict of field names to values
@@ -380,8 +413,10 @@ class ConceptRepresentationGenerator:
         Examples:
             >>> self._format_python_value("hello")
             '"hello"'
-            >>> self._format_python_value("MyClass(arg=value)")  # Already a Python expression
-            'MyClass(arg=value)'
+            >>> self._format_python_value("MyClass(arg=value)")  # A string is always a value, never code
+            '"MyClass(arg=value)"'
+            >>> self._format_python_value(PythonClassCall(class_name="MyClass", fields={"arg": "value"}))
+            'MyClass(arg="value")'
             >>> self._format_python_value(True)
             'True'
             >>> self._format_python_value(42)
@@ -393,13 +428,13 @@ class ConceptRepresentationGenerator:
             >>> self._format_python_value([1, 2, 3])
             '[1, 2, 3]'
         """
-        if isinstance(value, str):
-            # Check if it's already a Python expression (class instantiation)
-            if "(" in value and ")" in value and "=" in value:
-                return value
-            return f'"{value}"'
+        if isinstance(value, PythonClassCall):
+            return self._format_as_python(class_name=value.class_name, fields=value.fields)
+        elif isinstance(value, str):
+            # Every string is a value, whatever it holds: a choice or a placeholder is never emitted as code.
+            return escape_py_string(value)
         elif isinstance(value, (bool, int, float)):
-            return str(value)
+            return repr(value)
         elif isinstance(value, dict):
             dict_value = cast("dict[str, Any]", value)
             items = ", ".join(f"{self._format_python_value(key)}: {self._format_python_value(val)}" for key, val in dict_value.items())
@@ -409,7 +444,7 @@ class ConceptRepresentationGenerator:
             items = ", ".join(self._format_python_value(item) for item in list_value)
             return "[" + items + "]"
         else:
-            return str(value)
+            return repr(value)
 
 
 # Convenience functions

@@ -1,5 +1,6 @@
 """Unit tests for Literal type handling in ConceptRepresentationGenerator."""
 
+import ast
 from typing import Literal
 
 import pytest
@@ -44,6 +45,35 @@ class ContentWithRequiredAndOptionalLiteral(StructuredContent):
 
     status: Literal["draft", "published", "archived"] = Field(..., description="Status")
     priority: Literal["low", "medium", "high"] | None = Field(None, description="Priority")
+
+
+CODE_LIKE_CHOICE = "__import__('pathlib').Path('MARK').write_text('x') and (1==1)"
+QUOTES_AND_BREAKS_CHOICE = "He said \"hi\" and 'bye'\nthen (left) = done\\"
+
+
+class ContentWithCodeLikeChoice(StructuredContent):
+    """Content whose only choice reads like a Python expression."""
+
+    tone: Literal["__import__('pathlib').Path('MARK').write_text('x') and (1==1)"] = Field(..., description="Tone")
+
+
+class ContentWithQuotesAndBreaksChoice(StructuredContent):
+    """Content whose only choice holds both quotes, parentheses, an equals sign, a line break and a backslash."""
+
+    tone: Literal["He said \"hi\" and 'bye'\nthen (left) = done\\"] = Field(..., description="Tone")
+
+
+class ContentNestingCodeLikeChoice(StructuredContent):
+    """Content nesting a class with a code-like choice, alone and in a list."""
+
+    child: ContentWithCodeLikeChoice = Field(..., description="Child")
+    children: list[ContentWithQuotesAndBreaksChoice] = Field(..., description="Children")
+
+
+def _call_keywords(node: ast.expr) -> dict[str, ast.expr]:
+    assert isinstance(node, ast.Call)
+    assert not node.args
+    return {keyword.arg: keyword.value for keyword in node.keywords if keyword.arg is not None}
 
 
 # =============================================================================
@@ -150,3 +180,45 @@ class TestGenerateFieldValueLiteralTypes:
         assert isinstance(result, dict)
         assert result["status"] in {"draft", "published", "archived"}
         assert result["priority"] in {"low", "medium", "high"}
+
+
+class TestPythonFormatEscapesChoices:
+    """A choice is always rendered as a string literal in the Python format, never as code."""
+
+    @pytest.mark.parametrize(
+        ("content_class", "choice"),
+        [
+            (ContentWithCodeLikeChoice, CODE_LIKE_CHOICE),
+            (ContentWithQuotesAndBreaksChoice, QUOTES_AND_BREAKS_CHOICE),
+        ],
+    )
+    def test_choice_is_a_string_constant(self, content_class: type[StructuredContent], choice: str) -> None:
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        rendered = generator.generate_class_representation(content_class)
+        assert isinstance(rendered, str)
+        assert "\n" not in rendered, "a line break in a choice must be escaped, not written raw"
+        keywords = _call_keywords(ast.parse(rendered, mode="eval").body)
+        tone = keywords["tone"]
+        assert isinstance(tone, ast.Constant), f"the choice must be a string literal, got {ast.dump(tone)}"
+        assert tone.value == choice
+
+    def test_nested_classes_render_as_calls_and_their_choices_as_strings(self) -> None:
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        rendered = generator.generate_class_representation(ContentNestingCodeLikeChoice)
+        assert isinstance(rendered, str)
+        outer = _call_keywords(ast.parse(rendered, mode="eval").body)
+
+        child = outer["child"]
+        assert isinstance(child, ast.Call)
+        assert isinstance(child.func, ast.Name)
+        assert child.func.id == "ContentWithCodeLikeChoice"
+        child_tone = _call_keywords(child)["tone"]
+        assert isinstance(child_tone, ast.Constant)
+        assert child_tone.value == CODE_LIKE_CHOICE
+
+        children = outer["children"]
+        assert isinstance(children, ast.List)
+        assert len(children.elts) == 1
+        item_tone = _call_keywords(children.elts[0])["tone"]
+        assert isinstance(item_tone, ast.Constant)
+        assert item_tone.value == QUOTES_AND_BREAKS_CHOICE

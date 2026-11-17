@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
-from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.exceptions import TEMPLATE_NESTING_ERRORS, TEMPLATE_NESTING_FAULT, Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -112,6 +112,9 @@ class PipeConditionBlueprint(PipeBlueprint):
             raise ValueError(msg) from exc.__cause__
         try:
             make_jinja2_env_without_loader(template_category=TemplateCategory.EXPRESSION).compile(runtime_expression)
+        except TEMPLATE_NESTING_ERRORS as exc:
+            msg = f"The '{field_name}' of this PipeCondition does not compile: {TEMPLATE_NESTING_FAULT}"
+            raise ValueError(msg) from exc
         except TemplateSyntaxError as exc:
             msg = (
                 f"The '{field_name}' of this PipeCondition does not compile at line {exc.lineno} of that expression. "
