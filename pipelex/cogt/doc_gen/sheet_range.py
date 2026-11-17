@@ -17,8 +17,9 @@ read numbered, so an engine imports it from here rather than keeping a copy, as 
 
 **Finding a sheet range.** The finder reads the cells the sheet holds, never its grid: a sheet whose extent a formatted
 column stretches to the last row costs what its stored cells cost. A cell holds a value when it holds anything but
-nothing or an empty text, a formula included, whatever it calculates to; a cell carrying only formatting holds none. The
-worksheet is read with its formulas (opened with `data_only=False`), since the totals line is told by its formula.
+nothing or an empty text, a formula included, whatever it calculates to; a cell carrying only formatting holds none. A
+cell holds data when it holds a value that is not a formula. The worksheet is read with its formulas (opened with
+`data_only=False`), since the totals line and a template's pre-filled rows are told by their formulas.
 
 1. **The header row** is the row `header_row` names or, without it, the sheet's first row holding a value. A sheet
    holding no value is refused, and so is a `header_row` naming a row that holds none. Rows above the header row are
@@ -27,18 +28,24 @@ worksheet is read with its formulas (opened with `data_only=False`), since the t
    one holding none. A header cell of those columns that belongs to a merged range is refused, naming the merged range;
    a merge elsewhere on the header row is not, by this rule. A value further along the header row, past the empty cell
    that ends the columns, is a second block, refused naming it.
-3. **The data rows** run from the row under the header down to the first blank row, which holds no value in any of the
-   columns and is not one of them. When the row under the header is blank, the range has no data row, which is valid.
-4. **Nothing below.** A value in the columns below that blank row is refused, naming its cell: a further row of data
-   after a gap or a note, which the finder cannot tell apart.
-5. **No column without a header.** A value in the column just left or just right of the columns, on the header row or
-   a row the data rows rule found, a totals line included, is refused as a column with no header. Values further away,
-   past that empty column, are another part of the sheet and are left alone.
-6. **The totals line.** When a cell of the last row found holds a formula containing a reference to its own column's
-   cells, on the same sheet, from the first data row through the row above it, written as a range with a colon
-   (`C4:C5`, `$C$4:$C$5`, `Expenses!C4:C5`), that row is a totals line, not a data row (`SheetRegion.totals_row_count`).
-   The row under the header is never one, since no data row lies above it.
-7. **The filter.** A filter the sheet carries (Data > Filter) must start on the header row and cover the columns found;
+3. **The data rows** run from the row under the header down to the first row holding no data in any of the columns. A
+   cell inside a merged range whose first cell lies in a data row holds that cell's data, so a merge spanning rows does
+   not end the rows. When the row under the header holds no data, the range has no data row, which is valid.
+4. **The totals line.** A row is a totals line when a cell of it, in the columns, holds a formula containing a
+   reference to its own column's cells, on the same sheet, from the first data row through the row above it, written as
+   a range with a colon (`C4:C5`, `$C$4:$C$5`, `Expenses!C4:C5`): the last row the third rule found, when it is one,
+   such as a `Total` label beside its `=SUM(...)`, or else the row right after it. A totals line is not a data row
+   (`SheetRegion.totals_row_count`). The row under the header is never one, since no data row lies above it.
+5. **Pre-filled rows.** The rows after the range that hold formulas and no data, such as a template's
+   `=IF(A5="","",B5*C5)` filled down to row 500, are not part of the range and are not refused. The run of them directly
+   after it, up to a row totalling its column from the first data row, is `SheetRegion.prefilled_row_count`, the rows an
+   append writes into, keeping their formulas.
+6. **Nothing below.** Data in the columns below the range is refused, naming its cell: a further row of data after a gap
+   or a note, which the finder cannot tell apart.
+7. **No column without a header.** A value in the column just left or just right of the columns, on the header row or
+   a row of the range, a totals line included, is refused as a column with no header. Values further away, past that
+   empty column, are another part of the sheet and are left alone.
+8. **The filter.** A filter the sheet carries (Data > Filter) must start on the header row and cover the columns found;
    one that disagrees is refused, since the sheet then states its range twice.
 
 Every refusal names the sheet and the cell by its address, such as `Expenses!C12`, or the row, never a cell's value,
@@ -46,8 +53,9 @@ which is the run's data, and recommends fixing that cell or turning the range in
 region's size with its own limit, counted as `SheetRegion.nb_cells`.
 
 **Named ranges.** A name defined for the whole workbook or for one sheet, referring to one rectangular range of at least
-two cells on one worksheet by a plain reference. A name holding a formula or a value, several ranges, whole columns or
-rows, or cells that no longer exist (`#REF!`) is refused when a step names it, and so is a name defined more than once;
+two cells on one worksheet by a plain reference, within the sheet's grid. A name holding a formula or a value, several
+ranges, whole columns or rows, cells past the sheet's last row or column, or cells that no longer exist (`#REF!`) is
+refused when a step names it, and so is a name defined more than once;
 Excel's built-in names (`_xlnm.`) and LibreOffice's hidden database ranges (`__Anonymous_Sheet_DB__`) are never named
 ranges. Its first row is its header row, a header cell holding no value naming no column, and every row under it is a
 data row, an empty one included, as in a Table; the finder's rules do not apply, since the name declares its extent.
@@ -68,7 +76,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.tools.tabular.exceptions import CsvError, CsvReadError, TableRangeUnclearError, TableSelectionError
+from pipelex.tools.tabular.exceptions import CsvError, TableRangeUnclearError, TableSelectionError
 
 try:
     from openpyxl.formula.tokenizer import Tokenizer, TokenizerError
@@ -96,6 +104,11 @@ SHEET_RANGE_REFUSALS: tuple[type[CsvError], ...] = (TableRangeUnclearError, Tabl
 #: a print area or the range a filter keeps, and the hidden database ranges LibreOffice writes.
 BUILT_IN_NAME_PREFIXES: tuple[str, ...] = ("_xlnm.", "__Anonymous_Sheet_DB__")
 
+#: The last row and the last column of a worksheet's grid, `XFD1048576`: a reference past them names no cell.
+MAX_SHEET_ROW = 1_048_576
+MAX_SHEET_COLUMN = 16_384
+MAX_SHEET_COLUMN_LETTER = "XFD"
+
 # The advice every refusal of an unclear range ends with.
 _TABLE_REMEDY = "or turn the range into an Excel Table (Insert > Table)"
 
@@ -103,27 +116,39 @@ _TABLE_REMEDY = "or turn the range into an Excel Table (Insert > Table)"
 _BARE_SHEET_TITLE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # A reference qualified by its sheet: `Sheet1!C4:C5` or `'My sheet'!C4:C5`.
 _SHEET_QUALIFIED_REFERENCE = re.compile(r"(?:(?P<bare>[^'!]+)|'(?P<quoted>(?:[^']|'')+)')!(?P<reference>[^!]+)")
-# What a named range's definition may be: one area of cells on one sheet, a cell or a range.
-_SHEET_PART = r"(?:[A-Za-z0-9_.]+|'(?:[^']|'')+')"
+# What a named range's definition may be: one area of cells on one sheet, a cell or a range. Excel writes a title of
+# letters, digits, underscores and dots bare, a letter being any script's (`Données!$A$1:$B$3`), and quotes any other.
+_SHEET_PART = r"(?:[\w.]+|'(?:[^']|'')+')"
 _CELL_PART = r"\$?[A-Za-z]{1,3}\$?[0-9]+"
 _ONE_AREA = re.compile(rf"(?P<sheet>{_SHEET_PART})!(?P<first>{_CELL_PART})(?::(?P<last>{_CELL_PART}))?")
 _SEVERAL_AREAS = re.compile(rf"{_SHEET_PART}!{_CELL_PART}(?::{_CELL_PART})?(?:,{_SHEET_PART}!{_CELL_PART}(?::{_CELL_PART})?)+")
 _WHOLE_LINES = re.compile(rf"{_SHEET_PART}!(?:\$?[A-Za-z]{{1,3}}:\$?[A-Za-z]{{1,3}}|\$?[0-9]+:\$?[0-9]+)")
 
 
-class SheetRange(BaseModel):
-    """A step's `sheet_range`, as plain data: the worksheet a range lies on, and the row holding its header.
+#: A sheet row as a method writes it: an integer counted from 1, as the spreadsheet numbers its rows, never a text or a float.
+SheetRowNumber = Annotated[int, Field(ge=1, strict=True)]
+
+
+class SheetRangeFields(BaseModel):
+    """The fields every spelling of a sheet range shares: the worksheet a range lies on, and the row holding its header.
 
     Both are optional: without `sheet`, the workbook must hold exactly one worksheet, and without `header_row`, the
-    header is the sheet's first row holding a value.
+    header is the sheet's first row holding a value. The operators' blueprints and the plain data below derive from it,
+    so the rules of the two fields are written once.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid")
 
     sheet: str | None = Field(default=None, description="The worksheet, compared ignoring case; None for the workbook's only one")
-    header_row: Annotated[int, Field(ge=1, strict=True)] | None = Field(
+    header_row: SheetRowNumber | None = Field(
         default=None, description="The sheet row holding the header, counted from 1; None for the sheet's first row holding a value"
     )
+
+
+class SheetRange(SheetRangeFields):
+    """A step's `sheet_range`, as plain data: the worksheet a range lies on, and the row holding its header."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class SheetRangeFill(SheetRange):
@@ -156,8 +181,9 @@ class SheetRegion(BaseModel):
     The header row is `header_row`, over the columns `first_column` to `last_column`; the data rows run from the row under
     it to `last_row`, which is `header_row` itself when the region has none; and the `totals_row_count` rows after
     `last_row` are a Table's totals row or a sheet range's totals line, which are not data rows and are not counted in a
-    row's position. A Table's and a named range's numbers are what they declare, which may reach past the cells the sheet
-    holds; a sheet range's lie within them.
+    row's position. A sheet range's `prefilled_row_count` rows after those are a template's pre-filled rows, holding
+    formulas and no data, which are not part of the region and which an append writes into. A Table's and a named
+    range's numbers are what they declare, which may reach past the cells the sheet holds; a sheet range's lie within them.
 
     In a named range, a header cell holding no value names no column, and the cells under it are ignored; in a sheet
     range every header cell holds a value, and a Table's header names every column.
@@ -173,6 +199,9 @@ class SheetRegion(BaseModel):
     last_column: int = Field(ge=1)
     last_row: int = Field(ge=1, description="The last data row, or the header row when the region has no data row")
     totals_row_count: int = Field(ge=0, description="The rows after the last data row that total it: a Table's totals row, or a totals line")
+    prefilled_row_count: int = Field(
+        ge=0, description="A sheet range's formula-only rows directly after its totals line or last data row; 0 for a Table and a named range"
+    )
 
     @model_validator(mode="after")
     def validate_extent(self) -> Self:
@@ -184,6 +213,9 @@ class SheetRegion(BaseModel):
             raise ValueError(msg)
         if (self.name is None) != (self.kind == RegionKind.SHEET_RANGE):
             msg = "A Table and a named range are named, and a sheet range is not."
+            raise ValueError(msg)
+        if self.prefilled_row_count and self.kind != RegionKind.SHEET_RANGE:
+            msg = "Only a sheet range has pre-filled rows: a Table and a named range declare their extent."
             raise ValueError(msg)
         return self
 
@@ -206,9 +238,22 @@ class SheetRegion(BaseModel):
         return range(self.last_row + 1, self.last_row + 1 + self.totals_row_count)
 
     @property
+    def prefilled_rows(self) -> range:
+        """The sheet rows of the pre-filled rows after the region, empty when there are none."""
+        first_prefilled_row = self.last_row + 1 + self.totals_row_count
+        return range(first_prefilled_row, first_prefilled_row + self.prefilled_row_count)
+
+    @property
     def nb_cells(self) -> int:
         """The cells a region is bounded by: its header row and data rows, times its columns."""
         return (self.last_row - self.header_row + 1) * len(self.columns)
+
+    @property
+    def short_label(self) -> str:
+        """The region as a reader's message names it: "Table 'Expenses'", "the named range 'Expenses'", "the range on the sheet 'Sheet1'"."""
+        if self.kind == RegionKind.TABLE:
+            return f"Table '{self.name}'"
+        return self.label
 
     @property
     def label(self) -> str:
@@ -270,9 +315,11 @@ def _sentence_start(*, subject: str) -> str:
     return subject[:1].upper() + subject[1:]
 
 
-def _worksheets(*, workbook: "Workbook") -> list["Worksheet"]:
-    # A workbook opened neither read-only nor write-only lists its sheets of cells as `Worksheet`s; a chart sheet, which
-    # holds no cells, is not among them.
+def workbook_worksheets(*, workbook: "Workbook") -> list["Worksheet"]:
+    """A workbook's sheets of cells, in order: a chart sheet, which holds no cells, is not among them.
+
+    A workbook opened neither read-only nor write-only lists its sheets of cells as `Worksheet`s.
+    """
     return [cast("Worksheet", sheet) for sheet in workbook.worksheets]
 
 
@@ -286,7 +333,7 @@ def choose_worksheet(*, workbook: "Workbook", sheet: str | None, subject: str) -
     Raises:
         TableSelectionError: no worksheet has that name, or, without one, the workbook holds several worksheets or none.
     """
-    worksheets = _worksheets(workbook=workbook)
+    worksheets = workbook_worksheets(workbook=workbook)
     titles = [worksheet.title for worksheet in worksheets]
     if sheet is not None:
         wanted = sheet.casefold()
@@ -311,18 +358,32 @@ def table_region(*, worksheet: "Worksheet", table: "Table", subject: str) -> She
     """The region of an Excel Table: what its reference, header row count and totals row count declare.
 
     Raises:
-        CsvReadError: the Table's reference is no range of cells, or the Table has no header row.
+        TableRangeUnclearError: the Table's reference is no range of cells within the sheet's grid, or the Table has no
+            header row: the file opens, and its Table does not state rows a step can read or fill.
     """
     if range_boundaries is None:
         raise missing_openpyxl_error()
     table_label = f"Table '{table.displayName}'"
-    min_col, min_row, max_col, max_row = range_boundaries(str(table.ref))
+    try:
+        min_col, min_row, max_col, max_row = range_boundaries(str(table.ref))
+    except ValueError:
+        min_col = min_row = max_col = max_row = None
     if min_col is None or min_row is None or max_col is None or max_row is None:
-        msg = f"{table_label} of {subject} covers no range of cells."
-        raise CsvReadError(msg)
+        msg = f"{table_label} of {subject} covers no range of cells: recreate the Table over its header and rows."
+        raise TableRangeUnclearError(msg, sheet=worksheet.title, cell=None)
+    if max_row > MAX_SHEET_ROW or max_col > MAX_SHEET_COLUMN:
+        msg = (
+            f"{table_label} of {subject} covers cells past the sheet's last row ({MAX_SHEET_ROW}) or last column "
+            f"({MAX_SHEET_COLUMN_LETTER}), which name no cell: recreate the Table over its header and rows."
+        )
+        raise TableRangeUnclearError(msg, sheet=worksheet.title, cell=None)
     if table.headerRowCount == 0:
-        msg = f"{table_label} of {subject} has no header row; a header naming the columns is required."
-        raise CsvReadError(msg)
+        table_cells = range_address(sheet_title=worksheet.title, first_row=min_row, first_column=min_col, last_row=max_row, last_column=max_col)
+        msg = (
+            f"{table_label} of {subject}, over {table_cells}, has no header row, and a header naming the columns is required: "
+            "turn its header row on (Table Design > Header Row)."
+        )
+        raise TableRangeUnclearError(msg, sheet=worksheet.title, cell=cell_address(sheet_title=worksheet.title, row=min_row, column=min_col))
     totals_row_count = table.totalsRowCount or 0
     last_row = max(max_row - totals_row_count, min_row)
     return SheetRegion(
@@ -334,6 +395,7 @@ def table_region(*, worksheet: "Worksheet", table: "Table", subject: str) -> She
         last_column=max_col,
         last_row=last_row,
         totals_row_count=max_row - last_row,
+        prefilled_row_count=0,
     )
 
 
@@ -345,8 +407,8 @@ def resolve_sheet_range(*, workbook: "Workbook", sheet_range: SheetRange, subjec
 
     Raises:
         TableSelectionError: the worksheet cannot be chosen, or it holds several Tables.
-        TableRangeUnclearError: `header_row` is not the Table's header row, or the finder's rules refuse the range.
-        CsvReadError: the worksheet's one Table has no header row or covers no range of cells.
+        TableRangeUnclearError: `header_row` is not the Table's header row, the worksheet's one Table has no header row
+            or covers no range of cells, or the finder's rules refuse the range.
     """
     worksheet = choose_worksheet(workbook=workbook, sheet=sheet_range.sheet, subject=subject)
     tables = list(worksheet.tables.values())
@@ -374,6 +436,11 @@ def resolve_sheet_range(*, workbook: "Workbook", sheet_range: SheetRange, subjec
 def _holds_value(*, value: Any) -> bool:
     """Whether a cell holds a value: anything but nothing or an empty text, a formula included."""
     return value is not None and value != ""
+
+
+def _holds_data(*, cell: "Cell") -> bool:
+    """Whether a cell holds data: a value that is not a formula, which a template's pre-filled rows hold none of."""
+    return cell.data_type != "f" and _holds_value(value=cell.value)
 
 
 def _stored_cells(*, worksheet: "Worksheet") -> dict[tuple[int, int], "Cell"]:
@@ -466,30 +533,93 @@ def find_sheet_range(*, worksheet: "Worksheet", header_row: int | None, subject:
         )
         raise refuse(message=msg, row=the_header_row, column=past_columns[0])
 
-    # 3. The data rows, down to the first blank row.
+    # 3. The data rows, down to the first row holding no data in the columns.
     def in_columns(*, column: int) -> bool:
         return first_column <= column <= last_column
 
-    rows_holding_values = {row for row, column in value_cells if row > the_header_row and in_columns(column=column)}
+    data_cells = sorted(
+        position
+        for position, cell in stored_cells.items()
+        if position[0] > the_header_row and in_columns(column=position[1]) and _holds_data(cell=cell)
+    )
+    data_rows = {row for row, _ in data_cells}
+    formula_rows = {
+        row for (row, column), cell in stored_cells.items() if row > the_header_row and in_columns(column=column) and cell.data_type == "f"
+    }
+    # A cell inside a merged range shows the merge's first cell: the rows a merge spans below its first cell hold its data
+    # when that first cell holds data, so a vertical merge in a data row does not end the rows.
+    merge_anchor_rows: dict[int, set[int]] = {}
+    for merged_range in worksheet.merged_cells.ranges:
+        if merged_range.min_row <= the_header_row or not in_columns(column=merged_range.min_col):
+            continue
+        anchor = stored_cells.get((merged_range.min_row, merged_range.min_col))
+        if anchor is None or not _holds_data(cell=anchor):
+            continue
+        for covered_row in range(merged_range.min_row + 1, merged_range.max_row + 1):
+            merge_anchor_rows.setdefault(covered_row, set()).add(merged_range.min_row)
     last_row = the_header_row
-    while last_row + 1 in rows_holding_values:
-        last_row += 1
+    while True:
+        next_row = last_row + 1
+        if next_row in data_rows or any(the_header_row < anchor_row <= last_row for anchor_row in merge_anchor_rows.get(next_row, ())):
+            last_row = next_row
+            continue
+        break
 
-    # 4. Nothing below the blank row that ends them.
-    below = [(row, column) for row, column in value_cells if row > last_row and in_columns(column=column)]
+    # 4. The totals line: the last row found, beside a label, or the row right after it, never the row under the header.
+    def totals_column_data(*, row: int) -> bool:
+        if row < the_header_row + 2:
+            return False
+        for column in range(first_column, last_column + 1):
+            cell = stored_cells.get((row, column))
+            if cell is None or cell.data_type != "f":
+                continue
+            formula = _formula_text(value=cell.value)
+            if formula is not None and _references_column_data(
+                formula=formula, sheet_title=title, column=column, first_row=the_header_row + 1, last_row=row - 1
+            ):
+                return True
+        return False
+
+    totals_row_count = 0
+    data_last_row = last_row
+    if totals_column_data(row=last_row):
+        totals_row_count = 1
+        data_last_row = last_row - 1
+    elif totals_column_data(row=last_row + 1):
+        totals_row_count = 1
+    range_last_row = data_last_row + totals_row_count
+
+    # 5. The pre-filled rows: the run of rows holding formulas and no data right after the range, up to a row that totals
+    # its column from the first data row, such as a total under the pre-filled rows, which an append must not write into.
+    prefilled_row_count = 0
+    while True:
+        prefilled_row = range_last_row + prefilled_row_count + 1
+        if prefilled_row not in formula_rows or prefilled_row in data_rows or totals_column_data(row=prefilled_row):
+            break
+        prefilled_row_count += 1
+
+    # 6. No data below the range: formulas there are a template's, data a further block or a note.
+    below = [(row, column) for row, column in data_cells if row > range_last_row]
     if below:
         below_row, below_column = below[0]
+        ending_row = range_last_row + 1
+        if ending_row in formula_rows:
+            ending = f"row {ending_row}, which holds formulas and no data,"
+        else:
+            ending = f"the blank row {ending_row}"
         msg = (
-            f"The sheet '{title}' of {subject} holds a value in {address(row=below_row, column=below_column)}, below the blank "
-            f"row {last_row + 1} that ends the rows under the header {header_address}: a further row of data after a gap, or a "
-            f"note, which the range cannot tell apart. Move or clear that cell, remove the blank row if the data goes on, {_TABLE_REMEDY}."
+            f"The sheet '{title}' of {subject} holds a value in {address(row=below_row, column=below_column)}, below {ending} that ends "
+            f"the rows under the header {header_address}: a further row of data after a gap, or a note, which the range cannot tell "
+            f"apart. Move or clear that cell, remove the gap if the data goes on, {_TABLE_REMEDY}."
         )
         if header_row is None:
             msg += " When the header lies lower on the sheet, under a title, name its row with `header_row`."
         raise refuse(message=msg, row=below_row, column=below_column)
 
-    # 5. No column without a header, beside the columns, on the header row or a row found, a totals line included.
-    beside = [(row, column) for row, column in value_cells if column in {first_column - 1, last_column + 1} and the_header_row <= row <= last_row]
+    # 7. No column without a header, beside the columns, on the header row or a row of the range, a totals line included.
+    beside = [
+        (row, column) for row, column in value_cells if column in {first_column - 1, last_column + 1} and the_header_row <= row <= range_last_row
+    ]
     if beside:
         beside_row, beside_column = beside[0]
         side = "left" if beside_column < first_column else "right"
@@ -500,22 +630,7 @@ def find_sheet_range(*, worksheet: "Worksheet", header_row: int | None, subject:
         )
         raise refuse(message=msg, row=beside_row, column=beside_column)
 
-    # 6. The totals line: never the row under the header, which no data row lies above.
-    totals_row_count = 0
-    if last_row >= the_header_row + 2:
-        for column in range(first_column, last_column + 1):
-            cell = stored_cells.get((last_row, column))
-            if cell is None or cell.data_type != "f":
-                continue
-            formula = _formula_text(value=cell.value)
-            if formula is not None and _references_column_data(
-                formula=formula, sheet_title=title, column=column, first_row=the_header_row + 1, last_row=last_row - 1
-            ):
-                totals_row_count = 1
-                break
-    data_last_row = last_row - totals_row_count
-
-    # 7. The filter, when the sheet carries one, states the same range.
+    # 8. The filter, when the sheet carries one, states the same range.
     filter_reference = worksheet.auto_filter.ref
     if filter_reference:
         filter_min_col, filter_min_row, filter_max_col, _filter_max_row = range_boundaries(str(filter_reference))
@@ -536,6 +651,7 @@ def find_sheet_range(*, worksheet: "Worksheet", header_row: int | None, subject:
         last_column=last_column,
         last_row=data_last_row,
         totals_row_count=totals_row_count,
+        prefilled_row_count=prefilled_row_count,
     )
 
 
@@ -587,8 +703,8 @@ def resolve_named_range(*, workbook: "Workbook", name: str, subject: str) -> She
     Raises:
         TableSelectionError: the name is defined more than once, for several sheets or for the workbook and a sheet.
         TableRangeUnclearError: the name is not a named range: it refers to one cell, holds a formula or a value, refers
-            to several ranges, to whole columns or rows, to cells that no longer exist, or to a sheet the workbook does
-            not hold as a worksheet.
+            to several ranges, to whole columns or rows, to cells past the sheet's grid or that no longer exist, or to a
+            sheet the workbook does not hold as a worksheet.
     """
     if range_boundaries is None:
         raise missing_openpyxl_error()
@@ -598,7 +714,7 @@ def resolve_named_range(*, workbook: "Workbook", name: str, subject: str) -> She
         for defined_key, defined_name in workbook.defined_names.items()
         if _is_user_name(name=str(defined_key)) and str(defined_key).casefold() == wanted
     ]
-    worksheets = _worksheets(workbook=workbook)
+    worksheets = workbook_worksheets(workbook=workbook)
     for worksheet in worksheets:
         definitions.extend(
             (worksheet.title, defined_name)
@@ -650,6 +766,12 @@ def resolve_named_range(*, workbook: "Workbook", name: str, subject: str) -> She
         raise TableRangeUnclearError(msg, sheet=worksheet.title, cell=None)
     min_col, max_col = min(first_col, last_col), max(first_col, last_col)
     min_row, max_row = min(first_row, last_row), max(first_row, last_row)
+    if max_row > MAX_SHEET_ROW or max_col > MAX_SHEET_COLUMN:
+        msg = (
+            f"The name '{display_name}' of {subject} refers to cells past the sheet's last row ({MAX_SHEET_ROW}) or last column "
+            f"({MAX_SHEET_COLUMN_LETTER}), which name no cell: {remedy}."
+        )
+        raise TableRangeUnclearError(msg, sheet=worksheet.title, cell=None)
     if min_col == max_col and min_row == max_row:
         the_cell = cell_address(sheet_title=worksheet.title, row=min_row, column=min_col)
         msg = (
@@ -666,4 +788,5 @@ def resolve_named_range(*, workbook: "Workbook", name: str, subject: str) -> She
         last_column=max_col,
         last_row=max_row,
         totals_row_count=0,
+        prefilled_row_count=0,
     )

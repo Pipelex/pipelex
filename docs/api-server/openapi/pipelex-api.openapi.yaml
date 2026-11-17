@@ -2885,20 +2885,23 @@ components:
       description: 'The document engine a `PipeDocGen` step prints with: a model of the `doc_gen` family, such as `reportlab-pdf`.'
     DocGenSheetRangeBlueprint:
       properties:
-        list:
-          type: string
-          title: List
         sheet:
           anyOf:
           - type: string
           - type: 'null'
           title: Sheet
+          description: The worksheet, compared ignoring case; None for the workbook's only one
         header_row:
           anyOf:
           - type: integer
             minimum: 1.0
           - type: 'null'
           title: Header Row
+          description: The sheet row holding the header, counted from 1; None for the sheet's first row holding a value
+        list:
+          type: string
+          title: List
+          description: The list of records that fills the range, by its path in the step's data
       additionalProperties: false
       type: object
       required:
@@ -8369,12 +8372,14 @@ components:
           - type: string
           - type: 'null'
           title: Sheet
+          description: The worksheet, compared ignoring case; None for the workbook's only one
         header_row:
           anyOf:
           - type: integer
             minimum: 1.0
           - type: 'null'
           title: Header Row
+          description: The sheet row holding the header, counted from 1; None for the sheet's first row holding a value
       additionalProperties: false
       type: object
       title: SheetRangeBlueprint

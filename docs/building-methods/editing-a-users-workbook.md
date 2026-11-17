@@ -272,8 +272,8 @@ sheet_range    = { list = "expenses", sheet = "Expenses", header_row = 3 }
 ```
 
 - **`header_row` skips the title.** Without it, the header is the sheet's first row holding a value; a title above the header would be read as the header, and the refusal says to name the header's row.
-- **The range ends at the first blank row**, and anything typed below it in the same columns, a note or a further block of rows, refuses the run rather than being read or written over. A value in the column just beside the range is a column with no header, refused too.
-- **A totals line is not a row.** A last row that totals its column above with a formula written as a range, `=SUM(D4:D20)`, is read as a totals line, not a record, and does not count toward the positions.
+- **The range ends at the first row holding no data**, and anything typed below it in the same columns, a note or a further block of rows, refuses the run rather than being read or written over. Formulas a template fills down ahead of the rows to come, such as `=IF(A5="","",B5*C5)` to row 500, are not rows and are not refused. A value in the column just beside the range is a column with no header, refused too.
+- **A totals line is not a row.** A row under the data that totals its column above with a formula written as a range, `=SUM(D4:D20)`, is read as a totals line, not a record, and does not count toward the positions.
 - **`PipeDocGen` names the list.** With `sheet_range`, the list `list` names fills the range, whatever the sheet is called, and only `append` and `update` are allowed: `replace` could clear the user's rows past a boundary the rules found rather than one the workbook declares.
 - **Turning the range into a Table keeps the method working.** A sheet holding one Excel Table is read and filled as that Table.
 

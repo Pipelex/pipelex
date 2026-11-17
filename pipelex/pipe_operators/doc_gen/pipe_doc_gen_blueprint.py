@@ -1,10 +1,11 @@
-from typing import Annotated, Literal, Self
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, model_validator
+from pydantic import Field, ValidationInfo, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFields
 from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
@@ -43,7 +44,7 @@ def template_required_roots(*, template_source: str, template_category: Template
     return roots
 
 
-class DocGenSheetRangeBlueprint(BaseModel):
+class DocGenSheetRangeBlueprint(SheetRangeFields):
     """A range of rows on a worksheet that holds no Excel Table, and the list that fills it: `PipeDocGen`'s `sheet_range`.
 
     `list` names the list of records that fills the range, by its path in the step's data, its input's name first, as
@@ -53,11 +54,7 @@ class DocGenSheetRangeBlueprint(BaseModel):
     that Table.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
-    list: str
-    sheet: str | None = None
-    header_row: Annotated[int, Field(ge=1, strict=True)] | None = None
+    list: str = Field(description="The list of records that fills the range, by its path in the step's data")
 
 
 class PipeDocGenBlueprint(PipeBlueprint):

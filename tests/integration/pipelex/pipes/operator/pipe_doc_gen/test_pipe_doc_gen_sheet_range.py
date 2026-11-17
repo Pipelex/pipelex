@@ -7,15 +7,19 @@ propagate, refuses the run as the caller's workbook's, naming the cell.
 """
 
 import base64
+import io
 from collections.abc import Iterator
 from typing import Any
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
+from openpyxl import load_workbook
+from openpyxl.worksheet.table import Table
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFill, resolve_sheet_range
 from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
@@ -25,7 +29,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.tools.tabular.exceptions import TableRangeUnclearError
 from tests.helpers.office_files import XLSX_MIME_TYPE
-from tests.helpers.xlsx_workbooks import sheet_workbook
+from tests.helpers.xlsx_workbooks import sheet_workbook, workbook_bytes
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, only_problem_item, refusal_messages
 
 _CONCEPTS = """
@@ -178,4 +182,30 @@ class TestPipeDocGenSheetRange:
         assert problem.code == PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT
         assert "Expenses!A9" in exc_info.value.message
         assert "the input 'workbook'" in exc_info.value.message
+        assert sheet_range_xlsx_stub_engines.engine.jobs == []
+
+    async def test_a_table_without_a_header_row_the_finder_meets_refuses_the_caller_s_workbook_as_a_finding(
+        self, sheet_range_xlsx_stub_engines: StubEngines, mocker: MockerFixture
+    ) -> None:
+        """The finder's refusal of a Table with no header row is a range refusal, which the check reports, not an unreadable file."""
+        workbook = load_workbook(io.BytesIO(sheet_workbook(cells={"A1": "Rail Co", "B1": "travel"})))
+        workbook.active.add_table(Table(displayName="Lines", ref="A1:B1", headerRowCount=0))  # type: ignore[union-attr]
+
+        def _check_with_the_finder(*, request: TemplateCheckRequest) -> list[TemplateFinding]:
+            assert request.sheet_range is not None
+            template_workbook = load_workbook(io.BytesIO(request.template), data_only=False)
+            resolve_sheet_range(workbook=template_workbook, sheet_range=request.sheet_range, subject=request.template_name)
+            return []
+
+        mocker.patch.object(sheet_range_xlsx_stub_engines, "check_template", side_effect=_check_with_the_finder)
+
+        with pytest.raises(PipeDocGenTemplateInputUnfitError) as exc_info:
+            await PipelexMTHDSProtocol().execute(
+                mthds_contents=[_bundle(sheet_range='{ list = "lines" }')], inputs=_inputs(workbook_bytes=workbook_bytes(workbook))
+            )
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT
+        assert "Table 'Lines'" in exc_info.value.message
+        assert "Expenses!A1:B1, has no header row" in exc_info.value.message
         assert sheet_range_xlsx_stub_engines.engine.jobs == []

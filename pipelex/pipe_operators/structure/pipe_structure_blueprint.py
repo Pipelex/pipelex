@@ -1,8 +1,9 @@
-from typing import Annotated, Literal, Self
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import model_validator
 from typing_extensions import override
 
+from pipelex.cogt.doc_gen.sheet_range import SheetRangeFields
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -10,7 +11,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
-class SheetRangeBlueprint(BaseModel):
+class SheetRangeBlueprint(SheetRangeFields):
     """A range of rows on a worksheet that holds no Excel Table: `PipeStructure`'s `sheet_range`.
 
     `sheet` names the worksheet, compared ignoring case; without it the workbook must hold exactly one worksheet.
@@ -19,11 +20,6 @@ class SheetRangeBlueprint(BaseModel):
     worksheet holding one Excel Table reads as that Table. The rules the runtime finds the range by, and refuses an
     unclear one by, are those of the standard's "Finding a Sheet Range".
     """
-
-    model_config = ConfigDict(extra="forbid")
-
-    sheet: str | None = None
-    header_row: Annotated[int, Field(ge=1, strict=True)] | None = None
 
 
 class PipeStructureBlueprint(PipeBlueprint):
