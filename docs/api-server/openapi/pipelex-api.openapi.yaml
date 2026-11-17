@@ -2457,11 +2457,35 @@ components:
         value_type:
           anyOf:
           - type: string
+            enum:
+            - text
+            - list
+            - dict
+            - integer
+            - boolean
+            - number
+            - date
+            - datetime
+            - time
+            - concept
+            - Any
           - type: 'null'
           title: Value Type
         item_type:
           anyOf:
           - type: string
+            enum:
+            - text
+            - list
+            - dict
+            - integer
+            - boolean
+            - number
+            - date
+            - datetime
+            - time
+            - concept
+            - Any
           - type: 'null'
           title: Item Type
         concept_ref:

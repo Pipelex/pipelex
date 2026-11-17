@@ -1,9 +1,19 @@
 import keyword
 from datetime import date, datetime, time
 from enum import StrEnum
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    ValidationInfo,
+    WithJsonSchema,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
@@ -46,6 +56,19 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     DATETIME = "datetime"
     TIME = "time"
     CONCEPT = "concept"
+
+
+# The sentinel a nested type name (a list's `item_type`, a dict's `value_type`) carries for a value whose type is
+# genuinely unspecified. Native expansion writes it where a dict's values are untyped, since a dict requires a value type.
+ANY_NESTED_FIELD_TYPE = "Any"
+
+# Every name a nested type position admits: a field type, or the `Any` sentinel. Anything else is refused at load, because
+# these names are authored text that a type projection quotes, and a free string there is how a line break reached the
+# comment of an emitted Python module and turned the rest of the name into a statement of it.
+NESTED_FIELD_TYPE_NAMES: tuple[str, ...] = (*(field_type.value for field_type in ConceptStructureBlueprintFieldType), ANY_NESTED_FIELD_TYPE)
+
+# A nested type name as the JSON schema publishes it, so an editor flags the names the load refuses.
+NestedFieldTypeName = Annotated[str, WithJsonSchema({"type": "string", "enum": list(NESTED_FIELD_TYPE_NAMES)})]
 
 
 class FieldNameRefusal(StrEnum):
@@ -99,9 +122,9 @@ class ConceptStructureBlueprint(BaseModel):
     type: ConceptStructureBlueprintFieldType | None = None
     # type=dict
     key_type: str | None = None
-    value_type: str | None = None
+    value_type: NestedFieldTypeName | None = None
     # type=list
-    item_type: str | None = None
+    item_type: NestedFieldTypeName | None = None
     # type=concept
     concept_ref: str | None = None
     item_concept_ref: str | None = None
@@ -138,6 +161,22 @@ class ConceptStructureBlueprint(BaseModel):
         if dumped.get("hints") is None:
             dumped.pop("hints", None)
         return dumped
+
+    @field_validator("item_type", "value_type", mode="after")
+    @classmethod
+    def validate_nested_type_name(cls, nested_type_name: str | None, info: ValidationInfo) -> str | None:
+        """Refuse a nested type name that is neither a field type nor the `Any` sentinel.
+
+        A concept is never named here: a list of concepts is `item_type = "concept"` with its `item_concept_ref`. The
+        name is quoted with `repr`, so a line break or a control character in it reads as its escape.
+        """
+        if nested_type_name is None or nested_type_name in NESTED_FIELD_TYPE_NAMES:
+            return nested_type_name
+        admitted = ", ".join(f"'{name}'" for name in NESTED_FIELD_TYPE_NAMES)
+        msg = f"{info.field_name} {nested_type_name!r} is not a field type: use one of {admitted}"
+        if info.field_name == "item_type":
+            msg += ", and for a list of concepts item_type = 'concept' with its item_concept_ref"
+        raise ValueError(msg)
 
     @field_validator("concept_ref", mode="before")
     @classmethod

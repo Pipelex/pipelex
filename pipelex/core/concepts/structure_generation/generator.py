@@ -15,6 +15,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs import non_null_any
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.system.registries.class_registry_access import get_class_registry
+from pipelex.tools.misc.generated_module_shape import generated_module_shape_refusal
 from pipelex.tools.misc.python_literals import class_docstring, escape_py_string
 
 # The width past which a field description is split into an implicit concatenation, which keeps each emitted line under
@@ -178,41 +179,20 @@ class StructureGenerator:
         undecorated class named `expected_class_name` whose bases are plain names and whose body is its docstring
         followed only by annotated fields, `name: <annotation> = <value>`. Authored text reaches the module only inside
         string literals, so a module of any other shape means a text was rendered as code, and it is refused rather
-        than run. The check reads statements only: what an annotation or a value holds is left to the rendering.
+        than run. The check is `generated_module_shape_refusal`, which the codegen emitters gate their modules with too.
 
         Raises:
             ConceptStructureValidationError: When the module holds a statement the generator never emits.
         """
-        statements = module.body
-        if len(statements) < 2 or not cls._is_string_statement(statements[0]):
-            msg = "The generated structure module does not open with its header docstring followed by its class"
-            raise ConceptStructureValidationError(msg)
-        *imports, class_def = statements[1:]
-        if any(not isinstance(statement, ast.ImportFrom) for statement in imports):
-            msg = "The generated structure module holds a top-level statement other than its imports and its class"
-            raise ConceptStructureValidationError(msg)
-        if not isinstance(class_def, ast.ClassDef) or class_def.name != expected_class_name:
-            msg = f"The generated structure module does not end with the class '{expected_class_name}'"
-            raise ConceptStructureValidationError(msg)
-        if (
-            class_def.decorator_list
-            or class_def.keywords
-            or getattr(class_def, "type_params", None)
-            or not all(isinstance(base, ast.Name) for base in class_def.bases)
-        ):
-            msg = f"The generated class '{expected_class_name}' is not a plain class deriving from named bases"
-            raise ConceptStructureValidationError(msg)
-        docstring, *fields = class_def.body
-        if not cls._is_string_statement(docstring) or any(
-            not isinstance(field, ast.AnnAssign) or not isinstance(field.target, ast.Name) for field in fields
-        ):
-            msg = f"The body of the generated class '{expected_class_name}' holds a statement other than its docstring and its fields"
-            raise ConceptStructureValidationError(msg)
-
-    @classmethod
-    def _is_string_statement(cls, statement: ast.stmt) -> bool:
-        """Whether the statement is a lone string literal, as a docstring is."""
-        return isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant) and isinstance(statement.value.value, str)
+        refusal = generated_module_shape_refusal(
+            module=module,
+            module_label="generated structure module",
+            opens_with_docstring=True,
+            expected_class_names=(expected_class_name,),
+            class_attribute_assignments=frozenset(),
+        )
+        if refusal is not None:
+            raise ConceptStructureValidationError(refusal)
 
     def _refuse_fields_named_like_forward_refs(self, *, class_name: str) -> None:
         """Refuse a field named like a class the generated class refers to by forward reference.
