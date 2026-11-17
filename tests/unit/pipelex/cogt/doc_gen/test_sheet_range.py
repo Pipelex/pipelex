@@ -224,6 +224,10 @@ class TestFindSheetRange:
             pytest.param("=SUM(B2:B3)", id="sum"),
             pytest.param("=SUBTOTAL(109,$B$2:$B$3)", id="subtotal-absolute"),
             pytest.param("=SUM(Expenses!B2:B3)*1", id="same-sheet-qualified"),
+            pytest.param("=SUM($B$2:$B$3)", id="absolute"),
+            pytest.param("=SUM(Expenses!$B$2:$B$3)", id="same-sheet-qualified-absolute"),
+            pytest.param("=SUM('Expenses'!B2:B3)", id="same-sheet-quoted"),
+            pytest.param("=sum(b2:b3)", id="lower-case"),
         ],
     )
     def test_a_formula_totalling_its_column_above_is_a_totals_line(self, totals_formula: str) -> None:
@@ -609,6 +613,35 @@ class TestTotalsLineAndFooter:
 
         assert refusal.cell == "Expenses!A5"
         assert "below the totals line on row 4" in refusal.message
+
+    def test_a_data_row_whose_running_balance_refers_to_a_subtotal_is_refused_not_a_footer_row(self) -> None:
+        cells: dict[str, Any] = {"A1": "item", "B1": "qty", "C1": "price", "D1": "balance"}
+        cells |= {"A2": "Pens", "B2": 2, "C2": 5, "D2": "=C2", "A3": "Ink", "B3": 1, "C3": 7, "D3": "=D2+C3"}
+        cells |= {"A4": "Subtotal", "D4": "=SUM(D2:D3)", "A5": "Paper", "B5": 3, "C5": 2, "D5": "=D4+C5"}
+
+        refusal = _refusal(cells, cached_values={"D2": 5, "D3": 12, "D4": 17, "D5": 19})
+
+        assert refusal.cell == "Expenses!A5"
+        assert "below the totals line on row 4" in refusal.message
+
+    def test_a_running_balance_going_on_for_rows_after_a_subtotal_is_refused(self) -> None:
+        cells: dict[str, Any] = {"A1": "item", "B1": "price", "C1": "balance", "A2": "Pens", "B2": 5, "C2": "=B2", "A3": "Ink", "B3": 7}
+        cells |= {"C3": "=C2+B3", "A4": "Subtotal", "C4": "=SUM(C2:C3)"}
+        cells |= {f"A{row}": f"Item {row}" for row in range(5, 25)}
+        cells |= {f"B{row}": row for row in range(5, 25)}
+        cells |= {f"C{row}": f"=C{row - 1}+B{row}" for row in range(5, 25)}
+
+        refusal = _refusal(cells)
+
+        assert refusal.cell == "Expenses!A5"
+
+    def test_a_footer_row_holding_a_typed_rate_is_a_row_of_data(self) -> None:
+        """A number typed in the row, even beside a formula over the totals line, makes it a row of data."""
+        cells = {**TOTALLED_CELLS, "A5": 0.2, "B5": "=B4*A5"}
+
+        refusal = _refusal(cells, cached_values={**TOTALLED_VALUES, "B5": 1})
+
+        assert refusal.cell == "Expenses!A5"
 
     def test_a_value_beside_a_footer_row_is_a_column_with_no_header(self) -> None:
         cells = {**TOTALLED_CELLS, "A5": "VAT", "B5": "=B4*0.2", "C5": "20%"}

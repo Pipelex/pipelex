@@ -41,11 +41,12 @@ a template's pre-filled rows, and with its stored values (`data_only=True`), whi
    totals its column, such as a `Total` label beside its `=SUM(...)`, is the totals line, and ends the data rows: the
    rows above it are the data rows. When none does, the row right after them is the totals line when it totals its
    column, as a total the workbook stores no value of does. The row under the header is never one, since no data row
-   lies above it. **The footer rows** are the rows directly after the totals line each holding, in the columns, a
-   formula with a reference, to a cell or a range on the same sheet, lying wholly within the totals line and the footer
-   rows above it, in the columns: a VAT line `=C6*0.2`, or a grand total `=C6+C7`, whether or not it stores a value. The
-   totals line and its footer rows are not data rows, are not read and do not count toward a row's position
-   (`SheetRegion.totals_row_count`).
+   lies above it. **The footer rows** are the rows directly after the totals line each holding, in the columns, only
+   formulas and texts, and a formula with a reference, to a cell or a range on the same sheet, lying wholly within the
+   totals line and the footer rows above it, in the columns: a VAT line `=C6*0.2`, or a grand total `=C6+C7`, whether or
+   not it stores a value. A row holding a typed number, date or boolean is a row of data, never a footer row, even when
+   a formula of it refers to the totals line, as a running balance after a subtotal does. The totals line and its
+   footer rows are not data rows, are not read and do not count toward a row's position (`SheetRegion.totals_row_count`).
 5. **Pre-filled rows.** The rows after the range that hold formulas and no data, such as a template's
    `=IF(A5="","",B5*C5)` filled down to row 500, are not part of the range and are not refused. The run of them directly
    after the data rows or their totals rows is `SheetRegion.prefilled_row_count`, the rows an append writes into,
@@ -665,6 +666,12 @@ def find_sheet_range(*, worksheet: "Worksheet", value_worksheet: "Worksheet", he
 
     # 4. The totals line: the first of the data rows totalling its column from the first data row, never the row under
     # the header, which ends the data rows, or else the row right after them; and the footer rows directly after it.
+    # Every data row is a candidate, so a formula is tokenized only when its text names its column's first data cell
+    # followed by a colon, as a total does: a formula over its own row, `=SUM(B5:D5)`, is passed over cheaply.
+    column_total_starts = {
+        column: _column_range_start(column=column, first_row=the_header_row + 1) for column in range(first_column, last_column + 1)
+    }
+
     def totals_column_data(*, row: int) -> bool:
         if row < the_header_row + 2:
             return False
@@ -673,14 +680,25 @@ def find_sheet_range(*, worksheet: "Worksheet", value_worksheet: "Worksheet", he
             if cell is None or cell.data_type != "f":
                 continue
             formula = _formula_text(value=cell.value)
-            if formula is not None and _references_column_data(
-                formula=formula, sheet_title=title, column=column, first_row=the_header_row + 1, last_row=row - 1
+            if (
+                formula is not None
+                and column_total_starts[column].search(formula)
+                and _references_column_data(formula=formula, sheet_title=title, column=column, first_row=the_header_row + 1, last_row=row - 1)
             ):
                 return True
         return False
 
     def references_totals(*, row: int, first_totals_row: int) -> bool:
-        """Whether a cell of the row, in the columns, holds a formula referring to the totals line or the footer rows above it."""
+        """Whether the row is a footer row: in the columns, it holds only formulas and texts, and a formula referring to the
+        totals line or the footer rows above it.
+
+        A number, a date or a boolean typed in the row makes it a row of data, such as a row after a subtotal whose running
+        balance refers to the subtotal, and so no footer row.
+        """
+        for column in range(first_column, last_column + 1):
+            cell = stored_cells.get((row, column))
+            if cell is not None and cell.data_type != "f" and _holds_value(value=cell.value) and not isinstance(cell.value, str):
+                return False
         for column in range(first_column, last_column + 1):
             cell = stored_cells.get((row, column))
             if cell is None or cell.data_type != "f":
@@ -870,6 +888,17 @@ def _same_sheet_references(*, formula: str, sheet_title: str) -> list[tuple[str,
             continue
         references.append((reference, (min_col, min_row, max_col, max_row)))
     return references
+
+
+def _column_range_start(*, column: int, first_row: int) -> re.Pattern[str]:
+    """A pattern finding a reference to the cell at `column` and `first_row` followed by a colon, as a range from it starts.
+
+    It finds `C4:`, `$C$4:` and `Expenses!C4:`, ignoring case, and never `AC4:` or `C45:`: a formula it finds nothing in
+    holds no range from that cell, and one it finds something in is read in full.
+    """
+    if get_column_letter is None:
+        raise missing_openpyxl_error()
+    return re.compile(rf"(?<![A-Za-z0-9_.]){re.escape(get_column_letter(column))}\$?{first_row}\s*:", re.IGNORECASE)
 
 
 def _references_column_data(*, formula: str, sheet_title: str, column: int, first_row: int, last_row: int) -> bool:
