@@ -38,7 +38,7 @@ import io
 import zipfile
 import zlib
 from datetime import date, datetime, time, timedelta
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from pipelex.cogt.doc_gen.sheet_range import (
     RegionKind,
@@ -47,10 +47,11 @@ from pipelex.cogt.doc_gen.sheet_range import (
     resolve_named_range,
     resolve_sheet_range,
     table_region,
+    workbook_worksheets,
 )
 from pipelex.tools.tabular.exceptions import CsvReadError, TableSelectionError, TableTooLargeError
 from pipelex.tools.tabular.table_reading_config import TableReadingConfig
-from pipelex.tools.tabular.table_records import RawTable, RawTableRow, TableCellValue, sentence_subject
+from pipelex.tools.tabular.table_records import RawTable, RawTableRow, TableBinding, TableCellValue, sentence_subject
 from pipelex.tools.tabular.table_selector import TableSelector
 
 try:
@@ -108,12 +109,15 @@ def xlsx_subject(*, input_name: str | None) -> str:
     return f"the workbook given for input '{input_name}'" if input_name is not None else "the workbook"
 
 
-def read_xlsx_raw_table(*, raw_bytes: bytes, table_selector: TableSelector, limits: TableReadingConfig, subject: str) -> RawTable:
+def read_xlsx_raw_table(
+    *, raw_bytes: bytes, table_selector: TableSelector, binding: TableBinding, limits: TableReadingConfig, subject: str
+) -> RawTable:
     """Read the region of a workbook's bytes a step names into a `RawTable`.
 
     Args:
         raw_bytes: The workbook's bytes.
         table_selector: The Table or named range to read, the range on a sheet, or neither for the workbook's only Table.
+        binding: Whose rules the table is read under, which decides whether a refusal may tell its reader to name a region.
         limits: How large a workbook, and a region, may be read.
         subject: How messages name the workbook.
 
@@ -137,9 +141,9 @@ def read_xlsx_raw_table(*, raw_bytes: bytes, table_selector: TableSelector, limi
         formula_workbook = _load_workbook(raw_bytes=raw_bytes, data_only=False, subject=subject)
         region = resolve_sheet_range(workbook=formula_workbook, sheet_range=table_selector.sheet_range, subject=subject)
     else:
-        region = _choose_region(workbook=value_workbook, table_name=table_selector.table, subject=subject)
+        region = _choose_region(workbook=value_workbook, table_name=table_selector.table, binding=binding, subject=subject)
     worksheet = value_workbook[region.sheet_title]
-    region_label = _region_label(region=region)
+    region_label = region.short_label
     header_row = region.header_row
     last_data_row = region.last_row
 
@@ -196,15 +200,6 @@ def read_xlsx_raw_table(*, raw_bytes: bytes, table_selector: TableSelector, limi
     return RawTable(header=header, rows=rows, uncached_formula_columns=uncached_formula_columns)
 
 
-def _region_label(*, region: SheetRegion) -> str:
-    """How a reader's message names a region: "Table 'Expenses'", "the named range 'Expenses'", "the range on the sheet 'Sheet1'"."""
-    match region.kind:
-        case RegionKind.TABLE:
-            return f"Table '{region.name}'"
-        case RegionKind.NAMED_RANGE | RegionKind.SHEET_RANGE:
-            return region.label
-
-
 def _refuse_oversized_archive(*, raw_bytes: bytes, max_uncompressed_bytes: int, subject: str) -> None:
     """Refuse a workbook whose parts, decompressed, would hold more bytes than the limit, before decompressing any.
 
@@ -244,13 +239,14 @@ def _load_workbook(*, raw_bytes: bytes, data_only: bool, subject: str) -> "Workb
         raise CsvReadError(msg) from exc
 
 
-def _choose_region(*, workbook: "Workbook", table_name: str | None, subject: str) -> SheetRegion:
-    """The region to read when the step names no sheet range: the Table or named range named, or the workbook's only Table."""
+def _choose_region(*, workbook: "Workbook", table_name: str | None, binding: TableBinding, subject: str) -> SheetRegion:
+    """The region to read when the step names no sheet range: the Table or named range named, or the workbook's only Table.
+
+    A refusal tells a step's author how to name the region, with `table` or `sheet_range`; a run input names none, so its
+    refusal says what the workbook must hold instead.
+    """
     found: list[tuple[Worksheet, Table]] = []
-    # A workbook opened neither read-only nor write-only lists its sheets of cells as `Worksheet`s; a chart sheet, which
-    # holds no cells and so no Table, is not among them.
-    for sheet in workbook.worksheets:
-        worksheet = cast("Worksheet", sheet)
+    for worksheet in workbook_worksheets(workbook=workbook):
         found.extend((worksheet, table) for table in worksheet.tables.values())
     found_names = ", ".join(f"'{table.displayName}'" for _, table in found) or "none"
     if table_name is not None:
@@ -268,12 +264,18 @@ def _choose_region(*, workbook: "Workbook", table_name: str | None, subject: str
         found_worksheet, found_table = found[0]
         return table_region(worksheet=found_worksheet, table=found_table, subject=subject)
     if not found:
-        msg = (
-            f"{sentence_subject(subject=subject)} holds no Excel Table: define the rows to read as a Table (Insert > Table) in the "
-            "workbook, or read them from a range on a sheet with `sheet_range`."
-        )
+        msg = f"{sentence_subject(subject=subject)} holds no Excel Table: define the rows to read as a Table (Insert > Table) in the workbook"
+        msg += ", or read them from a range on a sheet with `sheet_range`." if binding.names_its_region else "."
         raise TableSelectionError(msg)
-    msg = f"{sentence_subject(subject=subject)} holds several Tables ({found_names}) and the step names none: name the Table to read with `table`."
+    if binding.names_its_region:
+        msg = (
+            f"{sentence_subject(subject=subject)} holds several Tables ({found_names}) and the step names none: name the Table to read with `table`."
+        )
+    else:
+        msg = (
+            f"{sentence_subject(subject=subject)} holds several Tables ({found_names}), and a workbook given as an input is read from its "
+            "only Table: keep the rows to read in one Table of the workbook."
+        )
     raise TableSelectionError(msg)
 
 

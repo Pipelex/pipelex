@@ -45,6 +45,7 @@ def _read(*, raw_bytes: bytes, table_selector: TableSelector, limits: TableReadi
 class TestXlsxRegions:
     def test_a_sheet_range_is_read_without_the_title_above_and_the_totals_line_below(self) -> None:
         raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP,
             raw_bytes=sheet_workbook(cells=EXPENSE_CELLS),
             table_selector=TableSelector(sheet_range=SheetRange(header_row=3)),
             limits=TABLE_READING_FALLBACK,
@@ -71,6 +72,7 @@ class TestXlsxRegions:
         cells = {"A1": "merchant", "B1": "amount", "A2": "Rail Co", "B2": "=40+44.5"}
 
         raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP,
             raw_bytes=sheet_workbook(cells=cells),
             table_selector=TableSelector(sheet_range=SheetRange()),
             limits=TABLE_READING_FALLBACK,
@@ -120,7 +122,11 @@ class TestXlsxRegions:
         xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=cells), name="Lines", definition="Expenses!$A$1:$C$2")
 
         raw_table = read_xlsx_raw_table(
-            raw_bytes=xlsx_bytes, table_selector=TableSelector(table="Lines"), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+            binding=TableBinding.STEP,
+            raw_bytes=xlsx_bytes,
+            table_selector=TableSelector(table="Lines"),
+            limits=TABLE_READING_FALLBACK,
+            subject=SUBJECT,
         )
 
         assert raw_table.header == ["merchant", "amount"]
@@ -154,3 +160,69 @@ class TestXlsxRegions:
     def test_a_selector_names_a_table_or_a_sheet_range_not_both(self) -> None:
         with pytest.raises(ValueError, match="not both"):
             TableSelector(table="Lines", sheet_range=SheetRange())
+
+
+class TestXlsxRegionRefusalsByBinding:
+    @pytest.mark.parametrize(
+        ("binding", "expected_message"),
+        [
+            (TableBinding.STEP, "in the workbook, or read them from a range on a sheet with `sheet_range`."),
+            (TableBinding.RUN_INPUT, "holds no Excel Table: define the rows to read as a Table (Insert > Table) in the workbook."),
+        ],
+        ids=["step", "run-input"],
+    )
+    def test_a_workbook_holding_no_table_is_refused_with_the_hint_its_reader_can_follow(self, binding: TableBinding, expected_message: str) -> None:
+        with pytest.raises(TableSelectionError) as exc_info:
+            read_xlsx_raw_table(
+                raw_bytes=sheet_workbook(cells=EXPENSE_CELLS),
+                table_selector=TableSelector(),
+                binding=binding,
+                limits=TABLE_READING_FALLBACK,
+                subject=SUBJECT,
+            )
+
+        assert exc_info.value.message.endswith(expected_message)
+        assert ("sheet_range" in exc_info.value.message) is binding.names_its_region
+
+    @pytest.mark.parametrize(
+        ("binding", "expected_message"),
+        [
+            (TableBinding.STEP, "and the step names none: name the Table to read with `table`."),
+            (TableBinding.RUN_INPUT, "a workbook given as an input is read from its only Table: keep the rows to read in one Table of the workbook."),
+        ],
+        ids=["step", "run-input"],
+    )
+    def test_a_workbook_holding_several_tables_is_refused_with_the_hint_its_reader_can_follow(
+        self, binding: TableBinding, expected_message: str
+    ) -> None:
+        workbook = empty_workbook()
+        add_table(workbook=workbook, sheet_title="Sheet1", table_name="Expenses", header=["item"], rows=[["Paper"]])
+        add_table(workbook=workbook, sheet_title="Sheet1", table_name="Income", header=["source"], rows=[["Sales"]], left_column=3)
+
+        with pytest.raises(TableSelectionError) as exc_info:
+            read_xlsx_raw_table(
+                raw_bytes=workbook_bytes(workbook),
+                table_selector=TableSelector(),
+                binding=binding,
+                limits=TABLE_READING_FALLBACK,
+                subject=SUBJECT,
+            )
+
+        assert exc_info.value.message.endswith(expected_message)
+        assert ("`table`" in exc_info.value.message) is binding.names_its_region
+
+
+class TestXlsxRegionsOfTemplates:
+    def test_rows_pre_filled_with_formulas_are_not_read(self) -> None:
+        cells: dict[str, Any] = {"A1": "merchant", "B1": "amount", "C1": "with_tax", "A2": "Rail Co", "B2": 84.5}
+        cells |= {f"C{row}": f'=IF(B{row}="","",B{row}*1.2)' for row in range(2, 501)}
+
+        table_records = _read(raw_bytes=sheet_workbook(cells=cells), table_selector=TableSelector(sheet_range=SheetRange()))
+
+        assert [record.label for record in table_records.records] == ["row 2 of the sheet 'Expenses'"]
+
+    def test_a_named_range_past_the_sheet_s_grid_is_refused_before_any_cell_is_read(self) -> None:
+        xlsx_bytes = with_defined_name(xlsx_bytes=sheet_workbook(cells=EXPENSE_CELLS), name="Lines", definition="Expenses!$A$1048577:$A$1048578")
+
+        with pytest.raises(TableRangeUnclearError, match="past the sheet's last row"):
+            _read(raw_bytes=xlsx_bytes, table_selector=TableSelector(table="Lines"))

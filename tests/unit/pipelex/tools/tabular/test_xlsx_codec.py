@@ -9,6 +9,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import TABLE_READING_FALLBACK
 from pipelex.tools.tabular.exceptions import CsvReadError, TableSelectionError, TableTooLargeError
 from pipelex.tools.tabular.table_reading_config import TableReadingConfig
+from pipelex.tools.tabular.table_records import TableBinding
 from pipelex.tools.tabular.table_selector import TableSelector
 from pipelex.tools.tabular.xlsx_codec import read_xlsx_raw_table
 from tests.helpers.xlsx_workbooks import (
@@ -39,7 +40,9 @@ class TestXlsxCodec:
             rows=[["Paper", 12.5, True, datetime(2026, 3, 4)], ["Ink", 3, False, None]],
         )
 
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert raw_table.header == ["Item", "Amount", "Approved", "Due"]
         assert [row.cells for row in raw_table.rows] == [["Paper", 12.5, True, datetime(2026, 3, 4)], ["Ink", 3, False, None]]
@@ -49,7 +52,11 @@ class TestXlsxCodec:
     @pytest.mark.parametrize("table_name", ["Income", "income", "INCOME"])
     def test_reads_the_table_named_ignoring_case(self, table_name: str) -> None:
         raw_table = read_xlsx_raw_table(
-            raw_bytes=_two_table_workbook(), table_selector=TableSelector(table=table_name), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+            binding=TableBinding.STEP,
+            raw_bytes=_two_table_workbook(),
+            table_selector=TableSelector(table=table_name),
+            limits=TABLE_READING_FALLBACK,
+            subject=SUBJECT,
         )
 
         assert raw_table.header == ["source"]
@@ -77,12 +84,20 @@ class TestXlsxCodec:
             raw_bytes = workbook_bytes(workbook)
 
         with pytest.raises(TableSelectionError, match=expected_message):
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(table=table_name), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+            read_xlsx_raw_table(
+                binding=TableBinding.STEP,
+                raw_bytes=raw_bytes,
+                table_selector=TableSelector(table=table_name),
+                limits=TABLE_READING_FALLBACK,
+                subject=SUBJECT,
+            )
 
     def test_the_totals_row_is_not_read_and_empty_rows_are(self) -> None:
         raw_bytes = single_table_workbook(header=["item", "amount"], rows=[["Paper", 2], [None, None], ["Ink", 3]], totals_row=["Total", 5])
 
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert [row.cells for row in raw_table.rows] == [["Paper", 2], [None, None], ["Ink", 3]]
 
@@ -92,7 +107,9 @@ class TestXlsxCodec:
             cached_value="42",
         )
 
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert raw_table.rows[0].cells == [2, 42]
         assert raw_table.uncached_formula_columns == frozenset()
@@ -100,7 +117,9 @@ class TestXlsxCodec:
     def test_a_formula_without_cached_value_reads_empty_and_is_reported(self) -> None:
         raw_bytes = single_table_workbook(header=["quantity", "total"], rows=[[2, "=A2*21"], [None, None]])
 
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert raw_table.rows[0].cells == [2, None]
         assert raw_table.uncached_formula_columns == frozenset({1})
@@ -112,14 +131,22 @@ class TestXlsxCodec:
             cached_text="",
         )
 
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert raw_table.rows[0].cells == [2, None]
         assert raw_table.uncached_formula_columns == frozenset()
 
     def test_bytes_that_are_not_a_workbook_are_refused(self) -> None:
         with pytest.raises(CsvReadError, match="Could not open the workbook given for input 'budget' as an Excel workbook"):
-            read_xlsx_raw_table(raw_bytes=b"item,amount\nPaper,2\n", table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+            read_xlsx_raw_table(
+                binding=TableBinding.STEP,
+                raw_bytes=b"item,amount\nPaper,2\n",
+                table_selector=TableSelector(),
+                limits=TABLE_READING_FALLBACK,
+                subject=SUBJECT,
+            )
 
     def test_a_table_declaring_the_whole_sheet_is_refused_without_reading_it(self) -> None:
         """A tiny workbook declaring a Table over the whole sheet is refused in moments, not read cell by cell."""
@@ -127,7 +154,9 @@ class TestXlsxCodec:
 
         started_at = time.monotonic()
         with pytest.raises(TableTooLargeError, match=r"spans 2097152 cells, more than the 2000000 a table is read with") as exc_info:
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+            read_xlsx_raw_table(
+                binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+            )
 
         assert time.monotonic() - started_at < 2
         assert exc_info.value.error_code == CoreCode.INPUT_TOO_LARGE
@@ -139,7 +168,9 @@ class TestXlsxCodec:
         raw_bytes = with_table_ref(xlsx_bytes=single_table_workbook(header=["item", "amount"], rows=[["Paper", 2]]), ref="A1:J100000")
 
         started_at = time.monotonic()
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert time.monotonic() - started_at < 2
         assert raw_table.header == ["item", "amount"]
@@ -154,17 +185,21 @@ class TestXlsxCodec:
 
         started_at = time.monotonic()
         with pytest.raises(TableTooLargeError, match=r"spans 1048576 cells, more than the 1000 a table is read with"):
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=limits, subject=SUBJECT)
+            read_xlsx_raw_table(binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=limits, subject=SUBJECT)
         # Under the cap, a Table with no column within the sheet is refused, since no header cell names a column.
         with pytest.raises(CsvReadError, match=r"Table 'Rows' of the workbook given for input 'budget' has no column within the sheet's cells"):
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+            read_xlsx_raw_table(
+                binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+            )
 
         assert time.monotonic() - started_at < 2
 
     def test_rows_past_the_sheet_are_empty_data_rows_and_columns_past_it_are_dropped(self) -> None:
         raw_bytes = with_table_ref(xlsx_bytes=single_table_workbook(header=["item", "amount"], rows=[["Paper", 2]]), ref="A1:J4")
 
-        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+        raw_table = read_xlsx_raw_table(
+            binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+        )
 
         assert raw_table.header == ["item", "amount"]
         assert [row.cells for row in raw_table.rows] == [["Paper", 2], [None, None], [None, None]]
@@ -175,7 +210,7 @@ class TestXlsxCodec:
         limits = TableReadingConfig(max_workbook_uncompressed_bytes=10_000_000, max_table_cells=5)
 
         with pytest.raises(TableTooLargeError, match=r"spans 6 cells, more than the 5 a table is read with"):
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=limits, subject=SUBJECT)
+            read_xlsx_raw_table(binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=limits, subject=SUBJECT)
 
     def test_a_workbook_past_the_decompressed_size_is_refused_before_it_is_loaded(self) -> None:
         raw_bytes = single_table_workbook(header=["item"], rows=[["Paper"]])
@@ -183,7 +218,7 @@ class TestXlsxCodec:
         limits = TableReadingConfig(max_workbook_uncompressed_bytes=declared_size - 1, max_table_cells=10)
 
         with pytest.raises(TableTooLargeError, match=r"once decompressed, more than the") as exc_info:
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=limits, subject=SUBJECT)
+            read_xlsx_raw_table(binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=limits, subject=SUBJECT)
 
         assert exc_info.value.problem_params() == {"input": None, "limit": declared_size - 1, "size": declared_size}
 
@@ -203,4 +238,6 @@ class TestXlsxCodec:
         )
 
         with pytest.raises(CsvReadError, match="Could not open the workbook given for input 'budget' as an Excel workbook"):
-            read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+            read_xlsx_raw_table(
+                binding=TableBinding.STEP, raw_bytes=raw_bytes, table_selector=TableSelector(), limits=TABLE_READING_FALLBACK, subject=SUBJECT
+            )

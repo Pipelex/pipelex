@@ -75,6 +75,15 @@ class TableBinding(StrEnum):
                 return False
 
     @property
+    def names_its_region(self) -> bool:
+        """Whether the reader can name the region of a workbook it reads, with `table` or `sheet_range`, as a step can."""
+        match self:
+            case TableBinding.RUN_INPUT:
+                return False
+            case TableBinding.STEP:
+                return True
+
+    @property
     def nulls_absent_nullable_fields(self) -> bool:
         """Whether a nullable field no column matches, or an empty cell under it, reads as null whatever its default."""
         match self:

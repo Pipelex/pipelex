@@ -138,7 +138,7 @@ def read_table_records(
                 raise TableSelectionError(msg)
             raw_table = read_csv_raw_table(raw_bytes=raw_bytes, binding=binding, limits=limits, subject=subject)
         case TableFormat.XLSX:
-            raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=table_selector, limits=limits, subject=subject)
+            raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_selector=table_selector, binding=binding, limits=limits, subject=subject)
     return build_table_records(
         raw_table=raw_table,
         table_format=table_format,
