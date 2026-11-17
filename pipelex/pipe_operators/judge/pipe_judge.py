@@ -40,6 +40,7 @@ from pipelex.pipe_controllers.binding.binding_derivation import BindingValueKind
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.judge.exceptions import PipeJudgeInputCapabilityError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_operators.shared.schema_mismatch_params import filling_schema_mismatch_params
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -427,23 +428,24 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         execution_data_dict: dict[str, Any]
         result_memory: WorkingMemory
         if self.questions is not None:
-            multi_result = await run_multi_judgment(
-                memory=working_memory,
-                prompt_content=self.prompt_content,
-                questions={
-                    question_name: AskedQuestion(question=question.judgment_question, threshold=question.threshold)
-                    for question_name, question in self.questions.items()
-                },
-                judgment_setting=judgment_setting,
-                concept=self.output.concept,
-                # The kernel does not read the concept library, so the output's content class is resolved here and
-                # handed down, as PipeLLM's object path does.
-                output_class=get_concept_library().get_structure_class(concept=self.output.concept),
-                job_metadata=job_metadata,
-                cogt_run_params=pipe_run_params.cogt_run_params,
-                templating_style=templating_style,
-                result_name=output_name,
-            )
+            with filling_schema_mismatch_params(concept_ref=self.output.concept.concept_ref, model_handle=judgment_setting.model):
+                multi_result = await run_multi_judgment(
+                    memory=working_memory,
+                    prompt_content=self.prompt_content,
+                    questions={
+                        question_name: AskedQuestion(question=question.judgment_question, threshold=question.threshold)
+                        for question_name, question in self.questions.items()
+                    },
+                    judgment_setting=judgment_setting,
+                    concept=self.output.concept,
+                    # The kernel does not read the concept library, so the output's content class is resolved here and
+                    # handed down, as PipeLLM's object path does.
+                    output_class=get_concept_library().get_structure_class(concept=self.output.concept),
+                    job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
+                    templating_style=templating_style,
+                    result_name=output_name,
+                )
             question_records: dict[str, dict[str, Any]] = {}
             for question_name, question in self.questions.items():
                 judgment = multi_result.judgments[question_name]
@@ -468,18 +470,19 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
             }
             result_memory = multi_result.memory
         elif self.question is not None:
-            judgment_result = await run_judgment(
-                memory=working_memory,
-                prompt_content=self.prompt_content,
-                question=self.question.judgment_question,
-                judgment_setting=judgment_setting,
-                concept=self.output.concept,
-                job_metadata=job_metadata,
-                cogt_run_params=pipe_run_params.cogt_run_params,
-                templating_style=templating_style,
-                threshold=self.question.threshold,
-                result_name=output_name,
-            )
+            with filling_schema_mismatch_params(concept_ref=self.output.concept.concept_ref, model_handle=judgment_setting.model):
+                judgment_result = await run_judgment(
+                    memory=working_memory,
+                    prompt_content=self.prompt_content,
+                    question=self.question.judgment_question,
+                    judgment_setting=judgment_setting,
+                    concept=self.output.concept,
+                    job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
+                    templating_style=templating_style,
+                    threshold=self.question.threshold,
+                    result_name=output_name,
+                )
             # The raw answer rides along because it carries what the verdict native's rendering does not
             # show, such as a choice's whole distribution.
             judgment_prompt = judgment_result.prompt

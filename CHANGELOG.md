@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A model's answer that does not fit names the model and the concept**: `model.output_schema_mismatch` now carries its `concept` parameter, the concept the step resolved for the run, a dynamic output's included, and its `model` on `PipeLLM`'s text path too, so the caller reads the registry's sentence naming both where it read the code's generic title. `PipeLLM`, `PipeStructure` and `PipeJudge` fill them, whether the failure reaches them wrapped or not.
+
 ## [v0.108.0] - 2026-11-17
 
 ### Added
