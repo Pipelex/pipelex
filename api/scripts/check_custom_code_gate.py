@@ -85,8 +85,11 @@ def main() -> int:
     validate_url = f"{args.base_url.rstrip('/')}/v1/validate"
     try:
         status, body = _post_validate(validate_url)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        print(f"Custom-code gate check FAILED: cannot read {validate_url}: {exc}")
+    # OSError covers what the request can raise on every python3 from 3.9: a refused connection (`URLError`), a read
+    # timeout (`socket.timeout`, an alias of `TimeoutError` only from 3.10) and a connection dropped mid-answer
+    # (`RemoteDisconnected`, `ConnectionResetError`). ValueError covers a body that is not JSON or not UTF-8.
+    except (OSError, ValueError) as exc:
+        print(f"Custom-code gate check FAILED: cannot read {validate_url}: {exc!r}")
         return 1
     print(f"POST {validate_url} with a .py file: {status} {json.dumps(body)}")
     mismatch = refusal_mismatch(status=status, body=body)

@@ -64,11 +64,15 @@ def _build_client(mocker: MockerFixture) -> TestClient:
 class _StubHandler(BaseHTTPRequestHandler):
     status: ClassVar[int] = 501
     body: ClassVar[dict[str, Any]] = _REFUSAL
+    drops_the_connection: ClassVar[bool] = False
     received: ClassVar[list[Any]] = []
 
     def do_POST(self) -> None:
         length = int(self.headers["content-length"])
         self.received.append((self.path, json.loads(self.rfile.read(length))))
+        if self.drops_the_connection:
+            self.close_connection = True
+            return
         payload = json.dumps(self.body).encode("utf-8")
         self.send_response(self.status)
         self.send_header("content-type", "application/problem+json")
@@ -144,3 +148,12 @@ class TestCheckCustomCodeGate:
         monkeypatch.setattr(sys, "argv", ["check_custom_code_gate.py", stub_server])
 
         assert check_custom_code_gate.main() == 1
+
+    def test_the_script_reports_a_dropped_connection_as_a_failed_check(
+        self, stub_server: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(_StubHandler, "drops_the_connection", True)
+        monkeypatch.setattr(sys, "argv", ["check_custom_code_gate.py", stub_server])
+
+        assert check_custom_code_gate.main() == 1
+        assert "Custom-code gate check FAILED: cannot read" in capsys.readouterr().out
