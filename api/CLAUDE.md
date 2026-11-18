@@ -11,7 +11,7 @@ This directory is the `api/` member of the pipelex repository's uv workspace: th
 - **Its dependencies are written in the metadata hook's table.** `dependencies` is dynamic: the server's requirements live in `[tool.hatch.metadata.hooks.custom]` of `pyproject.toml`, and `hatch_build.py` writes them into the metadata, pinning each `lockstep-dependencies` entry (pipelex with the server's extras) to `==` the release's version. uv ignores that pin on the workspace source, so it changes nothing here; in a published wheel it makes `pip install pipelex-api` take exactly the pipelex it was released with. Add or change a server dependency in that table by hand, then `make lock` at the root: `uv add` would write a static `[project] dependencies` list, which hatch refuses beside the dynamic one. `scripts/check_lockstep_pin.py` (`make build check-lockstep-pin`) checks the pin in a build, and the release workflow runs it before uploading.
 - **It has its own environment.** Every uv command in the Makefile targets `api/.venv` (`UV_PROJECT_ENVIRONMENT`), where `uv sync` installs this member with its extras and pipelex, in editable mode, with the server's extras and without `cli`. The targets that need the environment provision it, so a fresh worktree needs nothing run by hand first.
 - **Its gate runs from the root.** The root `make agent-check` ends with `make -C api agent-check` and the root `make agent-test` with `make -C api agent-test`; run them here directly while working on the server. Upgrading dependencies is done for the whole workspace, at the root.
-- **The image is built from the repository root** as its context, `docker build -f api/Dockerfile .`, which is what `make docker-build` runs, so the image installs the pipelex of the same commit. The root `.dockerignore` keeps that context to the files the build reads. `make docker-smoke` boots the image and checks that `/v1/version` reports this version for both the server and its pipelex.
+- **The image is built from the repository root** as its context, `docker build -f api/Dockerfile .`, which is what `make docker-build` runs, so the image installs the pipelex of the same commit. The root `.dockerignore` keeps that context to the files the build reads. `make docker-smoke` boots the image, checks that `/v1/version` reports this version for both the server and its pipelex, and checks that `POST /v1/validate` refuses a method holding a `.py` file with the 501 `pipelex.deployment.custom_code_requires_sandbox`, so a drift in the config the image ships at `/root/.pipelex/` cannot open the custom-code gate.
 - **A pipelex release ships it.** The root's `.github/workflows/publish-pypi.yml` publishes the `pipelex-api` wheel and sdist once the `pipelex` wheel is on PyPI and the release is tagged, then calls `publish-docker-hub.yml` to push `pipelex/pipelex-api:X.Y.Z` from the commit the tag names through `make deploy-docker-hub`, which smoke-tests before it pushes. `latest` moves only to the newest stable release, and a version already on Docker Hub is never rebuilt. A failed push is retried by re-running the failed job, or by dispatching `publish-docker-hub.yml` with the version. The Docker Hub overview is not part of the chain and is still updated by hand from `README.md`. `docs/contribute/api-server.md` at the root describes the whole chain.
 - **Its documentation is part of the pipelex docs site**: the pages are `docs/api-server/` at the repository root, served by the root `make docs` and checked by `make docs-check`, and published on docs.pipelex.com with each release. The committed OpenAPI artifact sits among them, at `docs/api-server/openapi/pipelex-api.openapi.yaml`.
 
@@ -42,11 +42,12 @@ pipelex_api/
 tests/
   unit/                # Unit tests
 scripts/
-  export_openapi.py        # Writes or drift-checks the committed OpenAPI artifact
-  sync_vendored_kit.py     # Writes or drift-checks the vendored .pipelex/inference/ tree
-  check_lockstep_pin.py    # Checks that a built wheel and sdist pin pipelex to the release's version
-  check_served_version.py  # Checks the versions a running server reports (make docker-smoke)
-hatch_build.py             # The metadata hook that writes the dependencies and the lockstep pin
+  export_openapi.py          # Writes or drift-checks the committed OpenAPI artifact
+  sync_vendored_kit.py       # Writes or drift-checks the vendored .pipelex/inference/ tree
+  check_lockstep_pin.py      # Checks that a built wheel and sdist pin pipelex to the release's version
+  check_served_version.py    # Checks the versions a running server reports (make docker-smoke)
+  check_custom_code_gate.py  # Checks that a running server refuses a method shipping Python (make docker-smoke)
+hatch_build.py               # The metadata hook that writes the dependencies and the lockstep pin
 ```
 
 This server is the reference implementation of the [MTHDS Protocol](https://mthds.ai): `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`, and the optional blob routes `POST /blobs/missing` and `PUT /blobs/{sha256}`, under the `/v1` base path, tagged `x-mthds-protocol: true` in the committed OpenAPI artifact (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root, regenerated via `make openapi-export`, drift-checked via `make openapi-check`). Contract nesting: MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex hosted API.
@@ -80,7 +81,7 @@ make li               # lock + install
 make build            # Build the pipelex-api wheel and sdist into dist/
 make check-lockstep-pin  # Check that the built distributions pin pipelex to this version
 make docker-build     # Build the image from local source, with the repository root as the build context
-make docker-smoke     # Boot the built image and check /health and the versions /v1/version reports
+make docker-smoke     # Boot the built image and check /health, the versions /v1/version reports and the custom-code gate
 make docker-run       # Build + run in Docker on http://localhost:8081 (foreground)
 make docker-run-hub   # Pull + run the published Docker Hub image (no local build); HUB_TAG=<tag> to pin
 make docker-stop      # Force-stop the Docker container
