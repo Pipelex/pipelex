@@ -1,0 +1,23 @@
+pipelex/plugins/docling/docling_sdk.py
+  078b6ff304c94013 3-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "023afc8e3f447880aa3afc6781ec55318e950526",
+  "prompts": {
+    "078b6ff304c94013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c6b09de-0d43-4ac0-a56b-e692df74bc0a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 8,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+tests/e2e/pipelex/cli/test_validate_cmd.py
+  55a8f62c55c05b1c 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "ff1635ed842cbf95568bce284c4314ae696c1051",
+  "prompts": {
+    "55a8f62c55c05b1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ead124e3-d1cb-46ee-a265-6ccd5a3faf79",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

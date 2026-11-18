@@ -1,0 +1,33 @@
+tests/integration/pipelex/cogt/test_llm_generate_security.py
+  d7ac28865e5080be 1-66
+CHANGELOG.md
+  d7ac28865e5080be 57-60
+tests/unit/pipelex/cogt/content_generation/test_assignment_models_security.py
+  d7ac28865e5080be 1-103
+pipelex/cogt/content_generation/exceptions.py
+  d7ac28865e5080be 10-13
+tests/unit/pipelex/cogt/content_generation/test_schema_to_model.py
+  d7ac28865e5080be 3-4,8,30-33,121-275
+pipelex/cogt/content_generation/schema_to_model.py
+  d7ac28865e5080be 7-10,20,24-25,69-106,112-113,133-172,175-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b2099c5bb67f77fec1bf43cd5a5ccc7769194250",
+  "prompts": {
+    "d7ac28865e5080be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56bfd7cd-4d63-43ab-8beb-c4970d4e2ac7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 455,
+      "total_deletions": 28,
+      "accepted_lines": 430,
+      "overriden_lines": 0
+    }
+  }
+}

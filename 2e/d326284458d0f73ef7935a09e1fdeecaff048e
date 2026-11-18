@@ -1,0 +1,27 @@
+pipelex/pipe_operators/llm/helpers.py
+  97a1075498b0fed5 2,29-31
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_batch.py
+  97a1075498b0fed5 40
+pipelex/cogt/llm/llm_prompt_template.py
+  97a1075498b0fed5 12,93-96,98,100-102,105,107-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "2ed326284458d0f73ef7935a09e1fdeecaff048e",
+  "prompts": {
+    "97a1075498b0fed5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4adef605-da3c-4906-b824-8d223dd5b050",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 20,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}

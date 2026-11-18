@@ -1,0 +1,23 @@
+tests/unit/pipelex/libraries/test_library_crate_accumulation.py
+  7da9b010f75b4730 136-139,141-142,144-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "0db5067c8e3045bfc63e0b70b5425c4df6f778bd",
+  "prompts": {
+    "7da9b010f75b4730": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "225fe0a6-42d5-41d3-b3c0-01d0d9e0f158",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 11,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}

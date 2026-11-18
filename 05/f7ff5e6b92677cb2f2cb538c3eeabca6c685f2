@@ -1,0 +1,39 @@
+pipelex/cli/commands/validate/bundle_cmd.py
+  1b28853f15d18a25 1-97
+pipelex/cli/commands/validate/app.py
+  1b28853f15d18a25 3,7,10-11
+pipelex/cli/agent_cli/commands/validate/bundle_cmd.py
+  1b28853f15d18a25 1-189
+pipelex/cli/agent_cli/commands/inputs/bundle_cmd.py
+  1b28853f15d18a25 1-138
+pipelex/cli/agent_cli/commands/validate/pipe_cmd.py
+  1b28853f15d18a25 1,15-16,26,28,39,45,49,52-53,94,96-97,100-102,104-106,108-114,116,121
+pipelex/cli/agent_cli/commands/validate/app.py
+  1b28853f15d18a25 7,17-18
+pipelex/cli/agent_cli/commands/inputs/pipe_cmd.py
+  1b28853f15d18a25 1,14-15,25-28,34,42-44,46-47,50-55,57,63,67
+pipelex/cli/agent_cli/commands/inputs/app.py
+  1b28853f15d18a25 7,17-18
+tests/unit/pipelex/cli/test_agent_validate_cmd.py
+  1b28853f15d18a25 1,11,20,23-24,43-44,54,67,72,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "05f7ff5e6b92677cb2f2cb538c3eeabca6c685f2",
+  "prompts": {
+    "1b28853f15d18a25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b29ae245-695c-40ef-87ef-50112ebf0c34",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 503,
+      "total_deletions": 172,
+      "accepted_lines": 495,
+      "overriden_lines": 0
+    }
+  }
+}

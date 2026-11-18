@@ -1,0 +1,35 @@
+pipelex/graph/graph_tracer_protocol.py
+  19f39d01bd1b703d 9,25-27,36-38,221-223
+pipelex/reporting/reporting_manager.py
+  19f39d01bd1b703d 1,19,22,27,45,47-49,52-71,85-88,113,128,143,158,175-199
+TODOS.md
+  19f39d01bd1b703d 408-428
+pipelex/graph/graph_tracer.py
+  19f39d01bd1b703d 23-34,128,130-135,142-177,185-187,189-201,217-220,271-274,429-443,471-485,512-526,544-545,559-574,630-644,672-684,704,709-723,739,752-768
+pipelex/graph/graph_tracer_manager.py
+  19f39d01bd1b703d 11,98-100,109-112,132-134
+tests/unit/pipelex/graph/test_graph_tracer_event_emission.py
+  19f39d01bd1b703d 1-546
+tests/unit/pipelex/reporting/test_reporting_event_emission.py
+  19f39d01bd1b703d 1-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "15ff00bee9e9dd857268b163e161fc4034c750ca",
+  "prompts": {
+    "19f39d01bd1b703d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c26b1d18-1dfb-467a-8e32-971ed8661a54",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1217,
+      "total_deletions": 285,
+      "accepted_lines": 976,
+      "overriden_lines": 2
+    }
+  }
+}

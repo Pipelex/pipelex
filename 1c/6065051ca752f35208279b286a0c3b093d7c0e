@@ -1,0 +1,27 @@
+tests/unit/pipelex/graph/test_graphspec_validation.py
+  e9eba21bd4e5cd8d 311-343
+tests/unit/pipelex/graph/test_graphspec_roundtrip.py
+  e9eba21bd4e5cd8d 62-63,166
+pipelex/graph/graphspec.py
+  e9eba21bd4e5cd8d 19-22,288-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "1c6065051ca752f35208279b286a0c3b093d7c0e",
+  "prompts": {
+    "e9eba21bd4e5cd8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "51408c7a-5f21-46c1-bb73-75fac5a85e6c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 50,
+      "total_deletions": 1,
+      "accepted_lines": 50,
+      "overriden_lines": 0
+    }
+  }
+}

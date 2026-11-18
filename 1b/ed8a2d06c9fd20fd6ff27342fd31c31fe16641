@@ -1,0 +1,23 @@
+typings/backports/strenum/__init__.pyi
+  e0b384ff643aab1b 9,11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "1bed8a2d06c9fd20fd6ff27342fd31c31fe16641",
+  "prompts": {
+    "e0b384ff643aab1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05d99f0d-1101-47be-b24d-1338d3f94462",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 3,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

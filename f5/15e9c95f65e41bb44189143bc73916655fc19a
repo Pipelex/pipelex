@@ -1,0 +1,23 @@
+CHANGELOG.md
+  a3b498579a4a1992 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "f515e9c95f65e41bb44189143bc73916655fc19a",
+  "prompts": {
+    "a3b498579a4a1992": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "87dd2dd0-d8e9-42fc-9745-5c9b893f0082",
+        "model": "gpt-5.4-medium"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

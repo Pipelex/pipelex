@@ -1,0 +1,27 @@
+pipelex/plugins/linkup/linkup_worker.py
+  d110ce1a114b6206 4,9,19
+pipelex/reporting/reporting_manager.py
+  d110ce1a114b6206 27
+pipelex/cogt/usage/cost_registry.py
+  d110ce1a114b6206 85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "863c3b86ab6bbf16a050db62cedf70a987112fa5",
+  "prompts": {
+    "d110ce1a114b6206": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a2838b2-8bf5-490e-bfd3-1d64b2ff800d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 150,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

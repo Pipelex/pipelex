@@ -1,0 +1,25 @@
+wip/error-handling-review.md
+  69e9b39c241e41f8 1-528
+TODO.md
+  69e9b39c241e41f8 201-258,262-342,346-401,405,407-411,413-416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "e08c0db0730dae98ea5f741e3735f3314494ebbb",
+  "prompts": {
+    "69e9b39c241e41f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20c6f1ae-4564-4b3e-abf2-de145b50b4bd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 770,
+      "total_deletions": 100,
+      "accepted_lines": 738,
+      "overriden_lines": 0
+    }
+  }
+}

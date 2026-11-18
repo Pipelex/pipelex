@@ -1,0 +1,56 @@
+pipelex/cli/agent_cli/commands/mthds_init_cmd.py
+  0f9d97aa506db555 1-24
+pipelex/cli/agent_cli/commands/mthds_install_cmd.py
+  0f9d97aa506db555 1-12
+pipelex/cli/agent_cli/commands/mthds_update_cmd.py
+  0f9d97aa506db555 1-12
+pipelex/cli/agent_cli/CLAUDE.md
+  0f9d97aa506db555 38-46,65-72,76
+pipelex/cli/agent_cli/commands/mthds_add_cmd.py
+  0f9d97aa506db555 1-40
+pipelex/cli/agent_cli/commands/mthds_validate_cmd.py
+  0f9d97aa506db555 1-42
+pipelex/cli/agent_cli/commands/mthds_passthrough.py
+  0f9d97aa506db555 1-31
+pipelex/cli/agent_cli/commands/mthds_lock_cmd.py
+  0f9d97aa506db555 1-12
+pipelex/cli/agent_cli/commands/mthds_list_cmd.py
+  0f9d97aa506db555 1-12
+pipelex/cli/agent_cli/commands/mthds_publish_cmd.py
+  0f9d97aa506db555 1-24
+pipelex/cli/agent_cli/_agent_cli.py
+  0f9d97aa506db555 19-26,51-59,139-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "e5973ed10caff885e66b8a227a5658d9942a4438",
+  "prompts": {
+    "0f9d97aa506db555": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee9e8123-6c57-4d48-bd43-8b24b0a3a3f7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 297,
+      "total_deletions": 2,
+      "accepted_lines": 298,
+      "overriden_lines": 0
+    },
+    "7e9aba11b7f94d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce224740-24cd-4c3a-8fbe-ceced44fdd9d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 5,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

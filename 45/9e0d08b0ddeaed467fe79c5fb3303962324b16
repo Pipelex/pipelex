@@ -1,0 +1,27 @@
+README.md
+  82d082cb9c664e47 40
+CHANGELOG.md
+  82d082cb9c664e47 3-8
+pyproject.toml
+  82d082cb9c664e47 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "459e0d08b0ddeaed467fe79c5fb3303962324b16",
+  "prompts": {
+    "82d082cb9c664e47": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e431ac6-ad15-494e-91cf-76fe1d3fb1f4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 2,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}

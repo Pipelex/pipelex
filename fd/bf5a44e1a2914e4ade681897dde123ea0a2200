@@ -1,0 +1,30 @@
+pipelex/temporal/tprl_pipe/hydration.py
+  7e9d54c9a879c8b2 17,27-28,31-32,34
+tests/unit/pipelex/temporal/tprl_pipe/test_validate_as_known_class.py
+  7e9d54c9a879c8b2 1-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "fdbf5a44e1a2914e4ade681897dde123ea0a2200",
+  "prompts": {
+    "7e9d54c9a879c8b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "074c4f7e-0dfc-46c6-91aa-b58ceb79111b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 77,
+      "total_deletions": 11,
+      "accepted_lines": 72,
+      "overriden_lines": 2
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

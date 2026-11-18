@@ -1,0 +1,40 @@
+pipelex/temporal/temporal_data_converter.py
+  849b06893864d5d9 101-105
+.claude/skills/temporal-e2e-validate/SKILL.md
+  849b06893864d5d9 26-27
+pipelex/temporal/tprl/workflow_library_setup.py
+  849b06893864d5d9 15,62-64,67-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "799836e81400ce548d4ed822bfae7db295763b55",
+  "prompts": {
+    "49fcde8902bb6860": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21886731-260d-4b6a-98a8-ebce47e870ee",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 30,
+      "total_deletions": 25,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "849b06893864d5d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "57a56004-ff98-456b-a0e3-234f6bb89088",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 24,
+      "accepted_lines": 43,
+      "overriden_lines": 0
+    }
+  }
+}

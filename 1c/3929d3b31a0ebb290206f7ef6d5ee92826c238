@@ -1,0 +1,39 @@
+pipelex/test_extras/shared_pytest_plugins.py
+  91c12fb96180d3a3 13-19,86-89
+tests/integration/pipelex/temporal/conftest.py
+  91c12fb96180d3a3 117-120,122-126,130,132-133,145-146,148-152,154,156-163
+tests/unit/pipelex/temporal/tprl_pipe/test_hydration.py
+  91c12fb96180d3a3 8,49,61,74,80-114
+pipelex/temporal/tprl_pipe/hydration.py
+  91c12fb96180d3a3 16,19-22,24-25,27,29
+pipelex/pipe_run/pipe_job.py
+  91c12fb96180d3a3 45
+Makefile
+  91c12fb96180d3a3 121,632,641-642,648-649,656-657
+pipelex/core/memory/working_memory.py
+  91c12fb96180d3a3 23,471-487
+pipelex/core/pipes/pipe_output.py
+  91c12fb96180d3a3 38
+CLAUDE.md
+  91c12fb96180d3a3 104-105,111-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "1c3929d3b31a0ebb290206f7ef6d5ee92826c238",
+  "prompts": {
+    "91c12fb96180d3a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "473d7aee-9e60-4ef3-98db-313b58df6bcd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 178,
+      "total_deletions": 90,
+      "accepted_lines": 124,
+      "overriden_lines": 0
+    }
+  }
+}

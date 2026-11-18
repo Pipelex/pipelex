@@ -1,0 +1,36 @@
+docs/wip/D-master-plan-distributed-execution-v2.md
+  d48d0827431c6471 1-322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "3d8d640fb3eaeb16709aa6337178f4eb3dc8b4a8",
+  "prompts": {
+    "cc5fde68acf86d23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd025045-ea9f-4b67-8ada-1154a82847c7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 230,
+      "total_deletions": 0,
+      "accepted_lines": 230,
+      "overriden_lines": 0
+    },
+    "d48d0827431c6471": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a37c34a-0fd1-42f9-961a-7b2ff00aac1f",
+        "model": "<synthetic>"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 576,
+      "total_deletions": 0,
+      "accepted_lines": 576,
+      "overriden_lines": 0
+    }
+  }
+}

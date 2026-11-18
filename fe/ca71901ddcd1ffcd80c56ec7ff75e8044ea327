@@ -1,0 +1,39 @@
+docs/building-methods/concepts/native-concepts.md
+  dfcf94b33f9d30fa 84-85,92-93,95,195,201
+pipelex/core/registry_models.py
+  dfcf94b33f9d30fa 13
+pipelex/core/stuffs/document_content.py
+  dfcf94b33f9d30fa 2,9,20-21,42-43,49-56,60,63-70,74,79-95
+pipelex/plugins/gateway/gateway_search_worker.py
+  dfcf94b33f9d30fa 18-19,91-92,94,96
+tests/integration/pipelex/cogt/test_search.py
+  dfcf94b33f9d30fa 48
+pipelex/core/stuffs/search_result_content.py
+  dfcf94b33f9d30fa 9,19,40,50
+pipelex/plugins/linkup/linkup_search_worker.py
+  dfcf94b33f9d30fa 12-13,60,63-64,66,68
+tests/unit/pipelex/builder/pipe/pipe_operator/pipe_extract/test_data.py
+  dfcf94b33f9d30fa 45
+tests/unit/pipelex/core/stuffs/document_content/test_data.py
+  dfcf94b33f9d30fa 18-19,28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "feca71901ddcd1ffcd80c56ec7ff75e8044ea327",
+  "prompts": {
+    "dfcf94b33f9d30fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb46bdbe-ed99-4abf-b49b-052de0ea50e0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 74,
+      "total_deletions": 74,
+      "accepted_lines": 72,
+      "overriden_lines": 0
+    }
+  }
+}

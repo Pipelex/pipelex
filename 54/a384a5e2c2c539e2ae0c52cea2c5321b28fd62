@@ -1,0 +1,31 @@
+pipelex/plugins/gateway/gateway_completions_factory.py
+  72509e2d897eacc2 5,34,36,39-63,164-165,322-384
+pipelex/plugins/gateway/gateway_search_schemas.py
+  72509e2d897eacc2 29-43
+pipelex/plugins/gateway/gateway_extract_worker.py
+  72509e2d897eacc2 17,23-24,73-82,114-121,123-178
+pipelex/plugins/gateway/gateway_protocols.py
+  72509e2d897eacc2 10,21-22
+pipelex/plugins/gateway/gateway_factory.py
+  72509e2d897eacc2 93-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "54a384a5e2c2c539e2ae0c52cea2c5321b28fd62",
+  "prompts": {
+    "72509e2d897eacc2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6139dd6e-1185-4715-879d-fa75752b9bbf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 205,
+      "total_deletions": 3,
+      "accepted_lines": 200,
+      "overriden_lines": 0
+    }
+  }
+}

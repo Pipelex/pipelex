@@ -1,0 +1,93 @@
+.pipelex/inference/backends/pipelex_gateway_models_plain.md
+  d8797f82a136a77d 34-36
+.pipelex-dev/test_profiles.toml
+  d79c673437f70dd5 90-95
+CHANGELOG.md
+  3367740c913d34b4 18
+tests/unit/pipelex/cogt/llm/test_llm_config_reasoning.py
+  3367740c913d34b4 34
+.pipelex/inference/deck/1_llm_deck.toml
+  d79c673437f70dd5 32,40-41,44-45,61
+  h_ad2a9d0839b83e 37-39
+.pipelex/inference/backends/pipelex_gateway_models.md
+  d8797f82a136a77d 88-95
+pipelex/plugins/google/google_config.py
+  3367740c913d34b4 18,46-47
+pipelex/kit/configs/inference/backends/google.toml
+  d79c673437f70dd5 90-111
+tests/unit/pipelex/plugins/google/test_google_reasoning.py
+  3367740c913d34b4 13,90
+.pipelex/inference/backends/google.toml
+  h_ad2a9d0839b83e 65,74,82-89
+  d79c673437f70dd5 73,75-81,90-111
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  d79c673437f70dd5 32,37-41,44-45,61
+pipelex/graph/reactflow/standalone_assets.py
+  9864b3efa7251880 8,13,20-21,24,31-32
+pipelex/pipelex.toml
+  3367740c913d34b4 172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "f9af465e34f5bac83bd6f10340b8c8d082649621",
+  "prompts": {
+    "3367740c913d34b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b1222b58-2453-4138-8c32-a129fcf35682",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 4,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "9864b3efa7251880": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a59ef32c-f6b3-4f1a-88a1-71940456ba05",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 23,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    },
+    "d79c673437f70dd5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e8ba8f4-0c5e-46f0-8e10-2e377fbc5ed9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 78,
+      "total_deletions": 14,
+      "accepted_lines": 70,
+      "overriden_lines": 1
+    },
+    "d8797f82a136a77d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2fdb259-36a0-414e-acb9-a5301e243354",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 2,
+      "accepted_lines": 11,
+      "overriden_lines": 2
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

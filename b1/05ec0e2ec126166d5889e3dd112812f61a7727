@@ -1,0 +1,38 @@
+TODOS.md
+  04adbcb3d84a2089 10,12,14-16,18-19,21,23,28,32,36,73,75,77,81,96,108-110,134-135,150,152-153,157,163-164,193-194,210,212,227-230,232,234,237,240,243,266-274,305,307,312,314,318,320,322-327,329,331,333-335,338,340,342-351,353,355,357,359,361,363,365-373,376,378,380,382,384,386,388,390,394-402,406-422,424-425,436,441-442,444,450-453,456-458,461-478,488-500,503,505,507-510,512,514,518-520,522-525,531-536,540-545,547,549-552,555-556,580-581,595,598-600,612,617-620
+wip/00-master-plan.md
+  d5c0fd6eb4c4750d 38,291-311,449-451,453,456
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "b105ec0e2ec126166d5889e3dd112812f61a7727",
+  "prompts": {
+    "04adbcb3d84a2089": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43871d2b-0472-4b9e-9be6-e7583571f6ba",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 225,
+      "total_deletions": 195,
+      "accepted_lines": 225,
+      "overriden_lines": 0
+    },
+    "d5c0fd6eb4c4750d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b738257a-971b-4f50-b319-855f0866ea65",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 2,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}

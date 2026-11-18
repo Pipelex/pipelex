@@ -1,0 +1,37 @@
+pipelex/cli/agent_cli/commands/validate/_validate_core.py
+  d9e67dd5f2793c80 50,52,79
+pipelex/pipe_controllers/condition/pipe_condition.py
+  d9e67dd5f2793c80 65,69
+pipelex/pipe_controllers/sequence/pipe_sequence.py
+  d9e67dd5f2793c80 112,116
+pipelex/pipeline/pipeline_run_setup.py
+  d9e67dd5f2793c80 179-181
+pipelex/pipe_controllers/parallel/pipe_parallel.py
+  d9e67dd5f2793c80 69,73
+tests/unit/pipelex/pipe_run/test_dry_run.py
+  d9e67dd5f2793c80 41,48,56-57
+pipelex/libraries/domain/domain_library.py
+  d9e67dd5f2793c80 4,34-36,39-49
+pipelex/pipe_run/dry_run.py
+  d9e67dd5f2793c80 113,127-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "003b260db78ed1d1f498e74a325029eb5ad8a719",
+  "prompts": {
+    "d9e67dd5f2793c80": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1143f96-7e6c-46ca-8261-4b170738cf84",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 38,
+      "total_deletions": 15,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    }
+  }
+}

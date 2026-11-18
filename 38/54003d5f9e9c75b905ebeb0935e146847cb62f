@@ -1,0 +1,45 @@
+pipelex/pipe_run/delivery_executor.py
+  e0388a2f96e71837 3,141-144
+tests/unit/pipelex/pipe_run/test_delivery_executor.py
+  e0388a2f96e71837 213-253
+tests/integration/pipelex/temporal/library_crate/test_submitter_without_bundle.py
+  1878753398539bc4 1-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "3854003d5f9e9c75b905ebeb0935e146847cb62f",
+  "prompts": {
+    "1878753398539bc4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dcd5a518-028c-485c-bc01-62c764bb3146",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 260,
+      "total_deletions": 55,
+      "accepted_lines": 205,
+      "overriden_lines": 0
+    },
+    "e0388a2f96e71837": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0edd70c-9167-4170-a1e1-203081c1106b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 15,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

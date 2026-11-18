@@ -1,0 +1,21 @@
+pipelex/system/telemetry/telemetry_manager.py
+  s_44ae092d2fd100::t_b8e173f2f1ae76 668-669,696-697
+CHANGELOG.md
+  s_44ae092d2fd100::t_2621cd9e18c4ee 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e259c095a6ec022dd1ebff693eec02d582798ffd",
+  "prompts": {},
+  "sessions": {
+    "s_44ae092d2fd100": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49ea81ca-2865-445c-beae-48d893dda44a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

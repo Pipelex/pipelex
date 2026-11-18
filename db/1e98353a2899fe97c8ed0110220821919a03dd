@@ -1,0 +1,34 @@
+pipelex/system/pipelex_service/pipelex_details.py
+  h_ad2a9d0839b83e 5
+pipelex/plugins/openai/openai_completions_llm_worker.py
+  9837d1ea2b21b603 15,131,134,185,188
+.pipelex/inference/backends/bedrock.toml
+  h_ad2a9d0839b83e 151
+CHANGELOG.md
+  9837d1ea2b21b603 10-12,18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "db1e98353a2899fe97c8ed0110220821919a03dd",
+  "prompts": {
+    "9837d1ea2b21b603": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f35377f2-9758-430c-8afa-a9ed241200e3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 2,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

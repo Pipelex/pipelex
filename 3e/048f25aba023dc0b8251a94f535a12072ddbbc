@@ -1,0 +1,33 @@
+pipelex/pipeline/validate_bundle.py
+  f2dd117bb9a7cc52 69
+tests/e2e/pipelex/cli/test_validate_cmd.py
+  f2dd117bb9a7cc52 8-11
+pipelex/libraries/library_manager.py
+  f2dd117bb9a7cc52 14,233,238,309
+pipelex/libraries/library_utils.py
+  f2dd117bb9a7cc52 4,79
+pipelex/builder/CLAUDE.md
+  f2dd117bb9a7cc52 3,37-44
+pipelex/core/pipes/exceptions.py
+  f2dd117bb9a7cc52 19,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "3e048f25aba023dc0b8251a94f535a12072ddbbc",
+  "prompts": {
+    "f2dd117bb9a7cc52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b540ce0-cbbe-45e1-8ae8-8544bc2c0c60",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 75,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}

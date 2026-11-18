@@ -1,0 +1,23 @@
+pipelex/kit/paths.py
+  da795a25e97b4849 25-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "05d720723850d6784c41c3ba425cd5032aa04e81",
+  "prompts": {
+    "da795a25e97b4849": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "436d3f22-735c-4a0b-8d25-2df1ae75a705",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

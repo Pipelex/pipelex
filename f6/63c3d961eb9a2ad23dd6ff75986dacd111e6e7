@@ -1,0 +1,31 @@
+pipelex/tracing/usage_aggregator.py
+  b665c8f81fb2d6db 1-22
+tests/unit/pipelex/tracing/test_usage_aggregator.py
+  b665c8f81fb2d6db 1-106
+tests/unit/pipelex/tracing/test_graphspec_assembler.py
+  b665c8f81fb2d6db 1-644
+pipelex/tracing/graphspec_assembler.py
+  b665c8f81fb2d6db 1-424
+TODOS.md
+  b665c8f81fb2d6db 291-308,310
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "f663c3d961eb9a2ad23dd6ff75986dacd111e6e7",
+  "prompts": {
+    "b665c8f81fb2d6db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f69016b-6a3c-4b86-9bb3-e4bbd586c474",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1266,
+      "total_deletions": 65,
+      "accepted_lines": 1215,
+      "overriden_lines": 0
+    }
+  }
+}

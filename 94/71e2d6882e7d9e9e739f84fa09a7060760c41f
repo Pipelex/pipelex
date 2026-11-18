@@ -1,0 +1,70 @@
+pipelex/plugins/mistral/mistral_llm_worker.py
+  557d72704264381f 217-218,231-233
+  390ec7b1aa911da4 73
+pipelex/plugins/openai/openai_completions_img_gen_worker.py
+  390ec7b1aa911da4 96
+pipelex/plugins/openai/openai_responses_llm_worker.py
+  390ec7b1aa911da4 157,236
+pipelex/plugins/openai/openai_completions_llm_worker.py
+  390ec7b1aa911da4 155,250
+pipelex/plugins/google/google_img_gen_worker.py
+  390ec7b1aa911da4 109
+pipelex/plugins/google/google_llm_worker.py
+  557d72704264381f 301-302,318-320
+  390ec7b1aa911da4 129
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  390ec7b1aa911da4 252,284,371,403
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  557d72704264381f 130-132,134
+pipelex/plugins/mistral/mistral_extract_worker.py
+  390ec7b1aa911da4 73
+pipelex/plugins/fal/fal_img_gen_worker.py
+  390ec7b1aa911da4 82
+pipelex/plugins/bedrock/bedrock_llm_worker.py
+  390ec7b1aa911da4 87,96
+pipelex/plugins/openai/openai_img_gen_worker.py
+  390ec7b1aa911da4 84
+pipelex/urls.py
+  390ec7b1aa911da4 36-42
+pipelex/plugins/linkup/linkup_extract_worker.py
+  390ec7b1aa911da4 78
+pipelex/cogt/inference/error_classification.py
+  557d72704264381f 13-15
+tests/unit/pipelex/plugins/azure_rest/test_data.py
+  557d72704264381f 55
+pipelex/plugins/linkup/linkup_search_worker.py
+  390ec7b1aa911da4 55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "9471e2d6882e7d9e9e739f84fa09a7060760c41f",
+  "prompts": {
+    "390ec7b1aa911da4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43b9b6b4-5b3b-4876-a3f7-f3eb8a5936d4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 46,
+      "total_deletions": 48,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    },
+    "557d72704264381f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dffe953-631c-4a51-bec7-c945c01499ca",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 17,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,27 @@
+docs/features/cli.md
+  37f031072c06c8e6 44,64
+docs/tools/cli/agent-cli.md
+  37f031072c06c8e6 2,7
+docs/features/claude-code-skills-plugin.md
+  37f031072c06c8e6 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "6644fd539c3cb9a03fe0751ff50d8244ccc33ac1",
+  "prompts": {
+    "37f031072c06c8e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9eb99991-472d-4d40-8b21-a4449818bc01",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 6,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,47 @@
+pipelex/cli/_cli.py
+  29675c1ba3e9967d 18,30,179
+pipelex/pipelex.toml
+  29675c1ba3e9967d 464-466
+pipelex/cli/commands/worker_cmd.py
+  29675c1ba3e9967d 1-57
+.pipelex/pipelex.toml
+  29675c1ba3e9967d 192-198
+pipelex/cli/commands/run/_run_core.py
+  29675c1ba3e9967d 247,253
+pipelex/cli/commands/run/bundle_cmd.py
+  29675c1ba3e9967d 72-75,167
+pipelex/deep_flow/worker_cli.py
+  29675c1ba3e9967d 59-64
+pipelex/deep_flow/tprl/workflow_caller.py
+  29675c1ba3e9967d 71-73
+pipelex/deep_flow/config_deep_flow.py
+  29675c1ba3e9967d 169
+pipelex/cli/commands/run/method_cmd.py
+  29675c1ba3e9967d 71-74,137
+pipelex/pipelex.py
+  29675c1ba3e9967d 160,181-184,186-188,364-380,383-387,389-392,397-405,442,470-471,505
+pipelex/cli/cli_factory.py
+  29675c1ba3e9967d 32,43,53
+pipelex/cli/commands/run/pipe_cmd.py
+  29675c1ba3e9967d 68-71,132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "62e23d61321933385f5bb75f44c9d76aa1e56879",
+  "prompts": {
+    "29675c1ba3e9967d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c360bb60-1df2-4e21-a5d9-baf365c80761",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 155,
+      "total_deletions": 8,
+      "accepted_lines": 150,
+      "overriden_lines": 2
+    }
+  }
+}

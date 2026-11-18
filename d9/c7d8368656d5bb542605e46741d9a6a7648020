@@ -1,0 +1,23 @@
+.github/workflows/doc-check.yml
+  06ec1ccd25aa380f 5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "d9c7d8368656d5bb542605e46741d9a6a7648020",
+  "prompts": {
+    "06ec1ccd25aa380f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "64369229-23bd-4a2f-8929-6b5ac68459cb",
+        "model": "claude-4.6-opus-high-thinking"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 21,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

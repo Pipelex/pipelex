@@ -1,0 +1,41 @@
+pipelex/system/telemetry/otel_factory.py
+  s_44ae092d2fd100::t_955ff305359b4b 296-297,301
+pipelex/system/telemetry/posthog_span_exporter.py
+  s_44ae092d2fd100::t_955ff305359b4b 35-36,55-56
+tests/unit/pipelex/system/telemetry/test_exception_capture_sdk_contract.py
+  s_44ae092d2fd100::t_dd792b1c362a9c 111
+tests/unit/pipelex/system/telemetry/test_posthog_span_exporter.py
+  s_44ae092d2fd100::t_dd792b1c362a9c 22
+pipelex/system/telemetry/telemetry_manager.py
+  s_44ae092d2fd100::t_955ff305359b4b 156,494,496-498,506,679
+tests/unit/pipelex/system/telemetry/test_telemetry_identity.py
+  s_44ae092d2fd100::t_9ff22e0c77415c 10-11,195
+docs/features/telemetry.md
+  s_44ae092d2fd100::t_132720a172c1c5 28
+docs/setup/telemetry.md
+  s_44ae092d2fd100::t_132720a172c1c5 15,118
+pipelex/system/telemetry/telemetry_identity.py
+  s_44ae092d2fd100::t_955ff305359b4b 16,64,79-84,150,172
+CHANGELOG.md
+  s_44ae092d2fd100::t_132720a172c1c5 3-8
+tests/unit/pipelex/system/telemetry/test_telemetry_manager_identity.py
+  s_44ae092d2fd100::t_dd792b1c362a9c 108-109,124-125,211,229-230
+tests/unit/pipelex/system/telemetry/test_exception_capture_identity.py
+  s_44ae092d2fd100::t_dd792b1c362a9c 102-103,115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5b2e28409c0f3ebadeb9d38fd4c18019095dbafa",
+  "prompts": {},
+  "sessions": {
+    "s_44ae092d2fd100": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49ea81ca-2865-445c-beae-48d893dda44a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

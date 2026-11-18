@@ -1,0 +1,29 @@
+wip/A-temporal-library-fix-proposals-v2.md
+  a68bb8c185075f92 141,143
+wip/B-library-as-execution-context.md
+  a68bb8c185075f92 5
+wip/D-master-plan-distributed-execution-v2.md
+  a68bb8c185075f92 94
+wip/C-temporal-payload-codec-strategy.md
+  a68bb8c185075f92 5,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "94f11d831da221e5889f2d86817f26bca5c2d6e2",
+  "prompts": {
+    "a68bb8c185075f92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "214b28af-5750-4a62-8aa1-57a41aa3de76",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 6,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,19 @@
+.drift/acks/pipelex-kernel-docs.toml
+  s_177b6af8a168a6::t_611d89cb965698 2-5,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b79b4490938798f84088e3660f25250705aeeb65",
+  "prompts": {},
+  "sessions": {
+    "s_177b6af8a168a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d0cb6e4-df5b-45ba-ab3c-25e38f06b2ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

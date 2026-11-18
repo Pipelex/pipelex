@@ -1,0 +1,207 @@
+docs/under-the-hood/architecture-overview.md
+  e2acaf5af7c1f239 3,8
+docs/under-the-hood/test-profile-configuration.md
+  e2acaf5af7c1f239 3
+docs/configuration/config-technical/library-config.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-technical/aws-config.md
+  e2acaf5af7c1f239 1-4
+docs/features/cloud-storage.md
+  e2acaf5af7c1f239 3
+docs/building-methods/configure-ai-llm-to-optimize-methods.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/storage-provider-injection.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/understanding-multiplicity.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/secrets-provider-injection.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/build/runner.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/executing-pipelines.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-operators/index.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/concepts/native-concepts.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/pkg.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/agent-cli.md
+  e2acaf5af7c1f239 1-4
+docs/cookbook/extract-gantt.md
+  e2acaf5af7c1f239 1-4
+docs/setup/telemetry.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-output.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-practical/pipe-run-config.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/build/structures.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-controllers/PipeBatch.md
+  e2acaf5af7c1f239 1-4
+docs/under-the-hood/reasoning-controls.md
+  e2acaf5af7c1f239 3
+docs/index.md
+  e2acaf5af7c1f239 3,10
+docs/features/validation-dry-run.md
+  e2acaf5af7c1f239 3
+docs/features/advanced-customizations.md
+  e2acaf5af7c1f239 3
+docs/setup/index.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-practical/logging-config.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/concepts/refining-concepts.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/pipe-router-injection.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/domain.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-controllers/index.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-pipeline-validation/dry-run-config.md
+  e2acaf5af7c1f239 1-4
+docs/.meta.yml
+  e2acaf5af7c1f239 2-3
+docs/tools/cli/build/output.md
+  e2acaf5af7c1f239 1-4
+docs/under-the-hood/index.md
+  e2acaf5af7c1f239 3
+docs/configuration/config-practical/reporting-config.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/run.md
+  e2acaf5af7c1f239 1-4
+docs/tools/logging.md
+  e2acaf5af7c1f239 1-4
+docs/cookbook/extract-proof-of-purchase.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-technical/inference-backend-config.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-operators/PipeFunc.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-controllers/PipeCondition.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-operators/PipeCompose.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-advanced/feature-config.md
+  e2acaf5af7c1f239 1-4
+docs/setup/project-organization.md
+  e2acaf5af7c1f239 1-4
+docs/under-the-hood/image-handling-in-llm-prompts.md
+  e2acaf5af7c1f239 3
+docs/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/reporting-delegate-injection.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/validate.md
+  e2acaf5af7c1f239 1-4
+docs/setup/configure-ai-providers.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-practical/telemetry-config.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/build/index.md
+  e2acaf5af7c1f239 1-4
+docs/contribute/configuration-defaults-and-overrides.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/libraries.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/config-technical/cogt-config.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/concepts/python-classes.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/init.md
+  e2acaf5af7c1f239 1-4
+docs/under-the-hood/init-cli-flows.md
+  e2acaf5af7c1f239 3
+docs/analytics/data-extraction.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-controllers/PipeSequence.md
+  e2acaf5af7c1f239 1-4
+mkdocs.yml
+  e2acaf5af7c1f239 3
+docs/features/plxt.md
+  e2acaf5af7c1f239 3
+docs/building-methods/pipes/index.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-operators/PipeExtract.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/index.md
+  e2acaf5af7c1f239 1-4
+docs/features/cost-tracking.md
+  e2acaf5af7c1f239 3
+docs/building-methods/llm-structured-generation-config.md
+  e2acaf5af7c1f239 1-4
+docs/tools/plxt.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/observer-provider-injection.md
+  e2acaf5af7c1f239 1-4
+docs/advanced/content-generator-injection.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-operators/PipeImgGen.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-operators/PipeSearch.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/pipe-controllers/PipeParallel.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/kick-off-a-methods-project.md
+  e2acaf5af7c1f239 1-4
+docs/tools/cli/index.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipelex-bundle-specification.md
+  e2acaf5af7c1f239 1-4
+docs/configuration/index.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/concepts/inline-structures.md
+  e2acaf5af7c1f239 1-4
+docs/setup/gateway-models.md
+  e2acaf5af7c1f239 3
+docs/under-the-hood/execution-graph-tracing.md
+  e2acaf5af7c1f239 3
+docs/tools/cli/build/inputs.md
+  e2acaf5af7c1f239 1-4
+docs/cookbook/extract-table.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/concepts/define_your_concepts.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/packages.md
+  e2acaf5af7c1f239 1-4
+docs/viewpoint/viewpoint.md
+  e2acaf5af7c1f239 1-4
+docs/under-the-hood/stuffartefact-and-image-rendering.md
+  e2acaf5af7c1f239 3
+docs/tools/cli/show.md
+  e2acaf5af7c1f239 1-4
+docs/cookbook/write-tweet.md
+  e2acaf5af7c1f239 1-4
+docs/cookbook/extract-dpe.md
+  e2acaf5af7c1f239 1-4
+docs/building-methods/pipes/working-memory.md
+  e2acaf5af7c1f239 1-4
+docs/under-the-hood/dry-run-mock-generation.md
+  e2acaf5af7c1f239 3
+docs/features/execution-graph.md
+  e2acaf5af7c1f239 3
+docs/building-methods/pipes/provide-inputs.md
+  e2acaf5af7c1f239 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "da2ebb9955b4ce0c965ee1e39e07bebeaf64e301",
+  "prompts": {
+    "e2acaf5af7c1f239": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bebc285-d649-4228-b653-3f432f56c778",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 337,
+      "total_deletions": 25,
+      "accepted_lines": 318,
+      "overriden_lines": 0
+    }
+  }
+}

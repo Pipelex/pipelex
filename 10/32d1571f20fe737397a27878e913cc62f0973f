@@ -1,0 +1,25 @@
+pipelex/temporal/codec/storage_payload_codec.py
+  36f09c27b2e74d72 13-14,46,116-118
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  36f09c27b2e74d72 7,278-310
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1032d1571f20fe737397a27878e913cc62f0973f",
+  "prompts": {
+    "36f09c27b2e74d72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2dcd3802-5a93-4910-94b2-4fc0e3d291b6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 3,
+      "accepted_lines": 40,
+      "overriden_lines": 0
+    }
+  }
+}

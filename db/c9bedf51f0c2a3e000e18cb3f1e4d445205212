@@ -1,0 +1,27 @@
+pipelex/cli/dev_cli/commands/update_gateway_models_cmd.py
+  4296940ab637c521 15,75-100
+pipelex/cli/dev_cli/commands/gateway_models_generator.py
+  4296940ab637c521 30-35
+pipelex/cli/dev_cli/commands/check_gateway_models_cmd.py
+  4296940ab637c521 16,125-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "dbc9bedf51f0c2a3e000e18cb3f1e4d445205212",
+  "prompts": {
+    "4296940ab637c521": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "51ac8607-b796-4813-980e-0f0836669e75",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 39,
+      "total_deletions": 14,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    }
+  }
+}

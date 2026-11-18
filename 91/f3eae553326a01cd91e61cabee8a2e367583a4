@@ -1,0 +1,28 @@
+.claude/skills/workflows/SKILL.md
+  s_1d8684b417c231::t_4bdeb5b189da44 21
+  s_1d8684b417c231::t_4b1372e2928d1b 57
+  s_1d8684b417c231::t_38a6dff1cfd36a 49
+pyproject.toml
+  h_39660369d4ad8c 9,88,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "91f3eae553326a01cd91e61cabee8a2e367583a4",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_1d8684b417c231": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d47cb64c-d84f-422c-9afc-541159c1ffe6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

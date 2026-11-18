@@ -1,0 +1,31 @@
+.pipelex/inference/backends/linkup.toml
+  febd73f344b6dbdc 47
+tests/integration/pipelex/cogt/test_extract.py
+  febd73f344b6dbdc 136
+pipelex/kit/configs/inference/backends/linkup.toml
+  febd73f344b6dbdc 47
+pipelex/cogt/extract/extract_worker_abstract.py
+  febd73f344b6dbdc 42-43,61
+pipelex/cogt/model_backends/model_spec.py
+  febd73f344b6dbdc 64-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "68cd0768f720a7fbdc242bd016c65598f78e9144",
+  "prompts": {
+    "febd73f344b6dbdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be4aac9e-f99a-4502-ae01-02ef2db6a095",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 8,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}

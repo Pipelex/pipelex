@@ -1,0 +1,29 @@
+pipelex/cli/installed_methods.py
+  9d0095f4c10bf2a5 174-202
+pipelex/libraries/library_manager.py
+  9d0095f4c10bf2a5 7,551-556,837-880,882-919
+pipelex/libraries/library.py
+  9d0095f4c10bf2a5 96-101,123-127
+pipelex/core/qualified_ref.py
+  9d0095f4c10bf2a5 157-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "c8f413b1951bf140e9be020ea49e84e02360e50b",
+  "prompts": {
+    "9d0095f4c10bf2a5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9109f232-2b5d-4242-9a19-82310306885f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 201,
+      "total_deletions": 56,
+      "accepted_lines": 176,
+      "overriden_lines": 2
+    }
+  }
+}

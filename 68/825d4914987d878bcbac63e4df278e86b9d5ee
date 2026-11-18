@@ -1,0 +1,35 @@
+pipelex/pipeline/pipeline_run_setup.py
+  3ef7d19fc723ffcb 189
+pipelex/libraries/library_manager.py
+  3ef7d19fc723ffcb 1061
+pipelex/builder/operations/inputs_ops.py
+  3ef7d19fc723ffcb 9,55,69
+pipelex/libraries/library_crate.py
+  3ef7d19fc723ffcb 38-42,49,51,55-58
+pipelex/libraries/library_crate_factory.py
+  3ef7d19fc723ffcb 3,5,7,59-70,75,78,86,97,100,108,116-117,122
+pipelex/pipe_run/dry_run_pipeline.py
+  3ef7d19fc723ffcb 11,57
+pipelex/core/pipes/pipe_factory.py
+  3ef7d19fc723ffcb 41-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "68825d4914987d878bcbac63e4df278e86b9d5ee",
+  "prompts": {
+    "3ef7d19fc723ffcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cee40ae6-0cca-4205-8379-17522967df21",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 52,
+      "total_deletions": 19,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}

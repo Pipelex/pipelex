@@ -1,0 +1,23 @@
+wip/H-phase2-implementation-plan.md
+  20a8cef22e81f3ae 1-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "ff5bb6a845293b0f1acf0cf9850403d7d2935f51",
+  "prompts": {
+    "20a8cef22e81f3ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e6aabb-ddeb-478b-93cc-97d04840c1ca",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 303,
+      "total_deletions": 0,
+      "accepted_lines": 303,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,35 @@
+docs/overrides/main.html
+  73b843355db9c6e1 34,50
+CHANGELOG.md
+  73b843355db9c6e1 189,561
+pipelex/kit/configs/inference/backends/pipelex_gateway_models_plain.md
+  73b843355db9c6e1 4
+docs/404.html
+  73b843355db9c6e1 51-54
+.github/workflows/doc-check.yml
+  73b843355db9c6e1 37
+pipelex/kit/configs/inference/backends/pipelex_gateway_models.md
+  73b843355db9c6e1 3
+pyproject.toml
+  73b843355db9c6e1 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "657033551aa50fb30bed2806c8b1bba95880d5a4",
+  "prompts": {
+    "73b843355db9c6e1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8cef3de-a8bf-46e0-9aa0-9e5ef58eceda",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 10,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}

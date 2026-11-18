@@ -1,0 +1,25 @@
+pipelex/cogt/llm/llm_report.py
+  819cf2f4cd33a928 38,50
+pipelex/cogt/usage/cost_registry.py
+  819cf2f4cd33a928 225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "ef5f1bda39d893c996fa046371f577388cf6129e",
+  "prompts": {
+    "819cf2f4cd33a928": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "460a757b-e570-4873-96a3-680d973508aa",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

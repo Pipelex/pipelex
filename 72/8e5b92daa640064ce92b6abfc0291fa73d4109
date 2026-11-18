@@ -1,0 +1,47 @@
+pipelex/plugins/mistral/mistral_extract_worker.py
+  s_76f9cf77043326::t_a8eeab38d481a7 3-4
+tests/unit/pipelex/plugins/test_plugin_pipelex_storage_images.py
+  s_76f9cf77043326::t_79020f0d0965d6 9
+tests/unit/pipelex/plugins/mistral/test_mistral_worker_error_handling.py
+  s_76f9cf77043326::t_e1affc6a88a1ae 9
+pyproject.toml
+  h_39660369d4ad8c 87,445
+  s_76f9cf77043326::t_0b369d79be5aab 442-444,446
+pipelex/plugins/mistral/mistral_llms.py
+  s_76f9cf77043326::t_c5b0651c3a0084 1,8,19-20
+tests/unit/pipelex/plugins/mistral/test_mistral_reasoning.py
+  s_76f9cf77043326::t_5f309b5c91a3ad 104
+pipelex/plugins/mistral/mistral_llm_worker.py
+  s_76f9cf77043326::t_eed65c61aa2632 3-6
+  s_76f9cf77043326::t_2678f9139a696d 28-29
+  s_76f9cf77043326::t_ec6d00e4a40fc8 180-184
+pipelex/plugins/mistral/mistral_config.py
+  s_76f9cf77043326::t_76aab929d6ffe1 12
+pipelex/plugins/mistral/mistral_factory.py
+  s_76f9cf77043326::t_938b8f2d3e7b1e 59
+  s_76f9cf77043326::t_fdb49e17542871 185
+  s_76f9cf77043326::t_f5049186f239b3 61
+  s_76f9cf77043326::t_df2bb0afa9fc1b 266
+  s_76f9cf77043326::t_435e9db881ac9b 7-9,15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "728e5b92daa640064ce92b6abfc0291fa73d4109",
+  "prompts": {},
+  "humans": {
+    "h_39660369d4ad8c": {
+      "author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_76f9cf77043326": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36add893-ccde-4a23-838a-81b4a7508026",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

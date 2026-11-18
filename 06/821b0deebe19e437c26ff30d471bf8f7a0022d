@@ -1,0 +1,102 @@
+pipelex/language/mthds_schema_generator.py
+  307354674e1fcddc 32
+pipelex/core/bundles/pipelex_bundle_blueprint.py
+  307354674e1fcddc 24,34
+pipelex/cogt/search/search_worker_abstract.py
+  307354674e1fcddc 1-57
+.pipelex/inference/backends.toml
+  307354674e1fcddc 61-64
+tests/integration/pipelex/cogt/test_search.py
+  774fcca0fd2d2359 1-63
+pipelex/cogt/search/search_depth.py
+  307354674e1fcddc 1-6
+pipelex/pipe_operators/search/pipe_search_blueprint.py
+  307354674e1fcddc 1-25,27
+pipelex/pipe_operators/search/pipe_search.py
+  307354674e1fcddc 1-173
+pipelex/core/registry_models.py
+  307354674e1fcddc 13,37-38,51,60,90-91
+pipelex/core/concepts/concept_factory.py
+  307354674e1fcddc 165-171
+pipelex/core/concepts/native/concept_native.py
+  307354674e1fcddc 12,29,70-71,127,150
+pipelex/pipe_operators/search/pipe_search_factory.py
+  307354674e1fcddc 1-76
+tests/integration/pipelex/cogt/test_setup_inference_workers.py
+  307354674e1fcddc 19-20
+pipelex/plugins/linkup/linkup_search_worker.py
+  774fcca0fd2d2359 1-95
+pipelex/kit/configs/inference/routing_profiles.toml
+  307354674e1fcddc 30-31
+pipelex/core/pipes/output/output_renderer.py
+  307354674e1fcddc 101
+pipelex/cogt/models/model_deck.py
+  307354674e1fcddc 17,33,71-77,82,116-121,131-132,204-217,222,408-508,651-661,713-728
+Makefile
+  774fcca0fd2d2359 30
+pipelex/kit/configs/inference/backends/linkup.toml
+  307354674e1fcddc 1-37
+pipelex/kit/configs/inference/deck/4_search_deck.toml
+  307354674e1fcddc 1-37
+pyproject.toml
+  774fcca0fd2d2359 234,251
+pipelex/cogt/models/model_deck_check.py
+  307354674e1fcddc 7,119-172
+pipelex/cogt/exceptions.py
+  307354674e1fcddc 129-135
+pipelex/core/stuffs/search_result_content.py
+  307354674e1fcddc 1-19
+pipelex/cogt/search/search_setting.py
+  307354674e1fcddc 1-28
+tests/unit/pipelex/cogt/models/test_model_deck.py
+  307354674e1fcddc 59-60,336-337,489-490
+pipelex/pipe_operators/search/exceptions.py
+  307354674e1fcddc 1-9
+pipelex/cogt/model_backends/model_type.py
+  307354674e1fcddc 8
+tests/unit/pipelex/language/test_mthds_schema.py
+  307354674e1fcddc 101,111-112
+tests/unit/pipelex/cogt/models/test_model_deck_references.py
+  307354674e1fcddc 118,179-180
+tests/integration/pipelex/cogt/test_data.py
+  774fcca0fd2d2359 237-240,244-246,248-251
+pipelex/cogt/models/model_manager.py
+  307354674e1fcddc 170-174
+pipelex/core/pipes/pipe_blueprint.py
+  307354674e1fcddc 46,70-71
+pipelex/cogt/search/search_worker_factory.py
+  307354674e1fcddc 1,3-19,21-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "06821b0deebe19e437c26ff30d471bf8f7a0022d",
+  "prompts": {
+    "307354674e1fcddc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a58b7f9a-d768-415f-a831-a6c89191f3e8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 967,
+      "total_deletions": 50,
+      "accepted_lines": 910,
+      "overriden_lines": 2
+    },
+    "774fcca0fd2d2359": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "beeb555c-5e75-4121-be14-68dfeca944a4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 184,
+      "total_deletions": 11,
+      "accepted_lines": 172,
+      "overriden_lines": 4
+    }
+  }
+}

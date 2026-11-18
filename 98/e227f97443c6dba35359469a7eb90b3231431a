@@ -1,0 +1,25 @@
+tests/unit/pipelex/cli/test_pipe_cmd_multiline.py
+  63df80deb3515053 1-93
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  63df80deb3515053 86-92,143,145,166,215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "98e227f97443c6dba35359469a7eb90b3231431a",
+  "prompts": {
+    "63df80deb3515053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68727665-9150-47b3-a1b6-3f6f0ed7770b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 106,
+      "total_deletions": 6,
+      "accepted_lines": 104,
+      "overriden_lines": 0
+    }
+  }
+}

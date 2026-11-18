@@ -1,0 +1,25 @@
+docs/home/1-features/claude-code-skills-plugin.md
+  697d7a95bcb094be 32-33
+docs/home/1-features/concepts.md
+  697d7a95bcb094be 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "45ba2422d31b80ee73309cfa1e981ecaf8a3f5d5",
+  "prompts": {
+    "697d7a95bcb094be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15aeb1a8-a67a-4748-be9c-bdab6a21a881",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

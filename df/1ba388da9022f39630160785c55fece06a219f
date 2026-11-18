@@ -1,0 +1,26 @@
+.gitignore
+  abf3608698abc834 63-65
+  b7de33ca7eb43b16 66-69
+  64f3a2c92cabe45c 78-81
+  643b1e1e1074880c 88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "df1ba388da9022f39630160785c55fece06a219f",
+  "prompts": {
+    "643b1e1e1074880c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "550d0ca5-9ef9-4f60-912c-8e0f8c34ad17",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

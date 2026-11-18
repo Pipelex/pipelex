@@ -1,0 +1,23 @@
+README.md
+  b7de33ca7eb43b16 107,109,112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "45e9769a86977dbe964d610aa3654f1a0a7379db",
+  "prompts": {
+    "b7de33ca7eb43b16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "32d9639c-3c7a-4f71-848f-1bfec5b965de",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

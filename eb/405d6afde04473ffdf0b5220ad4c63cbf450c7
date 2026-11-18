@@ -1,0 +1,43 @@
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  deb2405301c2f17b 19,94-95,97-106
+pipelex/cogt/img_gen/img_gen_report.py
+  deb2405301c2f17b 1-72
+pipelex/cogt/img_gen/img_gen_worker_abstract.py
+  deb2405301c2f17b 57,93
+pipelex/cogt/usage/cost_registry.py
+  deb2405301c2f17b 2,12,20-22,40,44,51-52,57-59,61-68,75-77,79-91,96-103,105,107-108,112,122,134,136-138,141-150,158,173,202,204,206,210-211,213-225,230-231,247
+pipelex/reporting/reporting_manager.py
+  deb2405301c2f17b 8-9,23-24,27-28,30,33-34,76,79-92,107-112,134
+pipelex/cogt/llm/llm_report.py
+  deb2405301c2f17b 12,35,48,67
+tests/unit/pipelex/cogt/usage/test_cost_registry.py
+  deb2405301c2f17b 35,237,287,296,328,391,415-417,419
+pipelex/cogt/img_gen/img_gen_job_components.py
+  deb2405301c2f17b 5
+pipelex/cogt/img_gen/img_gen_job.py
+  deb2405301c2f17b 7,9,22,28-34
+pipelex/plugins/openai/openai_img_gen_worker.py
+  deb2405301c2f17b 13,92-98
+pipelex/plugins/google/google_img_gen_worker.py
+  deb2405301c2f17b 16,121-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "eb405d6afde04473ffdf0b5220ad4c63cbf450c7",
+  "prompts": {
+    "deb2405301c2f17b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d912f302-f90f-4145-bfe6-cd7832777319",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 249,
+      "total_deletions": 99,
+      "accepted_lines": 242,
+      "overriden_lines": 0
+    }
+  }
+}

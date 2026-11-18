@@ -1,0 +1,23 @@
+README.md
+  4c23217f20d4fabb 121,530
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "0397bf44b1e6c571a251b61ac43ba5516b35300a",
+  "prompts": {
+    "4c23217f20d4fabb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dfc6a20a-43d0-4fe2-b91b-d2a40eabcbb4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 6,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,28 @@
+tests/integration/pipelex/temporal/tracing/conftest.py
+  feb152a75e4d6424 23-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "de652da8530b3c1019f38853c03e5abe97cb55a0",
+  "prompts": {
+    "feb152a75e4d6424": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcb7bc9a-bfbd-4b66-b031-1ad5ab162294",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 3,
+      "accepted_lines": 1118,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

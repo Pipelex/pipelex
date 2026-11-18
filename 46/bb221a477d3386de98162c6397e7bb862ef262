@@ -1,0 +1,31 @@
+wip/00-master-plan.md
+  b877386d6377fb57 98-102,336-382
+docs/under-the-hood/temporal-integration.md
+  b877386d6377fb57 1-219
+docs/under-the-hood/pipe-routing-and-execution.md
+  b877386d6377fb57 40-41,45,47,70,162,179-182,186,191,194-198,206,254,256,258,260,262-274,287-289,292,305-306,309,340-343
+mkdocs.yml
+  b877386d6377fb57 307,493
+docs/under-the-hood/index.md
+  b877386d6377fb57 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "46bb221a477d3386de98162c6397e7bb862ef262",
+  "prompts": {
+    "b877386d6377fb57": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a15501ba-c2af-44a6-9f3a-6509419ab22d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 339,
+      "total_deletions": 41,
+      "accepted_lines": 320,
+      "overriden_lines": 0
+    }
+  }
+}

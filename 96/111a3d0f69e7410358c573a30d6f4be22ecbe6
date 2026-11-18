@@ -1,0 +1,25 @@
+CLAUDE.md
+  1039e9564b4f64d6 79-104
+tests/integration/pipelex/temporal/conftest.py
+  1039e9564b4f64d6 10,16-17,19-20,22,27-29,77-82,84,86,89-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "96111a3d0f69e7410358c573a30d6f4be22ecbe6",
+  "prompts": {
+    "1039e9564b4f64d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d9417c6-49ec-4aa5-acad-3fa1020eb8c4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 17,
+      "accepted_lines": 45,
+      "overriden_lines": 0
+    }
+  }
+}

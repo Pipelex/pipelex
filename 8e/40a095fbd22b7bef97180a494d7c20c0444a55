@@ -1,0 +1,29 @@
+pipelex/libraries/library_manager.py
+  a581ad1579ab0d86 50-51,538,546-547,551,556,568-577,579-584,594
+pipelex/libraries/library_crate_factory.py
+  a581ad1579ab0d86 1-2,9-10,26
+tests/unit/pipelex/libraries/test_library_crate.py
+  a581ad1579ab0d86 51-52,57
+pipelex/libraries/library_crate.py
+  a581ad1579ab0d86 21-22,42-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "8e40a095fbd22b7bef97180a494d7c20c0444a55",
+  "prompts": {
+    "a581ad1579ab0d86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70521990-feaf-4061-83ca-1266feab4a5a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 52,
+      "total_deletions": 77,
+      "accepted_lines": 39,
+      "overriden_lines": 0
+    }
+  }
+}

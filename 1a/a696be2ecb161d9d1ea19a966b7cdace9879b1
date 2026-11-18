@@ -1,0 +1,57 @@
+.claude/skills/release/SKILL.md
+  4e2e25ca0e5d2d74 1-136
+pipelex/cli/agent_cli/commands/doctor_cmd.py
+  8712596ac0e2ba2b 9,14,43-53,95,112,118
+pyproject.toml
+  0cb966ef10e081bc 3
+pipelex/cli/commands/doctor_cmd.py
+  8712596ac0e2ba2b 50-77,414,431,453-461,578,596,739-741,761,868,877
+CHANGELOG.md
+  0cb966ef10e081bc 5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "1aa696be2ecb161d9d1ea19a966b7cdace9879b1",
+  "prompts": {
+    "0cb966ef10e081bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a87333b-0d68-4756-9484-fe1cf20c5f7c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "4e2e25ca0e5d2d74": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b842a03e-767c-467b-8324-57e29119728e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 139,
+      "total_deletions": 3,
+      "accepted_lines": 136,
+      "overriden_lines": 0
+    },
+    "8712596ac0e2ba2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c8534c7-94a1-4f9d-ba72-498c0603df83",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 65,
+      "total_deletions": 6,
+      "accepted_lines": 65,
+      "overriden_lines": 0
+    }
+  }
+}

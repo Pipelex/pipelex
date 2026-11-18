@@ -1,0 +1,23 @@
+.claude/skills/temporal-test-crate/SKILL.md
+  26f765268a0c61c6 29,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "cc757144d4c2d48771a12e5d39d401251bea082d",
+  "prompts": {
+    "26f765268a0c61c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87216057-b86a-4560-9570-b87b2d919937",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

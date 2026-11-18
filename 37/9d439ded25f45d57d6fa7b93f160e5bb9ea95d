@@ -1,0 +1,31 @@
+tests/integration/pipelex/cogt/test_extract.py
+  61383865a35d278b 126-169
+tests/cases/documents.py
+  61383865a35d278b 41-47
+pipelex/cogt/extract/extract_worker_abstract.py
+  61383865a35d278b 42-44
+pipelex/plugins/linkup/linkup_extract_worker.py
+  61383865a35d278b 2,14-40,86,90-96,101
+.pipelex-dev/test_profiles.toml
+  61383865a35d278b 50,221-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "379d439ded25f45d57d6fa7b93f160e5bb9ea95d",
+  "prompts": {
+    "61383865a35d278b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f3c8e27b-86aa-4daa-bc36-bf0d9f61a99c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 109,
+      "total_deletions": 13,
+      "accepted_lines": 96,
+      "overriden_lines": 0
+    }
+  }
+}

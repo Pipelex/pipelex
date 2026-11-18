@@ -1,0 +1,23 @@
+pipelex/builder/pipe/pipe_search_spec.py
+  915de804bf1b339f 5,56-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "ce1129bbe851b49672fa5b2c6b0f261812a0a0f7",
+  "prompts": {
+    "915de804bf1b339f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99e0d3ef-ea90-4470-b05a-7a6a4f0cd4fc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 1,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

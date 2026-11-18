@@ -1,0 +1,32 @@
+.badges/tests.json
+  4a02edfff656ba6f 4
+pyproject.toml
+  4a02edfff656ba6f 3
+CHANGELOG.md
+  4a02edfff656ba6f 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "03706ecee85f6eb406d18d147c6d2731b73553b2",
+  "prompts": {
+    "4a02edfff656ba6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee05fe3d-72d2-41e5-8343-db606d566565",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

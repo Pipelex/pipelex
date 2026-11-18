@@ -1,0 +1,47 @@
+tests/integration/pipelex/deep_flow/async/content_generation/test_tprl_content_generator_child.py
+  7c4f50d14deace07 5-7,14-16
+tests/integration/pipelex/deep_flow/async/content_generation/test_tprl_content_generator_top.py
+  7c4f50d14deace07 8-10,12-17,19,61,65-66,78,82-83,96-97,101-102,116,120-121,135-136,140-141,153-154,156,158-159,161-162,167,169,174,176,182,184-185,187-188,190-193,195-197,202-203,207-208,216-219
+tests/integration/pipelex/deep_flow/async/test_tprl_make_content_generator.py
+  7c4f50d14deace07 1-5,8-14,16,18
+tests/integration/pipelex/deep_flow/test_utils.py
+  7c4f50d14deace07 2-3
+tests/integration/pipelex/deep_flow/async/workflows/conftest.py
+  7c4f50d14deace07 8,22,24,26,28,34-35,39
+tests/integration/pipelex/deep_flow/async/workflows/test_wf_child_crafter.py
+  7c4f50d14deace07 6-7,12,14-15,18,21,25-26
+tests/integration/pipelex/deep_flow/synchro/data_converter/conftest.py
+  7c4f50d14deace07 3
+tests/integration/pipelex/deep_flow/synchro/data_converter/test_data_conv_pydantic.py
+  7c4f50d14deace07 3,7,14
+tests/integration/pipelex/deep_flow/synchro/data_converter/test_data_conv_craft.py
+  7c4f50d14deace07 1-2,6-8,14,20-21,24,41-42,45
+pyproject.toml
+  7c4f50d14deace07 234,255
+tests/integration/pipelex/deep_flow/async/content_generation/conftest.py
+  7c4f50d14deace07 9-16,18,24,28,33,35,38-39,44,50,55,59,61,63,68
+tests/integration/pipelex/deep_flow/synchro/test_tasks.py
+  7c4f50d14deace07 1-2,4-5,9
+Makefile
+  7c4f50d14deace07 30,121-122,143-145,172,183,618-632,945-957
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "7dd362b27f9af868dc66786989c10364bacf4a76",
+  "prompts": {
+    "7c4f50d14deace07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "96d53d0f-9f50-40a7-a61a-7c8304b33f9f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 223,
+      "total_deletions": 155,
+      "accepted_lines": 178,
+      "overriden_lines": 1
+    }
+  }
+}

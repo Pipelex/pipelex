@@ -1,0 +1,27 @@
+tests/e2e/pipelex/pipes/pipe_operators/pipe_search/pipe_search.mthds
+  c291598837144b1a 1-16
+tests/e2e/pipelex/pipes/pipe_operators/pipe_search/test_data.py
+  c291598837144b1a 1-13
+tests/e2e/pipelex/pipes/pipe_operators/pipe_search/test_pipe_search.py
+  c291598837144b1a 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "c97799b81d702435bc1600ff7631bafd05af04ce",
+  "prompts": {
+    "c291598837144b1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe168fdc-dbb7-4a0e-9177-686840ec9cd8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 84,
+      "total_deletions": 0,
+      "accepted_lines": 84,
+      "overriden_lines": 0
+    }
+  }
+}

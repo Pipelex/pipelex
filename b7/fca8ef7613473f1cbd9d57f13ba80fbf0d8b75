@@ -1,0 +1,23 @@
+tests/unit/pipelex/cogt/content_generation/test_content_generator_dry_tz.py
+  2eb900288cc762f1 26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b7fca8ef7613473f1cbd9d57f13ba80fbf0d8b75",
+  "prompts": {
+    "2eb900288cc762f1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b7a7394-d6a7-4094-bd83-cdba7b468875",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+TODOS.md
+  s_b4885031587f23::t_2b4f79e296c76c 38-44
+  s_b4885031587f23::t_80ac27f7b6d9da 75-81
+  s_b4885031587f23::t_90b087827653a7 662
+  s_b4885031587f23::t_47c613f1361b4f 333
+  s_b4885031587f23::t_13c42166ae7606 343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "00fe293c95179c24463a68306be30076da4dae91",
+  "prompts": {},
+  "sessions": {
+    "s_b4885031587f23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ede981f0-f743-462a-844c-3644c51209bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>"
+    }
+  }
+}

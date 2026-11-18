@@ -1,0 +1,45 @@
+pipelex/cli/agent_cli/commands/agent_output.py
+  34bc7e08567ce9be 9,161-179,182-187,189-190,194-201,204-205
+tests/unit/pipelex/cli/test_error_handlers.py
+  34bc7e08567ce9be 1-109
+tests/unit/pipelex/cli/test_agent_output.py
+  34bc7e08567ce9be 11,13,20,266-373
+pipelex/cli/error_handlers.py
+  34bc7e08567ce9be 52,60,73,86,99,109-124,209,219,222
+TODO.md
+  34bc7e08567ce9be 60,66,71
+  381acecb02c652d3 56,58,67-69,72,74-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "c4eabc3eb8d2dd76ab4ef79ae09c9a374a039eb3",
+  "prompts": {
+    "34bc7e08567ce9be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82761a3e-bff6-4759-9a91-df3dc149e65f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 327,
+      "total_deletions": 40,
+      "accepted_lines": 286,
+      "overriden_lines": 1
+    },
+    "381acecb02c652d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d89fc646-49c2-42f3-8090-3a779bc29390",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 15,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

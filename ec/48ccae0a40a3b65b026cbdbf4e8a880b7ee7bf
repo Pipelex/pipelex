@@ -1,0 +1,27 @@
+pipelex/tools/misc/http_utils.py
+  3998b1b9987e4578 46-48
+tests/integration/pipelex/temporal/library_crate/helpers.py
+  3998b1b9987e4578 47-57
+tests/unit/pipelex/tools/misc/test_http_utils.py
+  3998b1b9987e4578 1-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "ec48ccae0a40a3b65b026cbdbf4e8a880b7ee7bf",
+  "prompts": {
+    "3998b1b9987e4578": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64a8913b-3797-470c-a2df-1584b38e0279",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 119,
+      "total_deletions": 24,
+      "accepted_lines": 105,
+      "overriden_lines": 0
+    }
+  }
+}

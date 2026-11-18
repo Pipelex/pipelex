@@ -1,0 +1,38 @@
+pipelex/cli/agent_cli/commands/init_cmd.py
+  9528a1c4073c9d83 127,322
+.claude/skills/release/SKILL.md
+  0cb966ef10e081bc 20-21,78-93,104,106-107,119,151-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "b6429d4bdc33dce4b54e480be2a05c52c7cf525e",
+  "prompts": {
+    "0cb966ef10e081bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a87333b-0d68-4756-9484-fe1cf20c5f7c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 8,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    },
+    "9528a1c4073c9d83": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91b350c7-98d4-46a4-ac41-31864754959a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 4,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

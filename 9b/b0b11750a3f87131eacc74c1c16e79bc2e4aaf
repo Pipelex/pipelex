@@ -1,0 +1,45 @@
+tests/conftest.py
+  078b6ff304c94013 3,24-25,60,95-96
+pipelex/cogt/model_backends/backend_factory.py
+  078b6ff304c94013 51-52
+pipelex/system/telemetry/telemetry_manager_abstract.py
+  078b6ff304c94013 3,11-12,31,121,202
+pipelex/plugins/anthropic/anthropic_factory.py
+  078b6ff304c94013 22-23,168,195,197-198
+pipelex/system/telemetry/telemetry_factory.py
+  078b6ff304c94013 50-51
+pipelex/cogt/content_generation/content_generator.py
+  078b6ff304c94013 323-324
+pipelex/cogt/img_gen/img_gen_worker_factory.py
+  078b6ff304c94013 124-125,198-199
+pipelex/plugins/mistral/mistral_factory.py
+  078b6ff304c94013 4,21-23,123,129-138
+pipelex/plugins/gateway/gateway_completions_factory.py
+  078b6ff304c94013 28-29,46-54,106-107
+pipelex/plugins/portkey/portkey_completions_factory.py
+  078b6ff304c94013 20-22,37-45,97-98
+pipelex/plugins/openai/openai_completions_factory.py
+  078b6ff304c94013 1,16-18,29,31-41,97
+pipelex/hub.py
+  078b6ff304c94013 5,44-46,379
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "9bb0b11750a3f87131eacc74c1c16e79bc2e4aaf",
+  "prompts": {
+    "078b6ff304c94013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c6b09de-0d43-4ac0-a56b-e692df74bc0a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 72,
+      "accepted_lines": 97,
+      "overriden_lines": 0
+    }
+  }
+}

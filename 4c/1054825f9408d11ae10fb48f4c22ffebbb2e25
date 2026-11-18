@@ -1,0 +1,37 @@
+.pipelex/inference/backends/bedrock.toml
+  0925acbdbd77d3ab 128-129,131-137
+.pipelex-dev/test_profiles.toml
+  0925acbdbd77d3ab 69
+.vscode/launch.json
+  0925acbdbd77d3ab 103
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  0925acbdbd77d3ab 31,36
+.pipelex/inference/backends/anthropic.toml
+  0925acbdbd77d3ab 104-112
+pipelex/pipe_operators/pipe_operator.py
+  0925acbdbd77d3ab 48-50
+pipelex/kit/configs/inference/backends/anthropic.toml
+  0925acbdbd77d3ab 104-112
+pipelex/kit/configs/inference/backends/bedrock.toml
+  0925acbdbd77d3ab 128-129,131-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4c1054825f9408d11ae10fb48f4c22ffebbb2e25",
+  "prompts": {
+    "0925acbdbd77d3ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fea5b1b3-ed55-4a2f-a57a-aee5874e61d0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 4,
+      "accepted_lines": 43,
+      "overriden_lines": 2
+    }
+  }
+}

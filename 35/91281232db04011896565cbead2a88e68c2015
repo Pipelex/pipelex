@@ -1,0 +1,101 @@
+pipelex/plugins/gateway/gateway_extract_worker.py
+  dd57a7badf9ff60d 154,156,218,220
+tests/unit/pipelex/plugins/google/test_data.py
+  dd57a7badf9ff60d 1-85
+tests/unit/pipelex/plugins/google/test_google_worker_error_handling.py
+  dd57a7badf9ff60d 1-229
+pipelex/plugins/azure_rest/azure_img_gen_worker.py
+  dd57a7badf9ff60d 4,91-137
+tests/unit/pipelex/plugins/bedrock/test_bedrock_worker_error_handling.py
+  dd57a7badf9ff60d 1-160
+tests/unit/pipelex/plugins/huggingface/test_hf_worker_error_handling.py
+  dd57a7badf9ff60d 1-143
+tests/unit/pipelex/plugins/linkup/test_linkup_worker_error_handling.py
+  dd57a7badf9ff60d 1-168
+pipelex/plugins/pypdfium2/pypdfium2_worker.py
+  dd57a7badf9ff60d 7,82-86,88-101
+tests/unit/pipelex/plugins/bedrock/test_data.py
+  dd57a7badf9ff60d 1-64
+tests/unit/pipelex/plugins/linkup/test_data.py
+  dd57a7badf9ff60d 1-157
+pipelex/plugins/google/google_llm_worker.py
+  dd57a7badf9ff60d 11-16,107-152,261-271,301-323
+tests/unit/pipelex/plugins/gateway/test_data.py
+  dd57a7badf9ff60d 1-86
+pipelex/plugins/bedrock/bedrock_llm_worker.py
+  dd57a7badf9ff60d 3,7-11,70-120
+tests/unit/pipelex/plugins/mistral/test_mistral_worker_error_handling.py
+  dd57a7badf9ff60d 1-204
+tests/unit/pipelex/plugins/docling/test_data.py
+  dd57a7badf9ff60d 1-43
+pipelex/cogt/inference/error_classification.py
+  dd57a7badf9ff60d 9-15,36-59,74-107
+tests/unit/pipelex/plugins/gateway/test_gateway_quota_detection.py
+  dd57a7badf9ff60d 1-227,229-244
+tests/unit/pipelex/plugins/azure_rest/test_azure_worker_error_handling.py
+  dd57a7badf9ff60d 1-185
+TODO.md
+  dd57a7badf9ff60d 136-137,139-140,142,145-146,150,153,155,162,164,168-169,172-173,176,178,180-182,184,186,188,190-192,194
+pipelex/plugins/fal/fal_img_gen_worker.py
+  dd57a7badf9ff60d 4-5,9,51-55,57-65,67-104
+pipelex/plugins/huggingface/huggingface_img_gen_worker.py
+  dd57a7badf9ff60d 4,9,49-79
+tests/unit/pipelex/plugins/pypdfium2/test_data.py
+  dd57a7badf9ff60d 1-43
+tests/unit/pipelex/cogt/test_error_classification.py
+  dd57a7badf9ff60d 10-13,40-78,118-149
+pipelex/plugins/docling/docling_extract_worker.py
+  dd57a7badf9ff60d 10,92-107
+pipelex/cogt/exceptions.py
+  dd57a7badf9ff60d 282-285
+pipelex/plugins/linkup/linkup_extract_worker.py
+  dd57a7badf9ff60d 3-16,19,59-98
+pipelex/plugins/gateway/gateway_img_gen_worker.py
+  dd57a7badf9ff60d 83,85
+pipelex/plugins/mistral/mistral_extract_worker.py
+  dd57a7badf9ff60d 3,6,12-16,63-109,115-121,146-155
+pipelex/plugins/gateway/gateway_search_worker.py
+  dd57a7badf9ff60d 183,185
+pipelex/plugins/google/google_img_gen_worker.py
+  dd57a7badf9ff60d 11,16-20,90-132,160-170
+pipelex/plugins/mistral/mistral_llm_worker.py
+  dd57a7badf9ff60d 9-14,63-110,162-172,217-236
+pipelex/plugins/linkup/linkup_search_worker.py
+  dd57a7badf9ff60d 4-14,17-18,41-75,90-112,145-168
+tests/unit/pipelex/plugins/mistral/test_data.py
+  dd57a7badf9ff60d 1-144
+tests/unit/pipelex/plugins/huggingface/test_data.py
+  dd57a7badf9ff60d 1-72
+tests/unit/pipelex/plugins/docling/test_docling_worker_error_handling.py
+  dd57a7badf9ff60d 1-60,62-77,79-107,109-120
+tests/unit/pipelex/plugins/pypdfium2/test_pypdfium2_worker_error_handling.py
+  dd57a7badf9ff60d 1-31,33-63,65-89,91-114,116-128
+tests/unit/pipelex/plugins/fal/test_data.py
+  dd57a7badf9ff60d 1-81
+tests/unit/pipelex/plugins/azure_rest/test_data.py
+  dd57a7badf9ff60d 1-73
+pipelex/plugins/gateway/gateway_factory.py
+  dd57a7badf9ff60d 13,121-145
+tests/unit/pipelex/plugins/fal/test_fal_worker_error_handling.py
+  dd57a7badf9ff60d 1-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "3591281232db04011896565cbead2a88e68c2015",
+  "prompts": {
+    "dd57a7badf9ff60d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d97d98a0-4ccd-44c7-8cc3-9734fda4b458",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 3800,
+      "total_deletions": 422,
+      "accepted_lines": 3530,
+      "overriden_lines": 8
+    }
+  }
+}

@@ -1,0 +1,91 @@
+pipelex/cogt/extract/extract_job.py
+  cc31c6e8a01dd662 7,9,22,28-34
+pipelex/cogt/extract/extract_report.py
+  cc31c6e8a01dd662 1-72
+pipelex/reporting/reporting_manager.py
+  cc31c6e8a01dd662 8-9,25,95-108,127-128
+pipelex/cogt/usage/cost_registry.py
+  cc31c6e8a01dd662 12,21-22,80,82-83,225-234
+pipelex/plugins/gateway/gateway_completions_factory.py
+  fabd95cc7aff0600 3,138-167,173-179
+pipelex/cogt/extract/extract_job_components.py
+  cc31c6e8a01dd662 3,48
+pipelex/cogt/extract/extract_worker_abstract.py
+  cc31c6e8a01dd662 12,82,87-89,92-93
+  99476fd285e2f69d 90
+  4ca8a731ff5f048c 91
+pipelex/plugins/gateway/gateway_extract_worker.py
+  e3c4545920c51539 116-124,129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "ac791d3b16e578912ef84857db52f1b8c1c31f70",
+  "prompts": {
+    "4ca8a731ff5f048c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8796b3a-2907-4500-8c4c-8e6d2833d3ef",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 67,
+      "total_deletions": 0,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    },
+    "99476fd285e2f69d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b515b01-85a2-41bb-a27c-208778e80bf9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "cc31c6e8a01dd662": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "257bde07-dafd-4e97-b5bf-56c7bb27d605",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 130,
+      "total_deletions": 8,
+      "accepted_lines": 127,
+      "overriden_lines": 0
+    },
+    "e3c4545920c51539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e49cd1e-5b24-4d0d-953d-e674e21fd447",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 23,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    },
+    "fabd95cc7aff0600": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a211fb2-c544-4750-8588-22c803b50a05",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 47,
+      "total_deletions": 11,
+      "accepted_lines": 39,
+      "overriden_lines": 0
+    }
+  }
+}

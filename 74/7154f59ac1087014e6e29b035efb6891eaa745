@@ -1,0 +1,25 @@
+pipelex/cli/dev_cli/commands/check_urls_cmd.py
+  d9b782b1ec2f46c3 29-34,83,183-184
+CLAUDE.md
+  d9b782b1ec2f46c3 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "747154f59ac1087014e6e29b035efb6891eaa745",
+  "prompts": {
+    "d9b782b1ec2f46c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b1c581d2-2f4a-46d5-b68c-edcb3c50302d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 2,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

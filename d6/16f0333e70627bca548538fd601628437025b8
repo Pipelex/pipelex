@@ -1,0 +1,25 @@
+.pipelex/inference/backends/linkup.toml
+  891e7edf1120a1e6 30,36
+pipelex/kit/configs/inference/backends/linkup.toml
+  891e7edf1120a1e6 30,36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "d616f0333e70627bca548538fd601628437025b8",
+  "prompts": {
+    "891e7edf1120a1e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9702316-ca56-48b2-bd90-a8859e9699a5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

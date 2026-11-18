@@ -1,0 +1,23 @@
+pipelex/kit/agent_rules/pipelex_standards.md
+  ee81d8d14b67dbdb 3-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "c6ae2de4425cc94f7a541e04f848c3b386c30969",
+  "prompts": {
+    "ee81d8d14b67dbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4093cd66-ce1f-4d03-8eaf-883ade6705e5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}

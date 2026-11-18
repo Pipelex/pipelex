@@ -1,0 +1,29 @@
+pipelex/deep_flow/deep_flow_hub.py
+  7c4f50d14deace07 18-20
+tests/integration/pipelex/deep_flow/async/workflows/test_wf_child_crafter.py
+  7c4f50d14deace07 7,22-24
+pipelex/deep_flow/config_deep_flow.py
+  7c4f50d14deace07 2,11-12,98,104-105,120,158
+tests/integration/pipelex/deep_flow/conftest.py
+  7c4f50d14deace07 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "e416806798055488704a76e6a3a7220de8900788",
+  "prompts": {
+    "7c4f50d14deace07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "96d53d0f-9f50-40a7-a61a-7c8304b33f9f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 86,
+      "total_deletions": 53,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    }
+  }
+}

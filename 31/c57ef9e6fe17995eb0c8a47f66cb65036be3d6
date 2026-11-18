@@ -1,0 +1,32 @@
+tests/unit/pipelex/pipe_operators/pipe_compose/test_composer_field_resolutions.py
+  4fad0ff61016cd3b 1-95
+pipelex/pipe_operators/compose/structured_content_composer.py
+  4fad0ff61016cd3b 63-66,134,143-145
+pipelex/pipe_operators/compose/pipe_compose.py
+  4fad0ff61016cd3b 275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "31c57ef9e6fe17995eb0c8a47f66cb65036be3d6",
+  "prompts": {
+    "4fad0ff61016cd3b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ef1749c-bc13-44f3-95f8-7fd9996b503c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 135,
+      "total_deletions": 69,
+      "accepted_lines": 106,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

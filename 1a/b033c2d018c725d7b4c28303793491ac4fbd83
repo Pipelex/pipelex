@@ -1,0 +1,27 @@
+tests/integration/pipelex/temporal/async/library_crate/test_wf_library_crate.py
+  165e45defbe250c0 5,57-70
+tests/integration/pipelex/temporal/async/workflows/conftest.py
+  165e45defbe250c0 2
+tests/integration/pipelex/temporal/async/conftest.py
+  165e45defbe250c0 1-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "1ab033c2d018c725d7b4c28303793491ac4fbd83",
+  "prompts": {
+    "165e45defbe250c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7586e315-5bf7-4a57-8f4c-4cade56b655d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 60,
+      "overriden_lines": 0
+    }
+  }
+}

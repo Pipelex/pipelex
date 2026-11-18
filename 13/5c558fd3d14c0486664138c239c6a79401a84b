@@ -1,0 +1,35 @@
+tests/unit/pipelex/tracing/test_ndjson_event_log.py
+  4a8b7264f53e5a7f 1-167
+pipelex/tracing/in_memory_event_log.py
+  4a8b7264f53e5a7f 1-47
+TODOS.md
+  4a8b7264f53e5a7f 185-198
+pipelex/tracing/event_log_protocol.py
+  4a8b7264f53e5a7f 1-44
+pipelex/tracing/ndjson_event_log.py
+  4a8b7264f53e5a7f 1-129
+tests/unit/pipelex/tracing/test_in_memory_event_log.py
+  4a8b7264f53e5a7f 1-71
+tests/unit/pipelex/tracing/conftest.py
+  4a8b7264f53e5a7f 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "135c558fd3d14c0486664138c239c6a79401a84b",
+  "prompts": {
+    "4a8b7264f53e5a7f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88836557-35fc-416f-a7ee-db0c42c1c913",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 588,
+      "total_deletions": 103,
+      "accepted_lines": 496,
+      "overriden_lines": 0
+    }
+  }
+}

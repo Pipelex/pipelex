@@ -1,0 +1,23 @@
+tests/unit/pipelex/core/stuffs/document_content/test_data.py
+  84f953a1ea6a65f4 9,26,35,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "27c05bedbbc50730f98617abb916d79a15aeae3b",
+  "prompts": {
+    "84f953a1ea6a65f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e4e57af-0601-47f5-a5c8-9de3ce58dad7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

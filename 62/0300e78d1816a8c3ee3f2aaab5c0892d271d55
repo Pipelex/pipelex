@@ -1,0 +1,23 @@
+.pipelex-dev/test_profiles.toml
+  6f51ac2b796910cb 356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "620300e78d1816a8c3ee3f2aaab5c0892d271d55",
+  "prompts": {
+    "6f51ac2b796910cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bbec395-82d5-459c-9d69-b7a99b739651",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

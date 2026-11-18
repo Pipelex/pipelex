@@ -1,0 +1,23 @@
+pipelex/libraries/pipe/pipe_library.py
+  d9e67dd5f2793c80 82-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "e10bc534e2c75027dc91ad1e183d4d787c9cc5aa",
+  "prompts": {
+    "d9e67dd5f2793c80": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1143f96-7e6c-46ca-8261-4b170738cf84",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,55 @@
+pipelex/libraries/library_manager.py
+  87701f3df85b7583 99-101,125-127,134-136,197-208,365-367,378,380-387,449,458-461
+tests/unit/pipelex/libraries/test_library_crate_accumulation.py
+  87701f3df85b7583 1-113
+pipelex/pipe_run/pipe_job.py
+  87701f3df85b7583 5,16
+pipelex/libraries/library_manager_abstract.py
+  87701f3df85b7583 51-62
+pipelex/pipe_run/pipe_job_factory.py
+  87701f3df85b7583 4,20,31
+pipelex/pipe_controllers/sequence/pipe_sequence.py
+  87701f3df85b7583 1,23-25,184,199,214,221
+pipelex/pipe_controllers/parallel/pipe_parallel.py
+  87701f3df85b7583 33,141,156,226,246
+pipelex/pipeline/runner.py
+  87701f3df85b7583 198
+pipelex/pipe_controllers/sub_pipe.py
+  87701f3df85b7583 1,24-26,40,186,202,236
+pipelex/pipe_run/pipe_router.py
+  87701f3df85b7583 24
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  87701f3df85b7583 12,33-42,49,55-58
+pipelex/pipe_controllers/batch/pipe_batch.py
+  87701f3df85b7583 23,103,169,225,232
+pipelex/pipeline/pipeline_run_setup.py
+  87701f3df85b7583 293-295,302
+pipelex/pipe_operators/pipe_operator.py
+  87701f3df85b7583 17,37,86
+pipelex/core/pipes/pipe_abstract.py
+  87701f3df85b7583 41,384,441,449,504,554,574,582,593,604
+pipelex/pipe_controllers/pipe_controller.py
+  87701f3df85b7583 2,12-13,39,45,56,63,74,85
+pipelex/pipe_controllers/condition/pipe_condition.py
+  87701f3df85b7583 1,24-26,230,268,279,319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "4b0c53d58d4b4ede8d4c2fd3a84a6ca3c3804df6",
+  "prompts": {
+    "87701f3df85b7583": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7cbcaa37-2d71-401b-b58b-ae0627b1dfb0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 325,
+      "total_deletions": 89,
+      "accepted_lines": 248,
+      "overriden_lines": 6
+    }
+  }
+}

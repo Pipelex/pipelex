@@ -1,0 +1,37 @@
+pipelex/pipelex.toml
+  c7b3964886a15fc7 8,10,14,17,23
+tests/pipelex_unit_test.toml
+  c7b3964886a15fc7 2
+pipelex/system/configuration/configs.py
+  c7b3964886a15fc7 15,164
+pipelex/tools/storage/storage_config.py
+  c7b3964886a15fc7 164
+.pipelex/pipelex.toml
+  c7b3964886a15fc7 85,90,94,101
+tests/integration/pipelex/fixtures/generator_fixtures.py
+  c7b3964886a15fc7 23
+pipelex/kit/configs/pipelex.toml
+  c7b3964886a15fc7 85,90,94,101
+pipelex/pipelex.py
+  c7b3964886a15fc7 248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "abd0a555a3ee5a2736a4ddbb33126ab61ed46717",
+  "prompts": {
+    "c7b3964886a15fc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "920e9377-e65b-4915-9fdd-0c41223f0229",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 56,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}

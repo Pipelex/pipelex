@@ -1,0 +1,39 @@
+mkdocs.yml
+  8b009ad538ade95d 201,206,223,259,268,276,286,293,300,322,330
+docs/stylesheets/general.css
+  ca5d88228c9c4812 82-93
+  8b009ad538ade95d 17-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "54aa1833b11ba38f5327abe8debe06b967a8f8a4",
+  "prompts": {
+    "8b009ad538ade95d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0c904f28-7433-4a1c-985e-19f1237693e0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 15,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    },
+    "ca5d88228c9c4812": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22594cd0-4016-4791-b173-b848063fbb34",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}

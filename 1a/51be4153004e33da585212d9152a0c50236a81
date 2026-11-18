@@ -1,0 +1,23 @@
+pipelex/cli/dev_cli/commands/check_urls_cmd.py
+  205749470ebf886c 26-28,77,173,175-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1a51be4153004e33da585212d9152a0c50236a81",
+  "prompts": {
+    "205749470ebf886c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bca10068-11ed-4235-abd4-168db5c85ffd",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 4,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

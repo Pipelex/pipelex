@@ -1,0 +1,30 @@
+pipelex/pipe_run/delivery_executor.py
+  c9b73a808efc3b29 4,28-34,58,73,76-79,87-90,101-102,112-113,143-144,152-153,157,159-164,166,173-176,181-203,221,223
+tests/unit/pipelex/pipe_run/test_delivery_executor.py
+  c9b73a808efc3b29 240,251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8cefe15a913fac19bbb3cf7b0b5695540e54d8ff",
+  "prompts": {
+    "c9b73a808efc3b29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55ad9135-bd5e-446d-b8f1-48ed05e8e4dc",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 90,
+      "total_deletions": 92,
+      "accepted_lines": 65,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

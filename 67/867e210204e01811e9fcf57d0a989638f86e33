@@ -1,0 +1,23 @@
+CHANGELOG.md
+  911fc7452dcf96c4 18-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "67867e210204e01811e9fcf57d0a989638f86e33",
+  "prompts": {
+    "911fc7452dcf96c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "121f279f-642c-4d69-afe4-689a67de0512",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 5,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

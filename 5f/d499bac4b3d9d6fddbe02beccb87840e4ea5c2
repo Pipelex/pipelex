@@ -1,0 +1,23 @@
+tests/integration/pipelex/temporal/library_crate/conftest.py
+  c4dd81d3144d6028 37-38,40-42,44-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "5fd499bac4b3d9d6fddbe02beccb87840e4ea5c2",
+  "prompts": {
+    "c4dd81d3144d6028": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1027482b-0cbf-4a1d-a0f5-3cb2c5ab0d09",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 11,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}

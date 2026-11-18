@@ -1,0 +1,62 @@
+tests/integration/pipelex/temporal/library_crate/conftest.py
+  fc6c6705decd6528 9,37,43,55,65,78,88,101,111
+  3ee5d4d0d7e42d52 53,58,63,68,76,81,86,91,99,104,109,114
+pipelex/test_extras/shared_pytest_plugins.py
+  3ee5d4d0d7e42d52 127
+tests/integration/pipelex/fixtures/pipe_job_helpers.py
+  fc6c6705decd6528 1-67
+pipelex/temporal/tprl_content_generation/content_generator_top_factory.py
+  3ee5d4d0d7e42d52 3,21,32-33
+tests/integration/pipelex/temporal/library_crate/test_wf_deferred_hydration.py
+  fc6c6705decd6528 20,27-30
+.claude/skills/temporal-test-crate/SKILL.md
+  c7e46a49c8456083 3,10,12,14,16,18,20,23-24,26-39,42,44-50,52-54,58-61,64,66,68,72-77,79-88,119-123
+tests/integration/pipelex/temporal/content_generation/conftest.py
+  3ee5d4d0d7e42d52 1-2,10,23-31,44-45,51-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "63c127196aa6a92ff0a50e8dce7a5841f0a735ec",
+  "prompts": {
+    "3ee5d4d0d7e42d52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "914a070b-159b-41c5-bedc-99144e2effe4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 62,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "c7e46a49c8456083": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec45069-9607-4b16-a4f6-eef7a00d7b26",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 70,
+      "total_deletions": 79,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    },
+    "fc6c6705decd6528": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acf8928b-b9f5-450c-969e-fd5630d20d9e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 83,
+      "total_deletions": 110,
+      "accepted_lines": 81,
+      "overriden_lines": 0
+    }
+  }
+}

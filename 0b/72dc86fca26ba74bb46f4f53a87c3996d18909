@@ -1,0 +1,35 @@
+docs/tools/cli/init.md
+  75cda66cf6cb4fa2 124
+mkdocs.yml
+  75cda66cf6cb4fa2 99,101-102,104-106,206,334
+docs/configuration/config-technical/inference-backend-config.md
+  75cda66cf6cb4fa2 661
+docs/get-started/index.md
+  75cda66cf6cb4fa2 25,65-66
+docs/get-started/configure-ai-providers.md
+  75cda66cf6cb4fa2 1-175
+docs/tools/cli/index.md
+  75cda66cf6cb4fa2 55
+docs/features/gateway.md
+  75cda66cf6cb4fa2 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "0b72dc86fca26ba74bb46f4f53a87c3996d18909",
+  "prompts": {
+    "75cda66cf6cb4fa2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9a25e7c-bd37-4ba0-b894-873696140c1f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 190,
+      "total_deletions": 13,
+      "accepted_lines": 190,
+      "overriden_lines": 0
+    }
+  }
+}

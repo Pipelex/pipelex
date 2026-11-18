@@ -1,0 +1,44 @@
+pipelex/temporal/codec/codec_server_cli.py
+  a8a3a75b2e9f2f63 31
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  a8a3a75b2e9f2f63 172-234
+tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py
+  a8a3a75b2e9f2f63 9,124
+pipelex/temporal/codec/storage_payload_codec.py
+  a8a3a75b2e9f2f63 42
+pipelex/temporal/codec/codec_server.py
+  a8a3a75b2e9f2f63 58-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "b138a0983d7514ecf7b661a7c212d3b375bf06e5",
+  "prompts": {
+    "a8a3a75b2e9f2f63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20537641-4cb3-4afe-a4c4-44ebb8a613f8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 165,
+      "total_deletions": 89,
+      "accepted_lines": 81,
+      "overriden_lines": 0
+    },
+    "dc73a54e0dc3c25b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e7a88388-fe76-4d87-bd6c-848100590896",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

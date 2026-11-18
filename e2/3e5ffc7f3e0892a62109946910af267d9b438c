@@ -1,0 +1,114 @@
+.claude/skills/temporal-e2e-validate/SKILL.md
+  1522346872b0101e 175-179,186,202,205-209,211-212,214,222-226,230,235
+  d83162bfff056dbe 83-86,188-191,193-201,203-204,216-218,221
+pipelex/temporal/tprl_content_generation/act_llm_generate.py
+  782e1abf445490d1 7,19-23,25-30,36-40,42-47
+  e1d0598d6f4e5b7b 24,41
+wip/tier2-live-registry-propagation-v3.md
+  1522346872b0101e 1-184
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  1522346872b0101e 15,45-47,143
+pipelex/temporal/tprl_content_generation/wf_make_object.py
+  1522346872b0101e 17,34-35,37-42,54-57,71-72,74-78,90-92,107-108,110-114,147-149,164-165,167-171,204-206
+  782e1abf445490d1 131,188
+pipelex/cogt/content_generation/assignment_models.py
+  1522346872b0101e 17,89,95,107,115
+pipelex/temporal/tprl_content_generation/content_generator_top.py
+  1522346872b0101e 111,155,191,236
+pipelex/temporal/tprl/workflow_library_setup.py
+  d83162bfff056dbe 1-4,10-22,25-37,72-84,97-98
+  1522346872b0101e 5-9,23-24,38-71,85-96,99-101
+pipelex/libraries/library_manager.py
+  d83162bfff056dbe 217-227
+  1522346872b0101e 461
+CLAUDE.md
+  1522346872b0101e 119-153,155,157-158,160
+  d83162bfff056dbe 154,156,159
+pipelex/temporal/temporal_data_converter.py
+  d83162bfff056dbe 28,31,33-35,49,79-105,109
+pipelex/hub.py
+  1522346872b0101e 29,489-505
+tests/unit/pipelex/cogt/content_generation/test_assignment_models_library_crate.py
+  1522346872b0101e 1-149
+wip/tier2-activity-level-library-setup.md
+  d83162bfff056dbe 3,63-69,93,95,97-120,123-125,130-131,139,153,160,170
+  782e1abf445490d1 1-2,4-62,70-92,94,96,121-122,126-129,132-138,140-152,154-159,161-169,171-177
+wip/tier2-live-registry-propagation-v2.md
+  c78231badd529af5 1-238
+pipelex/libraries/library_manager_abstract.py
+  d83162bfff056dbe 72-80
+pipelex/temporal/tprl_content_generation/content_generator_child.py
+  1522346872b0101e 139,189,231,282
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "e23e5ffc7f3e0892a62109946910af267d9b438c",
+  "prompts": {
+    "1522346872b0101e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e3f83ad-8dd1-4b03-93b5-912a803236e8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 620,
+      "total_deletions": 108,
+      "accepted_lines": 532,
+      "overriden_lines": 0
+    },
+    "782e1abf445490d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c8a3c563-4bc0-4b5b-b825-544b03655d8d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 174,
+      "total_deletions": 7,
+      "accepted_lines": 159,
+      "overriden_lines": 1
+    },
+    "c78231badd529af5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c5409b9-51b0-4087-b93d-5b0c97f0e293",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 508,
+      "total_deletions": 270,
+      "accepted_lines": 238,
+      "overriden_lines": 0
+    },
+    "d83162bfff056dbe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fbe63175-a803-4ff3-acf9-8bc173a7703b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 188,
+      "total_deletions": 43,
+      "accepted_lines": 169,
+      "overriden_lines": 0
+    },
+    "e1d0598d6f4e5b7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "94aadd20-a832-48de-9ffd-b0e43f54686d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

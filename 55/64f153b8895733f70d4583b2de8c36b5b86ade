@@ -1,0 +1,69 @@
+pipelex/deep_flow/deep_flow_hub.py
+  6f2a2316dc4b85bb 22-23
+pipelex/deep_flow/tprl_content_generation/content_generator_child.py
+  6f2a2316dc4b85bb 106-107,147-148,196-197,279-280,317-318,325-326,367-368,434-435
+pipelex/deep_flow/worker_cli.py
+  6f2a2316dc4b85bb 46-47,50-52
+pipelex/deep_flow/tprl_content_generation/content_generator_child_factory.py
+  6f2a2316dc4b85bb 22
+pipelex/deep_flow/temporal_connect.py
+  6f2a2316dc4b85bb 25-26,31-32,65-66,78-79
+pipelex/deep_flow/tprl_content_generation/wf_make_jinja2_text.py
+  6f2a2316dc4b85bb 47-48
+pipelex/deep_flow/tprl_content_generation/wf_make_ocr.py
+  6f2a2316dc4b85bb 42-43
+pipelex/deep_flow/tprl/workflow_caller.py
+  6f2a2316dc4b85bb 22,76-77,94,110-111,122,138-139,150,166-169,172-173,184,200-203,206-207,228
+pipelex/deep_flow/temporal_manager.py
+  6f2a2316dc4b85bb 25-26,35-36,92-93,104
+pipelex/deep_flow/tprl_content_generation/content_generator_top.py
+  6f2a2316dc4b85bb 18,272-273
+pipelex/deep_flow/config_deep_flow.py
+  6f2a2316dc4b85bb 75-76
+pipelex/deep_flow/tprl_content_generation/content_generator_top_factory.py
+  6f2a2316dc4b85bb 22
+pipelex/deep_flow/deep_flow_manager.py
+  6f2a2316dc4b85bb 149
+pipelex/deep_flow/sandbox_manager.py
+  6f2a2316dc4b85bb 14
+pipelex/deep_flow/log_formatter.py
+  6f2a2316dc4b85bb 46
+pipelex/deep_flow/tprl_content_generation/wf_make_object.py
+  6f2a2316dc4b85bb 62-63,88-89,134-135,180-181
+pipelex/deep_flow/tprl_content_generation/wf_make_images.py
+  6f2a2316dc4b85bb 58-59
+pipelex/deep_flow/tprl_pipe/wf_pipe_router.py
+  6f2a2316dc4b85bb 43-44
+pipelex/deep_flow/tprl_pipe/pipe_router_child.py
+  6f2a2316dc4b85bb 62
+pipelex/deep_flow/tprl_pipe/pipe_router_top.py
+  6f2a2316dc4b85bb 96
+pipelex/deep_flow/tprl_content_generation/wf_make_llm_text.py
+  6f2a2316dc4b85bb 44-45
+pipelex/deep_flow/tprl_content_generation/act_ocr_generate.py
+  6f2a2316dc4b85bb 12
+pipelex/deep_flow/test_extras/wf_test_child_pipe.py
+  6f2a2316dc4b85bb 8,49
+pipelex/deep_flow/temporal_tasks.py
+  6f2a2316dc4b85bb 27-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "5564f153b8895733f70d4583b2de8c36b5b86ade",
+  "prompts": {
+    "6f2a2316dc4b85bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6bd54dc5-7bc3-4de1-88a3-701c922be114",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 97,
+      "total_deletions": 89,
+      "accepted_lines": 97,
+      "overriden_lines": 0
+    }
+  }
+}

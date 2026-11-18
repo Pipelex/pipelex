@@ -1,0 +1,14 @@
+README.md
+  h_ad2a9d0839b83e 66,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "64afb6ca9fe301ea35993852fc02340aa9cfab61",
+  "prompts": {},
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+pipelex/deep_flow/temporal_connect.py
+  a8c600872050950a 11
+pipelex/deep_flow/config_deep_flow.py
+  a8c600872050950a 9-16
+pipelex/system/configuration/configs.py
+  a8c600872050950a 204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "7f92228c91e53ec642196d3944edab0b6dfea332",
+  "prompts": {
+    "a8c600872050950a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cc1079-552b-4c58-b38e-2efae3c0cd5e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 4,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

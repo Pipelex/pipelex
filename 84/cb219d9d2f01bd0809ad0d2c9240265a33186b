@@ -1,0 +1,416 @@
+api/docs/stylesheets/general.css
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-75
+api/.pipelex/inference/backends/minimax.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-77
+api/.pipelex/inference/backends/pipelex_gateway.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-41
+api/pipelex_api/errors.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-130
+api/postman/sample-bundles/fashion_moodboard.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-134
+mkdocs.yml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 375,615
+api/postman/sample-bundles/invalid/unknown_concept.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-10
+api/pipelex_api/bundle.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-243
+api/.pipelex/inference/deck/x_custom_extract_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-40
+api/docs/storage-transport.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-21
+api/tests/unit/test_simple_routes.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-59
+api/pipelex_api/routes/pipelex/__init__.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-21
+api/Makefiles/Makefile_basics.mk
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-489
+api/pipelex_api/routes/pipelex/resolve.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-80
+api/.pipelex/inference/backends/vertexai.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-46
+api/pipelex_api/api.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-21
+api/scripts/export_openapi.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-63
+api/tests/unit/test_openapi_contract.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-255
+CLAUDE.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 7-8,11
+api/.env.example
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-76
+api/postman/sample-bundles/hello_greeting.inputs.json
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-3
+api/tests/unit/test_allow_signatures.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-94
+api/docs/logging.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-84
+api/postman/sample-bundles/draft_with_signature.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-30
+api/pipelex_api/middleware.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-209
+api/.pipelex/inference/backends/bedrock.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-169
+api/.pipelex/inference/deck/4_search_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-42
+api/.pipelex/inference/backends/azure_openai.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-210
+api/.pipelex/inference/backends/openai.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-220
+api/.pipelex/.gitignore
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-9
+api/.pipelex/inference/backends/scaleway.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-68
+api/pipelex_api/openapi_schema.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-83
+api/pipelex_api/routes/pipelex/agent/__init__.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-11
+api/.pipelex/inference/backends.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-131
+api/pipelex_api/security.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-284
+api/tests/unit/test_error_uri.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-35
+api/docker-compose.yml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-19
+api/.pipelex/telemetry.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-92
+api/tests/unit/test_error_responses.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-219
+api/tests/unit/test_method_cache.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-148
+api/docs/error-responses.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-302
+api/docs/CODE_OF_CONDUCT.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-5
+api/.pipelex/inference/backends/pipelex_gateway_models.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-513
+api/pipelex_api/routes/pipelex/tools.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-110
+api/.pipelex/pipelex.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-210
+docs/contribute/keyword-only-arguments.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 119
+api/pipelex_api/limits.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-58
+api/tests/unit/test_api_config.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-106
+api/tests/unit/test_security_no_auth.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-151
+api/tests/unit/_constants.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-384
+api/pipelex_api/main.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-221
+api/.pipelex/inference/backends/fal.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-112
+api/tests/conftest.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-13
+api/.pipelex/inference/backends/pipelex_manifold.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-56
+api/.pipelex/inference/deck/.kit_manifest.json
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-10
+api/pipelex_api/routes/pipelex/agent/pipe_spec.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-58
+api/tests/unit/test_security_verifiers.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-254
+api/tests/unit/test_validate_dispatch.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-175
+pipelex/kit/agent_rules/commands.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 5-6,9
+README.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 196
+api/.pipelex/inference/backends/google.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-158
+api/docs/pipe-validate.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-178
+api/pipelex_api/routes/health.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-24
+api/docs/contributing.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-5
+api/pipelex_api/routes/pipelex/agent/concept.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-59
+api/postman/sample-bundles/invalid/missing_main_pipe.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-13
+api/.pipelex/inference/backends/linkup.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-49
+api/README.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-143
+api/.pipelex/pipelex_service.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-19
+api/docs/index.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-198
+api/tests/unit/test_codegen_route.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-155
+api/.pipelex/inference/backends/huggingface.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-44
+api/tests/unit/test_problem_document.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-152
+.pipelex/plxt.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 27-37
+api/tests/unit/test_method_ref_run.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-207
+api/.pipelex/inference/backends/openrouter.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-2263
+api/tests/unit/test_analytics_groups_extras.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-164
+api/tests/unit/test_validate_caller_identity.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-232
+api/CHANGELOG.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-862
+api/tests/unit/test_read_scope_extras.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-163
+api/tests/unit/test_user_id_safety.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-48
+api/postman/sample-bundles/batch_candidate_screening.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-146
+api/docs/changelog.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-5
+api/tests/unit/test_run_refusals.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-149
+api/tests/unit/test_protocol_parity.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-133
+api/pipelex_api/routes/pipelex/crate_ops.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-331
+api/pipelex_api/routes/pipelex/build/runner.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-235
+api/CLAUDE.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-240
+api/.gitignore
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-63
+api/.pipelex/inference/backends/blackboxai.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-165
+api/docs/license.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-11
+api/.pipelex/inference/backends/ollama.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-63
+api/pipelex_api/error_types.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-80
+api/pyproject.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-393
+api/.claude/commands/update-postman.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-309
+api/pipelex_api/routes/pipelex/build/__init__.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-11
+api/postman/sample-bundles/invalid/missing_pipe_ref.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-20
+api/tests/unit/test_disclosure.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-38
+api/postman/sample-bundles/hello_greeting.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-10
+.worktreeinclude
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 10-13
+api/.pipelex/inference/routing_profiles.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-168
+api/postman/sample-bundles/README.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-30
+api/pipelex_api/routes/pipelex/validate.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-472
+api/tests/unit/test_execute_dispatch.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-374
+api/tests/unit/test_validate_envelope.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-90
+api/pipelex_api/exception_handlers.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-669
+api/scripts/sync_vendored_kit.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-330
+api/pipelex_api/method_source.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-215
+api/tests/unit/test_start_dispatch.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-112
+docs/contribute/api-server.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-50
+api/pipelex_api/routes/pipelex/agent/models.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-49
+api/pipelex_api/problem_document.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-134
+api/tests/unit/test_validate_errors.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-292
+api/tests/unit/test_request_id_middleware.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-166
+api/.pipelex/inference/backends/xai.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-56
+api/pipelex_api/schemas/models.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-653
+api/pipelex_api/api_config.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-144
+api/pipelex_api/routes/pipelex/pipe_io.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-185
+api/tests/unit/test_resolve_route.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-118
+api/tests/unit/test_run_source_precondition.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-137
+pyproject.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 339-340,525-530
+  s_f3c7cb8c321b75::t_69efd7df69c76d 531
+api/.claude/skills/postman-bundle/SKILL.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-230
+api/.claude/skills/postman-bundle/scripts/build_postman_query.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-890
+CHANGELOG.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 11,19-24
+api/pipelex_api/method_cache.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-241
+api/Makefile
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-50
+api/tests/unit/test_validate_render.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-80
+api/tests/unit/test_orchestration_mode_schema.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-30
+api/tests/unit/test_license_copy.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-20
+api/.pipelex/inference/backends/anthropic.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-186
+api/docs/stylesheets/mermaid.css
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-36
+api/pipelex_api/routes/pipelex/build/output.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-162
+api/pipelex_api/routes/pipelex/codegen.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-163
+api/docs/pipe-io.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-87
+api/pipelex_api/routes/pipelex/utils.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-6
+api/postman/sample-bundles/draft_with_signature.inputs.json
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-3
+api/postman/sample-bundles/invalid/syntax_error.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-2
+api/.pipelex/inference/backends/internal.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-68
+api/.pipelex/inference/deck/2_img_gen_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-56
+api/tests/unit/test_build_routes_envelope.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-427
+api/tests/unit/test_exception_handlers.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-904
+docs/under-the-hood/error-model.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 144
+api/tests/unit/test_protocol_conformance.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-265
+api/tests/unit/test_method_ref_validate.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-81
+api/.claude/settings.json
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-20
+api/pipelex_api/openapi_responses.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-186
+api/tests/unit/test_validate_default_pipe_ref.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-136
+api/tests/unit/test_pipe_io_route.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-472
+api/pipelex_api/routes/version.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-51
+api/Dockerfile
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-77
+api/docs/mthds-tools.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-90
+api/mkdocs.yml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-124
+api/tests/unit/test_validate_graph_target.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-173
+api/.pipelex/inference/deck/x_custom_llm_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-72
+api/tests/unit/test_webhook_recovery.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-193
+api/postman/sample-bundles/cv_job_match.inputs.json
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-4
+api/pipelex_api/error_uri.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-45
+api/tests/unit/test_validate_views.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-165
+api/tests/unit/test_sync_vendored_kit.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-136
+api/postman/sample-bundles/cv_job_match.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-32
+docs/under-the-hood/codegen-projections.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 170
+pipelex/kit/agent_rules/codex_commands.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 10,20
+api/.pipelex/inference/deck/1_llm_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-110
+api/.pipelex/inference/backends/groq.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-130
+AGENTS.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 12,22
+api/postman/sample-bundles/invalid/bad_pipe_type.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-10
+api/Makefiles/Makefile.deploy.api.mk
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-39
+api/tests/unit/test_bundle_materialize.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-182
+api/pipelex_api/disclosure.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-43
+api/docs/pipe-builder.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-184
+api/tests/unit/test_published_run_extras.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-20
+api/tests/unit/test_tools_routes.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-126
+Makefile
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 106,155-157,237,356-359,363-364,910-921,1308
+api/.pipelex/inference/backends/portkey.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-291
+api/.pipelex/plxt.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-120
+api/docs/openapi/pipelex-api.openapi.yaml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-8199
+api/docs/pipe-run.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-791
+api/docs/codegen.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-100
+api/LICENSE
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-95
+api/tests/unit/test_bundle_structures_refusal.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-144
+api/Makefiles/Makefile.local.mk
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-233
+api/postman/sample-bundles/invalid/prompt_input_mismatch.mthds
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-10
+api/docs/configuration.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-275
+api/pipelex_api/routes/pipelex/build/inputs.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-191
+api/.pipelex/inference/backends/.kit_manifest.json
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-6
+api/.pipelex/inference/deck/3_extract_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-48
+api/pipelex_api/routes/pipelex/pipeline.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-946
+.claude/skills/release/SKILL.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 42,66
+.dockerignore
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-48
+api/.pipelex/inference/deck/5_doc_gen_deck.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-41
+api/tests/unit/conftest.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-89
+api/.pipelex/inference/backends/pipelex_gateway_models_plain.md
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-195
+api/tests/unit/test_build_and_agent_routes.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-377
+api/tests/unit/test_pipeline_bundle.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-171
+api/pipelex_api/routes/__init__.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-23
+api/.pipelex/inference/backends/mistral.toml
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-235
+api/tests/unit/test_pipeline_routes.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-495
+api/tests/unit/test_error_log_records.py
+  s_f3c7cb8c321b75::t_ce3ae0233409f1 1-178
+uv.lock
+  s_f3c7cb8c321b75::t_1a0cac30cb3c7d 23-28,1169-1184,1684-1696,1721-1746,3446-3457,3757-3833,4301-4309,5328-5340,5742-5750,5841-5864,5877-5885,5898-5906,5937-5954,5994-6006
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "84cb219d9d2f01bd0809ad0d2c9240265a33186b",
+  "prompts": {},
+  "sessions": {
+    "s_f3c7cb8c321b75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2ef0cfe4-b474-4a78-ba43-f9225122039d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+tests/unit/pipelex/cogt/test_model_choice_not_found_disclosure.py
+  s_ba6d4b8c0392ab::t_617381d40e68e0 1-35
+pipelex/cogt/exceptions.py
+  s_ba6d4b8c0392ab::t_467d1365222fe8 213-217
+docs/under-the-hood/error-model.md
+  s_ba6d4b8c0392ab::t_92d70e051bfd24 574
+CHANGELOG.md
+  s_ba6d4b8c0392ab::t_3915748704178d 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fe5d55bbdfb5a05c342b69d9d6f1c4dee05283ba",
+  "prompts": {},
+  "sessions": {
+    "s_ba6d4b8c0392ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79a9f5ee-48ce-4787-854e-740c37fff5a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "thomashebrard <thomas@pipelex.com>"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+wip/D-master-plan-distributed-execution-v2.md
+  617c1e64279d069c 290,292,294,296-300,304,312
+wip/H-phase2-implementation-plan.md
+  20a8cef22e81f3ae 200-201,246-248,264,310
+  617c1e64279d069c 3,5-6,26,42-45,49,52-53,85,87-88,90-93,98-100,103-104,109,243,245,249,270-271,294-295,311
+wip/I-crate-first-architecture-vision.md
+  617c1e64279d069c 1-242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "bf46448da6e2622551c8dcce23de56faf0bb1c6b",
+  "prompts": {
+    "20a8cef22e81f3ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e6aabb-ddeb-478b-93cc-97d04840c1ca",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 8,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    },
+    "617c1e64279d069c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df60b488-c4ef-4f92-b59d-658ed3a418c8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 287,
+      "total_deletions": 37,
+      "accepted_lines": 286,
+      "overriden_lines": 0
+    }
+  }
+}

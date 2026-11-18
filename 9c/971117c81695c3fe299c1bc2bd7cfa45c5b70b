@@ -1,0 +1,51 @@
+pipelex/core/concepts/helpers.py
+  4813d6e281ec97c0 39,123
+  ab62fccfa92617e2 95-97,104,106
+pipelex/core/concepts/structure_generation/generator.py
+  4813d6e281ec97c0 405
+pipelex/pipeline/pipeline_run_setup.py
+  4813d6e281ec97c0 222
+docs/under-the-hood/temporal-integration.md
+  4813d6e281ec97c0 97
+wip/00-master-plan.md
+  4813d6e281ec97c0 40,406,408,410,412,414,416-449,451,453,455,457,459-482,484,516-521,524
+pipelex/pipeline/runner.py
+  4813d6e281ec97c0 236
+pipelex/core/qualified_ref.py
+  4813d6e281ec97c0 64-73
+TODOS.md
+  4813d6e281ec97c0 720-733
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "9c971117c81695c3fe299c1bc2bd7cfa45c5b70b",
+  "prompts": {
+    "4813d6e281ec97c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f09ba029-c7ef-4f59-9472-e600b3e075e4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 124,
+      "total_deletions": 31,
+      "accepted_lines": 110,
+      "overriden_lines": 0
+    },
+    "ab62fccfa92617e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bcb1a47-9b11-4893-b024-62c95c1fef76",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 3,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

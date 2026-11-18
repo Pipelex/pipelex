@@ -1,0 +1,39 @@
+pipelex/builder/pipe/pipe_extract_spec.py
+  5f8aa25a09f7125a 45-52
+pipelex/cogt/models/model_deck_check.py
+  5f8aa25a09f7125a 1-2,8,10,15-38,50-51,57-58,64-71,77-84,88,100-107,113-120,126-133,139-146,150,162-169,175-182,188-195,201-208,212,224-231,237-244,250-257,263-270
+pipelex/cogt/models/model_suggestion.py
+  5f8aa25a09f7125a 1-113
+pipelex/builder/pipe/pipe_llm_spec.py
+  5f8aa25a09f7125a 3,56-63
+pipelex/builder/pipe/pipe_img_gen_spec.py
+  5f8aa25a09f7125a 3,34-41
+pipelex/cli/agent_cli/commands/check_model_cmd.py
+  5f8aa25a09f7125a 10-14,76,78,90-91,102-103
+pipelex/cli/agent_cli/commands/agent_output.py
+  5f8aa25a09f7125a 21-24,77
+pipelex/cogt/exceptions.py
+  5f8aa25a09f7125a 50-52,58-60,63-71
+pipelex/builder/pipe/pipe_search_spec.py
+  5f8aa25a09f7125a 50-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "0328745ea84c8f4d21388983b4c4999a6cc129f9",
+  "prompts": {
+    "5f8aa25a09f7125a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2899450d-57dc-4ccd-afcd-442f40b06f50",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 335,
+      "total_deletions": 207,
+      "accepted_lines": 325,
+      "overriden_lines": 0
+    }
+  }
+}

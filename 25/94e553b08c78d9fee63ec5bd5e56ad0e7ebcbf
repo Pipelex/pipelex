@@ -1,0 +1,74 @@
+tests/unit/pipelex/test_hub_class_registry.py
+  21b58abc5cbf2ceb 1-83
+pipelex/core/pipes/pipe_factory.py
+  21b58abc5cbf2ceb 110
+pipelex/temporal/tprl_content_generation/wf_make_images.py
+  f96278993e1481b5 3
+pipelex/libraries/library_manager_abstract.py
+  21b58abc5cbf2ceb 5,41-47
+pipelex/hub.py
+  21b58abc5cbf2ceb 382,384-385,387-391
+pipelex/pipe_operators/func/pipe_func.py
+  21b58abc5cbf2ceb 104
+pipelex/temporal/tprl_content_generation/wf_make_object.py
+  f96278993e1481b5 8
+pipelex/libraries/library_manager.py
+  21b58abc5cbf2ceb 6,30,160-167,1142,1173
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  21b58abc5cbf2ceb 6,37,39-43,45,48-49,51-52,55
+pipelex/temporal/tprl_content_generation/wf_make_llm_text.py
+  f96278993e1481b5 3
+pipelex/core/concepts/structure_generation/generator.py
+  21b58abc5cbf2ceb 17-22,593
+pipelex/temporal/tprl_content_generation/wf_make_jinja2_text.py
+  f96278993e1481b5 3
+pipelex/tools/typing/structure_printer.py
+  21b58abc5cbf2ceb 26
+tests/unit/pipelex/tools/test_class_registry_utils.py
+  21b58abc5cbf2ceb 31
+pipelex/temporal/temporal_data_converter.py
+  21b58abc5cbf2ceb 43,77
+tests/unit/pipelex/pipe_run/test_pipe_job_hydration.py
+  21b58abc5cbf2ceb 106-116
+pipelex/temporal/tprl_content_generation/wf_make_extract.py
+  f96278993e1481b5 3
+pipelex/core/concepts/concept_factory.py
+  21b58abc5cbf2ceb 24-29,331,367,413,443
+pipelex/core/concepts/concept.py
+  21b58abc5cbf2ceb 3,26-33,140-141,167,169,179,187
+pipelex/libraries/library.py
+  21b58abc5cbf2ceb 5,39,41-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "2594e553b08c78d9fee63ec5bd5e56ad0e7ebcbf",
+  "prompts": {
+    "21b58abc5cbf2ceb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "133fb1b9-cbb3-45a4-9b60-cbe2957fdd68",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 230,
+      "total_deletions": 76,
+      "accepted_lines": 197,
+      "overriden_lines": 0
+    },
+    "f96278993e1481b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af299ae-c973-46a4-97e4-c038d5fac268",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 21,
+      "total_deletions": 39,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

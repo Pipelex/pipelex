@@ -1,0 +1,25 @@
+tests/unit/pipelex/cli/test_installed_methods.py
+  cd9e3ecb96e85afc 49,55,79,101,105,115,123,129,134,137,139,145,153,158,162,169
+tests/unit/pipelex/cli/test_method_resolver.py
+  cd9e3ecb96e85afc 31,114,131,171,199,224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "b18127dc64cd629cddf3788d2c0d70898c47bb70",
+  "prompts": {
+    "cd9e3ecb96e85afc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87a56631-2a38-4eae-851c-8090e76266ca",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 22,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}

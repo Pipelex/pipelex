@@ -1,0 +1,25 @@
+pipelex/builder/pipe/pipe_design.mthds
+  915de804bf1b339f 238,247
+docs/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md
+  915de804bf1b339f 83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "995d67d35552e9a6831f0b0288001de7fd7e45d4",
+  "prompts": {
+    "915de804bf1b339f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99e0d3ef-ea90-4470-b05a-7a6a4f0cd4fc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

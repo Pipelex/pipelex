@@ -1,0 +1,33 @@
+tests/e2e/pipelex/pipes/pipe_operators/pipe_search/test_pipe_search.py
+  fdd04fc7c45df01d 23,31-32,42
+pipelex/pipe_operators/search/pipe_search_factory.py
+  fdd04fc7c45df01d 5-6,32-34,52
+tests/e2e/pipelex/pipes/pipe_operators/pipe_search/test_data.py
+  fdd04fc7c45df01d 9-10
+pipelex/pipe_operators/search/pipe_search_blueprint.py
+  fdd04fc7c45df01d 7-8,10-13,19,31-60
+tests/e2e/pipelex/pipes/pipe_operators/pipe_search/pipe_search.mthds
+  fdd04fc7c45df01d 13,16,21,24
+pipelex/pipe_operators/search/pipe_search.py
+  fdd04fc7c45df01d 10-11,21,34,50-51,82-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "8d7ca4d91c9cb579d026e1c0bd6bed71b21065b4",
+  "prompts": {
+    "fdd04fc7c45df01d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f2acd8c-9dfc-4ae6-a164-79f6dda27e69",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 68,
+      "total_deletions": 38,
+      "accepted_lines": 64,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,66 @@
+pipelex/pipeline/fix_rules/prune_unused_concepts.py
+  e629f73f164a0508 1-45,48-66,68-130
+wip/validate-fix-strategy.md
+  530e5df40a163221 1-384
+pipelex/pipeline/fix_rules/base.py
+  e629f73f164a0508 1-55
+pipelex/cli/agent_cli/commands/fix_cmd.py
+  e629f73f164a0508 1-16,18-204
+pipelex/pipeline/fix_rules/fix_list_notation.py
+  e629f73f164a0508 1-31,34-90
+pipelex/cli/_cli.py
+  e629f73f164a0508 11,31,182
+pipelex/pipeline/fix_rules/match_sequence_output.py
+  e629f73f164a0508 1-101
+pipelex/cli/commands/fix_cmd.py
+  e629f73f164a0508 1-15,17-125
+pipelex/pipeline/fix_bundle.py
+  e629f73f164a0508 1-255
+pipelex/pipeline/fix_rules/strip_native_concept_redecl.py
+  e629f73f164a0508 1-30,34-61
+pipelex/pipeline/fix_rules/__init__.py
+  e629f73f164a0508 1
+pipelex/pipeline/fix_rules/registry.py
+  e629f73f164a0508 1-38
+pipelex/pipeline/fix_rules/sync_controller_inputs.py
+  e629f73f164a0508 1-6,8-111
+pipelex/cli/agent_cli/_agent_cli.py
+  e629f73f164a0508 14,36,128
+pipelex/pipeline/fix_rules/prune_unreachable.py
+  e629f73f164a0508 1-56,59-86
+pipelex/pipeline/fix_rules/strip_namespace.py
+  e629f73f164a0508 1-52,55-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "d6ebb3ed15eabfc4789e12b4d6266380169d9458",
+  "prompts": {
+    "530e5df40a163221": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2fea0346-82e0-4c82-a2e6-3587086d0b3f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 461,
+      "total_deletions": 77,
+      "accepted_lines": 384,
+      "overriden_lines": 0
+    },
+    "e629f73f164a0508": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d308e6d-9514-4f6c-8e91-085199e9d2b9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1555,
+      "total_deletions": 130,
+      "accepted_lines": 1442,
+      "overriden_lines": 12
+    }
+  }
+}

@@ -1,0 +1,34 @@
+pipelex/temporal/tprl_pipe/wf_pipe_run.py
+  e8163bc12e7b71e9 73-75
+pipelex/pipe_run/pipe_run_protocol.py
+  e8163bc12e7b71e9 26-30
+pipelex/pipe_run/pipe_run.py
+  e8163bc12e7b71e9 9,58-66
+tests/unit/pipelex/pipe_run/test_pipe_run.py
+  e8163bc12e7b71e9 35-36,48,55,80,83,122,125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "d0c570ca57c0e1fd9738493a72e8dfdcc3c5c5a7",
+  "prompts": {
+    "e8163bc12e7b71e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53945697-b95d-431b-ad13-65f186470e78",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 26,
+      "total_deletions": 21,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ad2a9d0839b83e": {
+      "author": "Louis Choquel"
+    }
+  }
+}

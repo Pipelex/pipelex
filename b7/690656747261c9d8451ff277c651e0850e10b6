@@ -1,0 +1,25 @@
+pipelex/temporal/config_temporal.py
+  643b1e1e1074880c 178
+pipelex/temporal/tprl_content_generation/wf_make_llm_text.py
+  643b1e1e1074880c 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b7690656747261c9d8451ff277c651e0850e10b6",
+  "prompts": {
+    "643b1e1e1074880c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "550d0ca5-9ef9-4f60-912c-8e0f8c34ad17",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

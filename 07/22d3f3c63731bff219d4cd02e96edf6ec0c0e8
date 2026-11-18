@@ -1,0 +1,23 @@
+pipelex/cli/commands/init/backends.py
+  347994b85fbc9d09 171-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "0722d3f3c63731bff219d4cd02e96edf6ec0c0e8",
+  "prompts": {
+    "347994b85fbc9d09": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "957ab038-444d-4049-970c-ddabfb1fe8aa",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 4,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}

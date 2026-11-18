@@ -1,0 +1,31 @@
+docs/404.md
+  735d39176c097b5d 4
+docs/contributing.md
+  735d39176c097b5d 3
+docs/CODE_OF_CONDUCT.md
+  735d39176c097b5d 3
+docs/changelog.md
+  735d39176c097b5d 3
+docs/license.md
+  735d39176c097b5d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "04e34a14787f68eee566510ef1f8428eca7b31a6",
+  "prompts": {
+    "735d39176c097b5d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5131ce96-b6e4-46c1-9da1-914c306a65b0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+wip/02-master-plan.md
+  a907a48717f19137 15,17,30,84-100,146,157
+wip/tracing-cost-reporting-as-built.md
+  a907a48717f19137 41,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "d2a5fe7c6cfdcb0caa22b94fca44b5649c636697",
+  "prompts": {
+    "a907a48717f19137": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "27dd6dc2-e4bd-4b1d-84b4-6928e10e02ee",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 1259,
+      "accepted_lines": 24,
+      "overriden_lines": 0
+    }
+  }
+}

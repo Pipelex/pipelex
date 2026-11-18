@@ -1,0 +1,29 @@
+tests/unit/pipelex/core/stuffs/test_image_content_url_validation.py
+  77960d8c8a4872c4 21
+tests/unit/pipelex/tools/misc/test_http_utils.py
+  77960d8c8a4872c4 1-55
+tests/unit/pipelex/core/stuffs/test_document_content_url_validation.py
+  77960d8c8a4872c4 21
+pipelex/tools/misc/http_utils.py
+  77960d8c8a4872c4 58-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "6b5e25393422013e8c212d4114cf9d560d1c6aad",
+  "prompts": {
+    "77960d8c8a4872c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4eb7f49-5fac-437f-9332-f94f27e1b5c3",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 78,
+      "total_deletions": 18,
+      "accepted_lines": 64,
+      "overriden_lines": 0
+    }
+  }
+}

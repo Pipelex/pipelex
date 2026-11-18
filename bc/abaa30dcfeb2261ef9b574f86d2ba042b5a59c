@@ -1,0 +1,40 @@
+CHANGELOG.md
+  6baf6459dcd4c499 3-8
+pyproject.toml
+  6baf6459dcd4c499 3
+pipelex/builder/operations/pipe_ops.py
+  deb0d0be7c21254c 37,39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "bcabaa30dcfeb2261ef9b574f86d2ba042b5a59c",
+  "prompts": {
+    "6baf6459dcd4c499": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c24337da-2e64-4d35-a8bb-42c768edd4e5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 1,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    },
+    "deb0d0be7c21254c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "193e5454-e71f-41e1-9cd4-c720f32b9ca1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 9,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

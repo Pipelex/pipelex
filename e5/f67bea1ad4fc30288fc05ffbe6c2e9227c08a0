@@ -1,0 +1,53 @@
+pipelex/pipe_operators/pipe_operator.py
+  0925acbdbd77d3ab 48-50
+pipelex/kit/configs/inference/backends/bedrock.toml
+  6f51ac2b796910cb 63
+  0925acbdbd77d3ab 128-129,131-137,147-158
+.pipelex/inference/backends/anthropic.toml
+  0925acbdbd77d3ab 104-112,121-131
+.vscode/launch.json
+  0925acbdbd77d3ab 103
+.pipelex-dev/test_profiles.toml
+  0925acbdbd77d3ab 69
+  6f51ac2b796910cb 358
+.pipelex/inference/backends/bedrock.toml
+  0925acbdbd77d3ab 128-129,131-137,147-158
+  6f51ac2b796910cb 63
+pipelex/kit/configs/inference/backends/anthropic.toml
+  0925acbdbd77d3ab 104-112,121-131
+pipelex/kit/configs/inference/deck/1_llm_deck.toml
+  0925acbdbd77d3ab 31,36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "e5f67bea1ad4fc30288fc05ffbe6c2e9227c08a0",
+  "prompts": {
+    "0925acbdbd77d3ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fea5b1b3-ed55-4a2f-a57a-aee5874e61d0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 4,
+      "accepted_lines": 89,
+      "overriden_lines": 0
+    },
+    "6f51ac2b796910cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bbec395-82d5-459c-9d69-b7a99b739651",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
