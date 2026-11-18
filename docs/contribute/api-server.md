@@ -40,7 +40,7 @@ Every pull request runs the server's checks, with no path filter, because a chan
 - **`Lint (api)`**, in `lint-check.yml`, runs the member's ruff, pyright and mypy, `openapi-check` and `kit-check` in its own environment.
 - **`Tests (api)`**, in `tests-check.yml`, runs its unit tests.
 - **`Tests (packages)`** builds the `pipelex` and `pipelex-api` wheels and sdists as a release would, checks the exact pin on `pipelex` in the `pipelex-api` metadata with `api/scripts/check_lockstep_pin.py`, installs the two wheels together under the lock's versions and imports the server from them.
-- **`Tests (api image)`** builds the image from the repository root and smoke-tests it with `make -C api docker-smoke`, which boots it, waits for `/health` and checks that `/v1/version` reports this version for both the server and the pipelex it runs.
+- **`Tests (api image)`** builds the image from the repository root and smoke-tests it with `make -C api docker-smoke`, which boots it, waits for `/health`, checks that `/v1/version` reports this version for both the server and the pipelex it runs, and checks that the custom-code gate is closed: `POST /v1/validate` with a method holding a `.py` file must answer the 501 `pipelex.deployment.custom_code_requires_sandbox`, origin `bundle`.
 
 They block through the `Lint (all)` and `Tests (all)` aggregates. Those run the floor Python version only, as they do for the library; on a pull request into `main`, the pre-main gates add the server to every supported version, in each `Lint fresh (pyX)` leg and in the `Tests full (api, pyX)` jobs.
 
@@ -60,7 +60,7 @@ The image is built with the repository root as its context, so it installs the p
 docker build -f api/Dockerfile .
 ```
 
-`make -C api docker-build` runs exactly that, and `make -C api docker-smoke` boots what it built and checks the versions it reports. The root `.dockerignore` keeps the context down to the files the build reads. It is an allowlist, and it sits at the root rather than beside the Dockerfile because the legacy builder reads no other ignore file, and without one it would copy local override files, which can hold credentials, into the image.
+`make -C api docker-build` runs exactly that, and `make -C api docker-smoke` boots what it built, checks the versions it reports and checks that it refuses a method shipping Python. That last check guards the image's packaging rather than the route, which pipelex's own tests cover: whether the server may run a method's `.py` files is configuration, the PipeFunc execution mode, and the image ships its configuration at `/root/.pipelex/` rather than in a project, so a drift there would open the gate on the published image alone. The root `.dockerignore` keeps the context down to the files the build reads. It is an allowlist, and it sits at the root rather than beside the Dockerfile because the legacy builder reads no other ignore file, and without one it would copy local override files, which can hold credentials, into the image.
 
 ## How a release ships it
 
