@@ -1,3 +1,5 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,7 +35,7 @@ from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.runtime_hub import get_secrets_provider
+from pipelex.runtime_hub import get_inference_backend_registry, get_models_manager, get_runtime_hub, get_secrets_provider
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 if TYPE_CHECKING:
@@ -157,6 +159,27 @@ def make_doc_gen_backends(*, registrar: PluginRegistrar) -> dict[str, MakeWorker
             case InferenceFamily.LLM | InferenceFamily.IMG_GEN | InferenceFamily.EXTRACT | InferenceFamily.SEARCH | InferenceFamily.JUDGMENT:
                 pass
     return backends
+
+
+@contextmanager
+def stub_engines_installed(*, engines: StubEngines) -> Generator[StubEngines, None, None]:
+    """Install a stub document generation plugin, and put the booted engines and model deck back on the way out.
+
+    The stub registers as the real plugin does: a worker per sdk, which replaces the runtime's document engines, and
+    the plugin's models and deck defaults, which a model manager set up with its declarations merges.
+    """
+    booted_registry = get_inference_backend_registry()
+    booted_models_manager = get_models_manager()
+    registrar = engines.make_registrar()
+    get_runtime_hub().set_inference_backend_registry(
+        booted_registry.with_family(family=InferenceFamily.DOC_GEN, backends=make_doc_gen_backends(registrar=registrar))
+    )
+    get_runtime_hub().set_models_manager(models_manager=make_models_manager(plugin_model_declarations=registrar.make_model_declarations()))
+    try:
+        yield engines
+    finally:
+        get_runtime_hub().set_inference_backend_registry(booted_registry)
+        get_runtime_hub().set_models_manager(models_manager=booted_models_manager)
 
 
 def make_models_manager(*, plugin_model_declarations: PluginModelDeclarations, backends_dir_path: Path | None = None) -> ModelManager:

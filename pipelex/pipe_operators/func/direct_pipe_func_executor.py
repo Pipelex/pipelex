@@ -252,11 +252,17 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
     async def _run_transported(
         self, *, request: PipeFuncExecutionRequest, written_pipe_trees: dict[str, MethodTree], is_storage_reachable: bool
     ) -> PipeFuncExecutionResponse:
-        # The crate was validated where it was assembled; its other steps name trees this process never receives, so it
-        # is loaded as it is, and the one step called checks its function as it binds it.
+        # The crate was validated where it was assembled. Only its concepts and the one step called are built here: the
+        # concepts type the memory and the output, and the step binds its function. No other step is, since building a
+        # step runs its static checks, and those of a sibling depend on an environment this process need not have, such
+        # as a `PipeDocGen` step's document engine, or name files of trees this process never receives.
+        step_crate = request.crate.restricted_to_pipe(pipe_ref=request.pipe_code)
+        if step_crate is None:
+            msg = f"The crate of the PipeFunc call holds no pipe '{request.pipe_code}'"
+            raise PipeFuncExecutionError(msg)
         working_memory = rehydrate_library_and_memory(
             library_id=TRANSPORTED_LIBRARY_ID,
-            crate=request.crate,
+            crate=step_crate,
             working_memory_raw=request.working_memory_raw,
             is_crate_prevalidated=True,
             written_pipe_trees=written_pipe_trees,

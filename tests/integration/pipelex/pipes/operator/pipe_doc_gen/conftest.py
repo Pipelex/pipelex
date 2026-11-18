@@ -16,8 +16,8 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     RecordingMethodFileStore,
     StubEngines,
     WorkerLikePipeRun,
-    make_doc_gen_backends,
     make_models_manager,
+    stub_engines_installed,
 )
 
 
@@ -58,18 +58,8 @@ def replace_only_xlsx_stub_engines() -> Iterator[StubEngines]:
 
 
 def _installed(*, engines: StubEngines) -> Iterator[StubEngines]:
-    booted_registry = get_inference_backend_registry()
-    booted_models_manager = get_models_manager()
-    registrar = engines.make_registrar()
-    get_runtime_hub().set_inference_backend_registry(
-        booted_registry.with_family(family=InferenceFamily.DOC_GEN, backends=make_doc_gen_backends(registrar=registrar))
-    )
-    get_runtime_hub().set_models_manager(models_manager=make_models_manager(plugin_model_declarations=registrar.make_model_declarations()))
-    try:
+    with stub_engines_installed(engines=engines):
         yield engines
-    finally:
-        get_runtime_hub().set_inference_backend_registry(booted_registry)
-        get_runtime_hub().set_models_manager(models_manager=booted_models_manager)
 
 
 @pytest.fixture
