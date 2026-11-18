@@ -61,47 +61,6 @@ def _build_client(mocker: MockerFixture) -> TestClient:
     return TestClient(app)
 
 
-class TestTheProbeAgainstTheRoutes:
-    def test_a_server_whose_gate_is_closed_passes(self, mocker: MockerFixture) -> None:
-        mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=False)
-        client = _build_client(mocker)
-
-        response = client.post("/v1/validate", json=check_custom_code_gate.REQUEST_BODY)
-
-        assert check_custom_code_gate.refusal_mismatch(status=response.status_code, body=response.json()) is None, response.text
-
-    def test_a_server_whose_gate_is_open_fails(self, mocker: MockerFixture) -> None:
-        mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)
-        client = _build_client(mocker)
-
-        response = client.post("/v1/validate", json=check_custom_code_gate.REQUEST_BODY)
-
-        assert check_custom_code_gate.refusal_mismatch(status=response.status_code, body=response.json()) is not None, response.text
-
-
-class TestTheVerdict:
-    def test_the_custom_code_refusal_passes(self) -> None:
-        assert check_custom_code_gate.refusal_mismatch(status=501, body=_REFUSAL) is None
-
-    @pytest.mark.parametrize(
-        ("status", "body", "named"),
-        [
-            pytest.param(200, {"is_valid": True}, "status 501", id="accepted"),
-            pytest.param(422, {**_REFUSAL, "status": 422}, "status 501", id="another-status"),
-            pytest.param(501, "Not Implemented", "JSON problem", id="not-a-problem"),
-            pytest.param(501, {**_REFUSAL, "code": "runtime.unexpected"}, "'code'", id="another-code"),
-            pytest.param(501, {**_REFUSAL, "domain": "runtime"}, "'domain'", id="another-domain"),
-            pytest.param(501, {**_REFUSAL, "params": {"origin": "method_ref"}}, "'params'", id="another-origin"),
-            pytest.param(501, {key: value for key, value in _REFUSAL.items() if key != "params"}, "'params'", id="no-params"),
-        ],
-    )
-    def test_any_other_answer_fails_and_says_why(self, status: int, body: Any, named: str) -> None:
-        mismatch = check_custom_code_gate.refusal_mismatch(status=status, body=body)
-
-        assert mismatch is not None
-        assert named in mismatch
-
-
 class _StubHandler(BaseHTTPRequestHandler):
     status: ClassVar[int] = 501
     body: ClassVar[dict[str, Any]] = _REFUSAL
@@ -133,8 +92,45 @@ def stub_server() -> Generator[str, None, None]:
     server.server_close()
 
 
-class TestTheScriptOverHttp:
-    def test_it_reads_the_refusal_from_an_error_status(self, stub_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
+class TestCheckCustomCodeGate:
+    def test_the_probe_passes_a_server_whose_gate_is_closed(self, mocker: MockerFixture) -> None:
+        mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=False)
+        client = _build_client(mocker)
+
+        response = client.post("/v1/validate", json=check_custom_code_gate.REQUEST_BODY)
+
+        assert check_custom_code_gate.refusal_mismatch(status=response.status_code, body=response.json()) is None, response.text
+
+    def test_the_probe_fails_a_server_whose_gate_is_open(self, mocker: MockerFixture) -> None:
+        mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)
+        client = _build_client(mocker)
+
+        response = client.post("/v1/validate", json=check_custom_code_gate.REQUEST_BODY)
+
+        assert check_custom_code_gate.refusal_mismatch(status=response.status_code, body=response.json()) is not None, response.text
+
+    def test_the_custom_code_refusal_passes(self) -> None:
+        assert check_custom_code_gate.refusal_mismatch(status=501, body=_REFUSAL) is None
+
+    @pytest.mark.parametrize(
+        ("status", "body", "named"),
+        [
+            pytest.param(200, {"is_valid": True}, "status 501", id="accepted"),
+            pytest.param(422, {**_REFUSAL, "status": 422}, "status 501", id="another-status"),
+            pytest.param(501, "Not Implemented", "JSON problem", id="not-a-problem"),
+            pytest.param(501, {**_REFUSAL, "code": "runtime.unexpected"}, "'code'", id="another-code"),
+            pytest.param(501, {**_REFUSAL, "domain": "runtime"}, "'domain'", id="another-domain"),
+            pytest.param(501, {**_REFUSAL, "params": {"origin": "method_ref"}}, "'params'", id="another-origin"),
+            pytest.param(501, {key: value for key, value in _REFUSAL.items() if key != "params"}, "'params'", id="no-params"),
+        ],
+    )
+    def test_any_other_answer_fails_and_says_why(self, status: int, body: Any, named: str) -> None:
+        mismatch = check_custom_code_gate.refusal_mismatch(status=status, body=body)
+
+        assert mismatch is not None
+        assert named in mismatch
+
+    def test_the_script_reads_the_refusal_from_an_error_status(self, stub_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "argv", ["check_custom_code_gate.py", stub_server])
 
         exit_code = check_custom_code_gate.main()
@@ -142,7 +138,7 @@ class TestTheScriptOverHttp:
         assert exit_code == 0
         assert _StubHandler.received == [("/v1/validate", check_custom_code_gate.REQUEST_BODY)]
 
-    def test_it_fails_on_an_accepted_method(self, stub_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_the_script_fails_on_an_accepted_method(self, stub_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(_StubHandler, "status", 200)
         monkeypatch.setattr(_StubHandler, "body", {"is_valid": True})
         monkeypatch.setattr(sys, "argv", ["check_custom_code_gate.py", stub_server])
