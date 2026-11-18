@@ -18,8 +18,9 @@ export HELP_DEPLOY_API
 # the repository root as the build context (see the Dockerfile's header).
 # $(VERSION) is the library's version, read from the root pyproject.toml, so the
 # image tag names the pipelex it runs. The image is smoke-tested (`docker-smoke`)
-# before anything is pushed, so a build that does not boot, or that reports
-# another version, never reaches Docker Hub.
+# before anything is pushed, so a build that does not boot, that reports
+# another version, or whose shipped config opens the custom-code gate, never
+# reaches Docker Hub.
 #
 # The release workflow runs this target from the commit the release's tag names,
 # once both distributions are on PyPI: `.github/workflows/publish-docker-hub.yml`,
