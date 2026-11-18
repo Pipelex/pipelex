@@ -7,11 +7,14 @@ published image alone while every route test stays green. This script sends `POS
 `.py` file and passes only when the server answers the 501 problem `pipelex.deployment.custom_code_requires_sandbox`,
 domain `operator`, with `params.origin` `bundle`. `make docker-smoke` runs it against the container it starts.
 
-It needs nothing but the standard library, so it runs on a bare runner without the member's environment.
+It needs nothing but the standard library, so it runs on a bare runner without the member's environment, on any python3 from 3.9.
 
 Usage:
     python scripts/check_custom_code_gate.py http://127.0.0.1:18081
 """
+
+# Postponed annotations keep the `X | None` hints legal on a bare runner whose python3 predates 3.10.
+from __future__ import annotations
 
 import argparse
 import json
