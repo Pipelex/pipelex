@@ -35,10 +35,9 @@ def rehydrate_library_and_memory(
     3. Hydrate the working memory (needs step 2 to have registered the classes it references).
 
     ``is_crate_prevalidated`` skips the pipes' validation, for a crate the sender validated where it was assembled,
-    such as the one a `PipeFunc` call carries to a sandbox, whose other steps may name files of trees the sandbox
-    never receives. ``written_pipe_trees`` are the trees this process wrote out for a step to run in, by that step's
-    pipe ref, such as the tree of a `PipeFunc` call written for its function to import: that step, and no other, is
-    built in it.
+    such as the one a `PipeFunc` call carries to a sandbox, restricted there to the step it calls.
+    ``written_pipe_trees`` are the trees this process wrote out for a step to run in, by that step's pipe ref, such as
+    the tree of a `PipeFunc` call written for its function to import: that step, and no other, is built in it.
 
     Returns the hydrated WorkingMemory, or None when there was nothing to hydrate.
     """

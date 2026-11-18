@@ -215,8 +215,8 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # is removed.
         TREE_PYTHON_HOLD.acquire(tree=tree, holder=TRANSPORTED_LIBRARY_ID, label=f"the method tree of the call to '{request.pipe_code}'")
         try:
-            # The step called, and it alone, is built in the tree written here, which holds none of its tree's bundles:
-            # every other step, a sibling of the same tree included, names its tree by the digest the crate names it by.
+            # The step called is built in the tree written here, which holds none of its tree's bundles; it is the only
+            # step `_run_transported` builds.
             written_pipe_trees = {request.pipe_code: tree} if request.tree_digest is not None else {}
             return await self._run_transported(request=request, written_pipe_trees=written_pipe_trees, is_storage_reachable=is_storage_reachable)
         finally:
