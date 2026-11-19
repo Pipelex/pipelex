@@ -3668,7 +3668,7 @@ requires-dist = [
     { name = "portkey-ai", specifier = ">=2.1.0" },
     { name = "posthog", specifier = ">=6.7.0" },
     { name = "protobuf", specifier = ">=6.33.5" },
-    { name = "pydantic", specifier = ">=2.10.6,<3.0.0" },
+    { name = "pydantic", specifier = ">=2.12.0,<3.0.0" },
     { name = "pygments", marker = "extra == 'docs'", specifier = ">=2.20.0" },
     { name = "pylint", marker = "extra == 'dev'", specifier = "==4.0.10" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.21.3" },
