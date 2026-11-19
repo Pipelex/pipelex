@@ -6,7 +6,7 @@ import threading
 import uuid
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Literal, get_args, get_origin
+from typing import Any, Literal, cast, get_args, get_origin
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
@@ -109,6 +109,37 @@ def _unique_schema(model_class: type[BaseModel]) -> tuple[dict[str, Any], str]:
     title = f"{model_class.__name__}_{uuid.uuid4().hex}"
     schema["title"] = title
     return schema, title
+
+
+def _nested_chain(*, definitions: int, nesting: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """A schema chaining `definitions` definitions, each but the last reaching the next through `nesting` nested arrays, and a value for it."""
+    defs: dict[str, Any] = {}
+    for index_link in range(definitions - 1):
+        node: dict[str, Any] = {"$ref": f"#/$defs/Link{index_link + 1}"}
+        for _index_nesting in range(nesting):
+            node = {"type": "array", "items": node}
+        defs[f"Link{index_link}"] = {"title": f"Link{index_link}", "type": "object", "properties": {"next": node}, "required": ["next"]}
+    end_name = f"Link{definitions - 1}"
+    defs[end_name] = {"title": end_name, "type": "object", "properties": {"label": {"type": "string"}}, "required": ["label"]}
+    title = f"NestedChain_{uuid.uuid4().hex}"
+    schema = {"title": title, "type": "object", "properties": {"first": {"$ref": "#/$defs/Link0"}}, "required": ["first"], "$defs": defs}
+
+    value: Any = {"label": "end"}
+    for _index_link in range(definitions - 1):
+        for _index_nesting in range(nesting):
+            value = [value]
+        value = {"next": value}
+    return schema, {"first": value}
+
+
+def _node_count(*, node: Any) -> int:
+    """The nodes a schema fragment holds, itself included."""
+    count = 1
+    if isinstance(node, dict):
+        count += sum(_node_count(node=child) for child in cast("dict[str, Any]", node).values())
+    elif isinstance(node, list):
+        count += sum(_node_count(node=child) for child in cast("list[Any]", node))
+    return count
 
 
 class TestSchemaToModel:
@@ -657,3 +688,21 @@ class TestSchemaToModel:
 
         with pytest.raises(UnsupportedSchemaError, match="references chain deeper than"):
             SchemaToModelFactory.make_from_json_schema(schema, class_name="Chain")
+
+    @pytest.mark.parametrize("is_past_the_cap", [False, True])
+    def test_the_definition_cap_counts_definitions_not_nodes(self, mocker: MockerFixture, is_past_the_cap: bool) -> None:
+        """The cap counts chained definitions alone: a chain of as many definitions as the cap rebuilds, though every link
+        nests as deep as the cap and the nodes along the chain far outnumber it, and one definition more is refused.
+        """
+        chain_cap = 4
+        mocker.patch.object(_SchemaModelBuilder, "MAX_DEFINITION_CHAIN", chain_cap)
+        definitions = chain_cap + 1 if is_past_the_cap else chain_cap
+        schema, value = _nested_chain(definitions=definitions, nesting=chain_cap)
+        assert _node_count(node=schema["$defs"]) > chain_cap
+
+        if is_past_the_cap:
+            with pytest.raises(UnsupportedSchemaError, match=f"references chain deeper than {chain_cap} definitions"):
+                SchemaToModelFactory.make_from_json_schema(schema, class_name="NestedChain")
+        else:
+            result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="NestedChain")
+            assert result_class.model_validate(value).model_dump() == value
