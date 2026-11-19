@@ -21,7 +21,6 @@ from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import (
     MANIFEST_FILE_NAME,
     trace_input_semantics,
 )
-from pipelex.core.stuffs.search_result_content import SearchResultContent
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -235,4 +234,7 @@ class TestTraceInputSemantics:
         sources = search_result["fields"]["sources"]
         assert sources["required"] is False
         assert sources["default"] == "PydanticUndefined"
-        assert sources["default_factory"] == repr(SearchResultContent.model_fields["sources"].default_factory)
+        # The factory is named by its module and qualified name, which hold no memory address, so the capture is the same
+        # on every run.
+        assert sources["default_factory"] == "pipelex.tools.typing.pydantic_utils.empty_list_factory_of.<locals>._factory"
+        assert " at 0x" not in sources["default_factory"]
