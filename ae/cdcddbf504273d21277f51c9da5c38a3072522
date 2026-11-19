@@ -1,0 +1,33 @@
+.badges/tests.json
+  s_00316332a512eb::t_ab39f83b75ec26 4
+docs/errors/index.md
+  s_00316332a512eb::t_56f13c2cfdef94 10
+pipelex/errors/registry/pipelex-error-registry.json
+  s_00316332a512eb::t_56f13c2cfdef94 2
+docs/api-server/openapi/pipelex-api.openapi.yaml
+  s_00316332a512eb::t_56f13c2cfdef94 15
+CHANGELOG.md
+  s_00316332a512eb::t_dfddd6b5d8a571 3
+pyproject.toml
+  s_00316332a512eb::t_05cbeaa0285297 3
+.test_durations
+  s_00316332a512eb::t_7f7a54bd6bd59b 1669,1853
+uv.lock
+  s_00316332a512eb::t_bf6698a3743ff2 3569
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aecdcddbf504273d21277f51c9da5c38a3072522",
+  "prompts": {},
+  "sessions": {
+    "s_00316332a512eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3453e5d-4edd-4295-aa5a-2da5b522295c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thomas Hebrard <thomas@pipelex.com>"
+    }
+  }
+}
