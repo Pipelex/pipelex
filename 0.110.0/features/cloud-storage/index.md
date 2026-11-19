@@ -1,0 +1,58 @@
+# Cloud Storage
+
+Store generated artifacts on cloud infrastructure.
+
+## Overview
+
+Pipelex can automatically upload generated artifacts — images, extracted pages, and other outputs — to cloud storage providers with configurable access control. For development and testing, local filesystem and in-memory storage are also available.
+
+## Supported Providers
+
+- **Local filesystem** — Store artifacts on the local disk (default for development)
+- **In-memory** — Ephemeral storage for testing, no persistence
+- **AWS S3** — Amazon Simple Storage Service with configurable region and bucket
+- **Google Cloud Storage** — GCS buckets with project-level credentials
+
+## URL Options
+
+- **Public URLs** — Directly accessible URLs for public content
+- **Signed URLs** — Time-limited secure URLs for private content, with configurable lifespan
+
+### The host an S3 link names
+
+An S3 link, signed or not, is virtual-hosted on the bucket's own regional host: `https://<bucket>.s3.<region>.amazonaws.com/<key>`. The runtime's own reads and writes go to that host too. A page that shows the runtime's links under a content security policy therefore allows that one origin, which covers your bucket and no one else's, where the region's shared endpoint `https://s3.<region>.amazonaws.com` would cover every bucket in the region.
+
+The exception is a legacy bucket name that cannot be a hostname, one with uppercase letters or an underscore. Its links are path-style on the regional endpoint, `https://s3.<region>.amazonaws.com/<bucket>/<key>`, so a policy must allow the shared endpoint for it. Name a bucket with lowercase letters, digits and hyphens only if its links have to be allowed on their own. A bucket name containing a dot is refused by the storage configuration; it could not be virtual-hosted over HTTPS anyway, because it breaks the `*.s3.<region>.amazonaws.com` wildcard certificate.
+
+A deployment whose egress rules allow S3 by hostname must allow `*.s3.<region>.amazonaws.com`, not only `s3.<region>.amazonaws.com`.
+
+## Configuration
+
+Storage is configured in `pipelex.toml` under `[runtime.storage]`. Set `method` to `local`, `in_memory`, `s3`, or `gcp`, then provide provider-specific settings such as `bucket_name`, `region`, or `project_id` in the matching subsection.
+
+For AWS configuration, see [AWS Configuration](../configuration/config-technical/aws-config.md).
+
+When an image-generation provider returns a URL rather than bytes and `is_fetch_remote_content_enabled` is on, Pipelex downloads the image into storage. That download, like every download of a URL a value carries, goes through the SSRF guard, which refuses private and metadata addresses; see [Network Configuration](../configuration/config-technical/network-config.md).
+
+## Large texts
+
+A `Text`, `Markdown`, `Html` or `JSON` value past a size threshold lives in storage and travels as a reference, as an image does, so that a long extracted page or a large JSON document is not copied into every step, trace event and result that carries it. The threshold is a byte count under `[runtime.storage]`:
+
+```toml
+[runtime.storage]
+inline_text_max_bytes = 4096
+```
+
+A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form is exercised everywhere. The value must not be negative.
+
+A value is stored where it enters the run or is produced:
+
+- a run's inputs, when the run starts, under `{storage_scope}/assets/`, as long as `is_normalize_data_urls_to_storage` is on, the switch that also uploads data URLs and local files;
+- a `PipeLLM`'s text or markdown output, and the text of each page a `PipeExtract` step returns, under `{storage_scope}/generated/`;
+- the text, HTML and JSON values a `PipeFunc` function returns, under `{storage_scope}/generated/`.
+
+Each is stored as `{hash}/value.txt`, `value.md`, `value.html` or `value.json` under its folder, the hash being the first 16 hexadecimal digits of the value's SHA-256. A dry run stores nothing. A `PipeCompose` output, a search's answer and the text fields of a structured output stay inline.
+
+A stored value is read back where a step reads it, and never past `[runtime.network] max_fetch_bytes`: a larger one fails the run with `input.too_large`. How a stored value looks, and how a caller gives one, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).
+
+A run's result files carry a stored value as its reference. When the main output holds one, anywhere in it, `main_stuff.json` is the output with each stored value as `{url, size, mime_type, preview}`, the shape the API returns, and a client loads the value from it. `main_stuff.md`, `main_stuff.html` and `main_stuff_viewer.html` are read by a person, so the delivery loads every stored value first, under the run's read scope, and renders the values themselves; a value it cannot load, such as one outside the read scope or no longer in storage, is described there by its kind, size, location and preview, and every file is still written. `pipelex run` and `pipelex-agent run` do the same with the output of a local run before they print or save it: see [Stored values in the main output](../tools/cli/run.md#stored-values-in-the-main-output).
