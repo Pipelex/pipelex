@@ -11,7 +11,7 @@
 Each hop of the chain writes its captures into the output directory, so a lost or mangled fact is localized to exactly one hop:
 
 - `hop1_bundle_blueprints.json` — **parse**: the `PipelexBundleBlueprint` dumps, i.e. what survived TOML.
-- `hop2_generated_sources/` — **resolve + generate**: the structure-class source the runtime generates per concept, re-derived with the same `StructureGenerator` calls the concept factory issues at load time. Saved as `.py.txt` so captures stay inert to linters.
+- `hop2_generated_sources/` — **resolve + generate**: the runtime builds each concept's structure class from data and writes no source, so this hop holds the module the `python-structures` codegen emitter renders for the bundles' concepts, with every class named as the runtime names it (`domain__Code`). It gives the same JSON schema as the class the runtime builds, which a parity test holds the two to. The manifest maps every declared concept to that module, and a `structure = "ClassName"` concept to `null`, since the runtime builds nothing for it. Saved as `structures.py.txt` so captures stay inert to linters.
 - `hop3_raw_pydantic_schemas/` — raw `model_json_schema()` per structure class, before any Pipelex render wrapping.
 - `hop4_schema_renders/` — the `SCHEMA` representation per pipe input: the `{"concept", "content"}` envelope, with array wrapping when the input is multiple.
 - `hop5_pipe_io_contracts.json` — the final wire contracts from `build_pipe_io_contracts`.

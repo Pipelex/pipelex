@@ -48,7 +48,7 @@ class TestCsvCodecBlankCells:
 
     def test_a_blank_cell_under_a_generated_defaulted_field_takes_its_default(self, tmp_path: Path):
         row_class: Any
-        _, row_class = StructureGenerator(local_domain="csv_blank").generate_from_structure_blueprint(
+        row_class = StructureGenerator(local_domain="csv_blank").generate_from_structure_blueprint(
             class_name="GeneratedRow",
             structure_blueprint={
                 "name": ConceptStructureBlueprint(description="a name", type=ConceptStructureBlueprintFieldType.TEXT, required=True),

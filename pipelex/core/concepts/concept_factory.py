@@ -299,8 +299,8 @@ class ConceptFactory:
         """The refusal of a concept whose structure class could not be generated, naming the concept and what went wrong.
 
         A structure the generator refuses on purpose carries its own `finding`. A class that fails to build for any other
-        reason, such as an exception the generated module raised, is described by the class of that exception alone: its
-        text quotes the generated code, and stays in the operator's message.
+        reason, such as an exception pydantic raised while building it, is described by the class of that exception alone:
+        its text stays in the operator's message.
 
         Args:
             message: The operator's message
@@ -398,7 +398,7 @@ class ConceptFactory:
     ) -> str:
         """Handle BLUEPRINT_WITH_STRUCTURE declaration type.
 
-        Structure is defined as a ConceptStructureBlueprint dict - run the structure generator
+        Structure is defined as a ConceptStructureBlueprint dict - build the class with the structure generator
         and register it in the class registry.
 
         Args:
@@ -418,13 +418,13 @@ class ConceptFactory:
 
         qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
         try:
-            _, the_generated_class = StructureGenerator(local_domain=domain_code).generate_from_structure_blueprint(
+            the_generated_class = StructureGenerator(local_domain=domain_code).generate_from_structure_blueprint(
                 class_name=qualified_class_name,
                 structure_blueprint=normalized_structure,
                 description=blueprint.description,
             )
         except ConceptStructureGeneratorError as exc:
-            msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain_code}': {exc}"
+            msg = f"Error building the structure class of concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise cls._structure_generation_refusal(message=msg, generation_error=exc, domain_code=domain_code, concept_code=concept_code) from exc
 
         # Register the generated class
@@ -459,7 +459,7 @@ class ConceptFactory:
             )
 
         try:
-            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+            the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                 class_name=qualified_class_name,
                 structure_blueprint={},
                 base_class_name=TextContent.__name__,
@@ -503,7 +503,7 @@ class ConceptFactory:
         # reports such a concept as `unknown` rather than promoting it to prose.
         if QualifiedRef.has_cross_package_prefix(current_refine):
             try:
-                _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                     class_name=qualified_class_name,
                     structure_blueprint={},
                     description=blueprint.description,
@@ -534,7 +534,7 @@ class ConceptFactory:
         # Generate a new class that inherits from the refined structure class
         # This creates an empty class that can be extended with additional fields in the future
         try:
-            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+            the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                 class_name=qualified_class_name,
                 structure_blueprint={},  # Empty structure - just inherits from refined class
                 base_class_name=refined_structure_class_name,

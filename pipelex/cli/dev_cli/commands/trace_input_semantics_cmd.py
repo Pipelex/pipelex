@@ -5,9 +5,9 @@ inside the validation window, dumps one artifact per hop of the chain that turns
 facts into the `json_schema` emitted on `pipe_io_contracts`:
 
 - ``hop1_bundle_blueprints.json`` — parse: the `PipelexBundleBlueprint` dumps (what survived TOML).
-- ``hop2_generated_sources/`` — resolve + generate: the structure-class source the runtime
-  generates per concept, re-derived with the same `StructureGenerator` calls
-  `ConceptFactory.make_from_blueprint` issues at load time.
+- ``hop2_generated_sources/`` — resolve + generate: the module the `python-structures` codegen
+  emitter renders for the bundles' concepts, which gives the class the runtime builds from data at
+  load time; every declared concept maps to it in the manifest.
 - ``hop3_raw_pydantic_schemas/`` — raw `model_json_schema()` per concept's structure class,
   before any Pipelex render wrapping.
 - ``hop4_schema_renders/`` — the `ConceptRepresentationFormat.SCHEMA` render per pipe input
@@ -29,20 +29,17 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 from rich.markup import escape
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
+from pipelex.codegen.emitters.python_structures import emit_python_structures
+from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.concepts.helpers import make_qualified_structure_class_name, normalize_structure_blueprint
-from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.structure_generation.generator import StructureGenerator
-from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -50,6 +47,8 @@ from pipelex.interpreter_hub import (
     get_library_manager,
     set_current_library,
 )
+from pipelex.libraries.crate_normalization import normalize_crate
+from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipelex import Pipelex
@@ -73,78 +72,6 @@ def _write_json(*, path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def regenerate_structure_source(
-    *,
-    domain_code: str,
-    concept_code: str,
-    declaration: ConceptBlueprint | str,
-) -> str | None:
-    """Re-derive the structure-class source the runtime generated for one concept declaration.
-
-    Mirrors the generation branches of `ConceptFactory.make_from_blueprint`
-    (pipelex/core/concepts/concept_factory.py) with the same `StructureGenerator` arguments, so the
-    captured source is what the factory produced at load time. Returns None for a
-    `structure = "ClassName"` declaration (the factory generates nothing there — the class
-    pre-exists in the registry). Must run inside the validation window: generated code that
-    inherits a bundle-defined base class resolves it through the class registry.
-    """
-    qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
-
-    if isinstance(declaration, str):
-        source, _ = StructureGenerator().generate_from_structure_blueprint(
-            class_name=qualified_class_name,
-            structure_blueprint={},
-            base_class_name=TextContent.__name__,
-            description=declaration,
-        )
-        return source
-
-    if isinstance(declaration.structure, str):
-        return None
-
-    if isinstance(declaration.structure, dict):
-        normalized_structure = normalize_structure_blueprint(declaration.structure)
-        source, _ = StructureGenerator(local_domain=domain_code).generate_from_structure_blueprint(
-            class_name=qualified_class_name,
-            structure_blueprint=normalized_structure,
-            description=declaration.description,
-        )
-        return source
-
-    if declaration.refines is not None:
-        current_refine = ConceptFactory.make_refine(refine=declaration.refines, domain_code=domain_code)
-        if QualifiedRef.has_cross_package_prefix(current_refine):
-            source, _ = StructureGenerator().generate_from_structure_blueprint(
-                class_name=qualified_class_name,
-                structure_blueprint={},
-                description=declaration.description,
-            )
-            return source
-        refined_ref = QualifiedRef.parse(current_refine)
-        refined_concept_code = refined_ref.local_code
-        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
-            refined_structure_class_name = refined_concept_code + "Content"
-        else:
-            refined_domain_code = refined_ref.domain_path or domain_code
-            refined_structure_class_name = make_qualified_structure_class_name(domain_code=refined_domain_code, concept_code=refined_concept_code)
-        source, _ = StructureGenerator().generate_from_structure_blueprint(
-            class_name=qualified_class_name,
-            structure_blueprint={},
-            base_class_name=refined_structure_class_name,
-            description=declaration.description,
-        )
-        return source
-
-    # Basic blueprint (description only): the factory generates an empty TextContent subclass.
-    source, _ = StructureGenerator().generate_from_structure_blueprint(
-        class_name=qualified_class_name,
-        structure_blueprint={},
-        base_class_name=TextContent.__name__,
-        description=declaration.description,
-    )
-    return source
-
-
 def _capture_hop1(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path) -> str:
     payload = [blueprint.model_dump(mode="json") for blueprint in blueprints]
     _write_json(path=output_dir / HOP1_FILE_NAME, payload=payload)
@@ -152,23 +79,33 @@ def _capture_hop1(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path)
 
 
 def _capture_hop2(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path) -> dict[str, str | None]:
+    """Write the module the `python-structures` emitter renders for the bundles' concepts, and map each declared concept to it.
+
+    The runtime builds a concept's structure class from data and writes no source, so the source shown is the emitter's,
+    which gives the class the runtime builds (its JSON schema is the same) and names every class as the runtime does. A
+    `structure = "ClassName"` declaration maps to None: the runtime builds nothing there, the class pre-exists.
+    """
+    crate = normalize_crate(LibraryCrateFactory.make_from_blueprints(blueprints=blueprints), mthds_version=MTHDS_STANDARD_VERSION)
+    resolved_library = resolve_concepts_from_crate(crate).with_qualified_names()
+    emitted_files = emit_python_structures(resolved_library)
+    # `.py.txt` on purpose: these are evidence artifacts, not code — a bare `.py` extension would drag them into the
+    # repo's linters when the output directory is inside the repository.
+    relative_paths: list[str] = []
+    for emitted_file in emitted_files:
+        relative_path = f"{HOP2_DIR_NAME}/{emitted_file.filename}.txt"
+        source_path = output_dir / relative_path
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_text(emitted_file.content, encoding="utf-8")
+        relative_paths.append(relative_path)
+    [structures_relative_path] = relative_paths
+
     captures: dict[str, str | None] = {}
     for blueprint in blueprints:
         if not blueprint.concept:
             continue
         for concept_code, declaration in blueprint.concept.items():
-            concept_ref = f"{blueprint.domain}.{concept_code}"
-            source = regenerate_structure_source(domain_code=blueprint.domain, concept_code=concept_code, declaration=declaration)
-            if source is None:
-                captures[concept_ref] = None
-                continue
-            # `.py.txt` on purpose: these are evidence artifacts, not code — a bare `.py`
-            # extension would drag them into the repo's linters when the output directory is inside the repository.
-            relative_path = f"{HOP2_DIR_NAME}/{concept_ref}.py.txt"
-            source_path = output_dir / relative_path
-            source_path.parent.mkdir(parents=True, exist_ok=True)
-            source_path.write_text(source, encoding="utf-8")
-            captures[concept_ref] = relative_path
+            is_class_backed = isinstance(declaration, ConceptBlueprint) and isinstance(declaration.structure, str)
+            captures[f"{blueprint.domain}.{concept_code}"] = None if is_class_backed else structures_relative_path
     return captures
 
 
@@ -374,7 +311,7 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
 
     console.print(f"[green]✓ Input-semantics trace written to {output_dir}[/green]")
     console.print(f"  hop 1: {manifest['hop1_bundle_blueprints']}")
-    console.print(f"  hop 2: {len(manifest['hop2_generated_sources'])} generated sources under {HOP2_DIR_NAME}/")
+    console.print(f"  hop 2: {len(manifest['hop2_generated_sources'])} concepts in the structures module under {HOP2_DIR_NAME}/")
     console.print(f"  hop 3: {len(manifest['hop3_raw_pydantic_schemas'])} raw schemas under {HOP3_DIR_NAME}/")
     console.print(f"  hop 4: {len(manifest['hop4_schema_renders'])} schema renders under {HOP4_DIR_NAME}/")
     console.print(f"  hop 5: {manifest['hop5_pipe_io_contracts']} + {manifest['hop5_input_form']}")

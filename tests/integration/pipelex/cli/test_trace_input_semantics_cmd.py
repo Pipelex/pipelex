@@ -73,12 +73,13 @@ class TestTraceInputSemantics:
         assert item_structure["label"]["required"] is True
         assert item_structure["qty"]["default_value"] == 3
 
-        # Hop 2: the regenerated structure-class source threads description and default into Field().
+        # Hop 2: the `python-structures` rendering of the class threads description and default into Field().
         hop2_relative = manifest["hop2_generated_sources"]["trace_tool_test.Item"]
         assert hop2_relative is not None
         source = (output_dir / hop2_relative).read_text(encoding="utf-8")
         assert 'description="SENT_field_label"' in source
         assert "default=3" in source
+        assert "class trace_tool_test__Item(StructuredContent):" in source
 
         # Hop 3: the raw pydantic schema for the concept's structure class.
         hop3 = _read_json(output_dir / manifest["hop3_raw_pydantic_schemas"]["trace_tool_test.Item"])

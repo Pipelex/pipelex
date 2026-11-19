@@ -1,10 +1,9 @@
 """Check that a generated Python module has the shape its generator writes, before anyone imports it.
 
-Two generators write Python modules with authored text in them: the runtime structure generator, which executes its
-module, and the codegen emitters, whose modules a developer's app, tests or CI import. Both write only imports and
-plain classes whose bodies hold a docstring and annotated fields, and authored text reaches the module only inside
-string literals and comments (`pipelex.tools.misc.python_literals`). So a module holding any other statement means a
-text was rendered as code, and its generator refuses it rather than let it run.
+The codegen emitters write Python modules with authored text in them, which a developer's app, tests or CI import.
+They write only imports and plain classes whose bodies hold a docstring and annotated fields, and authored text
+reaches the module only inside string literals and comments (`pipelex.tools.misc.python_literals`). So a module
+holding any other statement means a text was rendered as code, and the emitter refuses it rather than let it run.
 
 The check reads statements only: what an annotation, a base, an import or a value holds is left to the rendering.
 """
