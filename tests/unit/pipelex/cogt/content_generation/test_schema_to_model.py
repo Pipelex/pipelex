@@ -1,7 +1,10 @@
 """Unit tests for SchemaToModelFactory: rebuilding BaseModel classes from JSON schemas with create_model."""
 
+import copy
+import importlib.util
 import threading
 import uuid
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Literal, get_args, get_origin
 
@@ -13,7 +16,16 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.exceptions import UnsupportedSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory, _SchemaModelBuilder  # pyright: ignore[reportPrivateUsage]
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.unit.pipelex.cogt.content_generation.test_data import SchemaRebuildTestData
+from tests.unit.pipelex.cogt.content_generation.test_data import (
+    AliasedProperties,
+    Decimals,
+    FactoryDefaults,
+    ModelDefaults,
+    Pets,
+    SchemaRebuildTestData,
+    SharedTitles,
+    Tuples,
+)
 
 
 class SimpleModel(BaseModel):
@@ -173,17 +185,118 @@ class TestSchemaToModel:
             result_class.model_validate({"title": "Kept", "note": None})
         assert [error["loc"] for error in exc_info.value.errors()] == [("note",)]
 
-    def test_a_field_with_a_default_factory_starts_empty(self) -> None:
-        """A container the schema shows as optional with no default starts empty on the rebuilt class, as its factory made it."""
-        schema = ModelWithConstraints.model_json_schema()
-        schema["properties"]["tags"] = {"items": {"type": "string"}, "title": "Tags", "type": "array"}
-        schema["required"] = ["score", "code"]
-        schema["title"] = f"FactoryDefaults_{uuid.uuid4().hex}"
+    def test_a_field_with_a_default_factory_is_left_out_of_every_dump(self) -> None:
+        """A field the schema shows as optional with no default is left out of every dump while the input leaves it out."""
+        schema, title = _unique_schema(FactoryDefaults)
+        assert set(schema["required"]) == {"label"}
 
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="FactoryDefaults")
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
 
-        assert result_class.model_validate({"score": 1, "code": "AB"}).model_dump() == {"score": 1.0, "code": "AB", "tags": [], "ratio": None}
         assert result_class.model_json_schema() == schema
+        omitted = result_class.model_validate({"label": "x"})
+        assert omitted.model_dump() == {"label": "x"}
+        assert omitted.model_dump(mode="json", by_alias=True, serialize_as_any=True) == {"label": "x"}
+        assert omitted.model_dump_json() == '{"label":"x"}'
+        assert copy.deepcopy(omitted).model_dump() == {"label": "x"}
+        assert omitted.model_copy(deep=True).model_dump() == {"label": "x"}
+        given = result_class.model_validate({"label": "x", "tags": [], "names": ["a"]})
+        assert given.model_dump() == {"label": "x", "names": ["a"], "tags": []}
+        assert FactoryDefaults.model_validate(omitted.model_dump(by_alias=True)) == FactoryDefaults(label="x")
+
+    def test_a_property_that_cannot_name_a_field_is_an_alias(self) -> None:
+        """A keyword, a name that is no identifier and an underscore-led one each name a field the builder picks, as its alias."""
+        schema, title = _unique_schema(AliasedProperties)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        aliases = {field_name: field_info.alias for field_name, field_info in result_class.model_fields.items()}
+        assert aliases == {"field_1": "from", "field_2": "first-name", "field_3": "@type", "field_4": "_id", "field_0": None}
+        values = {"from": "Paris", "first-name": "Ada", "@type": "Person", "_id": "p-1", "field_0": "kept"}
+        assert result_class.model_validate(values).model_dump(by_alias=True) == values
+
+    def test_a_decimal_rebuilds_as_a_decimal_with_its_constraints(self) -> None:
+        """The number-or-digits pair pydantic writes for a Decimal rebuilds as a Decimal, its digits and bounds enforced."""
+        schema, title = _unique_schema(Decimals)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class.model_validate({"amount": "12.345", "maybe": 1})
+        assert instance.amount == Decimal("12.345")  # type: ignore[attr-defined]
+        assert type(instance.amount) is Decimal  # type: ignore[attr-defined]
+        assert type(instance.maybe) is Decimal  # type: ignore[attr-defined]
+        assert instance.price == Decimal("1.50")  # type: ignore[attr-defined]
+        invalid_cases: list[dict[str, Any]] = [{"price": "1000"}, {"price": "1.234"}, {"digits_only": "12345"}, {"bounded": 10}, {"bounded": "0.3"}]
+        for invalid_values in invalid_cases:
+            with pytest.raises(ValidationError):
+                result_class.model_validate({"amount": 1, **invalid_values})
+
+    def test_a_tuple_rebuilds_as_a_tuple(self) -> None:
+        """Items of a fixed length rebuild as a tuple of their types, and a tuple of any length as a list."""
+        schema, title = _unique_schema(Tuples)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class.model_validate({"pair": ["a", "1"], "nested": [1, ["b", "c"]]})
+        assert instance.pair == ("a", 1)  # type: ignore[attr-defined]
+        assert instance.nested == (1, ("b", "c"))  # type: ignore[attr-defined]
+        with pytest.raises(ValidationError):
+            result_class.model_validate({"pair": ["a", 1, 2]})
+
+    def test_a_discriminated_union_picks_its_member_by_the_discriminator(self) -> None:
+        """A oneOf with its discriminator rebuilds as a discriminated union over the rebuilt members."""
+        schema, title = _unique_schema(Pets)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class.model_validate({"pet": {"kind": "dog", "name": "Rex"}, "pets": [{"kind": "cat", "lives": 9}]})
+        assert type(instance.pet).__name__ == "Dog"  # type: ignore[attr-defined]
+        assert type(instance.pets[0]).__name__ == "Cat"  # type: ignore[attr-defined]
+        with pytest.raises(ValidationError) as exc_info:
+            result_class.model_validate({"pet": {"kind": "bird"}})
+        assert exc_info.value.errors()[0]["type"] == "union_tag_invalid"
+
+    def test_a_default_is_validated_into_the_field_type(self) -> None:
+        """A default the schema writes in its JSON form holds the rebuilt model or enumeration member, not the raw value."""
+        schema, title = _unique_schema(ModelDefaults)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class()
+        assert type(instance.counter) is result_class.model_fields["counter"].annotation  # type: ignore[attr-defined]
+        assert instance.counter.count == 2  # type: ignore[attr-defined]
+        assert type(instance.rank).__name__ == "Rank"  # type: ignore[attr-defined]
+        assert instance.rank == 2  # type: ignore[attr-defined]
+
+    def test_definitions_sharing_a_title_keep_their_keys(self) -> None:
+        """Each definition's class is named after its `$defs` key and carries its title apart, so shared titles keep both keys."""
+        schema = SharedTitles.model_json_schema()
+        assert {definition["title"] for definition in schema["$defs"].values()} == {"Item"}
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="SharedTitles")
+
+        assert result_class.model_json_schema() == schema
+        first_class = result_class.model_fields["first"].annotation
+        assert isinstance(first_class, type)
+        assert first_class.__name__ in schema["$defs"]
+
+    def test_an_email_rebuilds_only_where_email_validator_is_installed(self) -> None:
+        """An email field needs `email-validator`, an optional dependency, without which its format is refused."""
+        schema = {
+            "title": f"Mail_{uuid.uuid4().hex}",
+            "type": "object",
+            "properties": {"to": {"format": "email", "title": "To", "type": "string"}},
+            "required": ["to"],
+        }
+        if importlib.util.find_spec("email_validator") is None:
+            with pytest.raises(UnsupportedSchemaError, match="format 'email'"):
+                SchemaToModelFactory.make_from_json_schema(schema, class_name="Mail")
+        else:
+            assert SchemaToModelFactory.make_from_json_schema(schema, class_name="Mail").model_json_schema() == schema
 
     def test_nested_model_reconstruction(self) -> None:
         """A nested model rebuilds as a new class of the same name, with the same schema."""
@@ -238,6 +351,28 @@ class TestSchemaToModel:
 
         assert class_1 is class_2
         assert class_1 is not class_nested
+
+    def test_the_class_name_of_a_titleless_schema_is_part_of_the_cache_key(self) -> None:
+        """Two class names for one titleless schema name two classes, since the class name names the root."""
+        schema = SimpleModel.model_json_schema()
+        schema["description"] = f"Untitled {uuid.uuid4().hex}"
+        del schema["title"]
+
+        first_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="FirstName")
+        second_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="SecondName")
+
+        assert first_class.__name__ == "FirstName"
+        assert second_class.__name__ == "SecondName"
+
+    def test_a_cache_hit_skips_the_size_check(self, mocker: MockerFixture) -> None:
+        """The size check walks the schema only on a miss, never on a hit."""
+        schema, title = _unique_schema(SimpleModel)
+        spy = mocker.spy(_SchemaModelBuilder, "check_size")
+
+        SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+        SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert spy.call_count == 1
 
     def test_concurrent_first_miss_builds_only_once(self, mocker: MockerFixture) -> None:
         """N threads racing on the same uncached schema build the class exactly once."""
@@ -325,6 +460,16 @@ class TestSchemaToModel:
 
         with pytest.raises(UnsupportedSchemaError, match="nests deeper than"):
             SchemaToModelFactory.make_from_json_schema(schema, class_name="Deep")
+
+    def test_a_schema_past_the_encoder_recursion_is_refused_as_too_deep(self) -> None:
+        """A schema nesting far past the cap, deeper than the JSON encoder that keys the cache can recurse, is refused as too deep."""
+        node: dict[str, Any] = {"type": "string"}
+        for _ in range(100_000):
+            node = {"type": "array", "items": node}
+        schema = {"title": "Abyss", "type": "object", "properties": {"deep": node}}
+
+        with pytest.raises(UnsupportedSchemaError, match="nests deeper than"):
+            SchemaToModelFactory.make_from_json_schema(schema, class_name="Abyss")
 
     def test_references_chaining_past_the_depth_cap_are_refused(self) -> None:
         """Definitions referencing one another in a chain longer than the cap are refused, though the schema nests shallowly."""

@@ -20,14 +20,14 @@ No provider is ever called (the leaves short-circuit before any worker), so no i
 """
 
 import pytest
-from pydantic import ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, SearchAssignment, SearchObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, DryRunObjectFidelityError, OutputStructureSchemaError
-from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_data
+from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_data, revalidate_leaf_object
 from pipelex.cogt.content_generation.search_generate import search_gen_structured
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -56,6 +56,17 @@ class StructuredAnswer(StructuredContent):
 
     answer: str
     confidence: float
+
+
+class MockCounter(BaseModel):
+    count: int = 1
+
+
+class AliasedWithIgnoredFactory(StructuredContent):
+    """A property no field can be named after, beside a field with a default factory the dry-run mock leaves unset."""
+
+    origin: str = Field(alias="from")
+    counter: MockCounter = Field(default_factory=MockCounter, json_schema_extra={"mock_format": "ignore"})
 
 
 class OpaqueWidget:
@@ -202,6 +213,23 @@ class TestLeafDryObjectMocks:
         assert isinstance(result, NormalizedAnswer)
         assert result.answer.startswith("INV-")
         assert not result.answer.startswith("INV-INV-")
+
+    async def test_boundary_dry_mocks_leave_out_a_field_they_leave_unset(self, job_metadata: JobMetadata) -> None:
+        """A field the mock leaves unset is left out of the boundary's dumps, so the original class fills it with its factory."""
+        search_object_assignment = SearchObjectAssignment.make_for_class(
+            output_class=AliasedWithIgnoredFactory,
+            search_assignment=self._dry_search_assignment(job_metadata),
+        )
+
+        result_dict = await search_gen_structured(search_object_assignment=search_object_assignment)
+        raw_mock = dry_llm_gen_object(_dry_object_assignment(AliasedWithIgnoredFactory))
+
+        assert set(result_dict) == {"from"}
+        search_result = revalidate_leaf_data(result_dict, object_class=AliasedWithIgnoredFactory, is_mock_built=True)
+        assert search_result.counter == MockCounter()
+        object_result = revalidate_leaf_object(raw_mock, object_class=AliasedWithIgnoredFactory, is_mock_built=True, dump_mode="json")
+        assert object_result.counter == MockCounter()
+        assert object_result.origin == raw_mock.model_dump(by_alias=True)["from"]
 
     async def test_boundary_dry_search_structured_dict_validates_against_original_class(self) -> None:
         """The structured-search dry boundary leaf returns a dict the original output class accepts."""

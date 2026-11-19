@@ -51,8 +51,11 @@ def revalidate_leaf_object(
     ``by_alias=True`` keys the dump on the schema's property names. The object being converted was built
     from ``object_class.model_json_schema()``, which pydantic emits **by alias**, so the schema's property
     names are what ``object_class`` accepts on the way back in. The class rebuilt from that schema names
-    every field after its property, so on the boundary the alias *is* the field name; dumping by alias keeps
-    the round trip keyed on the schema's names whatever class the object came from.
+    each field after its property, or, for a property no field can be named after (a keyword, a name that
+    is no identifier, an underscore-led one), names the field itself with the property as its alias;
+    dumping by alias keeps the round trip keyed on the schema's names whatever class the object came from.
+    A rebuilt field the schema shows as optional with no default is left out of the dump while it was left
+    out of the input, so ``object_class`` runs the default factory the schema could not describe.
 
     ``dump_mode`` is the one thing the two boundaries genuinely disagree on. It is
     :meth:`~pydantic.BaseModel.model_dump`'s own mode: an object that crossed a distributed
