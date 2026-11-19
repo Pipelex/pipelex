@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from typing import Any, ClassVar, NamedTuple
 
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -12,8 +13,8 @@ def _field(**blueprint: Any) -> ConceptStructureBlueprint:
 class ShadowingFieldCase(NamedTuple):
     """A structure whose first field is named like a module-level name, and a payload of its fields with their values.
 
-    The second field, `after`, reads the same name where the generated class body reads one, so the case pins both
-    the field's own annotation and the lines after it.
+    The second field, `after`, has the type that name spells, so the case pins both the field's own annotation and the
+    field after it.
     """
 
     shadowed_name: str
@@ -23,7 +24,7 @@ class ShadowingFieldCase(NamedTuple):
 
 
 class ShadowingFieldNamesTestData:
-    # Names the generated class body reads at module level: a field named like one gets it imported under an alias.
+    # Names a class written as source would read at module level for its annotations and defaults.
     READ_NAME_CASES: ClassVar[list[ShadowingFieldCase]] = [
         ShadowingFieldCase(
             shadowed_name="date",
@@ -126,8 +127,7 @@ class ShadowingFieldNamesTestData:
         ),
     ]
 
-    # Names the generated module imports or could import, which its class body never reads: a field named like one
-    # shadows nothing the class needs, and keeps the source unchanged.
+    # Names a module written as source would import, or could, which its class body never reads.
     UNREAD_NAME_CASES: ClassVar[list[ShadowingFieldCase]] = [
         ShadowingFieldCase(
             shadowed_name=unread_name,
@@ -138,7 +138,7 @@ class ShadowingFieldNamesTestData:
         for unread_name in ("StructuredContent", "Enum", "BaseModel", "List", "Optional", "Annotated", "Union")
     ]
 
-    # Fields named like the temporal type they hold, each with a default, which the class body rebuilds by that type.
+    # Fields named like the temporal type they hold, each with a default of that type.
     TEMPORAL_DEFAULTS_STRUCTURE: ClassVar[dict[str, ConceptStructureBlueprint]] = {
         "date": _field(type="date", default_value=date(2026, 7, 7)),
         "datetime": _field(type="datetime", default_value=datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))),
@@ -168,3 +168,87 @@ class ShadowingFieldNamesTestData:
             },
         ),
     ]
+
+
+def _concept(description: str, **fields: ConceptStructureBlueprint) -> ConceptBlueprint:
+    return ConceptBlueprint(description=description, structure=dict(fields))
+
+
+class StructureParityTestData:
+    """Concepts with a structure, read by the runtime structure generator and by the `python-structures` emitter alike.
+
+    Together they cover every resolved type kind, presence both ways, defaults of every kind, choices, native content
+    classes, references within a domain and across domains, a class referring to itself and two classes referring to
+    each other, and descriptions whose docstring a naive rendering would change. A field naming `native.Anything` is
+    left out: the emitter writes it as `StructuredContent` where the runtime holds any value (L-261119-cb6979).
+    """
+
+    CONCEPTS: ClassVar[dict[str, ConceptBlueprint]] = {
+        "parity.Scalars": _concept(
+            "Every scalar field type, required, optional and defaulted",
+            title=_field(type="text", required=True),
+            ratio=_field(type="number", required=True),
+            count=_field(type="integer"),
+            enabled=_field(type="boolean", default_value=False),
+            published_on=_field(type="date", default_value=date(2026, 7, 7)),
+            recorded_at=_field(type="datetime", default_value=datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))),
+            starts_at=_field(type="time", default_value=time(9, 30)),
+            note=_field(type="text", default_value="none"),
+        ),
+        "parity.Choices": _concept(
+            "Choices, required, optional and defaulted",
+            status=_field(choices=["draft", "final"], required=True),
+            tier=_field(choices=["low", "medium", "high"], default_value="medium"),
+            verdict=_field(choices=['marked "urgent"', "left, unmarked"]),
+        ),
+        "parity.Containers": _concept(
+            "Lists and dicts, typed and untyped, with defaults",
+            tags=_field(type="list", item_type="text", required=True),
+            scores=_field(type="list", item_type="number", default_value=[1.5, 2.5]),
+            deadlines=_field(type="list", item_type="date"),
+            counts=_field(type="dict", key_type="text", value_type="integer", default_value={"total": 12, "per-reviewer": 3}),
+            labels=_field(type="dict", key_type="text", value_type="text"),
+            loose=_field(type="list", required=True),
+        ),
+        "parity.Natives": _concept(
+            "Native content classes as fields and list items",
+            picture=_field(type="concept", concept_ref="native.Image", required=True),
+            gallery=_field(type="list", item_type="concept", item_concept_ref="native.Image"),
+            caption=_field(type="concept", concept_ref="Text"),
+            page=_field(type="concept", concept_ref="native.Html"),
+        ),
+        "parity.Node": _concept(
+            "A tree node, referring to its own class",
+            label=_field(type="text", required=True),
+            children=_field(type="list", item_type="concept", item_concept_ref="parity.Node"),
+            parent=_field(type="concept", concept_ref="Node"),
+        ),
+        "parity.Author": _concept(
+            "An author, referring to the books that refer back to it",
+            name=_field(type="text", required=True),
+            books=_field(type="list", item_type="concept", item_concept_ref="Book", required=True),
+        ),
+        "parity.Book": _concept(
+            "A book, referring to its author",
+            title=_field(type="text", required=True),
+            author=_field(type="concept", concept_ref="parity.Author"),
+            shelf=_field(type="concept", concept_ref="library.Shelf", required=True),
+        ),
+        "library.Shelf": _concept(
+            "A shelf in another domain, referring back to the books on it",
+            code=_field(type="text", required=True),
+            books=_field(type="list", item_type="concept", item_concept_ref="parity.Book"),
+        ),
+        "parity.Described": _concept(
+            "\n  Intro:\n    - item one\n    - item two\n",
+            notes=_field(
+                type="text",
+                description='A "quoted" word, a \\ backslash,\n\ta tab and trailing spaces   ' + "and a long tail " * 12,
+                required=True,
+            ),
+        ),
+        "parity.Spanning": _concept(
+            'A description that spans lines.\n\nIts second paragraph holds """ triple quotes.',
+            padded=_field(type="text", description="  Padded with edge whitespace  "),
+        ),
+    }

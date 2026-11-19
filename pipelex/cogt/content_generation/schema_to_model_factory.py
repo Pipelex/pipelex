@@ -83,6 +83,10 @@ def _doc_reading_back_as(*, description: str) -> str:
     A description pydantic wrote came out of `cleandoc` already, so it reads back unchanged unless its first line is
     indented or the lines after the first share an indentation, which `cleandoc` would strip. Set between line breaks,
     it leaves `cleandoc` no first line to treat apart and no indentation the lines share, so it reads back as it is.
+
+    This is `class_doc_value` of `pipelex.tools.misc.python_literals` without its normalization: that one renders
+    authored text, whose trailing spaces a docstring loses, while this one restores a description pydantic already
+    wrote, which has to come back byte for byte.
     """
     if cleandoc(description) == description:
         return description
