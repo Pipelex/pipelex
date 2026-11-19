@@ -64,7 +64,6 @@ class ImportSite(NamedTuple):
 EXPECTED_THIRD_PARTY_ROOTS: frozenset[str] = frozenset(
     {
         "PIL",
-        "datamodel_code_generator",
         "httpx",
         "instructor",
         "jinja2",
@@ -76,6 +75,8 @@ EXPECTED_THIRD_PARTY_ROOTS: frozenset[str] = frozenset(
         "opentelemetry",
         "polyfactory",
         "pydantic",
+        # pydantic's own core, whose `SchemaError` a class rebuilt from a JSON schema raises on a pattern it cannot compile.
+        "pydantic_core",
         "rich",
         "tenacity",
         "typing_extensions",

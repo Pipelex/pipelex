@@ -12,9 +12,10 @@ from pydantic import ValidationError
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.resolved_fields import resolve_field
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
+from pipelex.core.stuffs.non_null_any import field_admits_none
 
 
-def _generate(structure_blueprint: dict[str, ConceptStructureBlueprint]) -> tuple[str, Any]:
+def _generate(structure_blueprint: dict[str, ConceptStructureBlueprint]) -> Any:
     return StructureGenerator(local_domain="presence").generate_from_structure_blueprint(
         class_name="PresenceModel", structure_blueprint=structure_blueprint
     )
@@ -36,11 +37,12 @@ class TestStructureGeneratorPresence:
         assert resolve_field(field_name="field", blueprint=field_blueprint).may_hold_nothing is may_hold_nothing
 
     def test_a_defaulted_field_takes_its_default_and_refuses_null(self):
-        source, generated_class = _generate(
+        generated_class = _generate(
             {"note": ConceptStructureBlueprint(description="a note", type=ConceptStructureBlueprintFieldType.TEXT, default_value="fallback")}
         )
 
-        assert '    note: str = Field(default="fallback", description="a note")' in source
+        assert generated_class.model_fields["note"].annotation is str
+        assert generated_class.model_fields["note"].default == "fallback"
         assert generated_class.model_validate({}).note == "fallback"
         assert generated_class.model_validate({"note": "written"}).note == "written"
         with pytest.raises(ValidationError) as exc_info:
@@ -49,24 +51,26 @@ class TestStructureGeneratorPresence:
 
     def test_a_defaulted_falsy_value_is_still_a_default(self):
         """`default_value = false` is a default like any other, so the field is not nullable either."""
-        source, generated_class = _generate(
+        generated_class = _generate(
             {"enabled": ConceptStructureBlueprint(description="on", type=ConceptStructureBlueprintFieldType.BOOLEAN, default_value=False)}
         )
 
-        assert "    enabled: bool = Field(default=False" in source
+        assert generated_class.model_fields["enabled"].annotation is bool
+        assert generated_class.model_fields["enabled"].default is False
         with pytest.raises(ValidationError):
             generated_class.model_validate({"enabled": None})
 
     def test_a_field_that_may_hold_nothing_keeps_an_explicit_null(self):
-        source, generated_class = _generate({"note": ConceptStructureBlueprint(description="a note", type=ConceptStructureBlueprintFieldType.TEXT)})
+        generated_class = _generate({"note": ConceptStructureBlueprint(description="a note", type=ConceptStructureBlueprintFieldType.TEXT)})
 
-        assert "    note: str | None = Field(default=None" in source
+        assert generated_class.model_fields["note"].annotation == str | None
+        assert generated_class.model_fields["note"].default is None
         assert generated_class.model_validate({"note": None}).note is None
         assert generated_class.model_validate({}).note is None
 
     @pytest.mark.parametrize("value", ["text", 0, False, [1, "two"], {"key": "value"}, {}])
     def test_a_required_anything_field_holds_any_value_but_null(self, value: Any):
-        source, generated_class = _generate(
+        generated_class = _generate(
             {
                 "payload": ConceptStructureBlueprint(
                     description="any value", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="native.Anything", required=True
@@ -74,8 +78,8 @@ class TestStructureGeneratorPresence:
             }
         )
 
-        assert "from pipelex.core.stuffs.non_null_any import NonNullAny" in source
-        assert "    payload: NonNullAny = Field(..., description=" in source
+        assert generated_class.model_fields["payload"].is_required()
+        assert not field_admits_none(field_info=generated_class.model_fields["payload"])
         assert generated_class.model_validate({"payload": value}).payload == value
         with pytest.raises(ValidationError) as exc_info:
             generated_class.model_validate({"payload": None})
@@ -83,7 +87,7 @@ class TestStructureGeneratorPresence:
 
     def test_a_required_anything_field_keeps_an_open_schema(self):
         """The schema is what a model is asked for, and the strict modes that would read `not` refuse it."""
-        _, generated_class = _generate(
+        generated_class = _generate(
             {
                 "payload": ConceptStructureBlueprint(
                     description="any value", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="native.Anything", required=True
@@ -96,7 +100,7 @@ class TestStructureGeneratorPresence:
         assert schema["required"] == ["payload"]
 
     def test_an_optional_anything_field_may_hold_nothing(self):
-        source, generated_class = _generate(
+        generated_class = _generate(
             {
                 "payload": ConceptStructureBlueprint(
                     description="any value", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="native.Anything"
@@ -104,6 +108,6 @@ class TestStructureGeneratorPresence:
             }
         )
 
-        assert "    payload: Any | None = Field(default=None" in source
-        assert "NonNullAny" not in source
+        assert generated_class.model_fields["payload"].annotation == Any | None
+        assert field_admits_none(field_info=generated_class.model_fields["payload"])
         assert generated_class.model_validate({"payload": None}).payload is None

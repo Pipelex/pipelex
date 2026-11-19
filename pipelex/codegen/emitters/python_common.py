@@ -3,7 +3,7 @@
 Only the target-agnostic pieces live here: default-value formatting, the generated-file header
 (carrying the extension-file subclassing story), the `= Field(...)` assignment, the `Literal[...]`
 annotation, and the import block. String escaping and the class docstring are rendered by
-`pipelex.tools.misc.python_literals`, which the structure generator shares. Each Python emitter keeps its own
+`pipelex.tools.misc.python_literals`. Each Python emitter keeps its own
 resolved-type -> annotation walker, because the concept spelling (runtime content classes vs.
 generated models) differs.
 """
@@ -285,8 +285,7 @@ def refuse_unexpected_python_module_shape(body: str) -> None:
     They write only imports and plain classes whose body is a docstring followed by annotated fields, plus the
     `model_config` of an opaque concept, and authored text reaches the module only inside string literals and comments.
     A module of any other shape means a text was rendered as code: it is refused here, before it is stamped, written or
-    served, because the developer who imports it would run that code. The check is the one the runtime structure
-    generator applies to the module it executes, `generated_module_shape_refusal`.
+    served, because the developer who imports it would run that code. The check is `generated_module_shape_refusal`.
 
     Raises:
         CodegenEmissionError: When the module does not parse, or holds a statement the emitters never write.
@@ -299,8 +298,6 @@ def refuse_unexpected_python_module_shape(body: str) -> None:
     refusal = generated_module_shape_refusal(
         module=module,
         module_label="emitted Python module",
-        opens_with_docstring=False,
-        expected_class_names=None,
         class_attribute_assignments=_CLASS_ATTRIBUTE_ASSIGNMENTS,
     )
     if refusal is not None:

@@ -12,7 +12,6 @@ from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
-from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.doc_gen.exceptions import TemplateUrlRefusedError
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.errors.error_code_declaration import InheritsCause
@@ -125,8 +124,8 @@ def _refuse_another_while_handling(*, refusal: SsrfBlockedError) -> None:
     try:
         raise refusal
     except SsrfBlockedError:
-        msg = "The schema of concept 'Invoice' carries x-python-* extensions."
-        raise UnsafeSchemaError(msg)  # ruff: ignore[raise-without-from-inside-except] — chained only as its context, on purpose
+        msg = "Refused by the template sandbox."
+        raise Jinja2TemplateSecurityError(msg)  # ruff: ignore[raise-without-from-inside-except] — chained only as its context, on purpose
 
 
 def _wrapped(*, refusal: PipelexError) -> PipelineInputContentError:
@@ -188,15 +187,6 @@ class TestSecurityEvent:
                 SecurityTargetKind.URL,
                 SecurityTargetClass.PRIVATE,
                 id="ssrf_provider",
-            ),
-            pytest.param(
-                UnsafeSchemaError("The schema of concept 'Invoice' carries x-python-* extensions."),
-                CoreCode.SECURITY_SCHEMA_REFUSED,
-                ProblemDomain.METHOD,
-                "UnsafeSchemaError",
-                SecurityTargetKind.SCHEMA,
-                None,
-                id="unsafe_schema",
             ),
             pytest.param(
                 Jinja2TemplateSecurityError("Jinja2 render — refused by the template sandbox: A template may not read '_owner'."),
@@ -373,12 +363,12 @@ class TestSecurityEvent:
         refusal = _ssrf_refusal()
         with _security_event_lines() as lines:
             assert emit_security_event(error=refusal)
-            with pytest.raises(UnsafeSchemaError) as exc_info:
+            with pytest.raises(Jinja2TemplateSecurityError) as exc_info:
                 _refuse_another_while_handling(refusal=refusal)
             assert emit_security_event(error=exc_info.value)
 
         assert exc_info.value.__context__ is refusal
-        assert [line["error.code"] for line in lines] == [CoreCode.SECURITY_INPUT_URL_REFUSED, CoreCode.SECURITY_SCHEMA_REFUSED]
+        assert [line["error.code"] for line in lines] == [CoreCode.SECURITY_INPUT_URL_REFUSED, CoreCode.SECURITY_TEMPLATE_REFUSED]
 
     def test_a_failure_whose_event_was_logged_elsewhere_is_not_reported_again(self) -> None:
         """A host marks the error a transport rebuilt from a worker's report, whose worker logged the event."""

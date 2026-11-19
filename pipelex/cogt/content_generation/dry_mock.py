@@ -218,12 +218,10 @@ def _leaf_gen_object(object_assignment: ObjectAssignment, *, report_func: _Repor
     """Shared object-mock pipeline: resolve the class to mock, report once, build one mock.
 
     With the caller's class in hand the mock is built from it directly, so every invariant it enforces
-    is honored. Without it (the boundary case) the class is rebuilt from the JSON schema, which drops
-    custom validators and the format hints encoded via ``json_schema_extra`` that
-    datamodel-code-generator omits on round-trip — so exotic-format schemas may yield mock data the
-    original class would reject. The generator re-validates against the original class and re-raises
-    that failure as ``DryRunObjectFidelityError`` (review F2); declare ``examples`` / ``mock_format``
-    on the constrained fields to fix it.
+    is honored. Without it (the boundary case) the class is rebuilt from the JSON schema, which cannot
+    carry custom validators — so a mock may hold data the original class would reject. The generator
+    re-validates against the original class and re-raises that failure as ``DryRunObjectFidelityError``
+    (review F2); declare ``examples`` / ``mock_format`` on the constrained fields to fix it.
 
     Reports exactly once — the live leaf makes one ``gen_object`` call (a list is one call against a
     list-wrapper schema), so a single ``UsageReportEvent`` matches the real one-call topology that
@@ -421,9 +419,12 @@ def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) 
 
     ``by_alias=True`` keys the dict by the schema's property names, which is what the live arm returns
     (the provider answers the schema it was given) and what the original class accepts. Without it, a
-    property the class rebuild had to rename — a python keyword, or a name shadowing a ``BaseModel``
-    attribute — would come back under the renamed key and fail re-validation; see
-    :func:`~pipelex.cogt.content_generation.object_revalidation.revalidate_leaf_object`.
+    property whose field the class rebuild names itself, keeping the property as its alias — a Python
+    keyword, a name that is no identifier, or one led by an underscore — would come back under the
+    builder's field name and fail re-validation; a name shadowing a ``BaseModel`` attribute other than
+    pydantic's ``model_…`` API keeps its own name. A field the mock leaves unset that the schema shows as
+    optional with no default is left out of the dict, so the original class runs its own default factory;
+    see :func:`~pipelex.cogt.content_generation.object_revalidation.revalidate_leaf_object`.
     """
     boundary_class = SchemaToModelFactory.make_from_json_schema(
         schema=search_object_assignment.output_class_schema,

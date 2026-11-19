@@ -417,8 +417,8 @@ UnknownPipeFuncExecutionModeError | pipelex.plugin.not_found
 UnknownSecretsMethodError | pipelex.plugin.not_found
 UnknownStorageMethodError | pipelex.plugin.not_found
 UnknownVarPrefixError | pipelex.config.invalid
-UnsafeSchemaError | security.schema_refused
 UnsupportedImageMimeTypeError | one of input.file_type_unsupported, provider.response_invalid
+UnsupportedSchemaError | runtime.unexpected
 UriReadRefusedError | one of security.input_url_refused, security.method_url_refused
 UriTextNotUtf8Error | input.file_unreadable
 UriTextTooLargeError | input.too_large

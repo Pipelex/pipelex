@@ -1,6 +1,6 @@
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import PipelexError, SecurityError
+from pipelex.base_exceptions import PipelexError
 
 
 class NeitherUrlNorDataError(PipelexError):
@@ -19,15 +19,16 @@ class MockUsageOnLiveRunError(PipelexError, ValueError):
     error_code = CoreCode.REQUEST_INVALID
 
 
-class UnsafeSchemaError(SecurityError):
-    """A JSON schema carrying the code generator's extensions, refused before any code is generated from it.
+class UnsupportedSchemaError(PipelexError):
+    """A JSON schema a class cannot be rebuilt from: a shape outside the subset the builder supports, or past one of its caps.
 
-    The schema is the method's output concept, or a payload forged across a process boundary, so it is refused as a
-    security policy rather than read as a malformed method. The same perimeter refuses, as this error, an import the
-    generated code makes outside its allowlist.
+    The schema always comes from a pipelex class's own ``model_json_schema()``, shipped to a worker beside a structured
+    generation, so a shape outside the subset is a defect of ours to fix in the builder, never the method author's; and
+    a schema past the caps, or naming a field no class can hold, can only be a malformed payload. Either way the step
+    fails.
     """
 
-    error_code = CoreCode.SECURITY_SCHEMA_REFUSED
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class DryRunObjectFidelityError(PipelexError):
@@ -35,9 +36,8 @@ class DryRunObjectFidelityError(PipelexError):
 
     The dry object leaf mock builds its instance from the **schema-reconstructed** class (the leaf
     carries only the JSON schema, not the original class). ``ContentGenerator.make_object`` then
-    re-validates that data against the **original** class. Invariants the JSON-schema round-trip cannot
-    capture — custom ``@field_validator`` / ``@model_validator`` logic, or format / pattern hints encoded
-    via ``json_schema_extra`` that datamodel-code-generator drops — are absent from the reconstructed
+    re-validates that data against the **original** class. Invariants no JSON schema carries — custom
+    ``@field_validator`` / ``@model_validator`` logic — are absent from the reconstructed
     class, so polyfactory can fill a value the reconstructed class accepts but the original rejects. This
     turns an opaque mid-run ``pydantic.ValidationError`` into a clear, actionable message that names the
     class and the remedy. Scoped to the dry path only: a LIVE provider's invalid output keeps its existing

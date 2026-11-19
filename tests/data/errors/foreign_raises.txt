@@ -26,7 +26,6 @@ pipelex/cogt/content_generation/content_generator.py | ContentGenerator.make_ren
 pipelex/cogt/content_generation/content_generator_protocol.py | update_job_metadata.wrapper | RuntimeError | invariant
 pipelex/cogt/content_generation/content_generator_protocol.py | update_job_metadata.wrapper | TypeError | invariant
 pipelex/cogt/content_generation/doc_gen_generate.py | RunRenderResources.load | RuntimeError | invariant
-pipelex/cogt/content_generation/schema_to_model_factory.py | SchemaToModelFactory._exec_and_extract_class | ValueError | invariant
 pipelex/cogt/doc_gen/document_composition.py | DocumentComposition._validate_url_base | ValueError | validator
 pipelex/cogt/doc_gen/document_composition.py | DocumentComposition._validate_url_base | ValueError | validator
 pipelex/cogt/doc_gen/document_composition.py | DocumentComposition._validate_url_base | ValueError | validator

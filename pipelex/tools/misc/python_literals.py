@@ -1,9 +1,10 @@
 """Render authored text as Python source: a string literal, a class docstring, or the lines of a comment.
 
 Every place that writes generated Python source with authored text in it goes through here — the codegen
-emitters and the structure generator, whose modules are executed — so that one escaping decides how text
-sits in source, and it reads back exactly as authored. Text interpolated between quotes by hand is how a
-description ending in a quote, a backslash or a triple quote comes out as a different module than intended.
+emitters, whose modules a developer imports — so that one escaping decides how text sits in source, and it reads
+back exactly as authored. Text interpolated between quotes by hand is how a description ending in a quote, a
+backslash or a triple quote comes out as a different module than intended. The runtime structure generator writes
+no source, and takes from here only the docstring value of the class it builds (`class_doc_value`).
 """
 
 from inspect import cleandoc
@@ -71,6 +72,21 @@ def normalized_docstring_text(text: str) -> str:
     """
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     return cleandoc("\n".join(line.rstrip(" \t") for line in lines))
+
+
+def class_doc_value(description: str) -> str:
+    """The `__doc__` of a class built from data, which `inspect.cleandoc` reads back as `normalized_docstring_text(description)`.
+
+    This is `class_docstring`'s contract for a class that has no source: pydantic writes `inspect.cleandoc(__doc__)` as
+    the JSON schema's description, and `inspect.getdoc` reads the same, so the value has to survive that call. The
+    normalized text survives it unless the lines after its first share an indentation, which `cleandoc` would strip:
+    such a text is set between line breaks, which leave `cleandoc` no first line to treat apart, so the indentation the
+    lines share, none since the first holds none, is all it removes.
+    """
+    body = normalized_docstring_text(description)
+    if cleandoc(body) == body:
+        return body
+    return f"\n{body}\n"
 
 
 def _docstring_delimiter(text: str) -> str | None:

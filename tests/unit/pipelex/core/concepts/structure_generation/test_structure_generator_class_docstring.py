@@ -1,7 +1,7 @@
-"""How a class description renders as the docstring of a generated structure class.
+"""How a class description becomes the docstring of a generated structure class.
 
-Whatever characters the description holds, the docstring reads back as authored and the generated module runs no
-statement the description spells.
+Whatever characters the description holds, the docstring and the schema's description read back as authored, and no
+statement the description spells runs.
 """
 
 import inspect
@@ -49,7 +49,7 @@ class TestStructureGeneratorClassDocstringEscaping:
             else {}
         )
 
-        _, generated_class = StructureGenerator().generate_from_structure_blueprint(
+        generated_class = StructureGenerator().generate_from_structure_blueprint(
             class_name="Described", structure_blueprint=blueprint, description=description
         )
 
@@ -60,7 +60,7 @@ class TestStructureGeneratorClassDocstringEscaping:
         """A description that opens on a blank line and indents its whole body reads back as `inspect.cleandoc` leaves it."""
         description = "\n  Intro:\n    - item one\n    - item two"
 
-        _, generated_class = StructureGenerator().generate_from_structure_blueprint(
+        generated_class = StructureGenerator().generate_from_structure_blueprint(
             class_name="Described", structure_blueprint={}, description=description
         )
 
@@ -69,7 +69,7 @@ class TestStructureGeneratorClassDocstringEscaping:
 
     def test_long_class_description_gains_no_line_break(self):
         """A one-line description longer than any line limit stays one line: no newline the author did not write."""
-        _, generated_class = StructureGenerator().generate_from_structure_blueprint(
+        generated_class = StructureGenerator().generate_from_structure_blueprint(
             class_name="Described", structure_blueprint={}, description=_LONG_DESCRIPTION
         )
 

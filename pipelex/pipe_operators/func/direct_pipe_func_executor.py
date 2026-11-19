@@ -237,10 +237,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         concept's structure class (`concept.structure_class_name`), and that is the exact name a
         PipeFunc's return-type validation checks against.
         """
-        resolved_library = resolve_concepts_from_crate(crate)
-        qualified_library = resolved_library.model_copy(
-            update={"concepts": [concept.model_copy(update={"needs_qualification": True}) for concept in resolved_library.concepts]}
-        )
+        qualified_library = resolve_concepts_from_crate(crate).with_qualified_names()
         for emitted in emit_python_structures(qualified_library):
             generated_target = tree_root / emitted.filename
             if generated_target.exists():

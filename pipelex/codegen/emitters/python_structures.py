@@ -1,6 +1,6 @@
 """python-structures emitter: project a crate's concept set as Pipelex `StuffContent` classes.
 
-The runtime idiom (today's `StructureGenerator` presentation) over the shared resolved layers. Each
+The runtime idiom, as source: the class `StructureGenerator` builds from data at load, over the shared resolved layers. Each
 non-native concept becomes a `StuffContent` subclass; native *references* map to the runtime content
 classes (`TextContent`, ...); a concept that still refines a native inherits that content class, and
 a structureless one inherits `TextContent` because that is what the runtime promotes it to (see
@@ -10,8 +10,8 @@ Field annotations use `from __future__ import annotations`, so concept reference
 names resolved from the module namespace (no explicit string quoting, no ordering constraint beyond
 class inheritance).
 
-Modern typing throughout — builtin generics (`list` / `dict`) and `X | None` — matching both the
-runtime `StructureGenerator` and the repo's Python standards. The emitted bytes are lint-clean on
+Modern typing throughout — builtin generics (`list` / `dict`) and `X | None` — matching the repo's
+Python standards. The emitted bytes are lint-clean on
 arrival so a consumer's `ruff` run cannot invalidate the codegen stamp; see `render_import_block`.
 """
 

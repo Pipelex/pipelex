@@ -48,16 +48,14 @@ def revalidate_leaf_object(
     (a local activity, an in-process shortcut, a converter change) cannot silently reinstate the double
     validation.
 
-    ``by_alias=True`` is load-bearing, not cosmetic. The object being converted was built from
-    ``object_class.model_json_schema()``, which pydantic emits **by alias**, so the schema's property
-    names are what ``object_class`` accepts on the way back in. The rebuilt class does not always name
-    its fields that way: ``datamodel-code-generator`` renames any property that is not a usable field
-    name — a python keyword, or a name shadowing a ``BaseModel`` attribute (``json``, ``copy``,
-    ``schema``, ``construct``) — and records the original as an alias. Dumping by field name then emits
-    ``construct_`` for a field ``object_class`` calls ``construct``, and re-validation fails with a bare
-    "Field required". Dumping by alias emits exactly the schema's property names, which is what the whole
-    round trip is keyed on. Where nothing was renamed the alias *is* the field name, so this changes
-    nothing for the models that were already fine.
+    ``by_alias=True`` keys the dump on the schema's property names. The object being converted was built
+    from ``object_class.model_json_schema()``, which pydantic emits **by alias**, so the schema's property
+    names are what ``object_class`` accepts on the way back in. The class rebuilt from that schema names
+    each field after its property, or, for a property no field can be named after (a keyword, a name that
+    is no identifier, an underscore-led one), names the field itself with the property as its alias;
+    dumping by alias keeps the round trip keyed on the schema's names whatever class the object came from.
+    A rebuilt field the schema shows as optional with no default is left out of the dump while it was left
+    out of the input, so ``object_class`` runs the default factory the schema could not describe.
 
     ``dump_mode`` is the one thing the two boundaries genuinely disagree on. It is
     :meth:`~pydantic.BaseModel.model_dump`'s own mode: an object that crossed a distributed
@@ -89,8 +87,7 @@ def revalidate_leaf_data(
     single one on its path, and the caller's validators run here exactly once.
 
     Under the dry-run leaf mock (``run_mode=DRY``) the data was built from a class reconstructed from the
-    JSON schema, which can drop invariants the original class enforces (custom validators,
-    ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip), so
+    JSON schema, which cannot carry the custom validators the original class enforces, so
     polyfactory can fill a value the reconstructed class accepts but the original rejects. Set
     ``is_mock_built`` on that path and the ``ValidationError`` is re-raised as a clear typed
     :class:`DryRunObjectFidelityError` naming the class and the ``examples`` / ``mock_format`` remedy.

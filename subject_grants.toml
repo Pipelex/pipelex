@@ -1268,37 +1268,9 @@ rationale = "Consumes the raw_obj the leaf returned; single operand."
 param = "render_assignment"
 rationale = "Transforms/renders the render_assignment; single operand."
 
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._collect_unsafe_extension_paths"]
-param = "node"
-rationale = "Walks the schema node; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._exec_and_extract_class"]
-param = "source_code"
-rationale = "Executes the generated source code; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._exec_source_to_types"]
-param = "source_code"
-rationale = "Executes the generated source code; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._generate_source_from_schema"]
-param = "schema"
-rationale = "Worker verb–object: processes the schema; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._normalize_class_name"]
-param = "title"
-rationale = "Transforms/renders the title; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._reject_unsafe_schema_extensions"]
-param = "schema"
-rationale = "Rejects unsafe extensions in the schema; single operand."
-
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory.make_from_json_schema"]
 param = "schema"
 rationale = "Factory from source: builds the result from the schema; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory.make_types_from_source"]
-param = "source_code"
-rationale = "Factory from source: builds the result from the source_code; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::_make_search_job"]
 param = "search_assignment"
@@ -2444,37 +2416,17 @@ rationale = "Noun-named derivation: the imprecision reasons of the resolved type
 param = "structure_blueprint"
 rationale = "Verb-object: resolves the structure blueprint's fields; local_domain is context."
 
-["pipelex/core/concepts/structure_generation/exceptions.py::SyntaxErrorData.from_syntax_error"]
-param = "syntax_error"
-rationale = "Factory from source: builds from the syntax error; single operand."
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._annotation"]
+param = "resolved_type"
+rationale = "Noun-named derivation: the Python annotation for the resolved type; single operand."
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_default_value"]
-param = "value"
-rationale = "Transforms the value; context stays keyword."
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._concept_annotation"]
+param = "resolved_type"
+rationale = "Noun-named derivation: the Python annotation for the resolved concept type; single operand."
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_field_description"]
-param = "description"
-rationale = "Transforms the description; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_line"]
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._field_definition"]
 param = "resolved_field"
-rationale = "Noun-named derivation: the source line for the resolved field; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_for_concept"]
-param = "resolved_type"
-rationale = "Noun-named derivation: the Python type for the resolved type; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_from_resolved"]
-param = "resolved_type"
-rationale = "Noun-named derivation: the Python type for the resolved type; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._validate_execution"]
-param = "python_code"
-rationale = "Verb-object: validates the python code; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator.validate_generated_code"]
-param = "python_code"
-rationale = "Verb-object: validates the python code; single operand."
+rationale = "Noun-named derivation: the annotation and Field of the resolved field; single operand."
 
 ["pipelex/core/concepts/validation.py::is_concept_code_valid"]
 param = "concept_code"
@@ -6060,7 +6012,7 @@ rationale = "Parses/reads the path; single operand."
 param = "mime_type"
 rationale = "Transforms the mime_type; single operand."
 
-["pipelex/tools/misc/generated_module_shape.py::is_string_statement"]
+["pipelex/tools/misc/generated_module_shape.py::_is_string_statement"]
 param = "statement"
 rationale = "Predicate on the statement; single operand."
 
@@ -6219,6 +6171,10 @@ rationale = "Single-operand derivation: picks the delimiter that fits the text."
 ["pipelex/tools/misc/python_literals.py::_double_quoted_inner"]
 param = "value"
 rationale = "Single-operand conversion of the value."
+
+["pipelex/tools/misc/python_literals.py::class_doc_value"]
+param = "description"
+rationale = "Noun-named derivation: the __doc__ value for the description; single operand."
 
 ["pipelex/tools/misc/python_literals.py::class_docstring"]
 param = "description"
