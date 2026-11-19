@@ -29,8 +29,10 @@ from tests.unit.pipelex.cogt.content_generation.test_data import (
     MoreFormats,
     NestedModelDefaults,
     Pets,
+    PlainDefaults,
     RingEnd,
     SchemaRebuildTestData,
+    SetDefaults,
     SharedTitles,
     TitledTypes,
     Tuples,
@@ -321,6 +323,43 @@ class TestSchemaToModel:
         with pytest.raises(ValidationError):
             result_class.model_validate({"count": -1})
 
+    def test_a_set_default_is_validated_into_a_set(self) -> None:
+        """A set's default, which the schema writes sorted, holds a set on the rebuilt class, which writes it sorted again."""
+        schema, title = _unique_schema(SetDefaults)
+        assert schema["properties"]["tags"]["default"] == ["alpha", "beta", "mid", "q", "zeta"]
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class()
+        defaults: dict[str, Any] = {name: getattr(instance, name) for name in ("tags", "nums", "single")}
+        # pydantic writes a frozenset's schema exactly as a set's, so the rebuilt `nums` is a set like the others.
+        assert {name: type(value) for name, value in defaults.items()} == {"tags": set, "nums": set, "single": set}
+        assert defaults == {"tags": {"zeta", "alpha", "mid", "beta", "q"}, "nums": {30, 1, 200, 7}, "single": {"only"}}
+        assert SetDefaults.model_validate(instance.model_dump(mode="json", by_alias=True)) == SetDefaults()
+
+    @pytest.mark.parametrize(
+        ("model_class", "is_rebuilt_again"),
+        [
+            (PlainDefaults, False),
+            (SetDefaults, True),
+            (ModelDefaults, True),
+        ],
+    )
+    def test_only_a_default_that_changes_rebuilds_the_classes_again(
+        self, mocker: MockerFixture, model_class: type[BaseModel], is_rebuilt_again: bool
+    ) -> None:
+        """Defaults that validate into equal copies of themselves leave the classes built once; a set, model or member rebuilds them."""
+        schema, title = _unique_schema(model_class)
+        rebuild_spy = mocker.spy(_SchemaModelBuilder, "_rebuild")
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        forced = [call.kwargs["force"] for call in rebuild_spy.call_args_list]
+        assert forced == ([False, True] if is_rebuilt_again else [False])
+        assert result_class().model_dump() == model_class().model_dump()
+
     def test_bytes_and_versioned_uuids_keep_their_constraints(self) -> None:
         """Bytes keep their length bounds and each versioned UUID format refuses a UUID of another version."""
         schema, title = _unique_schema(MoreFormats)
@@ -580,11 +619,10 @@ class TestSchemaToModel:
         with pytest.raises(UnsupportedSchemaError, match="nests deeper than"):
             SchemaToModelFactory.make_from_json_schema(schema, class_name="Abyss")
 
-    def test_a_chain_of_definitions_counts_definitions_not_nodes(self) -> None:
-        """A chain of distinct classes, several nodes deep per class, rebuilds exactly well below the definition cap."""
+    def test_a_chain_of_definitions_rebuilds_exactly(self) -> None:
+        """A chain of distinct classes, each requiring the next, rebuilds exactly below the definition cap."""
         schema = ModelChain.model_json_schema()
-        assert len(schema["$defs"]) == MODEL_CHAIN_LENGTH
-        assert len(schema["$defs"]) * 3 > _SchemaModelBuilder.MAX_DEFINITION_CHAIN
+        assert len(schema["$defs"]) == MODEL_CHAIN_LENGTH < _SchemaModelBuilder.MAX_DEFINITION_CHAIN
 
         result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=ModelChain.__name__)
 
@@ -595,12 +633,17 @@ class TestSchemaToModel:
         assert link.label == str(MODEL_CHAIN_LENGTH)
 
     def test_a_recursion_error_while_building_is_refused_as_too_deep(self, mocker: MockerFixture) -> None:
-        """Should the caps leave a rebuild past Python's recursion, the RecursionError is refused as a schema too deep."""
+        """A rebuild past Python's recursion below the caps is refused as nesting too deep, naming no cap it did not count."""
         schema, title = _unique_schema(SimpleModel)
         mocker.patch.object(_SchemaModelBuilder, "build", side_effect=RecursionError("maximum recursion depth exceeded"))
 
-        with pytest.raises(UnsupportedSchemaError, match="references chain deeper than"):
+        with pytest.raises(UnsupportedSchemaError) as exc_info:
             SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        message = str(exc_info.value)
+        assert message == "The schema nests too deep for its class to be rebuilt within Python's recursion limit."
+        assert str(_SchemaModelBuilder.MAX_DEFINITION_CHAIN) not in message
+        assert isinstance(exc_info.value.__cause__, RecursionError)
 
     def test_references_chaining_past_the_definition_cap_are_refused(self) -> None:
         """Definitions referencing one another in a chain longer than the cap are refused, though the schema nests shallowly."""
