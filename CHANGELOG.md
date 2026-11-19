@@ -7,6 +7,10 @@
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.
 - **`pipelex-dev trace-input-semantics` names a default factory the same way on every run**: a field's `default_factory` in the `hop2_structure_classes/` captures is the factory's module and qualified name, where it was its `repr`, whose memory address changed on every run, so the captures of two traces diff cleanly.
 
+### Security
+
+- **`uv.lock` moves `mail-parser` to 4.11.0**: a development checkout installing the `docling` extra, which reaches `mail-parser` through Docling's email reader, gets 4.11.0 where the lock held 4.3.0, past GHSA-fr3h-cpq2-9496, GHSA-r7w7-vpq8-c5vv, GHSA-72px-j8gh-p79x, GHSA-24mq-4vc6-2prf and GHSA-xhrq-2mqv-q8wx. The `pipelex/pipelex-api` image does not install that extra and no `pyproject.toml` range moved, so an application installing `pipelex[docling]` gets the patched release on a fresh resolve, and one whose own lock or environment already holds an older `mail-parser` upgrades it there.
+
 ## [v0.110.0] - 2026-11-19
 
 ### Changed
