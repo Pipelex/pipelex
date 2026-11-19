@@ -91,6 +91,14 @@ class ResolvedLibrary(BaseModel):
         """Index the resolved concepts and wire shapes by their ref (for base / field-reference lookups)."""
         return {concept.concept_ref: concept for concept in [*self.concepts, *self.wire_shapes]}
 
+    def with_qualified_names(self) -> "ResolvedLibrary":
+        """The same library with every concept's class name domain-qualified, as the runtime names a concept's structure class.
+
+        The runtime always qualifies (`concept.structure_class_name`, `domain__Code`), where a projection qualifies a code
+        only when it collides across domains. A module emitted from this library names each class as the runtime does.
+        """
+        return self.model_copy(update={"concepts": [concept.model_copy(update={"needs_qualification": True}) for concept in self.concepts]})
+
 
 # Appended to a concept's ref to make its wire shape's: `#` never appears in a concept ref, so no authored concept collides.
 WIRE_SHAPE_REF_SUFFIX = "#wire"

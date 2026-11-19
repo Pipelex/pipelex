@@ -76,7 +76,7 @@ Before a pipe can execute, the **library** must be loaded. The library contains:
 When a `.mthds` file declares a concept like `RawText = "Raw input text..."`, the library loading process:
 
 1. `ConceptFactory._handle_basic_blueprint()` detects the concept declaration
-2. `StructureGenerator.generate_from_structure_blueprint()` dynamically creates a Python class (e.g., `RawText` inheriting from `TextContent`)
+2. `StructureGenerator.generate_from_structure_blueprint()` builds a Python class from data with `pydantic.create_model` (e.g., `RawText` inheriting from `TextContent`)
 3. The class is registered with the active `ClassRegistry` (accessed via `hub.get_class_registry()`) so it can be serialized/deserialized
 
 These dynamically-generated classes become the `content` type of `Stuff` objects in `WorkingMemory`.

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Concept structure classes are built with `create_model` (Breaking)**: a concept's structure class is built at load with `pydantic.create_model` from its resolved fields, where a Python module was rendered and run, and the class, its fields and its JSON schema are unchanged. `StructureGenerator.generate_from_structure_blueprint` returns the class alone, `StructureGenerator.validate_generated_code` and `SyntaxErrorData` are removed, `ConceptStructureGeneratorError` no longer carries `structure_class_python_code` or `syntax_error_data`, and a class pydantic refuses to build is a `ConceptStructureGeneratorError` whose cause is pydantic's exception. `pipelex-dev trace-input-semantics` captures as hop 2 a description of each traced concept's loaded structure class under `hop2_structure_classes/`, beside the `python-structures` module rendered from the loaded crate.
+
 ## [v0.109.1] - 2026-11-19
 
 ### Fixed

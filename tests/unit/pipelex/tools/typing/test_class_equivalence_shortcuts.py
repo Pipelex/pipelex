@@ -58,14 +58,14 @@ def _generate_structure_classes() -> list[type[BaseModel]]:
     generated_classes: dict[str, type[BaseModel]] = {}
     for concept_code, structure_blueprint in GeneratedStructureTestCases.BLUEPRINTS.items():
         class_name = make_qualified_structure_class_name(domain_code=GeneratedStructureTestCases.DOMAIN, concept_code=concept_code)
-        _, generated_class = StructureGenerator(local_domain=GeneratedStructureTestCases.DOMAIN).generate_from_structure_blueprint(
+        generated_class = StructureGenerator(local_domain=GeneratedStructureTestCases.DOMAIN).generate_from_structure_blueprint(
             class_name=class_name, structure_blueprint=structure_blueprint
         )
         assert issubclass(generated_class, BaseModel)
         generated_classes[class_name] = generated_class
-    for generated_class in generated_classes.values():
-        generated_class.model_rebuild(_types_namespace=generated_classes)
-        assert generated_class.__pydantic_complete__
+    for built_class in generated_classes.values():
+        built_class.model_rebuild(_types_namespace=generated_classes)
+        assert built_class.__pydantic_complete__
     return list(generated_classes.values())
 
 

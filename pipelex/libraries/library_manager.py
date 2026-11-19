@@ -257,9 +257,10 @@ def _dependency_entries_first(*, concepts_by_key: "Mapping[str, Concept]") -> li
 def _forward_refs_missing_from(*, annotation: object, namespace: "Mapping[str, type]") -> list[str]:
     """The structure class names an annotation holds as forward references that the namespace lacks.
 
-    The generator spells a field typed by a concept as a quoted name, `"domain__Code"`, or `"domain__Code | None"` for
-    an optional one, alone or inside a `list[...]` or a `dict[...]`. A rebuild that fails leaves those names as they
-    were written, a `ForwardRef` or a plain string, so a name is missing when the namespace has no entry for it.
+    The generator annotates a field typed by a concept with its class name, `"domain__Code"`, `Optional["domain__Code"]`
+    for an optional one, alone or inside a `list[...]` or a `dict[...]`; a class written as source may spell the optional
+    one `"domain__Code | None"`. A rebuild that fails leaves those names as they were written, a `ForwardRef` or a plain
+    string, so a name is missing when the namespace has no entry for it.
     """
     if isinstance(annotation, ForwardRef):
         annotation = annotation.__forward_arg__

@@ -13,6 +13,7 @@ import pytest
 from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import (
     HOP1_FILE_NAME,
     HOP2_DIR_NAME,
+    HOP2_PYTHON_STRUCTURES_FILE_NAME,
     HOP3_DIR_NAME,
     HOP4_DIR_NAME,
     HOP5_FILE_NAME,
@@ -20,6 +21,7 @@ from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import (
     MANIFEST_FILE_NAME,
     trace_input_semantics,
 )
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -48,6 +50,27 @@ $loose
 '''
 """
 
+_PADDED_BUNDLE = """
+domain = "trace_tool_padded"
+description = "Bundle for trace-input-semantics docstring and default-factory tests"
+
+[concept.Padded]
+description = "\\n\\nSENT_padded_first_line\\n    SENT_padded_second_line"
+
+[concept.Padded.structure]
+label = { type = "text", description = "SENT_field_label" }
+
+[pipe.read_padded]
+type = "PipeLLM"
+description = "Make text from a padded concept and a search result"
+inputs = { padded = "Padded", found = "SearchResult" }
+output = "Text"
+prompt = '''
+@padded
+@found
+'''
+"""
+
 _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "probe_bundle.mthds"
 
 
@@ -73,12 +96,30 @@ class TestTraceInputSemantics:
         assert item_structure["label"]["required"] is True
         assert item_structure["qty"]["default_value"] == 3
 
-        # Hop 2: the regenerated structure-class source threads description and default into Field().
-        hop2_relative = manifest["hop2_generated_sources"]["trace_tool_test.Item"]
+        # Hop 2: the structure class the library holds, read off the class, carries description, presence and default.
+        hop2_relative = manifest["hop2_structure_classes"]["trace_tool_test.Item"]
         assert hop2_relative is not None
-        source = (output_dir / hop2_relative).read_text(encoding="utf-8")
-        assert 'description="SENT_field_label"' in source
-        assert "default=3" in source
+        hop2 = _read_json(output_dir / hop2_relative)
+        assert hop2["class_name"] == "trace_tool_test__Item"
+        assert hop2["bases"] == ["StructuredContent"]
+        assert hop2["doc"] == "SENT_concept_item"
+        assert hop2["fields"]["label"] == {
+            "annotation": "<class 'str'>",
+            "required": True,
+            "admits_none": False,
+            "default": "PydanticUndefined",
+            "default_factory": None,
+            "description": "SENT_field_label",
+        }
+        assert hop2["fields"]["qty"]["required"] is False
+        assert hop2["fields"]["qty"]["default"] == 3
+        # `native.Anything` declares no structure class.
+        assert manifest["hop2_structure_classes"]["native.Anything"] is None
+        # Beside it, the module the `python-structures` target writes for the loaded crate.
+        assert manifest["hop2_python_structures"] == HOP2_PYTHON_STRUCTURES_FILE_NAME
+        module_source = (output_dir / HOP2_PYTHON_STRUCTURES_FILE_NAME).read_text(encoding="utf-8")
+        assert "class trace_tool_test__Item(StructuredContent):" in module_source
+        assert 'description="SENT_field_label"' in module_source
 
         # Hop 3: the raw pydantic schema for the concept's structure class.
         hop3 = _read_json(output_dir / manifest["hop3_raw_pydantic_schemas"]["trace_tool_test.Item"])
@@ -139,9 +180,9 @@ class TestTraceInputSemantics:
         renamed_bundle_path.write_text(_SMALL_BUNDLE.replace("Item", "Widget"), encoding="utf-8")
         manifest = await trace_input_semantics(bundle_paths=[renamed_bundle_path], output_dir=output_dir)
 
-        assert manifest["hop2_generated_sources"]["trace_tool_test.Widget"] is not None
+        assert manifest["hop2_structure_classes"]["trace_tool_test.Widget"] is not None
         hop_dirs_to_manifest_keys = {
-            HOP2_DIR_NAME: "hop2_generated_sources",
+            HOP2_DIR_NAME: "hop2_structure_classes",
             HOP3_DIR_NAME: "hop3_raw_pydantic_schemas",
             HOP4_DIR_NAME: "hop4_schema_renders",
         }
@@ -157,9 +198,16 @@ class TestTraceInputSemantics:
 
         manifest = await trace_input_semantics(bundle_paths=[_PROBE_BUNDLE_PATH], output_dir=output_dir)
 
-        assert manifest["hop2_generated_sources"]["input_semantics_probe.Widget"] is not None
-        # A `structure = "ClassName"` declaration generates no class — captured as None.
-        assert manifest["hop2_generated_sources"]["input_semantics_probe.ClassBacked"] is None
+        assert manifest["hop2_structure_classes"]["input_semantics_probe.Widget"] is not None
+        # A `structure = "ClassName"` concept holds the class it names, which the runtime built nothing for.
+        class_backed = _read_json(output_dir / manifest["hop2_structure_classes"]["input_semantics_probe.ClassBacked"])
+        assert class_backed["class_name"] == "TextContent"
+        # A description-only concept holds a plain refinement of `TextContent`, documented by its description.
+        plain_note = _read_json(output_dir / manifest["hop2_structure_classes"]["input_semantics_probe.PlainNote"])
+        assert plain_note["class_name"] == "input_semantics_probe__PlainNote"
+        assert plain_note["bases"] == ["TextContent"]
+        assert plain_note["doc"] == "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)"
+        assert plain_note["fields"]["text"]["annotation"] == class_backed["fields"]["text"]["annotation"]
         assert "input_semantics_probe.Widget" in manifest["hop3_raw_pydantic_schemas"]
         # Native concepts appearing as direct pipe inputs are traced too.
         assert "native.Image" in manifest["hop3_raw_pydantic_schemas"]
@@ -167,3 +215,24 @@ class TestTraceInputSemantics:
         hop5 = _read_json(output_dir / HOP5_FILE_NAME)
         assert "input_semantics_probe.probe_markers" in hop5
         assert "input_semantics_probe.probe_markers" in _read_json(output_dir / HOP5_INPUT_FORM_FILE_NAME)
+
+    async def test_hop2_reads_docstrings_and_default_factories_as_pydantic_does(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
+        """Hop 2's doc is the schema description hop 3 shows, and a default factory is named rather than read as required."""
+        load_empty_library()
+        bundle_path = tmp_path / "padded_bundle.mthds"
+        bundle_path.write_text(_PADDED_BUNDLE, encoding="utf-8")
+        output_dir = tmp_path / "trace"
+
+        manifest = await trace_input_semantics(bundle_paths=[bundle_path], output_dir=output_dir)
+
+        padded = _read_json(output_dir / manifest["hop2_structure_classes"]["trace_tool_padded.Padded"])
+        padded_schema = _read_json(output_dir / manifest["hop3_raw_pydantic_schemas"]["trace_tool_padded.Padded"])
+        assert padded["doc"] == padded_schema["description"]
+        assert padded["doc"].startswith("SENT_padded_first_line")
+        assert padded["fields"]["label"]["default_factory"] is None
+
+        search_result = _read_json(output_dir / manifest["hop2_structure_classes"]["native.SearchResult"])
+        sources = search_result["fields"]["sources"]
+        assert sources["required"] is False
+        assert sources["default"] == "PydanticUndefined"
+        assert sources["default_factory"] == repr(SearchResultContent.model_fields["sources"].default_factory)
