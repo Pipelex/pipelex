@@ -1,21 +1,15 @@
 """What survives the boundary's rebuild → dump → validate round trip, over the models that actually cross it.
 
 The boundary arm of `revalidate_leaf_object` converts a leaf result that was built from a class
-*reconstructed from JSON schema* back into the caller's own class. That round trip is not
-identity-preserving in general, and the audit behind this module found exactly one way it loses:
-
-**A property the rebuild had to rename comes back under the renamed key.** `datamodel-code-generator`
-cannot name a field `json`, `copy`, `schema` or `construct` — they shadow `BaseModel` attributes — so it
-names it `json_` and records `json` as the alias. Dumping by field name then emits a key the original
-class has never heard of, and re-validation fails with a bare "Field required" on a field the caller did
-supply. Dumping by alias emits the schema's own property names, which is what both the round trip and
-the provider are keyed on.
-
-The rest of the audit's suspects turned out to be safe, and each has a test here so they stay that way:
-plain aliases (the schema is emitted by alias, so the rebuilt field name *is* the alias), nested models
-and lists, and `extra="allow"` components. Subclass erasure is unreachable rather than safe — the
-rebuilt class is derived from the original's own schema, so it cannot carry a field the original lacks —
-which is why there is no test for it: there is no way to construct the case through this path.
+*reconstructed from JSON schema* back into the caller's own class. The rebuild names every field after the
+schema's own property, so the round trip is keyed on the schema's names from end to end, and each shape
+that could have lost data on the way has a test here so it stays that way: field names that shadow a
+pydantic v1 method (`json`, `copy`, `schema`, `construct`), which a rebuild that renamed them once
+brought back under the wrong key; plain aliases (the schema is emitted by alias, so the rebuilt field name
+*is* the alias); nested models and lists; and `extra="allow"` components. Subclass erasure is unreachable
+rather than safe — the rebuilt class is derived from the original's own schema, so it cannot carry a field
+the original lacks — which is why there is no test for it: there is no way to construct the case through
+this path.
 
 No provider and no worker are involved, so this needs no inference marker.
 """
@@ -37,9 +31,9 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 
 
 class ShadowingNames(StructuredContent):
-    """Field names a caller may legitimately choose that the class rebuild cannot keep.
+    """Field names a caller may legitimately choose that shadow a pydantic v1 method.
 
-    Each shadows a `BaseModel` attribute. Pydantic allows them (with a warning); the rebuild renames them.
+    Pydantic allows them (with a warning), and the rebuild keeps them under the same names.
     """
 
     construct: str  # type: ignore[assignment] # pyright: ignore[reportIncompatibleMethodOverride]
@@ -68,12 +62,11 @@ def _cross_the_boundary(original: type[BaseModel], *, values: dict[str, Any]) ->
 
 
 class TestBoundaryRoundtripFidelity:
-    def test_a_renamed_property_still_comes_back_under_its_own_name(self) -> None:
-        """The one real loss the audit found: the rebuild renames, so the dump has to speak aliases."""
+    def test_a_shadowing_property_comes_back_under_its_own_name(self) -> None:
+        """A field named like a pydantic v1 method keeps its name through the rebuild, so it comes back under it."""
         values = {"construct": "a", "copy": "b", "json": "c", "schema": "d"}
         raw_obj = _cross_the_boundary(ShadowingNames, values=values)
-        # The rebuild really did rename — without this the test could pass for the wrong reason.
-        assert "construct_" in type(raw_obj).model_fields
+        assert list(type(raw_obj).model_fields) == ["construct", "copy", "json", "schema"]
 
         result = revalidate_leaf_object(raw_obj, object_class=ShadowingNames, is_mock_built=False)
 
@@ -83,7 +76,7 @@ class TestBoundaryRoundtripFidelity:
         assert result.schema == "d"
 
     @pytest.mark.parametrize("dump_mode", ["python", "json"])
-    def test_the_renamed_property_survives_in_either_dump_mode(self, dump_mode: Literal["json", "python"]) -> None:
+    def test_the_shadowing_property_survives_in_either_dump_mode(self, dump_mode: Literal["json", "python"]) -> None:
         """The distributed arm dumps in json mode, so the fix has to hold there too."""
         raw_obj = _cross_the_boundary(ShadowingNames, values={"construct": "a", "copy": "b", "json": "c", "schema": "d"})
 
@@ -92,7 +85,7 @@ class TestBoundaryRoundtripFidelity:
         assert result.construct == "a"
 
     def test_a_plain_alias_round_trips(self) -> None:
-        """No rename needed, so nothing to compensate for — asserted rather than assumed."""
+        """The rebuilt field is named after the alias, which the original validates by — asserted rather than assumed."""
         raw_obj = _cross_the_boundary(AliasedOutput, values={"myField": "v"})
         assert "myField" in type(raw_obj).model_fields
 

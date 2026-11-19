@@ -1268,37 +1268,9 @@ rationale = "Consumes the raw_obj the leaf returned; single operand."
 param = "render_assignment"
 rationale = "Transforms/renders the render_assignment; single operand."
 
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._collect_unsafe_extension_paths"]
-param = "node"
-rationale = "Walks the schema node; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._exec_and_extract_class"]
-param = "source_code"
-rationale = "Executes the generated source code; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._exec_source_to_types"]
-param = "source_code"
-rationale = "Executes the generated source code; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._generate_source_from_schema"]
-param = "schema"
-rationale = "Worker verb–object: processes the schema; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._normalize_class_name"]
-param = "title"
-rationale = "Transforms/renders the title; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._reject_unsafe_schema_extensions"]
-param = "schema"
-rationale = "Rejects unsafe extensions in the schema; single operand."
-
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory.make_from_json_schema"]
 param = "schema"
 rationale = "Factory from source: builds the result from the schema; single operand."
-
-["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory.make_types_from_source"]
-param = "source_code"
-rationale = "Factory from source: builds the result from the source_code; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::_make_search_job"]
 param = "search_assignment"

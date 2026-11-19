@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Classes rebuilt from a JSON schema are built with `create_model` (Breaking)**: `SchemaToModelFactory.make_from_json_schema`, which a worker calls to rebuild a structured output's class from its schema, builds the class from the schema's data with `pydantic.create_model`, so the rebuilt class's `model_json_schema()` is the original schema, a `Literal` field holds its value, constraints survive and every field keeps its name; `datamodel-code-generator` is no longer a dependency. A schema outside the subset pydantic emits for pipelex's classes is refused with the new `UnsupportedSchemaError`, coded `runtime.unexpected`, which replaces `UnsafeSchemaError`. `SchemaToModelFactory.make_types_from_source` and the `__kajson_class_source__` attribute of a rebuilt class are gone.
+
 ## [v0.109.1] - 2026-11-19
 
 ### Fixed

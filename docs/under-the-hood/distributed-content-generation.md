@@ -1,6 +1,6 @@
 ---
 title: "Content Generation Across Boundaries"
-description: "How Pipelex serializes dynamic Pydantic models and large binary content across a worker boundary — JSON schema propagation, class source injection, and storage-based payload offloading — independent of the host runtime."
+description: "How Pipelex serializes dynamic Pydantic models and large binary content across a worker boundary — JSON schema propagation, the class rebuilt from data, and storage-based payload offloading — independent of the host runtime."
 ---
 
 # Content Generation Across Boundaries
@@ -18,7 +18,7 @@ When content generation (LLM structured output, image generation, PDF extraction
 
 | Challenge | Trigger | Root cause | Solution |
 |-----------|---------|------------|----------|
-| **Dynamic class propagation** | LLM structured output (`PipeLLM` with object concept) | The submitter creates a Pydantic model at runtime from `.mthds` concept definitions; the worker process has no such class | Embed the JSON schema in the assignment, reconstruct the class on the worker, carry the source code through the transport's payload metadata |
+| **Dynamic class propagation** | LLM structured output (`PipeLLM` with object concept) | The submitter creates a Pydantic model at runtime from `.mthds` concept definitions; the worker process has no such class | Embed the JSON schema in the assignment, rebuild the class on the worker with `create_model`, and carry the generated object back as plain data |
 | **Large payload management** | Image generation (`PipeImgGen`), PDF extraction (`PipeExtract`), LLM text (`PipeLLM`), `PipeFunc` | Binary data (base64 images, rendered pages) and large texts exceed a host runtime's payload limit (Temporal's is ~2 MB) | Activities store binary data and texts past the inline threshold to external storage, return lightweight URI references |
 
 ---
@@ -51,54 +51,26 @@ The schema is a plain `dict` — fully serializable, inspectable on the wire, an
 
 ### Schema-to-model reconstruction
 
-Reconstruction is the *boundary* answer, and only that. An in-process run never walks it: `ContentGenerator` passes the caller's live class down beside the assignment, and `resolve_object_class` (`pipelex/cogt/content_generation/object_class_resolution.py`) uses it as-is. That matters because the rebuild is lossy — custom validators, `json_schema_extra` hints, and the output structure's own description do not survive the round trip — so in-process the provider would otherwise be constrained by a weaker contract than the author wrote, for no reason. On a worker there is no choice: the class genuinely cannot travel, so the rebuild below is the right answer there.
+Reconstruction is the *boundary* answer, and only that. An in-process run never walks it: `ContentGenerator` passes the caller's live class down beside the assignment, and `resolve_object_class` (`pipelex/cogt/content_generation/object_class_resolution.py`) uses it as-is. That matters because a schema cannot carry everything a class enforces — a custom validator has no JSON schema — so in-process the provider would otherwise be constrained by a weaker contract than the author wrote, for no reason. On a worker there is no choice: the class genuinely cannot travel, so the rebuild below is the right answer there.
 
-On the worker, `SchemaToModelFactory.make_from_json_schema(schema, *, class_name)` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
+On the worker, `SchemaToModelFactory.make_from_json_schema(schema, *, class_name)` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema with `pydantic.create_model`, from the schema's data alone: no Python source is generated and nothing is executed. The rebuild is faithful, which the unit tests assert over the structure classes and the native content classes: the rebuilt class's `model_json_schema()` is the schema it was rebuilt from, so the provider on a worker is constrained exactly as in process. A `Literal` field holds its value, the numeric and length constraints survive, an enumeration in `$defs` becomes an `Enum` class whose members equal their values, and a recursive model resolves through forward references the builder names itself.
 
-```python
-source_code = cls._generate_source_from_schema(schema)  # datamodel-code-generator
-reconstructed_class = cls._exec_and_extract_class(source_code, class_name=class_name)  # exec()
-reconstructed_class.__kajson_class_source__ = source_code  # attached for downstream use
-```
+The builder accepts exactly the subset of JSON Schema that pydantic's `model_json_schema()` emits for the classes Pipelex builds and ships: objects and their `$defs` with local references, unions through `anyOf` (`null` included), a single-member `allOf`, string, integer and boolean `enum` and `const` values, the scalar types with the formats `date`, `date-time`, `time` and `uri`, arrays (a set when `uniqueItems`), dictionaries through `additionalProperties`, defaults, examples, the dry-run mock factory's `mock_format` hint, and the numeric, length and pattern constraints. The module docstring lists the subset in full. Anything else — an unknown keyword, a reference outside the schema, an inline object, an unknown format — is refused as `UnsupportedSchemaError`, coded `runtime.unexpected`, and the step fails: the schema always comes from a Pipelex class, so a shape outside the subset is a defect to fix in the builder, never the method author's.
 
-The reconstruction pipeline:
+The builder also guards itself, because the schema crosses a process boundary:
 
-1. **Generate** — `datamodel-code-generator` converts the JSON schema into Python source code defining a `BaseModel` subclass.
-2. **Execute** — `exec()` compiles the source in an isolated namespace and extracts the named class.
-3. **Cache** — A thread-safe SHA-256 hash cache is guarded by a single lock held across the entire check-then-generate sequence, not double-check locking: the lock is acquired once, the cache is checked, and — on a miss — generation and exec happen before the lock is released. This kills same-schema thundering herds (concurrent first-misses each paying a full codegen+exec round) at the cost of serializing cache hits on other schemas behind any in-flight miss, an acceptable trade-off given real workloads use a small bounded set of distinct schemas cached for the process lifetime.
-4. **Tag** — The generated source code is attached as `__kajson_class_source__` on the class, enabling Kajson to carry it through the transport.
+- a cap on the number of nodes and on the nesting depth, checked before anything is read, and a cap on how deep references may chain;
+- a field name must be an identifier, not a Python keyword, not underscore-led, and must not shadow pydantic's own `model_…` API; pydantic v1's deprecated method names, such as `copy`, `json` or `schema`, are accepted, as a concept structure accepts them;
+- types come from a fixed table and from the classes the builder made from the schema's own `$defs`, never from a module, an attribute or the class registry a title names, so every class it returns is a new one in the `builtins` module;
+- a forward reference is an underscore-led alias the builder chose, so no text the schema holds is ever evaluated.
 
-!!! warning "Class name normalization"
-    `datamodel-code-generator` normalizes schema titles to PascalCase (e.g., `dynamic_concept_test__Greeting` becomes `DynamicConceptTestGreeting`). The code tries both the original and normalized names. If neither matches, it raises `ValueError` listing the available classes.
+The description of each object survives too: pydantic writes `inspect.cleandoc(__doc__)` as the schema's `description`, so the builder sets `__doc__` to a value that `cleandoc` reads back as the original description, indented first lines included.
 
-### Carrying the class source across the boundary
+Rebuilt classes are cached by the SHA-256 of the schema in a bounded LRU cache guarded by a single lock held across the whole check-then-build sequence, not double-check locking: the lock is acquired once, the cache is checked, and — on a miss — the class is built before the lock is released. This kills same-schema thundering herds (concurrent first misses each paying a full rebuild) at the cost of serializing cache hits on other schemas behind any in-flight miss, an acceptable trade-off given real workloads use a small bounded set of distinct schemas cached for the process lifetime.
 
-The reconstructed class's source rides in the transport's **payload metadata**, not in the payload data itself — keeping the JSON payload clean and the reconstruction transparent. A host runtime's data converter injects it on serialize and re-attaches it on deserialize:
+### Nothing carries Python source across the boundary
 
-**Serialize:**
-
-```python
-class_source = getattr(type(value), "__kajson_class_source__", None)
-if class_source is not None:
-    metadata["kajson_class_source"] = class_source.encode()
-```
-
-**Deserialize:**
-
-```python
-source_bytes = payload.metadata.get("kajson_class_source")
-class_source_code = source_bytes.decode() if source_bytes else None
-pydantic_gizmo = kajson.loads(
-    data,
-    class_registry=get_class_registry(),
-    class_source_code=class_source_code,
-)
-# Re-attach source so it survives further hops
-if class_source_code is not None and isinstance(pydantic_gizmo, BaseModel):
-    type(pydantic_gizmo).__kajson_class_source__ = class_source_code
-```
-
-Re-attaching after `kajson.loads()` ensures the source survives if the object crosses another boundary (e.g. a worker returning a result to a parent that forwards it). The `__kajson_class_source__` attachment is open core; the converter that injects it into payload metadata is the host-runtime plugin's (Pipelex's Temporal backend realizes it as `BaseModelPayloadConverter`).
+The class rebuilt on a worker never crosses the boundary itself. An object generation encodes as plain JSON data (`LLMObjectGeneration.__json_encode__` in `pipelex/cogt/llm/llm_generation.py`) and decodes on the far side with each object as a `GeneratedObjectData`, which the workflow side validates into the output class it holds; a structured search returns a `dict`. No payload describes a class with Python source, and a host runtime's data converter writes none and refuses a payload that carries one (Pipelex's Temporal backend refuses the `kajson_class_source` metadata key).
 
 ### The type bridge
 
@@ -112,7 +84,7 @@ return object_class.model_validate(raw_obj.model_dump(mode=dump_mode, serialize_
 
 `model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class, restoring type safety for downstream code.
 
-`by_alias=True` is what keys that dict correctly. `model_json_schema()` emits **by alias**, so the schema's property names are what the original class accepts on the way back in — but the reconstructed class does not always name its fields that way. `datamodel-code-generator` renames any property that cannot be a field name (a python keyword, or a name shadowing a `BaseModel` attribute such as `json`, `copy`, `schema`, `construct`) and records the original as an alias. Dumping by field name would emit `construct_` for a field the original calls `construct`. Where nothing was renamed, the alias is the field name, so this is a no-op.
+`by_alias=True` keys that dict on the schema's property names. `model_json_schema()` emits **by alias**, so the schema's property names are what the original class accepts on the way back in, and the reconstructed class names each field after its property, so on the boundary the alias is the field name and the dump speaks the schema's names whichever class the object came from.
 
 The short-circuit is what makes this a *boundary* conversion rather than a step on every path. In-process the leaf already worked from the caller's class, so the object is already one — note `isinstance`, not `type(...) is`: a provider library typically returns a *subclass* of the response model, not the class itself. Converting it anyway would run the caller's validators a second time on data they already normalized, which corrupts the output of any validator that transforms rather than merely rejects. A reconstructed class is never a subclass of the original, so the boundary path falls through to the conversion as before.
 
@@ -172,7 +144,7 @@ What gets stored vs. what crosses the boundary, by content type:
 | Rendered page views | PDF page renders → storage | `list[ImageContent]` with URIs |
 | PDF of an Office file | The converted PDF → storage, beside its source or under the run's storage scope, with its metadata | `ReadablePdf`: the PDF's URI, whether it was kept or made, the converter and its version, the page count |
 | LLM text | The text, when it is past `inline_text_max_bytes` | `TextContent` or `MarkdownContent`, inline or as its reference |
-| LLM object | Nothing (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
+| LLM object | Nothing (JSON is small) | The generation as plain JSON data, re-validated against the output class on the submitter |
 | Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
 | Judgment answers | Nothing (verdicts are small) | `dict[str, JudgmentAnswer]` keyed as the questions were |
@@ -230,29 +202,7 @@ A structured generation never asks for a stored value's reference. The JSON sche
 
 ## Kajson class resolution
 
-When `kajson.loads()` receives both a `class_registry` and `class_source_code`, the resolution follows a priority chain:
-
-```python
-if class_source_code is not None:
-    source_registry = _build_registry_from_source(class_source_code)
-    if class_registry is not None:
-        # Source-derived classes fill gaps; explicit registry takes priority
-        for name, cls in source_registry.root.items():
-            if not class_registry.has_class(name):
-                class_registry.register_class(cls, name=name, ...)
-    else:
-        class_registry = source_registry
-```
-
-Resolution order:
-
-1. **Explicit `class_registry`** — the per-call scoped registry (see [Runtime Bridge & Transport](./runtime-bridge-and-transport.md#per-call-scoping))
-2. **Source-derived classes** — from `class_source_code`, filling gaps in the explicit registry
-3. **`sys.modules`** — already-imported classes
-4. **Dynamic import** — last resort, importing the module path from `__module__` metadata
-
-!!! note "exec() safety"
-    `_build_registry_from_source()` uses `exec()` internally. The source code originates from `datamodel-code-generator` running against the same JSON schema the submitter used — it is never user-supplied arbitrary code.
+Pipelex calls `kajson.loads()` with the per-call scoped class registry (see [Runtime Bridge & Transport](./runtime-bridge-and-transport.md#per-call-scoping)) and never with class source code. A class marker in a payload resolves, in order, against that explicit registry, then against `sys.modules`, then by importing the module path its `__module__` metadata names.
 
 ---
 

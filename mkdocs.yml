@@ -572,7 +572,7 @@ plugins:
         'errors/unknown-secrets-method-error.md': 'errors/pipelex/plugin/not_found.md'
         'errors/unknown-storage-method-error.md': 'errors/pipelex/plugin/not_found.md'
         'errors/unknown-var-prefix-error.md': 'errors/pipelex/config/invalid.md'
-        'errors/unsafe-schema-error.md': 'https://mthds.ai/errors/security.schema_refused'
+        'errors/unsafe-schema-error.md': 'errors/index.md'
         'errors/uri-read-refused-error.md': 'https://mthds.ai/errors/security.input_url_refused'
         'errors/validate-bundle-error.md': 'https://mthds.ai/errors/method.invalid'
         'errors/var-fallback-pattern-error.md': 'errors/pipelex/config/variable_missing.md'

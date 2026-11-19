@@ -1,7 +1,8 @@
-"""Unit tests for SchemaToModelFactory: reconstructing BaseModel classes from JSON schemas."""
+"""Unit tests for SchemaToModelFactory: rebuilding BaseModel classes from JSON schemas with create_model."""
 
 import threading
 import uuid
+from enum import StrEnum
 from typing import Any, Literal, get_args, get_origin
 
 import pytest
@@ -9,8 +10,10 @@ from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, Field, ValidationError
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
-from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
+from pipelex.cogt.content_generation.exceptions import UnsupportedSchemaError
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory, _SchemaModelBuilder  # pyright: ignore[reportPrivateUsage]
+from pipelex.system.registries.class_registry_access import get_class_registry
+from tests.unit.pipelex.cogt.content_generation.test_data import SchemaRebuildTestData
 
 
 class SimpleModel(BaseModel):
@@ -19,28 +22,22 @@ class SimpleModel(BaseModel):
 
 
 class ModelWithLiteralChoices(BaseModel):
-    """A model whose ``recommendation`` field is a ``Literal`` over string choices.
-
-    Mirrors the shape a `.mthds` ``choices = [...]`` declaration produces: the
-    field's JSON schema contains an inline ``enum: [strings]`` array, and the
-    Python annotation is ``Literal[...]`` — NOT a named Python enum class.
-    """
+    """A model whose ``recommendation`` field is a ``Literal`` over string choices, as a ``choices`` declaration makes."""
 
     recommendation: Literal["Strong Match", "Good Match", "Partial Match", "Poor Match"]
 
 
 class ModelWithJsonObject(BaseModel):
-    """A model with a free-form JSON object field typed ``dict[str, Any]``.
-
-    Mirrors ``JSONContent``, the native content class that a concept refining the
-    native ``JSON`` concept resolves to. The ``Any`` in ``dict[str, Any]`` is what
-    breaks forward-reference resolution: datamodel-code-generator emits
-    ``from __future__ import annotations``, turning the field annotation into the
-    string ``"dict[str, Any]"``. If the rebuild namespace does not carry ``Any``,
-    ``model_rebuild`` raises ``NameError: name 'Any' is not defined``.
-    """
+    """A model with a free-form JSON object field, as ``JSONContent`` carries."""
 
     json_obj: dict[str, Any] = Field(description="The JSON object")
+
+
+class ModelWithConstraints(BaseModel):
+    score: float = Field(gt=0, le=10)
+    code: str = Field(min_length=2, max_length=4, pattern=r"^[A-Z]+$")
+    tags: list[str] = Field(min_length=1)
+    ratio: float | None = Field(default=None, ge=0, le=1)
 
 
 class Address(BaseModel):
@@ -53,8 +50,25 @@ class PersonWithAddress(BaseModel):
     address: Address
 
 
-def _benign_object_schema() -> dict[str, Any]:
-    return {"title": "Innocent", "type": "object", "properties": {"x": {"type": "integer"}}}
+class TreeNode(BaseModel):
+    label: str
+    children: list["TreeNode"] | None = None
+
+
+class Tone(StrEnum):
+    FORMAL = "formal"
+    CASUAL = "casual"
+
+
+class ModelWithEnum(BaseModel):
+    tone: Tone
+
+
+class ModelWithIndentedDescription(BaseModel):
+    # Assigned rather than written as a docstring, which the formatter would reflow.
+    __doc__ = "\n    Indented first line.\nThen a line that is not.\n"
+
+    note: str
 
 
 class ModelWithPresenceVariants(BaseModel):
@@ -65,128 +79,89 @@ class ModelWithPresenceVariants(BaseModel):
     title: str = Field(..., description="A required title")
 
 
+def _unique_schema(model_class: type[BaseModel]) -> tuple[dict[str, Any], str]:
+    """The class's schema under a title no other test uses, so the class-level cache never answers for it."""
+    schema = model_class.model_json_schema()
+    title = f"{model_class.__name__}_{uuid.uuid4().hex}"
+    schema["title"] = title
+    return schema, title
+
+
 class TestSchemaToModel:
-    def test_literal_choices_field_round_trips_as_literal_not_enum(self) -> None:
-        """Round-tripping a ``Literal[str-set]`` field through ``make_from_json_schema``
-        must keep it as a ``Literal[...]`` annotation in the reconstructed class.
+    def test_literal_choices_field_holds_the_value(self) -> None:
+        """A ``Literal`` field rebuilds as a ``Literal`` over the same values, and a valid answer holds the value itself."""
+        schema, title = _unique_schema(ModelWithLiteralChoices)
 
-        Bug repro: today the round-trip silently re-emits the field as a generated
-        ``Enum`` class (e.g. ``class Recommendation(Enum)`` with members like
-        ``Poor_Match = "Poor Match"``). When this reconstructed class is handed to
-        an LLM as the structured-output target, the LLM tends to fill it with the
-        Python enum repr (``"Recommendation.Poor_Match"``) instead of the literal
-        string (``"Poor Match"``), which then fails Pydantic validation against the
-        original choice set.
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
 
-        We assert two things:
-          1. the generated Python source code does NOT introduce an ``Enum`` class
-             named after the field (``class Recommendation(Enum)``);
-          2. the reconstructed model's ``recommendation`` field annotation is a
-             ``Literal[...]`` whose args are exactly the original string choices.
-        """
-        # Use a unique title so the class-level schema cache never short-circuits
-        # this test with a stale (already-correct or already-buggy) result from
-        # another test run.
-        schema = ModelWithLiteralChoices.model_json_schema()
-        unique_title = f"LiteralChoicesRepro_{uuid.uuid4().hex}"
-        schema["title"] = unique_title
+        annotation = result_class.model_fields["recommendation"].annotation
+        assert get_origin(annotation) is Literal
+        assert get_args(annotation) == ("Strong Match", "Good Match", "Partial Match", "Poor Match")
+        assert result_class.model_validate({"recommendation": "Poor Match"}).recommendation == "Poor Match"  # type: ignore[attr-defined]
+        with pytest.raises(ValidationError):
+            result_class.model_validate({"recommendation": "Recommendation.Poor_Match"})
+        assert result_class.model_json_schema() == schema
 
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=unique_title)
-        source = getattr(result_class, "__kajson_class_source__", "")
+    def test_json_object_field_reconstructs(self) -> None:
+        """A ``dict[str, Any]`` field rebuilds as one and holds any JSON object."""
+        schema, title = _unique_schema(ModelWithJsonObject)
 
-        assert "class Recommendation(Enum)" not in source, (
-            "Bug: Literal[...] choices were re-emitted as a generated Enum class. "
-            "An LLM targeting this Enum returns 'Recommendation.Poor_Match' (Python "
-            "enum repr) instead of the literal 'Poor Match', which fails validation "
-            "against the original choice set.\n\nGenerated source:\n" + source
-        )
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
 
-        recommendation_field = result_class.model_fields["recommendation"]
-        annotation = recommendation_field.annotation
-        assert get_origin(annotation) is Literal, (
-            f"Expected the round-tripped 'recommendation' field annotation to be Literal[...], got {annotation!r}. Source:\n{source}"
-        )
-        assert set(get_args(annotation)) == {
-            "Strong Match",
-            "Good Match",
-            "Partial Match",
-            "Poor Match",
-        }, f"Literal args drifted during round-trip: {get_args(annotation)!r}"
-
-    def test_json_object_field_reconstructs_without_undefined_any(self) -> None:
-        """A schema with a ``dict[str, Any]`` field reconstructs without raising.
-
-        Bug repro: a ``PipeLLM`` whose output is a concept refining the native
-        ``JSON`` concept produces a structured-output model carrying an
-        ``Any``-typed field (inherited from ``JSONContent``). datamodel-code-generator
-        emits ``from __future__ import annotations``, so the field annotation becomes
-        the string ``"dict[str, Any]"``. If ``model_rebuild`` runs against a namespace
-        that lacks ``Any``, it raises ``PydanticUndefinedAnnotation: name 'Any' is
-        not defined``. The rebuild namespace must carry the typing names the generated
-        source was written against.
-        """
-        schema = ModelWithJsonObject.model_json_schema()
-        unique_title = f"JsonObjectRepro_{uuid.uuid4().hex}"
-        schema["title"] = unique_title
-
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=unique_title)
-
-        source = getattr(result_class, "__kajson_class_source__", "")
-        assert "from __future__ import annotations" in source, (
-            f"Expected datamodel-code-generator to emit future annotations (so the regression target is meaningful). Source:\n{source}"
-        )
-        assert "json_obj" in result_class.model_fields
+        assert result_class.model_fields["json_obj"].annotation == dict[str, Any]
         instance = result_class(json_obj={"category": "vectors", "count": 3})
         assert instance.json_obj == {"category": "vectors", "count": 3}  # type: ignore[attr-defined]
 
-    def test_make_types_from_source_resolves_any_annotation(self) -> None:
-        """The receiver path (``make_types_from_source``) rebuilds a model whose
-        string annotation references ``Any`` without raising.
+    def test_constraints_survive_the_rebuild(self) -> None:
+        """Every constraint of the original class constrains the rebuilt one, inside a union too."""
+        schema, title = _unique_schema(ModelWithConstraints)
 
-        This is the cross-process path: a ``__kajson_class_source__`` payload carrying
-        ``from __future__ import annotations`` plus a ``dict[str, Any]`` field must
-        rebuild against a namespace that includes ``Any``.
-        """
-        source = (
-            "from __future__ import annotations\n"
-            "from typing import Any\n"
-            "from pydantic import BaseModel, Field\n"
-            "\n\n"
-            "class JsonHolder(BaseModel):\n"
-            "    json_obj: dict[str, Any] = Field(..., description='The JSON object')\n"
-        )
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
 
-        types = SchemaToModelFactory.make_types_from_source(source)
-
-        json_holder = types["JsonHolder"]
-        assert issubclass(json_holder, BaseModel)
-        instance = json_holder(json_obj={"k": "v"})
-        assert instance.json_obj == {"k": "v"}  # type: ignore[attr-defined]
+        assert result_class.model_json_schema() == schema
+        valid = {"score": 10, "code": "AB", "tags": ["x"], "ratio": 0.5}
+        assert result_class.model_validate(valid).model_dump() == {**valid, "score": 10.0}
+        invalid_cases: list[dict[str, Any]] = [{"score": 0}, {"code": "A"}, {"code": "ab"}, {"code": "ABCDE"}, {"tags": []}, {"ratio": 2}]
+        for invalid_values in invalid_cases:
+            with pytest.raises(ValidationError):
+                result_class.model_validate({**valid, **invalid_values})
 
     def test_simple_model_reconstruction(self) -> None:
-        """A simple model can be reconstructed from its JSON schema."""
+        """A simple model rebuilds under its title, with its fields, and validates data."""
         schema = SimpleModel.model_json_schema()
         result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="SimpleModel")
 
         assert result_class.__name__ == "SimpleModel"
-        assert "name" in result_class.model_fields
-        assert "age" in result_class.model_fields
-
-    def test_reconstructed_model_can_validate(self) -> None:
-        """The reconstructed model can validate data."""
-        schema = SimpleModel.model_json_schema()
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="SimpleModel")
-
+        assert result_class.__module__ == "builtins"
+        assert list(result_class.model_fields) == ["name", "age"]
         instance = result_class(name="Alice", age=30)
-        assert instance.name == "Alice"  # type: ignore[attr-defined]
-        assert instance.age == 30  # type: ignore[attr-defined]
+        assert instance.model_dump() == {"name": "Alice", "age": 30}
+        restored = result_class.model_validate_json(instance.model_dump_json())
+        assert restored.model_dump() == {"name": "Alice", "age": 30}
+
+    def test_the_rebuilt_class_is_always_a_new_one(self) -> None:
+        """The title names the class, but never selects a class that already exists, in the registry or anywhere."""
+        schema = SimpleModel.model_json_schema()
+        schema["title"] = "TextContent"
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="TextContent")
+
+        assert result_class is not get_class_registry().get_required_class("TextContent")
+        assert result_class.__name__ == "TextContent"
+        assert result_class.__bases__ == (BaseModel,)
+
+    def test_class_name_names_a_root_without_title(self) -> None:
+        """A root schema without a title takes the class name the caller gives."""
+        schema = SimpleModel.model_json_schema()
+        del schema["title"]
+        class_name = f"Untitled_{uuid.uuid4().hex}"
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=class_name)
+
+        assert result_class.__name__ == class_name
 
     def test_reconstructed_model_keeps_each_field_nullable_only_where_the_source_is(self) -> None:
-        """A defaulted field refuses `null` on the rebuilt class, as on the class it was rebuilt from.
-
-        The rebuilt class is what a model's answer is validated against on a worker, so a `null` it admitted
-        would pass there and fail only at the revalidation into the caller's class, too late to ask again.
-        """
+        """A defaulted field refuses `null` on the rebuilt class, as on the class it was rebuilt from."""
         schema = ModelWithPresenceVariants.model_json_schema()
         result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="ModelWithPresenceVariants")
 
@@ -198,81 +173,76 @@ class TestSchemaToModel:
             result_class.model_validate({"title": "Kept", "note": None})
         assert [error["loc"] for error in exc_info.value.errors()] == [("note",)]
 
+    def test_a_field_with_a_default_factory_starts_empty(self) -> None:
+        """A container the schema shows as optional with no default starts empty on the rebuilt class, as its factory made it."""
+        schema = ModelWithConstraints.model_json_schema()
+        schema["properties"]["tags"] = {"items": {"type": "string"}, "title": "Tags", "type": "array"}
+        schema["required"] = ["score", "code"]
+        schema["title"] = f"FactoryDefaults_{uuid.uuid4().hex}"
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="FactoryDefaults")
+
+        assert result_class.model_validate({"score": 1, "code": "AB"}).model_dump() == {"score": 1.0, "code": "AB", "tags": [], "ratio": None}
+        assert result_class.model_json_schema() == schema
+
     def test_nested_model_reconstruction(self) -> None:
-        """A model with nested BaseModel fields (producing $defs) can be reconstructed."""
+        """A nested model rebuilds as a new class of the same name, with the same schema."""
         schema = PersonWithAddress.model_json_schema()
         result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="PersonWithAddress")
 
-        instance = result_class(
-            name="Bob",
-            address={"street": "123 Main", "city": "NYC"},
-        )
-        assert instance.name == "Bob"  # type: ignore[attr-defined]
+        address_class = result_class.model_fields["address"].annotation
+        assert isinstance(address_class, type)
+        assert address_class.__name__ == "Address"
+        assert address_class is not Address
+        instance = result_class(name="Bob", address={"street": "123 Main", "city": "NYC"})
         assert instance.address.city == "NYC"  # type: ignore[attr-defined]
+        assert result_class.model_json_schema() == schema
 
-    def test_kajson_class_source_attached(self) -> None:
-        """The reconstructed class has __kajson_class_source__ with the generated Python source."""
-        schema = SimpleModel.model_json_schema()
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="SimpleModel")
+    def test_recursive_model_reconstruction(self) -> None:
+        """A recursive model, whose schema is a root `$ref`, rebuilds through a forward reference the builder resolves."""
+        schema = TreeNode.model_json_schema()
+        assert set(schema) == {"$defs", "$ref"}
 
-        source = getattr(result_class, "__kajson_class_source__", None)
-        assert source is not None
-        assert "class SimpleModel" in source
-        assert "BaseModel" in source
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="TreeNode")
+
+        assert result_class.model_json_schema() == schema
+        tree = result_class.model_validate({"label": "root", "children": [{"label": "leaf"}]})
+        assert tree.children[0].label == "leaf"  # type: ignore[attr-defined]
+        assert type(tree.children[0]) is result_class  # type: ignore[attr-defined]
+
+    def test_enumeration_definition_rebuilds_as_an_enum_equal_to_its_values(self) -> None:
+        """An enumeration in `$defs` rebuilds as an Enum class of that name whose members equal their values."""
+        schema = ModelWithEnum.model_json_schema()
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="ModelWithEnum")
+
+        assert result_class.model_json_schema() == schema
+        tone = result_class.model_validate({"tone": "casual"}).tone  # type: ignore[attr-defined]
+        assert tone == "casual"
+        assert ModelWithEnum.model_validate({"tone": tone}).tone is Tone.CASUAL
+
+    def test_description_reads_back_as_written(self) -> None:
+        """A description whose first line is indented reads back unchanged, through the docstring compensation."""
+        schema = ModelWithIndentedDescription.model_json_schema()
+        assert schema["description"].startswith("    Indented")
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="ModelWithIndentedDescription")
+
+        assert result_class.model_json_schema()["description"] == schema["description"]
 
     def test_caching_returns_same_class(self) -> None:
-        """Calling with the same schema returns the same class object (cached)."""
-        schema = SimpleModel.model_json_schema()
-        class_1 = SchemaToModelFactory.make_from_json_schema(schema, class_name="SimpleModel")
-        class_2 = SchemaToModelFactory.make_from_json_schema(schema, class_name="SimpleModel")
+        """Calling with the same schema returns the same class object, and different schemas different classes."""
+        class_1 = SchemaToModelFactory.make_from_json_schema(SimpleModel.model_json_schema(), class_name="SimpleModel")
+        class_2 = SchemaToModelFactory.make_from_json_schema(SimpleModel.model_json_schema(), class_name="SimpleModel")
+        class_nested = SchemaToModelFactory.make_from_json_schema(PersonWithAddress.model_json_schema(), class_name="PersonWithAddress")
 
         assert class_1 is class_2
+        assert class_1 is not class_nested
 
-    def test_different_schemas_different_classes(self) -> None:
-        """Different schemas produce different classes even if class names differ."""
-        schema_simple = SimpleModel.model_json_schema()
-        schema_nested = PersonWithAddress.model_json_schema()
-
-        class_simple = SchemaToModelFactory.make_from_json_schema(schema_simple, class_name="SimpleModel")
-        class_nested = SchemaToModelFactory.make_from_json_schema(schema_nested, class_name="PersonWithAddress")
-
-        assert class_simple is not class_nested
-
-    def test_json_roundtrip_with_reconstructed_class(self) -> None:
-        """An instance of the reconstructed class survives JSON round-trip."""
-        schema = SimpleModel.model_json_schema()
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="SimpleModel")
-
-        instance = result_class(name="Charlie", age=25)
-        json_str = instance.model_dump_json()
-        restored = result_class.model_validate_json(json_str)
-        assert restored.name == "Charlie"  # type: ignore[attr-defined]
-        assert restored.age == 25  # type: ignore[attr-defined]
-
-    def test_normalized_class_name_lookup(self) -> None:
-        """A class_name with underscores/double-underscores resolves via PascalCase normalization."""
-        schema = SimpleModel.model_json_schema()
-        # Override the title to simulate a dynamic concept code like "my_namespace__Greeting"
-        schema["title"] = "my_namespace__Greeting"
-        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="my_namespace__Greeting")
-
-        assert "name" in result_class.model_fields
-        assert "age" in result_class.model_fields
-        instance = result_class(name="Ada", age=40)
-        assert instance.name == "Ada"  # type: ignore[attr-defined]
-
-    def test_concurrent_first_miss_generates_source_only_once(self, mocker: MockerFixture) -> None:
-        """N threads racing on the same uncached schema must trigger codegen exactly once.
-
-        The cache is class-level state shared across tests, so we use a unique title per
-        run to guarantee a cold-cache start. Without serialization, every thread that
-        observes the empty cache pays the full _generate_source_from_schema cost.
-        """
-        schema = SimpleModel.model_json_schema()
-        unique_title = f"ConcurrentMiss_{uuid.uuid4().hex}"
-        schema["title"] = unique_title
-
-        spy = mocker.spy(SchemaToModelFactory, "_generate_source_from_schema")
+    def test_concurrent_first_miss_builds_only_once(self, mocker: MockerFixture) -> None:
+        """N threads racing on the same uncached schema build the class exactly once."""
+        schema, title = _unique_schema(SimpleModel)
+        spy = mocker.spy(SchemaToModelFactory, "_build")
 
         thread_count = 8
         barrier = threading.Barrier(thread_count)
@@ -281,7 +251,7 @@ class TestSchemaToModel:
 
         def worker() -> None:
             barrier.wait()
-            result = SchemaToModelFactory.make_from_json_schema(schema, class_name=unique_title)
+            result = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
             with results_lock:
                 results.append(result)
 
@@ -292,208 +262,79 @@ class TestSchemaToModel:
             thread.join()
 
         assert len(results) == thread_count
-        first_class = results[0]
-        for result_class in results[1:]:
-            assert result_class is first_class
+        assert all(result_class is results[0] for result_class in results)
         assert spy.call_count == 1
 
     def test_cache_bounded_size_evicts_lru(self, mocker: MockerFixture) -> None:
-        """The schema cache caps at _SCHEMA_CACHE_MAX_SIZE and evicts least-recently-used entries.
-
-        Lowers the bound to 3, inserts 4 distinct schemas, and asserts: (1) cache size never
-        exceeds the bound, (2) the oldest schema was evicted (re-requesting it triggers
-        fresh codegen). Saves and restores the class-level cache to keep the test isolated.
-        """
-        # Snapshot then clear class-level state so this test is hermetic.
+        """The schema cache caps at _SCHEMA_CACHE_MAX_SIZE and evicts the least recently used entry."""
         saved_cache = SchemaToModelFactory._schema_cache.copy()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         SchemaToModelFactory._schema_cache.clear()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         mocker.patch.object(SchemaToModelFactory, "_SCHEMA_CACHE_MAX_SIZE", 3)
-        spy = mocker.spy(SchemaToModelFactory, "_generate_source_from_schema")
+        spy = mocker.spy(SchemaToModelFactory, "_build")
 
         try:
-            schemas: list[tuple[str, dict[str, Any]]] = []
-            for index in range(4):
-                schema = SimpleModel.model_json_schema()
-                title = f"BoundedCacheTest_{uuid.uuid4().hex}_{index}"
-                schema["title"] = title
-                schemas.append((title, schema))
+            schemas = [_unique_schema(SimpleModel) for _ in range(4)]
+            for schema, title in schemas:
                 SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
                 assert len(SchemaToModelFactory._schema_cache) <= 3  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-
             assert spy.call_count == 4
-            assert len(SchemaToModelFactory._schema_cache) == 3  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-            # Oldest schema (index 0) must have been evicted: re-requesting it triggers fresh codegen.
-            oldest_title, oldest_schema = schemas[0]
+            oldest_schema, oldest_title = schemas[0]
             SchemaToModelFactory.make_from_json_schema(oldest_schema, class_name=oldest_title)
             assert spy.call_count == 5
 
-            # Most-recently-used schema (index 3) must still be cached: no fresh codegen.
-            recent_title, recent_schema = schemas[3]
+            recent_schema, recent_title = schemas[3]
             SchemaToModelFactory.make_from_json_schema(recent_schema, class_name=recent_title)
             assert spy.call_count == 5
         finally:
             SchemaToModelFactory._schema_cache.clear()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             SchemaToModelFactory._schema_cache.update(saved_cache)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-    def test_exec_blocks_dangerous_builtins(self) -> None:
-        """The restricted exec namespace blocks open(), eval(), exec(), and compile()."""
-        malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\nleaked = open('/etc/passwd')\n"
-        with pytest.raises(NameError, match="open"):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+    @pytest.mark.parametrize(("topic", "schema", "expected_fragment"), SchemaRebuildTestData.REFUSED_SCHEMAS)
+    def test_a_schema_outside_the_subset_is_refused(self, topic: str, schema: dict[str, Any], expected_fragment: str) -> None:
+        """Each shape outside the supported subset, and each field name no class can hold, is refused by name."""
+        with pytest.raises(UnsupportedSchemaError) as exc_info:
+            SchemaToModelFactory.make_from_json_schema(schema, class_name="Refused")
+        assert expected_fragment in str(exc_info.value), topic
+        assert exc_info.value.resolve_error_code() == CoreCode.RUNTIME_UNEXPECTED
 
-    # ---- Layer 1: schema sanitization (x-python-* extensions are rejected) ----
+    @pytest.mark.parametrize("field_name", ["copy", "dict", "json", "schema", "validate", "model_year"])
+    def test_a_field_named_like_a_deprecated_pydantic_method_is_kept(self, field_name: str) -> None:
+        """A concept structure may name a field `copy` or `json`, or start one with `model_`: the rebuilt class keeps it."""
+        schema = {"title": f"Kept_{uuid.uuid4().hex}", "type": "object", "properties": {field_name: {"title": "Value", "type": "string"}}}
 
-    def test_x_python_import_at_top_level_is_rejected(self) -> None:
-        """A schema with x-python-import at the top level is rejected before reaching codegen."""
-        schema = _benign_object_schema()
-        schema["x-python-import"] = {"module": "subprocess", "name": "run"}
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Innocent")
-        assert "x-python-import" in str(exc_info.value)
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="Kept")
 
-    def test_x_python_import_in_defs_is_rejected(self) -> None:
-        """Realistic exploit shape: x-python-import nested under $defs is rejected.
+        assert list(result_class.model_fields) == [field_name]
+        assert result_class.model_validate({field_name: "kept"}).model_dump() == {field_name: "kept"}
 
-        This is the actual attack vector — datamodel-code-generator emits
-        `from subprocess import run` from this payload with zero sanitization.
-        """
-        schema: dict[str, Any] = {
-            "title": "Innocent",
-            "type": "object",
-            "properties": {"hit": {"$ref": "#/$defs/Run"}},
-            "$defs": {"Run": {"x-python-import": {"module": "subprocess", "name": "run"}}},
+    def test_a_schema_past_the_node_cap_is_refused(self, mocker: MockerFixture) -> None:
+        """The node cap is checked before anything is built."""
+        mocker.patch.object(_SchemaModelBuilder, "MAX_NODES", 20)
+        schema = {"title": "Wide", "type": "object", "properties": {f"field_{index}": {"type": "string"} for index in range(20)}}
+
+        with pytest.raises(UnsupportedSchemaError, match="more than 20 nodes"):
+            SchemaToModelFactory.make_from_json_schema(schema, class_name="Wide")
+
+    def test_a_schema_past_the_depth_cap_is_refused(self) -> None:
+        """A schema nesting deeper than the cap is refused before anything is built."""
+        node: dict[str, Any] = {"type": "string"}
+        for _ in range(_SchemaModelBuilder.MAX_DEPTH):
+            node = {"type": "array", "items": node}
+        schema = {"title": "Deep", "type": "object", "properties": {"deep": node}}
+
+        with pytest.raises(UnsupportedSchemaError, match="nests deeper than"):
+            SchemaToModelFactory.make_from_json_schema(schema, class_name="Deep")
+
+    def test_references_chaining_past_the_depth_cap_are_refused(self) -> None:
+        """Definitions referencing one another in a chain longer than the cap are refused, though the schema nests shallowly."""
+        chain_length = _SchemaModelBuilder.MAX_DEPTH
+        defs = {
+            f"Link{index}": {"title": f"Link{index}", "type": "object", "properties": {"next": {"$ref": f"#/$defs/Link{index + 1}"}}}
+            for index in range(chain_length)
         }
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Innocent")
-        assert "x-python-import" in str(exc_info.value)
+        defs[f"Link{chain_length}"] = {"title": "End", "type": "object", "properties": {}}
+        schema = {"title": "Chain", "type": "object", "properties": {"first": {"$ref": "#/$defs/Link0"}}, "$defs": defs}
 
-    def test_x_python_type_is_rejected(self) -> None:
-        """Sibling extension x-python-type must also be rejected."""
-        schema = _benign_object_schema()
-        schema["properties"]["x"]["x-python-type"] = "subprocess.Popen"
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Innocent")
-        assert "x-python-type" in str(exc_info.value)
-
-    @pytest.mark.parametrize(
-        "extension_key",
-        [
-            "x-python-import",
-            "x-python-type",
-            "x-python-class-name",
-            "x-python-fancy-future-feature",
-        ],
-    )
-    def test_any_x_python_extension_is_rejected(self, extension_key: str) -> None:
-        """Future-proofing: any x-python-* extension in the schema is rejected."""
-        schema = _benign_object_schema()
-        schema[extension_key] = "anything"
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Innocent")
-        assert extension_key in str(exc_info.value)
-
-    def test_deeply_nested_x_python_import_is_rejected(self) -> None:
-        """The walker must recurse into deeply nested structures (arrays + $defs + properties)."""
-        schema: dict[str, Any] = {
-            "title": "Outer",
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {"$ref": "#/$defs/Inner"},
-                }
-            },
-            "$defs": {
-                "Inner": {
-                    "type": "object",
-                    "properties": {
-                        "evil": {"x-python-import": {"module": "subprocess", "name": "run"}},
-                    },
-                },
-            },
-        }
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Outer")
-        assert "x-python-import" in str(exc_info.value)
-
-    def test_unsafe_schema_error_names_the_offending_path(self) -> None:
-        """The error message points to where the violation was found, for diagnostic logs."""
-        schema: dict[str, Any] = {
-            "title": "Innocent",
-            "type": "object",
-            "properties": {"hit": {"$ref": "#/$defs/Run"}},
-            "$defs": {"Run": {"x-python-import": {"module": "subprocess", "name": "run"}}},
-        }
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Innocent")
-        message = str(exc_info.value)
-        assert "$defs" in message
-        assert "Run" in message
-
-    def test_multiple_violations_are_all_reported(self) -> None:
-        """All violations in a single schema are surfaced — incident response needs the full picture."""
-        schema: dict[str, Any] = {
-            "title": "Innocent",
-            "type": "object",
-            "properties": {
-                "a": {"x-python-import": {"module": "subprocess", "name": "run"}},
-                "b": {"x-python-type": "os.system"},
-            },
-        }
-        with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(schema, class_name="Innocent")
-        message = str(exc_info.value)
-        assert "x-python-import" in message
-        assert "x-python-type" in message
-
-    # ---- Layer 2: __import__ allowlist (defense-in-depth at the exec boundary) ----
-
-    def test_exec_blocks_import_subprocess(self) -> None:
-        """Even bypassing Layer 1, the restricted __import__ blocks `import subprocess`, as the perimeter's refusal."""
-        malicious_source = "from pydantic import BaseModel\nimport subprocess\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        with pytest.raises(UnsafeSchemaError, match="subprocess") as exc_info:
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_SCHEMA_REFUSED
-
-    def test_exec_blocks_direct_dunder_import_call(self) -> None:
-        """A direct __import__('subprocess') call is also blocked."""
-        malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n_leak = __import__('subprocess')\n"
-        with pytest.raises(UnsafeSchemaError, match="subprocess"):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-
-    @pytest.mark.parametrize(
-        ("import_line", "expected_module"),
-        [
-            ("from os import system", "os"),
-            ("from socket import socket", "socket"),
-            ("import shutil", "shutil"),
-            ("from urllib.request import urlopen", "urllib"),
-        ],
-    )
-    def test_exec_blocks_dangerous_imports(self, import_line: str, expected_module: str) -> None:
-        """A range of dangerous stdlib imports is blocked by the allowlist."""
-        malicious_source = f"from pydantic import BaseModel\n{import_line}\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        with pytest.raises(UnsafeSchemaError, match=expected_module):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-
-    @pytest.mark.parametrize(
-        "import_line",
-        [
-            "from pydantic import BaseModel",
-            "from typing import Optional",
-            "from typing_extensions import override",
-            "from datetime import datetime",
-            "from decimal import Decimal",
-            "from uuid import UUID",
-            "from enum import Enum",
-            "from __future__ import annotations",
-            "from collections.abc import Mapping",
-            "import re",
-        ],
-    )
-    def test_exec_allowlisted_imports_succeed(self, import_line: str) -> None:
-        """Allowlisted imports required by datamodel-code-generator output continue to work."""
-        source = f"{import_line}\nfrom pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        result_class = SchemaToModelFactory._exec_and_extract_class(source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-        assert result_class.__name__ == "Innocent"
+        with pytest.raises(UnsupportedSchemaError, match="references chain deeper than"):
+            SchemaToModelFactory.make_from_json_schema(schema, class_name="Chain")

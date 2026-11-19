@@ -218,12 +218,10 @@ def _leaf_gen_object(object_assignment: ObjectAssignment, *, report_func: _Repor
     """Shared object-mock pipeline: resolve the class to mock, report once, build one mock.
 
     With the caller's class in hand the mock is built from it directly, so every invariant it enforces
-    is honored. Without it (the boundary case) the class is rebuilt from the JSON schema, which drops
-    custom validators and the format hints encoded via ``json_schema_extra`` that
-    datamodel-code-generator omits on round-trip — so exotic-format schemas may yield mock data the
-    original class would reject. The generator re-validates against the original class and re-raises
-    that failure as ``DryRunObjectFidelityError`` (review F2); declare ``examples`` / ``mock_format``
-    on the constrained fields to fix it.
+    is honored. Without it (the boundary case) the class is rebuilt from the JSON schema, which cannot
+    carry custom validators — so a mock may hold data the original class would reject. The generator
+    re-validates against the original class and re-raises that failure as ``DryRunObjectFidelityError``
+    (review F2); declare ``examples`` / ``mock_format`` on the constrained fields to fix it.
 
     Reports exactly once — the live leaf makes one ``gen_object`` call (a list is one call against a
     list-wrapper schema), so a single ``UsageReportEvent`` matches the real one-call topology that

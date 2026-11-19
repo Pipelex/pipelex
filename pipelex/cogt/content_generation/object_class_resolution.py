@@ -2,10 +2,9 @@
 
 ``ObjectAssignment`` is a wire model: it carries the output structure's JSON *schema*, never the live
 class, because a distributed orchestrator ships it to a worker process that cannot receive a ``type``.
-A worker entering from that boundary has to rebuild an approximation of the class from the schema —
-which is lossy (``datamodel-code-generator`` cannot express a custom validator, and drops
-``json_schema_extra`` format/pattern hints) and costs a code generation plus an ``exec()`` on the first
-call for each distinct schema.
+A worker entering from that boundary has to rebuild the class from the schema with ``create_model``. The
+rebuild reproduces the schema exactly, but a schema cannot carry a custom validator, so the rebuilt class
+enforces less than the caller's.
 
 In-process there is no boundary: the caller's real class is still on the stack, so it travels down
 beside the assignment and is used as-is. ``None`` means "no class in hand", which is exactly what a

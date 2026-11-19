@@ -30,8 +30,7 @@ Two facts decide how this bump differs from bumping an ordinary dependency, and
 they pull in opposite directions:
 
 - **kajson's output is a wire format**, not just an API. What it encodes is what
-  crosses the Temporal transport, what a working memory rehydrates from, and
-  what `__kajson_class_source__` carries. A change to the *format* is a
+  crosses the Temporal transport and what a working memory rehydrates from. A change to the *format* is a
   compatibility question between two processes, which a type checker cannot see
   and a single-process test suite will not fail on.
 - **kajson does not reach this engine's public surface.** Nothing in

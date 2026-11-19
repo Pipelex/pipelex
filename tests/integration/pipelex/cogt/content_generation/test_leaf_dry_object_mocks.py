@@ -1,7 +1,7 @@
 """Integration tests for the ``run_mode == DRY`` object mocks at the cogt leaf.
 
 These call the leaves with no live class in hand, so the mock is built from the **schema-reconstructed**
-class (pre-flight decision 2), exercising real datamodel-code-generator codegen. Contracts pinned here:
+class (pre-flight decision 2), exercising the real schema rebuild. Contracts pinned here:
 
 - a representative ``StructuredContent`` mocks into a valid instance of the original class
   (the object-mock fidelity pin mandated by pre-flight decision 2);
