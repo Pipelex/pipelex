@@ -1,7 +1,8 @@
 """Path helpers for accessing test data files."""
 
-from importlib import resources
 from pathlib import Path
+
+TESTS_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
 def data_path(relative: str) -> Path:
@@ -18,5 +19,4 @@ def data_path(relative: str) -> Path:
         >>> doc = data_path("documents/solar_system.pdf")
 
     """
-    data_dir = resources.files("tests.data")
-    return Path(str(data_dir)) / relative
+    return TESTS_DATA_DIR / relative
