@@ -298,8 +298,6 @@ def refuse_unexpected_python_module_shape(body: str) -> None:
     refusal = generated_module_shape_refusal(
         module=module,
         module_label="emitted Python module",
-        opens_with_docstring=False,
-        expected_class_names=None,
         class_attribute_assignments=_CLASS_ATTRIBUTE_ASSIGNMENTS,
     )
     if refusal is not None:

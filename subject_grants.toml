@@ -6040,7 +6040,7 @@ rationale = "Parses/reads the path; single operand."
 param = "mime_type"
 rationale = "Transforms the mime_type; single operand."
 
-["pipelex/tools/misc/generated_module_shape.py::is_string_statement"]
+["pipelex/tools/misc/generated_module_shape.py::_is_string_statement"]
 param = "statement"
 rationale = "Predicate on the statement; single operand."
 

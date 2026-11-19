@@ -5,9 +5,13 @@ inside the validation window, dumps one artifact per hop of the chain that turns
 facts into the `json_schema` emitted on `pipe_io_contracts`:
 
 - ``hop1_bundle_blueprints.json`` — parse: the `PipelexBundleBlueprint` dumps (what survived TOML).
-- ``hop2_generated_sources/`` — resolve + generate: the module the `python-structures` codegen
-  emitter renders for the bundles' concepts, which gives the class the runtime builds from data at
-  load time; every declared concept maps to it in the manifest.
+- ``hop2_structure_classes/`` — resolve + build: per traced concept, the structure class the loaded
+  library holds for it, read off the class (name, bases, docstring, and each field's annotation,
+  requiredness, default and description): the class the runtime built from the concept's structure
+  at load time, or the class a `structure = "ClassName"` concept names.
+- ``hop2_python_structures.py.txt`` — the module the `python-structures` codegen emitter renders for
+  the loaded crate, the file `pipelex build structures` would write. It agrees with the runtime's
+  classes on concepts with a structure table only (see the codegen projections page).
 - ``hop3_raw_pydantic_schemas/`` — raw `model_json_schema()` per concept's structure class,
   before any Pipelex render wrapping.
 - ``hop4_schema_renders/`` — the `ConceptRepresentationFormat.SCHEMA` render per pipe input
@@ -30,6 +34,8 @@ from pathlib import Path
 from typing import Any
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
+from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 from rich.markup import escape
 
 from pipelex.base_exceptions import PipelexError
@@ -37,9 +43,9 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
+from pipelex.core.stuffs.non_null_any import field_admits_none
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -48,7 +54,6 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.libraries.crate_normalization import normalize_crate
-from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipelex import Pipelex
@@ -60,7 +65,8 @@ from pipelex.runtime_hub import get_console
 
 MANIFEST_FILE_NAME = "trace_manifest.json"
 HOP1_FILE_NAME = "hop1_bundle_blueprints.json"
-HOP2_DIR_NAME = "hop2_generated_sources"
+HOP2_DIR_NAME = "hop2_structure_classes"
+HOP2_PYTHON_STRUCTURES_FILE_NAME = "hop2_python_structures.py.txt"
 HOP3_DIR_NAME = "hop3_raw_pydantic_schemas"
 HOP4_DIR_NAME = "hop4_schema_renders"
 HOP5_FILE_NAME = "hop5_pipe_io_contracts.json"
@@ -72,41 +78,79 @@ def _write_json(*, path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _write_text(*, path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def _capture_hop1(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path) -> str:
     payload = [blueprint.model_dump(mode="json") for blueprint in blueprints]
     _write_json(path=output_dir / HOP1_FILE_NAME, payload=payload)
     return HOP1_FILE_NAME
 
 
-def _capture_hop2(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path) -> dict[str, str | None]:
-    """Write the module the `python-structures` emitter renders for the bundles' concepts, and map each declared concept to it.
+def _structure_class_dump(*, structure_class: type[BaseModel]) -> dict[str, Any]:
+    """What a structure class holds, read off the class itself: its name, bases, docstring and fields."""
+    fields: dict[str, Any] = {}
+    for field_name, field_info in structure_class.model_fields.items():
+        fields[field_name] = {
+            "annotation": repr(field_info.annotation),
+            "required": field_info.is_required(),
+            "admits_none": field_admits_none(field_info=field_info),
+            # A required field's default is pydantic's `PydanticUndefined` sentinel, which is written as its repr.
+            "default": to_jsonable_python(field_info.default, fallback=repr),
+            "description": field_info.description,
+        }
+    return {
+        "class_name": structure_class.__name__,
+        "bases": [base_class.__name__ for base_class in structure_class.__bases__],
+        "doc": structure_class.__doc__,
+        "fields": fields,
+    }
 
-    The runtime builds a concept's structure class from data and writes no source, so the source shown is the emitter's,
-    which gives the class the runtime builds (its JSON schema is the same) and names every class as the runtime does. A
-    `structure = "ClassName"` declaration maps to None: the runtime builds nothing there, the class pre-exists.
+
+def _capture_hop2(
+    *,
+    concept_refs: list[str],
+    concept_provider: ConceptProviderAbstract,
+    output_dir: Path,
+) -> dict[str, str | None]:
+    """Dump the structure class the runtime holds for each traced concept, as the loaded library resolves it.
+
+    The class is the one the library registered: the class the runtime built from the concept's structure, or the
+    class a `structure = "ClassName"` concept names. A concept that declares no structure class (`native.Anything`)
+    maps to None.
     """
-    crate = normalize_crate(LibraryCrateFactory.make_from_blueprints(blueprints=blueprints), mthds_version=MTHDS_STANDARD_VERSION)
-    resolved_library = resolve_concepts_from_crate(crate).with_qualified_names()
-    emitted_files = emit_python_structures(resolved_library)
-    # `.py.txt` on purpose: these are evidence artifacts, not code — a bare `.py` extension would drag them into the
-    # repo's linters when the output directory is inside the repository.
-    relative_paths: list[str] = []
-    for emitted_file in emitted_files:
-        relative_path = f"{HOP2_DIR_NAME}/{emitted_file.filename}.txt"
-        source_path = output_dir / relative_path
-        source_path.parent.mkdir(parents=True, exist_ok=True)
-        source_path.write_text(emitted_file.content, encoding="utf-8")
-        relative_paths.append(relative_path)
-    [structures_relative_path] = relative_paths
-
     captures: dict[str, str | None] = {}
-    for blueprint in blueprints:
-        if not blueprint.concept:
+    for concept_ref in concept_refs:
+        concept = concept_provider.get_required_concept(concept_ref)
+        if not concept.declares_a_structure_class:
+            captures[concept_ref] = None
             continue
-        for concept_code, declaration in blueprint.concept.items():
-            is_class_backed = isinstance(declaration, ConceptBlueprint) and isinstance(declaration.structure, str)
-            captures[f"{blueprint.domain}.{concept_code}"] = None if is_class_backed else structures_relative_path
+        structure_class = concept_provider.get_structure_class(concept=concept)
+        relative_path = f"{HOP2_DIR_NAME}/{concept_ref}.json"
+        _write_json(path=output_dir / relative_path, payload=_structure_class_dump(structure_class=structure_class))
+        captures[concept_ref] = relative_path
     return captures
+
+
+def _capture_hop2_python_structures(*, library_id: str | None, output_dir: Path) -> str | None:
+    """Write the module the `python-structures` codegen emitter renders for the loaded library's crate.
+
+    It is the file a user of `pipelex build structures` would get, with every class named as the runtime names it. For
+    a concept with a structure table it has the JSON schema of the class the runtime builds; a structureless concept, a
+    class-backed concept, a refinement of a concept outside the crate and a `native.Anything` field are rendered
+    differently (see `docs/under-the-hood/codegen-projections.md`). None when the library holds no crate.
+    """
+    crate = get_library_manager().get_crate(library_id=library_id) if library_id is not None else None
+    if crate is None:
+        return None
+    resolved_library = resolve_concepts_from_crate(normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)).with_qualified_names()
+    [emitted_file] = emit_python_structures(resolved_library)
+    # `.py.txt` on purpose: this is an evidence artifact, not code — a bare `.py` extension would drag it into the repo's
+    # linters when the output directory is inside the repository.
+    _write_text(path=output_dir / HOP2_PYTHON_STRUCTURES_FILE_NAME, content=emitted_file.content)
+    return HOP2_PYTHON_STRUCTURES_FILE_NAME
 
 
 def _collect_traced_concept_refs(*, blueprints: list[PipelexBundleBlueprint], pipes: list[PipeAbstract]) -> list[str]:
@@ -240,6 +284,7 @@ async def trace_input_semantics(
         stale_hop_dir = output_dir / hop_dir_name
         if stale_hop_dir.is_dir():
             shutil.rmtree(stale_hop_dir)
+    (output_dir / HOP2_PYTHON_STRUCTURES_FILE_NAME).unlink(missing_ok=True)
 
     prev_library_id = get_current_library_id_or_none()
     validation_library_id: str | None = None
@@ -253,8 +298,9 @@ async def trace_input_semantics(
         concept_provider = get_concept_library()
 
         hop1_capture = _capture_hop1(blueprints=result.blueprints, output_dir=output_dir)
-        hop2_captures = _capture_hop2(blueprints=result.blueprints, output_dir=output_dir)
         concept_refs = _collect_traced_concept_refs(blueprints=result.blueprints, pipes=result.pipes)
+        hop2_captures = _capture_hop2(concept_refs=concept_refs, concept_provider=concept_provider, output_dir=output_dir)
+        hop2_python_structures_capture = _capture_hop2_python_structures(library_id=validation_library_id, output_dir=output_dir)
         hop3_captures, hop3_skipped = _capture_hop3(concept_refs=concept_refs, concept_provider=concept_provider, output_dir=output_dir)
         hop4_captures = _capture_hop4(pipes=result.pipes, concept_provider=concept_provider, output_dir=output_dir)
         hop5_capture = _capture_hop5(pipes=result.pipes, output_dir=output_dir)
@@ -271,7 +317,8 @@ async def trace_input_semantics(
     manifest: dict[str, Any] = {
         "bundle_paths": mthds_sources,
         "hop1_bundle_blueprints": hop1_capture,
-        "hop2_generated_sources": hop2_captures,
+        "hop2_structure_classes": hop2_captures,
+        "hop2_python_structures": hop2_python_structures_capture,
         "hop3_raw_pydantic_schemas": hop3_captures,
         "hop3_skipped": hop3_skipped,
         "hop4_schema_renders": hop4_captures,
@@ -311,7 +358,9 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
 
     console.print(f"[green]✓ Input-semantics trace written to {output_dir}[/green]")
     console.print(f"  hop 1: {manifest['hop1_bundle_blueprints']}")
-    console.print(f"  hop 2: {len(manifest['hop2_generated_sources'])} concepts in the structures module under {HOP2_DIR_NAME}/")
+    console.print(
+        f"  hop 2: {len(manifest['hop2_structure_classes'])} structure classes under {HOP2_DIR_NAME}/ + {manifest['hop2_python_structures']}"
+    )
     console.print(f"  hop 3: {len(manifest['hop3_raw_pydantic_schemas'])} raw schemas under {HOP3_DIR_NAME}/")
     console.print(f"  hop 4: {len(manifest['hop4_schema_renders'])} schema renders under {HOP4_DIR_NAME}/")
     console.print(f"  hop 5: {manifest['hop5_pipe_io_contracts']} + {manifest['hop5_input_form']}")
