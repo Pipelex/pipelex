@@ -15,6 +15,9 @@ from pipelex.system.telemetry.current_span import HostSpanToJoin
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.replay_safe_id_generator import ReplaySafeIdGenerator
+from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
 
 
 class TestOtelFactory:
@@ -222,3 +225,20 @@ class TestOtelFactory:
         # The span id still marks the context as the run's root.
         assert carried.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
         assert (carried.trace_name, carried.trace_name_redacted) == OtelFactory.make_trace_names("run_123", pipe_code="my_pipe")
+
+    def test_the_tracer_provider_draws_its_ids_through_the_replay_safe_generator(self):
+        """A span opened in an orchestrator's workflow code takes its id from the workflow's deterministic random."""
+        _, provider = OtelFactory.make_ai_tracer(
+            custom_fallback_distinct_id=None,
+            custom_run_identity_policy=RunIdentityPolicy.DIRECT,
+            custom_posthog_client=None,
+            custom_redaction_config=TelemetryRedactionConfig(
+                redact_content=False, redact_pipe_codes=False, redact_output_class_names=False, content_max_length=None
+            ),
+            otlp_exporters=None,
+            langfuse_config=None,
+        )
+        try:
+            assert isinstance(provider.id_generator, ReplaySafeIdGenerator)
+        finally:
+            provider.shutdown()

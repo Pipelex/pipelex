@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Pipe spans opened in replayable workflow code are exported once, with their true start**: a boot-orchestrator plugin whose runtime replays its workflow code claims the new `HubSlot.WORKFLOW_EXECUTION_PROBE` with `PluginRegistrar.claim_workflow_execution_probe`, whose probe answers the `WorkflowExecutionProtocol` of the workflow code a call runs in (`pipelex/system/telemetry/workflow_execution.py`). A pipe span opened there takes its id from the workflow's deterministic random, through `ReplaySafeIdGenerator`, the id generator of Pipelex's tracer provider, and its start and end from the workflow's clock, and only the live execution ends it, never a replay nor the orchestrator unwinding the code on an eviction or a retried workflow task, so a controller crossing an eviction yields one span to every destination where it yielded one per execution, with the start it had before the eviction. Unclaimed, nothing changes. The plugin API stays at v14.
+- **A pipe's `$ai_span` carries a deterministic uuid**: the PostHog exporter derives it as a UUIDv5 of `"$ai_span:<$ai_span_id>"`, so a capture the PostHog client delivers twice carries one uuid, as the tracking plan's rule 7 asks.
+
 ### Fixed
 
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.
