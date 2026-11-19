@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.
+
 ## [v0.110.0] - 2026-11-19
 
 ### Changed

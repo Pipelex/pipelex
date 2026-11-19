@@ -39,14 +39,16 @@ underscore, is a field the builder names itself, `field_<n>`, under the property
 schema shows as optional with no default had a default factory, which the schema does not describe: its field is left
 out of every dump while the input leaves it out, so the caller's class runs its own factory on the way back. A default
 the schema writes is validated into its field's type once every class is built, so a nested model's default holds the
-rebuilt model and an enumeration's its member; a default its own field refuses is kept as the schema writes it, since
-the caller's class never validates its defaults either and accepts an input that leaves the field out.
+rebuilt model, an enumeration's its member and a set's, which the schema writes sorted, a set; a default its own
+field refuses is kept as the schema writes it, since the caller's class never validates its defaults either and
+accepts an input that leaves the field out.
 
 Anything else is refused with `UnsupportedSchemaError` naming where the schema left the subset: a shape outside it is a
 pipelex defect to fix here, never a method author's. The builder carries its own guards, because the schema may cross
 a process boundary: a cap on the number of nodes and on the nesting depth, checked before anything is built, and a cap
-on how many definitions references chain into one another, with a `RecursionError` refused the same way as the
-backstop; a property must not shadow pydantic's `model_…` API; types come from a fixed table and from the classes the
+on how many definitions references chain into one another, which bounds the builder's own recursion, and a
+`RecursionError` raised while building, by pydantic's recursion through the classes before that cap is met, refused as
+a schema nesting too deep to rebuild; a property must not shadow pydantic's `model_…` API; types come from a fixed table and from the classes the
 builder itself made from the schema's `$defs`, never from a module, an attribute or the class registry a title names,
 so every class returned is a new one; and a forward reference is an alias the builder chose, never a name the schema
 spelled, so no text of the schema is ever evaluated.
@@ -168,6 +170,35 @@ def _validated_type(*, field_info: FieldInfo) -> Any:
     return Annotated[field_info.annotation, *metadata]
 
 
+def _schema_default(*, default: Any) -> Any:
+    """The default as pydantic writes it into a JSON schema, a set's members sorted, through pydantic's own encoding.
+
+    A field annotated `Any` writes nothing of its own beside its default, so its schema is the encoded default alone.
+    """
+    return TypeAdapter(Annotated[Any, Field(default=default)]).json_schema()["default"]
+
+
+def _is_equal_copy(*, value: Any, raw: Any) -> bool:
+    """Whether a validated default is the raw JSON value again, of the same types throughout, so keeping it changes nothing.
+
+    A model, an enumeration member, a set, a tuple or a `Decimal` validated from a JSON value is of another type than
+    that value, even where it compares equal to it, as a `StrEnum` member does to its string.
+    """
+    if type(value) is not type(raw):
+        return False
+    if isinstance(raw, dict):
+        raw_dict = cast("dict[Any, Any]", raw)
+        value_dict = cast("dict[Any, Any]", value)
+        return value_dict.keys() == raw_dict.keys() and all(_is_equal_copy(value=value_dict[key], raw=raw_dict[key]) for key in raw_dict)
+    if isinstance(raw, list):
+        raw_list = cast("list[Any]", raw)
+        value_list = cast("list[Any]", value)
+        return len(value_list) == len(raw_list) and all(
+            _is_equal_copy(value=value_item, raw=raw_item) for value_item, raw_item in zip(value_list, raw_list, strict=True)
+        )
+    return bool(value == raw)
+
+
 def _doc_reading_back_as(*, description: str) -> str:
     """The `__doc__` whose `inspect.cleandoc` is `description`, which pydantic writes as the schema's description.
 
@@ -249,7 +280,13 @@ class _SchemaModelBuilder:
 
     MAX_NODES: ClassVar[int] = 10_000
     MAX_DEPTH: ClassVar[int] = 100
-    # The size check bounds how deep the schema nests in itself; references can still chain definitions deeper.
+    # The size check bounds how deep the schema nests in itself; references can still chain definitions deeper, and
+    # this cap bounds how deep they take the builder's own recursion. It does not keep pydantic within Python's: pydantic
+    # recurses through a chain of classes when it builds them and when it writes their schema, at a cost per class that
+    # depends on the interpreter and on the stack already in use, and it may run out before the cap is met. The cap is
+    # left above that point rather than tuned to one interpreter's stack: pydantic runs out the same way writing the
+    # caller's own class's schema, so a chain that long never comes from a pipelex class, and the `RecursionError`
+    # backstop in `SchemaToModelFactory._build` refuses whatever pydantic cannot build below the cap.
     MAX_DEFINITION_CHAIN: ClassVar[int] = 100
 
     def __init__(self, *, schema: dict[str, Any]) -> None:
@@ -292,6 +329,11 @@ class _SchemaModelBuilder:
     def too_long_a_chain(cls, *, path: str) -> UnsupportedSchemaError:
         return _refuse(path=path, reason=f"its references chain deeper than {cls.MAX_DEFINITION_CHAIN} definitions")
 
+    @staticmethod
+    def too_deep_to_generate() -> UnsupportedSchemaError:
+        msg = "The schema nests too deep for its class to be rebuilt within Python's recursion limit."
+        return UnsupportedSchemaError(msg)
+
     def build(self, *, class_name: str) -> type[BaseModel]:
         """Build the schema's class, named `class_name` when its root carries no title."""
         schema = self._schema
@@ -331,8 +373,10 @@ class _SchemaModelBuilder:
         The caller's class never validates its defaults, so a default its own field refuses, such as `-1` under `ge=0`,
         or `None` on a string a `mode="before"` validator of the caller fills, stays as the schema writes it, and an
         input that leaves the field out is accepted as the caller's class accepts it. A default that validates holds
-        the rebuilt model or enumeration member, not the raw value, and is kept only when it dumps back to the raw
-        value, so the rebuilt class's schema writes the very same default.
+        the rebuilt model, enumeration member or set, not the raw value, and is kept only when pydantic writes it into
+        a schema as the raw value, so the rebuilt class's schema writes the very same default. A validated default that
+        is only an equal copy of the raw value changes nothing and is not kept, so a class whose defaults are all plain
+        values is not built twice.
         """
         is_any_validated = False
         for model, field_name in self._defaulted_fields:
@@ -343,7 +387,7 @@ class _SchemaModelBuilder:
                 validated_default = adapter.validate_python(raw_default)
             except ValidationError:
                 continue
-            if validated_default is raw_default or adapter.dump_python(validated_default, mode="json", by_alias=True) != raw_default:
+            if _is_equal_copy(value=validated_default, raw=raw_default) or _schema_default(default=validated_default) != raw_default:
                 continue
             field_info.default = validated_default
             is_any_validated = True
@@ -839,5 +883,7 @@ class SchemaToModelFactory:
         try:
             return _SchemaModelBuilder(schema=schema).build(class_name=class_name)
         except RecursionError as exc:
-            # The caps keep the rebuild well within Python's recursion, and this is the backstop should they not.
-            raise _SchemaModelBuilder.too_long_a_chain(path="#") from exc
+            # pydantic recurses through chained classes as it builds them and writes their schema, and may exhaust
+            # Python's recursion before the definition cap is met: the schema is refused as nesting too deep, naming no
+            # count of definitions or levels, since none was counted.
+            raise _SchemaModelBuilder.too_deep_to_generate() from exc
