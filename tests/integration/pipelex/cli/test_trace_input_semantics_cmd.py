@@ -21,6 +21,7 @@ from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import (
     MANIFEST_FILE_NAME,
     trace_input_semantics,
 )
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,6 +47,27 @@ prompt = '''
 @items
 @?hint
 $loose
+'''
+"""
+
+_PADDED_BUNDLE = """
+domain = "trace_tool_padded"
+description = "Bundle for trace-input-semantics docstring and default-factory tests"
+
+[concept.Padded]
+description = "\\n\\nSENT_padded_first_line\\n    SENT_padded_second_line"
+
+[concept.Padded.structure]
+label = { type = "text", description = "SENT_field_label" }
+
+[pipe.read_padded]
+type = "PipeLLM"
+description = "Make text from a padded concept and a search result"
+inputs = { padded = "Padded", found = "SearchResult" }
+output = "Text"
+prompt = '''
+@padded
+@found
 '''
 """
 
@@ -86,6 +108,7 @@ class TestTraceInputSemantics:
             "required": True,
             "admits_none": False,
             "default": "PydanticUndefined",
+            "default_factory": None,
             "description": "SENT_field_label",
         }
         assert hop2["fields"]["qty"]["required"] is False
@@ -192,3 +215,24 @@ class TestTraceInputSemantics:
         hop5 = _read_json(output_dir / HOP5_FILE_NAME)
         assert "input_semantics_probe.probe_markers" in hop5
         assert "input_semantics_probe.probe_markers" in _read_json(output_dir / HOP5_INPUT_FORM_FILE_NAME)
+
+    async def test_hop2_reads_docstrings_and_default_factories_as_pydantic_does(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
+        """Hop 2's doc is the schema description hop 3 shows, and a default factory is named rather than read as required."""
+        load_empty_library()
+        bundle_path = tmp_path / "padded_bundle.mthds"
+        bundle_path.write_text(_PADDED_BUNDLE, encoding="utf-8")
+        output_dir = tmp_path / "trace"
+
+        manifest = await trace_input_semantics(bundle_paths=[bundle_path], output_dir=output_dir)
+
+        padded = _read_json(output_dir / manifest["hop2_structure_classes"]["trace_tool_padded.Padded"])
+        padded_schema = _read_json(output_dir / manifest["hop3_raw_pydantic_schemas"]["trace_tool_padded.Padded"])
+        assert padded["doc"] == padded_schema["description"]
+        assert padded["doc"].startswith("SENT_padded_first_line")
+        assert padded["fields"]["label"]["default_factory"] is None
+
+        search_result = _read_json(output_dir / manifest["hop2_structure_classes"]["native.SearchResult"])
+        sources = search_result["fields"]["sources"]
+        assert sources["required"] is False
+        assert sources["default"] == "PydanticUndefined"
+        assert sources["default_factory"] == repr(SearchResultContent.model_fields["sources"].default_factory)

@@ -1,7 +1,8 @@
 from datetime import date, datetime, time, timedelta, timezone
-from typing import cast
+from typing import Optional, cast
 
 import pytest
+from pydantic import create_model
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
@@ -10,6 +11,19 @@ from pipelex.core.concepts.structure_generation.exceptions import ConceptStructu
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 from tests.unit.pipelex.core.concepts.structure_generation.class_shape import assert_same_class
+
+
+def _make_base_beside_a_local_class_named_like_a_reference() -> type[StructuredContent]:
+    """A content class defined in a function whose locals hold a class named like the forward reference `d__P`."""
+
+    class d__P(StructuredContent):  # ruff: ignore[invalid-class-name]
+        decoy: int
+
+    class LocalBase(StructuredContent):
+        pass
+
+    assert d__P is not None
+    return LocalBase
 
 
 class TestStructureGenerator:
@@ -891,3 +905,21 @@ class Invoice(DocumentContent):
         cause = exc_info.value.__cause__
         assert isinstance(cause, ConceptStructureValidationError)
         assert finding in str(cause)
+
+    def test_a_forward_reference_ignores_the_namespace_its_base_was_defined_in(self, mocker: MockerFixture):
+        """A base defined in a function whose locals hold a class named like the reference does not bind it."""
+        base_class = _make_base_beside_a_local_class_named_like_a_reference()
+        class_registry = mocker.patch("pipelex.core.concepts.structure_generation.generator.get_class_registry").return_value
+        class_registry.get_class.return_value = base_class
+        structure_blueprint = {
+            "part": ConceptStructureBlueprint(description="The part", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="d.P"),
+        }
+
+        generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="Assembly", structure_blueprint=structure_blueprint, base_class_name="LocalBase"
+        )
+
+        assert not generated_class.__pydantic_complete__
+        real_part_class = create_model("d__P", __base__=StructuredContent, label=(str, ...))
+        generated_class.model_rebuild(_types_namespace={"d__P": real_part_class})
+        assert generated_class.model_fields["part"].annotation == Optional[real_part_class]  # ruff: ignore[non-pep604-annotation-optional]

@@ -11,7 +11,7 @@ holds the two to: the same JSON schema.
 
 import copy
 from datetime import date, datetime, time
-from typing import Any, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, create_model
@@ -28,8 +28,17 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.tools.misc.python_literals import class_doc_value
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 # The module a generated class names as its own, which marks it as importable from no module.
 _GENERATED_CLASS_MODULE = "builtins"
+# `create_model` builds a class without resetting its parent namespace, so the class would inherit its base's: a base
+# defined inside a function whose locals hold a class named like one of the forward references would bind that local,
+# and the namespace the library rebuilds with could not override it. `create_model` has no flag for this, and
+# `__cls_kwargs__` refuses the keyword it passes itself, so the attribute is cleared through `__validators__`, whose
+# entries become class attributes. Cast to the type `create_model` gives that argument, which expects validators.
+_PARENT_NAMESPACE_RESET = cast("dict[str, Callable[..., Any]]", {"__pydantic_parent_namespace__": None})
 
 
 class StructureGenerator:
@@ -91,7 +100,14 @@ class StructureGenerator:
             # mypy's pydantic plugin types the class `create_model` returns as a new class of its own, pyright as its base.
             the_class = cast(  # pyright: ignore[reportUnnecessaryCast]
                 "type[StuffContent]",
-                create_model(class_name, __base__=base_class, __doc__=doc, __module__=_GENERATED_CLASS_MODULE, **field_definitions),
+                create_model(
+                    class_name,
+                    __base__=base_class,
+                    __doc__=doc,
+                    __module__=_GENERATED_CLASS_MODULE,
+                    __validators__=_PARENT_NAMESPACE_RESET,
+                    **field_definitions,
+                ),
             )
         except Exception as exc:
             # Unbounded code (case 2): building the class runs the metaclass and the subclass hooks of its base, which

@@ -27,6 +27,7 @@ of the captures (e.g. a survival table) stays with the caller.
 """
 
 import asyncio
+import inspect
 import json
 import shutil
 import sys
@@ -74,8 +75,7 @@ HOP5_INPUT_FORM_FILE_NAME = "hop5_input_form.json"
 
 
 def _write_json(*, path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _write_text(path=path, content=json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
 
 
 def _write_text(*, path: Path, content: str) -> None:
@@ -97,14 +97,18 @@ def _structure_class_dump(*, structure_class: type[BaseModel]) -> dict[str, Any]
             "annotation": repr(field_info.annotation),
             "required": field_info.is_required(),
             "admits_none": field_admits_none(field_info=field_info),
-            # A required field's default is pydantic's `PydanticUndefined` sentinel, which is written as its repr.
+            # A required field's default, and that of a field with a default factory, is pydantic's `PydanticUndefined`
+            # sentinel, which is written as its repr. The factory is named, never called.
             "default": to_jsonable_python(field_info.default, fallback=repr),
+            "default_factory": repr(field_info.default_factory) if field_info.default_factory is not None else None,
             "description": field_info.description,
         }
     return {
         "class_name": structure_class.__name__,
         "bases": [base_class.__name__ for base_class in structure_class.__bases__],
-        "doc": structure_class.__doc__,
+        # The docstring as pydantic writes it to the schema's description, so it reads as hop 3 does. Not
+        # `inspect.getdoc`, which walks the MRO and gives `BaseModel`'s docstring to a class without its own.
+        "doc": inspect.cleandoc(structure_class.__doc__) if structure_class.__doc__ else None,
         "fields": fields,
     }
 
