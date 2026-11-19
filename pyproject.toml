@@ -49,7 +49,7 @@ dependencies = [
   "posthog>=6.7.0",
   "protobuf>=6.33.5",
   "pypdfium2>=4.30.0,!=4.30.1,<5.0.0",
-  "pydantic>=2.10.6,<3.0.0",
+  "pydantic>=2.12.0,<3.0.0",
   "python-dotenv>=1.2.2",
   "PyYAML>=6.0.2",
   "reportlab>=4.0,<5",                 # the built-in PDF engine of PipeDocGen, and synthetic PDFs in tests
