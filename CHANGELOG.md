@@ -9,7 +9,7 @@
 
 ### Security
 
-- **`uv.lock` moves `mail-parser` to 4.11.0**: a development checkout installing the `docling` extra, which reaches `mail-parser` through Docling's email reader, gets 4.11.0 where the lock held 4.3.0, past GHSA-fr3h-cpq2-9496, GHSA-r7w7-vpq8-c5vv, GHSA-72px-j8gh-p79x, GHSA-24mq-4vc6-2prf and GHSA-xhrq-2mqv-q8wx. The `pipelex/pipelex-api` image does not install that extra and no `pyproject.toml` range moved, so an application installing `pipelex[docling]` picks the patched release up through its own resolution.
+- **`uv.lock` moves `mail-parser` to 4.11.0**: a development checkout installing the `docling` extra, which reaches `mail-parser` through Docling's email reader, gets 4.11.0 where the lock held 4.3.0, past GHSA-fr3h-cpq2-9496, GHSA-r7w7-vpq8-c5vv, GHSA-72px-j8gh-p79x, GHSA-24mq-4vc6-2prf and GHSA-xhrq-2mqv-q8wx. The `pipelex/pipelex-api` image does not install that extra and no `pyproject.toml` range moved, so an application installing `pipelex[docling]` gets the patched release on a fresh resolve, and one whose own lock or environment already holds an older `mail-parser` upgrades it there.
 
 ## [v0.110.0] - 2026-11-19
 
