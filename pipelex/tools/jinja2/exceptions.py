@@ -143,10 +143,9 @@ class Jinja2TemplateSecurityError(SecurityError):
     (`pipelex.errors.problem`). The pipe whose template it was locates it on the template's field, ``template_field``
     (`locating_template_refusal`).
 
-    A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError`, `SsrfBlockedError` and
-    `UnsafeSchemaError`, so that a host catching that family never absorbs it into a domain answer and never retries
-    it. A type of its own, apart from `Jinja2TemplateRenderError`, so that a refusal reads apart from a template that
-    fails for any other reason.
+    A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError` and `SsrfBlockedError`, so that a
+    host catching that family never absorbs it into a domain answer and never retries it. A type of its own, apart
+    from `Jinja2TemplateRenderError`, so that a refusal reads apart from a template that fails for any other reason.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_TEMPLATE_REFUSED, others=(CoreCode.RUNTIME_UNEXPECTED,))

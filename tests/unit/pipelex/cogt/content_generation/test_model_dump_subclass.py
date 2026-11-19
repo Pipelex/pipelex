@@ -26,6 +26,7 @@ class TestModelDumpSubclass:
         schema = InnerDetail.model_json_schema()
         reconstructed_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="InnerDetail")
 
+        assert reconstructed_class.model_json_schema() == schema
         raw_obj: BaseModel = reconstructed_class(label="score", value=42)
 
         dumped = raw_obj.model_dump(serialize_as_any=True)
@@ -37,6 +38,10 @@ class TestModelDumpSubclass:
         """Nested reconstructed model roundtrips through model_dump(serialize_as_any=True) → model_validate."""
         schema = OuterModel.model_json_schema()
         reconstructed_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="OuterModel")
+        assert reconstructed_class.model_json_schema() == schema
+        reconstructed_detail_class = reconstructed_class.model_fields["detail"].annotation
+        assert isinstance(reconstructed_detail_class, type)
+        assert reconstructed_detail_class is not InnerDetail
 
         raw_obj: BaseModel = reconstructed_class(
             title="Test",
@@ -44,6 +49,7 @@ class TestModelDumpSubclass:
         )
 
         dumped = raw_obj.model_dump(serialize_as_any=True)
+        assert dumped == {"title": "Test", "detail": {"label": "score", "value": 42}}
         restored = OuterModel.model_validate(dumped)
         assert restored.title == "Test"
         assert restored.detail.label == "score"
