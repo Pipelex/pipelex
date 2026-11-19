@@ -13,7 +13,8 @@ pydantic emits for the classes pipelex builds and ships:
 
 - objects with `properties`, `required`, `title`, `description` and `additionalProperties` (`true` is `extra="allow"`,
   `false` is `extra="forbid"`), and, on a property, an object whose `additionalProperties` is a schema or `true`, which
-  is a `dict[str, …]` field;
+  is a `dict` field, its `minProperties` and `maxProperties` as its least and most keys, and its `propertyNames`, when
+  they are a string `enum` or `const`, as `Literal` keys;
 - `$defs` with local `#/$defs/…` references, a root that is only a `$ref` included, and recursion through forward
   references resolved by one `model_rebuild` over the built classes; a definition is an object or an enumeration, and
   its class is named after its `$defs` key, its title set apart, so two definitions sharing a title keep their keys;
@@ -21,12 +22,14 @@ pydantic emits for the classes pipelex builds and ships:
   `discriminator` as a discriminated union;
 - an inline string, integer or boolean `enum` or `const` as a `Literal`, and an enumeration in `$defs` as an `Enum`
   class of that name whose members are its values;
-- `string` (with the formats `date`, `date-time`, `time`, `duration`, `uuid`, `binary` and `uri`, and `email` when
-  `email-validator` is installed), `integer`, `number`, `boolean` and `null`;
+- `string` (with the formats `date`, `date-time`, `time`, `duration`, `uuid`, `uuid1`, `uuid3`, `uuid4`, `uuid5`,
+  `binary`, with its length, and `uri`, and `email` when `email-validator` is installed), `integer`, `number`,
+  `boolean` and `null`;
 - the pair pydantic writes for a `Decimal`, a number or a string of digits, as a `Decimal`, with its `max_digits`,
   `decimal_places` and bounds;
 - arrays, with `uniqueItems` as a set, and `prefixItems` of a fixed length as a tuple;
-- on a property, `title`, `description`, `examples`, `default` and the dry-run mock factory's `mock_format` hint;
+- on a property, `title`, `description`, `examples`, `default`, `deprecated` and the dry-run mock factory's
+  `mock_format` hint, and a `title` on any other type, such as a list's item type;
 - the constraints `exclusiveMinimum`, `minimum`, `exclusiveMaximum`, `maximum`, `multipleOf`,
   `minLength`, `maxLength`, `pattern`, `minItems` and `maxItems` as the matching `Field` arguments, wherever a type
   sits.
@@ -34,15 +37,19 @@ pydantic emits for the classes pipelex builds and ships:
 A property whose name cannot be a field name, a Python keyword, a name that is no identifier or one led by an
 underscore, is a field the builder names itself, `field_<n>`, under the property's name as its alias. A property the
 schema shows as optional with no default had a default factory, which the schema does not describe: its field is left
-out of every dump while the input leaves it out, so the caller's class runs its own factory on the way back.
+out of every dump while the input leaves it out, so the caller's class runs its own factory on the way back. A default
+the schema writes is validated into its field's type once every class is built, so a nested model's default holds the
+rebuilt model and an enumeration's its member; a default its own field refuses is kept as the schema writes it, since
+the caller's class never validates its defaults either and accepts an input that leaves the field out.
 
 Anything else is refused with `UnsupportedSchemaError` naming where the schema left the subset: a shape outside it is a
 pipelex defect to fix here, never a method author's. The builder carries its own guards, because the schema may cross
-a process boundary: a cap on the number of nodes and on the nesting depth, checked before anything is built; a property
-must not shadow pydantic's `model_…` API; types come from a fixed table and from the classes the builder itself made
-from the schema's `$defs`, never from a module, an attribute or the class registry a title names, so every class
-returned is a new one; and a forward reference is an alias the builder chose, never a name the schema spelled, so no
-text of the schema is ever evaluated.
+a process boundary: a cap on the number of nodes and on the nesting depth, checked before anything is built, and a cap
+on how many definitions references chain into one another, with a `RecursionError` refused the same way as the
+backstop; a property must not shadow pydantic's `model_…` API; types come from a fixed table and from the classes the
+builder itself made from the schema's `$defs`, never from a module, an attribute or the class registry a title names,
+so every class returned is a new one; and a forward reference is an alias the builder chose, never a name the schema
+spelled, so no text of the schema is ever evaluated.
 """
 
 import hashlib
@@ -60,7 +67,22 @@ from types import GenericAlias
 from typing import Annotated, Any, ClassVar, ForwardRef, Literal, Union, cast
 from uuid import UUID
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, EmailStr, Field, PydanticUserError, UrlConstraints, create_model
+from pydantic import (
+    UUID1,
+    UUID3,
+    UUID4,
+    UUID5,
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    PydanticUserError,
+    TypeAdapter,
+    UrlConstraints,
+    ValidationError,
+    create_model,
+)
 from pydantic.fields import FieldInfo
 from pydantic_core import SchemaError
 
@@ -74,12 +96,13 @@ _ALIASED_FIELD_PREFIX = "field_"
 
 _MODEL_KEYS = frozenset({"type", "properties", "required", "title", "description", "additionalProperties"})
 _ENUM_DEF_KEYS = frozenset({"enum", "type", "title", "description"})
-_PROPERTY_KEYS = frozenset({"title", "description", "default", "examples", "mock_format"})
+_PROPERTY_KEYS = frozenset({"title", "description", "default", "examples", "mock_format", "deprecated"})
 _STRING_KEYS = frozenset({"type", "format", "minLength", "maxLength", "pattern"})
+_BINARY_KEYS = frozenset({"type", "format", "minLength", "maxLength"})
 _NUMBER_KEYS = frozenset({"type", "exclusiveMinimum", "minimum", "exclusiveMaximum", "maximum", "multipleOf"})
 _ARRAY_KEYS = frozenset({"type", "items", "uniqueItems", "minItems", "maxItems"})
 _TUPLE_KEYS = frozenset({"type", "prefixItems", "minItems", "maxItems"})
-_DICT_KEYS = frozenset({"type", "additionalProperties"})
+_DICT_KEYS = frozenset({"type", "additionalProperties", "propertyNames", "minProperties", "maxProperties"})
 _LITERAL_KEYS = frozenset({"type"})
 _DISCRIMINATED_UNION_KEYS = frozenset({"oneOf", "discriminator"})
 _DISCRIMINATOR_KEYS = frozenset({"propertyName", "mapping"})
@@ -92,13 +115,17 @@ _FORMAT_TYPES: dict[str, Any] = {
     "time": time,
     "duration": timedelta,
     "uuid": UUID,
-    "binary": bytes,
+    "uuid1": UUID1,
+    "uuid3": UUID3,
+    "uuid4": UUID4,
+    "uuid5": UUID5,
     **({"email": EmailStr} if _IS_EMAIL_SUPPORTED else {}),
 }
 _LITERAL_VALUE_TYPES: dict[type[Any], str] = {str: "string", int: "integer", bool: "boolean"}
 _NUMERIC_CONSTRAINTS = {"exclusiveMinimum": "gt", "minimum": "ge", "exclusiveMaximum": "lt", "maximum": "le", "multipleOf": "multiple_of"}
 _LENGTH_CONSTRAINTS = {"minLength": "min_length", "maxLength": "max_length"}
 _ITEM_CONSTRAINTS = {"minItems": "min_length", "maxItems": "max_length"}
+_PROPERTY_COUNT_CONSTRAINTS = {"minProperties": "min_length", "maxProperties": "max_length"}
 
 # The upper bounds of the repetitions in a `Decimal`'s pattern, from which its `max_digits` and `decimal_places` are read.
 _DECIMAL_PATTERN_BOUNDS = re.compile(r"\{\d+,(\d+)\}")
@@ -129,6 +156,16 @@ def _is_omitted(  # kw-only: ignore — pydantic calls a field's `exclude_if` wi
     value: Any,
 ) -> bool:
     return isinstance(value, _Omission)
+
+
+def _validated_type(*, field_info: FieldInfo) -> Any:
+    """The type a field validates its values into: its annotation with the constraints and the discriminator pydantic set apart."""
+    metadata: list[Any] = list(field_info.metadata)
+    if field_info.discriminator is not None:
+        metadata.append(Field(discriminator=field_info.discriminator))
+    if not metadata:
+        return field_info.annotation
+    return Annotated[field_info.annotation, *metadata]
 
 
 def _doc_reading_back_as(*, description: str) -> str:
@@ -212,6 +249,8 @@ class _SchemaModelBuilder:
 
     MAX_NODES: ClassVar[int] = 10_000
     MAX_DEPTH: ClassVar[int] = 100
+    # The size check bounds how deep the schema nests in itself; references can still chain definitions deeper.
+    MAX_DEFINITION_CHAIN: ClassVar[int] = 100
 
     def __init__(self, *, schema: dict[str, Any]) -> None:
         defs = schema.get("$defs", {})
@@ -224,6 +263,8 @@ class _SchemaModelBuilder:
         self._in_progress: set[str] = set()
         self._namespace: dict[str, Any] = {}
         self._models: list[type[BaseModel]] = []
+        # The fields whose property carries a default, by the class that holds them, validated once every class is built.
+        self._defaulted_fields: list[tuple[type[BaseModel], str]] = []
 
     @classmethod
     def check_size(cls, *, schema: Any) -> None:
@@ -247,37 +288,69 @@ class _SchemaModelBuilder:
     def too_deep(cls) -> UnsupportedSchemaError:
         return UnsupportedSchemaError(f"The schema nests deeper than {cls.MAX_DEPTH} levels, the most a class rebuilt from a schema may nest.")
 
+    @classmethod
+    def too_long_a_chain(cls, *, path: str) -> UnsupportedSchemaError:
+        return _refuse(path=path, reason=f"its references chain deeper than {cls.MAX_DEFINITION_CHAIN} definitions")
+
     def build(self, *, class_name: str) -> type[BaseModel]:
         """Build the schema's class, named `class_name` when its root carries no title."""
         schema = self._schema
         root: type[BaseModel]
         if "$ref" in schema:
             _refuse_unknown_keys(node=schema, allowed=frozenset({"$ref", "$defs"}), path="#")
-            referenced = self._reference(ref=schema["$ref"], depth=1, path="#/$ref")
+            referenced = self._reference(ref=schema["$ref"], path="#/$ref")
             if not (isinstance(referenced, type) and issubclass(referenced, BaseModel)):
                 raise _refuse(path="#/$ref", reason="the root references no object")
             root = referenced
         else:
             title = schema.get("title")
             root_name = title if isinstance(title, str) and title else class_name
-            root = self._model(node=schema, class_name=root_name, depth=1, path="#", allowed_keys=_MODEL_KEYS | {"$defs"})
-        for model in self._models:
-            if not model.__pydantic_complete__:
-                try:
-                    model.model_rebuild(_types_namespace=self._namespace)
-                except (PydanticUserError, SchemaError) as exc:
-                    msg = f"The class '{model.__name__}' rebuilt from the schema did not resolve its references: {exc}"
-                    raise UnsupportedSchemaError(msg) from exc
+            root = self._model(node=schema, class_name=root_name, path="#", allowed_keys=_MODEL_KEYS | {"$defs"})
+        self._rebuild(models=[model for model in self._models if not model.__pydantic_complete__], force=False)
+        if self._validate_defaults():
+            # A class's validator embeds those of the classes its fields hold, cycles included, and pydantic reuses each
+            # class's cached core schema when it builds another: every cache is dropped first, so that each class is built
+            # afresh from fields holding the validated defaults, and none embeds a class's validator from before.
+            for model in self._models:
+                if "__pydantic_core_schema__" in model.__dict__:
+                    del model.__pydantic_core_schema__
+            self._rebuild(models=self._models, force=True)
         return root
 
-    def _count_depth(self, *, depth: int, path: str) -> None:
-        # The size check bounds the schema itself; references can still chain definitions deeper than it nests.
-        if depth > self.MAX_DEPTH:
-            raise _refuse(path=path, reason=f"its references chain deeper than {self.MAX_DEPTH} levels")
+    def _rebuild(self, *, models: list[type[BaseModel]], force: bool) -> None:
+        for model in models:
+            try:
+                model.model_rebuild(force=force, _types_namespace=self._namespace)
+            except (PydanticUserError, SchemaError) as exc:
+                msg = f"The class '{model.__name__}' rebuilt from the schema did not resolve its references: {exc}"
+                raise UnsupportedSchemaError(msg) from exc
 
-    def _model(self, *, node: Any, class_name: str, depth: int, path: str, allowed_keys: frozenset[str] = _MODEL_KEYS) -> type[BaseModel]:
+    def _validate_defaults(self) -> bool:
+        """Validate each default the schema writes, in its JSON form, into its field's type, where it holds; whether any did.
+
+        The caller's class never validates its defaults, so a default its own field refuses, such as `-1` under `ge=0`,
+        or `None` on a string a `mode="before"` validator of the caller fills, stays as the schema writes it, and an
+        input that leaves the field out is accepted as the caller's class accepts it. A default that validates holds
+        the rebuilt model or enumeration member, not the raw value, and is kept only when it dumps back to the raw
+        value, so the rebuilt class's schema writes the very same default.
+        """
+        is_any_validated = False
+        for model, field_name in self._defaulted_fields:
+            field_info = model.model_fields[field_name]
+            raw_default = field_info.default
+            adapter: TypeAdapter[Any] = TypeAdapter(_validated_type(field_info=field_info))
+            try:
+                validated_default = adapter.validate_python(raw_default)
+            except ValidationError:
+                continue
+            if validated_default is raw_default or adapter.dump_python(validated_default, mode="json", by_alias=True) != raw_default:
+                continue
+            field_info.default = validated_default
+            is_any_validated = True
+        return is_any_validated
+
+    def _model(self, *, node: Any, class_name: str, path: str, allowed_keys: frozenset[str] = _MODEL_KEYS) -> type[BaseModel]:
         """Build the class of an object, named `class_name`, its schema's title set through its config."""
-        self._count_depth(depth=depth, path=path)
         if not isinstance(node, dict):
             raise _refuse(path=path, reason="it is not an object")
         model_node = cast("dict[str, Any]", node)
@@ -312,13 +385,13 @@ class _SchemaModelBuilder:
             case _:
                 raise _refuse(path=f"{path}/additionalProperties", reason="an object's extra properties are allowed or forbidden, never typed")
 
+        field_names = self._field_names(properties=properties, path=path)
         fields: dict[str, Any] = {}
-        for property_name, field_name in self._field_names(properties=properties, path=path).items():
+        for property_name, field_name in field_names.items():
             fields[field_name] = self._field(
                 node=properties[property_name],
                 is_required=property_name in required_names,
                 alias=None if field_name == property_name else property_name,
-                depth=depth + 1,
                 path=f"{path}/properties/{property_name}",
             )
 
@@ -334,6 +407,9 @@ class _SchemaModelBuilder:
             msg = f"The schema at '{path}' did not build into a class: {exc}"
             raise UnsupportedSchemaError(msg) from exc
         self._models.append(model)
+        for property_name, field_name in field_names.items():
+            if "default" in properties[property_name]:
+                self._defaulted_fields.append((model, field_name))
         return model
 
     def _field_names(self, *, properties: dict[str, Any], path: str) -> dict[str, str]:
@@ -358,12 +434,12 @@ class _SchemaModelBuilder:
             field_names[property_name] = field_name
         return field_names
 
-    def _field(self, *, node: Any, is_required: bool, alias: str | None, depth: int, path: str) -> tuple[Any, FieldInfo]:
+    def _field(self, *, node: Any, is_required: bool, alias: str | None, path: str) -> tuple[Any, FieldInfo]:
         if not isinstance(node, dict):
             raise _refuse(path=path, reason="the property is not an object")
         field_node = cast("dict[str, Any]", node)
         type_node = {key: value for key, value in field_node.items() if key not in _PROPERTY_KEYS}
-        annotation = self._annotation(node=type_node, depth=depth, path=path)
+        annotation = self._annotation(node=type_node, path=path)
         field_kwargs: dict[str, Any] = {}
         if alias is not None:
             field_kwargs["alias"] = alias
@@ -381,9 +457,14 @@ class _SchemaModelBuilder:
             if not isinstance(field_node["mock_format"], str):
                 raise _refuse(path=f"{path}/mock_format", reason="the mock format is not a string")
             field_kwargs["json_schema_extra"] = {"mock_format": field_node["mock_format"]}
+        if "deprecated" in field_node:
+            # pydantic writes a deprecated field as `true`, whatever message the caller's class gave it.
+            if field_node["deprecated"] is not True:
+                raise _refuse(path=f"{path}/deprecated", reason="a field is deprecated as `true`")
+            field_kwargs["deprecated"] = True
         if "default" in field_node:
-            # The schema writes a default in its JSON form, so it is validated into the field's type, as an input is.
-            return annotation, Field(default=field_node["default"], validate_default=True, **field_kwargs)
+            # The schema writes a default in its JSON form, which `_validate_defaults` validates once every class is built.
+            return annotation, Field(default=field_node["default"], **field_kwargs)
         if is_required:
             return annotation, Field(**field_kwargs)
         # Optional with no default: the caller's class has a default factory, which the schema does not describe. The
@@ -391,24 +472,30 @@ class _SchemaModelBuilder:
         # A default factory, unlike a default, writes nothing into the schema.
         return annotation, Field(default_factory=_omitted, exclude_if=_is_omitted, **field_kwargs)
 
-    def _annotation(self, *, node: Any, depth: int, path: str) -> Any:
-        self._count_depth(depth=depth, path=path)
+    def _annotation(self, *, node: Any, path: str) -> Any:
         if not isinstance(node, dict):
             raise _refuse(path=path, reason="a type is described by an object")
         type_node = cast("dict[str, Any]", node)
+        if "title" in type_node:
+            # A title on a type that is no property's, such as a list's item type, which pydantic writes from a `Field`.
+            title = type_node["title"]
+            if not isinstance(title, str):
+                raise _refuse(path=f"{path}/title", reason="the title is not a string")
+            untitled_node = {key: value for key, value in type_node.items() if key != "title"}
+            return Annotated[self._annotation(node=untitled_node, path=path), Field(title=title)]
         if "$ref" in type_node:
             _refuse_unknown_keys(node=type_node, allowed=frozenset({"$ref"}), path=path)
-            return self._reference(ref=type_node["$ref"], depth=depth + 1, path=f"{path}/$ref")
+            return self._reference(ref=type_node["$ref"], path=f"{path}/$ref")
         if "anyOf" in type_node:
-            return self._union(node=type_node, depth=depth, path=path)
+            return self._union(node=type_node, path=path)
         if "oneOf" in type_node:
-            return self._discriminated_union(node=type_node, depth=depth, path=path)
+            return self._discriminated_union(node=type_node, path=path)
         if "allOf" in type_node:
             _refuse_unknown_keys(node=type_node, allowed=frozenset({"allOf"}), path=path)
             members = type_node["allOf"]
             if not isinstance(members, list) or len(cast("list[Any]", members)) != 1:
                 raise _refuse(path=f"{path}/allOf", reason="only an allOf of one member is supported")
-            return self._annotation(node=cast("list[Any]", members)[0], depth=depth + 1, path=f"{path}/allOf/0")
+            return self._annotation(node=cast("list[Any]", members)[0], path=f"{path}/allOf/0")
         if "const" in type_node:
             _refuse_unknown_keys(node=type_node, allowed=_LITERAL_KEYS | {"const"}, path=path)
             return Literal[self._literal_values(values=[type_node["const"]], node=type_node, path=path)]
@@ -433,13 +520,13 @@ class _SchemaModelBuilder:
                 _refuse_unknown_keys(node=type_node, allowed=frozenset({"type"}), path=path)
                 return None
             case "array":
-                return self._array(node=type_node, depth=depth, path=path)
+                return self._array(node=type_node, path=path)
             case "object":
-                return self._dict(node=type_node, depth=depth, path=path)
+                return self._dict(node=type_node, path=path)
             case other_type:
                 raise _refuse(path=f"{path}/type", reason=f"the type {other_type!r} is not supported")
 
-    def _union(self, *, node: dict[str, Any], depth: int, path: str) -> Any:
+    def _union(self, *, node: dict[str, Any], path: str) -> Any:
         """A union of its members, where the number and the string of digits pydantic writes for a `Decimal` are one."""
         _refuse_unknown_keys(node=node, allowed=frozenset({"anyOf"}), path=path)
         members = node["anyOf"]
@@ -456,7 +543,7 @@ class _SchemaModelBuilder:
                     member_types.append(decimal_type)
                     index_member += 2
                     continue
-            member_types.append(self._annotation(node=member_nodes[index_member], depth=depth + 1, path=f"{path}/anyOf/{index_member}"))
+            member_types.append(self._annotation(node=member_nodes[index_member], path=f"{path}/anyOf/{index_member}"))
             index_member += 1
         return Union[tuple(member_types)]
 
@@ -489,7 +576,7 @@ class _SchemaModelBuilder:
             return Decimal
         return Annotated[Decimal, Field(**constraints)]
 
-    def _discriminated_union(self, *, node: dict[str, Any], depth: int, path: str) -> Any:
+    def _discriminated_union(self, *, node: dict[str, Any], path: str) -> Any:
         """A `oneOf` of references with its discriminator, which is what pydantic writes for a discriminated union."""
         _refuse_unknown_keys(node=node, allowed=_DISCRIMINATED_UNION_KEYS, path=path)
         discriminator = node.get("discriminator")
@@ -515,8 +602,7 @@ class _SchemaModelBuilder:
         if len(set(member_refs)) != len(member_refs) or set(mapped_refs) != set(member_refs):
             raise _refuse(path=f"{path}/discriminator/mapping", reason="the discriminator maps its values to exactly the members")
         member_types = tuple(
-            self._reference(ref=member_ref, depth=depth + 1, path=f"{path}/oneOf/{index_member}/$ref")
-            for index_member, member_ref in enumerate(member_refs)
+            self._reference(ref=member_ref, path=f"{path}/oneOf/{index_member}/$ref") for index_member, member_ref in enumerate(member_refs)
         )
         return Annotated[Union[member_types], Field(discriminator=property_name)]
 
@@ -540,6 +626,9 @@ class _SchemaModelBuilder:
         if string_format in _FORMAT_TYPES:
             _refuse_unknown_keys(node=node, allowed=frozenset({"type", "format"}), path=path)
             return _FORMAT_TYPES[string_format]
+        if string_format == "binary":
+            # pydantic writes the length constraints of `bytes` beside its format.
+            return self._constrained(base=bytes, node=node, keys=_BINARY_KEYS, path=path)
         if string_format == "uri":
             # pydantic writes a URL as a string of at least one character, and its length cap when it has one.
             _refuse_unknown_keys(node=node, allowed=frozenset({"type", "format", "minLength", "maxLength"}), path=path)
@@ -574,11 +663,11 @@ class _SchemaModelBuilder:
             return base
         return Annotated[base, Field(**constraints)]
 
-    def _array(self, *, node: dict[str, Any], depth: int, path: str) -> Any:
+    def _array(self, *, node: dict[str, Any], path: str) -> Any:
         if "prefixItems" in node:
-            return self._tuple(node=node, depth=depth, path=path)
+            return self._tuple(node=node, path=path)
         _refuse_unknown_keys(node=node, allowed=_ARRAY_KEYS, path=path)
-        item_type = self._annotation(node=node["items"], depth=depth + 1, path=f"{path}/items") if "items" in node else Any
+        item_type = self._annotation(node=node["items"], path=f"{path}/items") if "items" in node else Any
         unique_items = node.get("uniqueItems", False)
         if not isinstance(unique_items, bool):
             raise _refuse(path=f"{path}/uniqueItems", reason="uniqueItems is a boolean")
@@ -594,7 +683,7 @@ class _SchemaModelBuilder:
             return container
         return Annotated[container, Field(**constraints)]
 
-    def _tuple(self, *, node: dict[str, Any], depth: int, path: str) -> Any:
+    def _tuple(self, *, node: dict[str, Any], path: str) -> Any:
         """A tuple of fixed length, which pydantic writes as its items in order, its length both the least and the most."""
         _refuse_unknown_keys(node=node, allowed=_TUPLE_KEYS, path=path)
         prefix_items = node["prefixItems"]
@@ -604,23 +693,48 @@ class _SchemaModelBuilder:
         if node.get("minItems") != len(item_nodes) or node.get("maxItems") != len(item_nodes):
             raise _refuse(path=path, reason="a tuple's least and most items are its number of items")
         item_types = tuple(
-            self._annotation(node=item_node, depth=depth + 1, path=f"{path}/prefixItems/{index_item}")
-            for index_item, item_node in enumerate(item_nodes)
+            self._annotation(node=item_node, path=f"{path}/prefixItems/{index_item}") for index_item, item_node in enumerate(item_nodes)
         )
         return GenericAlias(tuple, item_types)
 
-    def _dict(self, *, node: dict[str, Any], depth: int, path: str) -> Any:
+    def _dict(self, *, node: dict[str, Any], path: str) -> Any:
         if "properties" in node:
             raise _refuse(path=path, reason="an inline object is not supported, only one in '$defs'")
         _refuse_unknown_keys(node=node, allowed=_DICT_KEYS, path=path)
         value_node = node.get("additionalProperties", True)
-        if value_node is True:
-            return dict[str, Any]
-        value_type = self._annotation(node=value_node, depth=depth + 1, path=f"{path}/additionalProperties")
-        return GenericAlias(dict, (str, value_type))
+        value_type = Any if value_node is True else self._annotation(node=value_node, path=f"{path}/additionalProperties")
+        key_type = self._dict_keys(node=node["propertyNames"], path=f"{path}/propertyNames") if "propertyNames" in node else str
+        container = GenericAlias(dict, (key_type, value_type))
+        constraints: dict[str, Any] = {}
+        for key, argument in _PROPERTY_COUNT_CONSTRAINTS.items():
+            if key in node:
+                if not _is_count(value=node[key]):
+                    raise _refuse(path=f"{path}/{key}", reason="a length is a count")
+                constraints[argument] = node[key]
+        if not constraints:
+            return container
+        return Annotated[container, Field(**constraints)]
 
-    def _reference(self, *, ref: Any, depth: int, path: str) -> Any:
-        self._count_depth(depth=depth, path=path)
+    def _dict_keys(self, *, node: Any, path: str) -> Any:
+        """The keys of a dictionary whose property names are an enumeration of strings, which pydantic writes for `Literal` keys."""
+        if not isinstance(node, dict):
+            raise _refuse(path=path, reason="a type is described by an object")
+        keys_node = cast("dict[str, Any]", node)
+        values: Any
+        if "const" in keys_node:
+            _refuse_unknown_keys(node=keys_node, allowed=_LITERAL_KEYS | {"const"}, path=path)
+            values = [keys_node["const"]]
+        elif "enum" in keys_node:
+            _refuse_unknown_keys(node=keys_node, allowed=_LITERAL_KEYS | {"enum"}, path=path)
+            values = keys_node["enum"]
+        else:
+            raise _refuse(path=path, reason="a dictionary's keys are constrained only to an enumeration of strings")
+        literal_values = self._literal_values(values=values, node=keys_node, path=path)
+        if any(not isinstance(value, str) for value in literal_values):
+            raise _refuse(path=path, reason="a dictionary's keys are constrained only to an enumeration of strings")
+        return Literal[literal_values]
+
+    def _reference(self, *, ref: Any, path: str) -> Any:
         if not isinstance(ref, str) or not ref.startswith(_LOCAL_REF_PREFIX):
             raise _refuse(path=path, reason=f"only a local '{_LOCAL_REF_PREFIX}…' reference is supported, not {ref!r}")
         def_name = ref.removeprefix(_LOCAL_REF_PREFIX)
@@ -630,6 +744,8 @@ class _SchemaModelBuilder:
             return self._built[def_name]
         if def_name in self._in_progress:
             return ForwardRef(self._forward_refs[def_name])
+        if len(self._in_progress) >= self.MAX_DEFINITION_CHAIN:
+            raise self.too_long_a_chain(path=path)
 
         def_path = f"#/$defs/{def_name}"
         def_node = self._defs[def_name]
@@ -639,7 +755,7 @@ class _SchemaModelBuilder:
         else:
             self._forward_refs[def_name] = f"{_FORWARD_REF_PREFIX}{len(self._forward_refs)}"
             self._in_progress.add(def_name)
-            built = self._model(node=def_node, class_name=def_name, depth=depth + 1, path=def_path)
+            built = self._model(node=def_node, class_name=def_name, path=def_path)
             self._in_progress.discard(def_name)
             self._namespace[self._forward_refs[def_name]] = built
         self._built[def_name] = built
@@ -720,4 +836,8 @@ class SchemaToModelFactory:
     def _build(cls, *, schema: dict[str, Any], class_name: str) -> type[BaseModel]:
         """Build the class of one schema the cache does not hold, once its size is checked."""
         _SchemaModelBuilder.check_size(schema=schema)
-        return _SchemaModelBuilder(schema=schema).build(class_name=class_name)
+        try:
+            return _SchemaModelBuilder(schema=schema).build(class_name=class_name)
+        except RecursionError as exc:
+            # The caps keep the rebuild well within Python's recursion, and this is the backstop should they not.
+            raise _SchemaModelBuilder.too_long_a_chain(path="#") from exc

@@ -1,10 +1,11 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import IntEnum
+from types import GenericAlias
 from typing import Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, HttpUrl, create_model
+from pydantic import UUID1, UUID3, UUID4, UUID5, AnyUrl, BaseModel, ConfigDict, Field, HttpUrl, create_model, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
@@ -155,10 +156,97 @@ class Pets(StructuredContent):
 
 
 class ModelDefaults(StructuredContent):
-    """Defaults the schema writes in their JSON form: a nested model and an enumeration member."""
+    """Defaults the schema writes in their JSON form: a nested model, an enumeration member and a discriminated union's member."""
 
     counter: Counter = Counter(count=2)
     rank: Rank = Rank.SECOND
+    pet: Pet = Cat(kind="cat", lives=9)
+
+
+class NestedModelDefaults(StructuredContent):
+    """A class holding one whose defaults are models and enumeration members."""
+
+    holder: ModelDefaults
+
+
+class RingStart(BaseModel):
+    """One of two classes holding one another, each with a nested model's default."""
+
+    counter: Counter = Counter(count=5)
+    after: "RingEnd | None" = None
+
+
+class RingEnd(BaseModel):
+    counter: Counter = Counter(count=6)
+    start: RingStart | None = None
+
+
+RingStart.model_rebuild()
+
+
+class UnvalidatedDefaults(StructuredContent):
+    """Defaults the class never validates: one its own constraint refuses, and `None` on a string a validator fills."""
+
+    count: int = Field(default=-1, ge=0)
+    # A default its own type refuses, which is the shape under test.
+    name: str = Field(default=None)  # type: ignore[assignment]
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _none_is_empty(cls, value: Any) -> Any:
+        return "" if value is None else value
+
+
+class MoreFormats(StructuredContent):
+    """Bytes with a length, and the UUID formats of a version."""
+
+    payload: bytes = Field(min_length=1, max_length=8)
+    version_1: UUID1
+    version_3: UUID3 | None = None
+    version_4: UUID4
+    version_5: UUID5
+
+
+class DeprecatedFields(StructuredContent):
+    """Deprecated fields, with a message and without, which the schema writes as `deprecated`."""
+
+    current: str
+    legacy: str | None = Field(default=None, deprecated=True)
+    older: str = Field(default="kept", deprecated="Use `current` instead")
+
+
+class TitledTypes(StructuredContent):
+    """Titles on types that are no property's: a list's items, a reference and a union."""
+
+    names: list[Annotated[str, Field(title="Name")]]
+    counters: list[Annotated[Counter, Field(title="Entry")]] = Field(default_factory=empty_list_factory_of(Counter))
+    maybe_numbers: list[Annotated[int | None, Field(title="Maybe")]] | None = None
+
+
+def _no_kinds() -> dict[Literal["a", "b"], int]:
+    return {}
+
+
+class BoundedDicts(StructuredContent):
+    """Dictionaries bounded in their number of keys, and dictionaries keyed by literal strings."""
+
+    scores: dict[str, float] = Field(min_length=1, max_length=3)
+    by_kind: dict[Literal["a", "b"], int] = Field(default_factory=_no_kinds)
+    only_one: dict[Literal["only"], str] | None = None
+
+
+def _chain_of_models(*, length: int) -> type[BaseModel]:
+    """A chain of distinct classes, each holding an optional list of the next, `length` classes past the first."""
+    links: list[type[BaseModel]] = [create_model(f"Link{length}", label=(str, ...))]
+    for index_link in reversed(range(length)):
+        next_type: Any = GenericAlias(list, (links[-1],)) | None
+        links.append(create_model(f"Link{index_link}", label=(str, ...), next=(next_type, None)))
+    return links[-1]
+
+
+# Deeper than a cap counting every node on the path allowed, and short of the depth from which pydantic's own
+# `model_json_schema()` recurses past Python's default limit on this shape, about 35 classes.
+ModelChain = _chain_of_models(length=30)
 
 
 # Two definitions titled `Item`, from two modules, which pydantic keys apart in `$defs`.
@@ -226,7 +314,23 @@ class SchemaRebuildTestData:
         ("enumeration of floats", _object(x={"enum": [1.5, 2.5]}), "strings, integers or booleans"),
         ("enumeration whose type is not its values'", _object(x={"enum": ["a"], "type": "integer"}), "declared type"),
         ("typed extra properties on an object", {**_object(), "additionalProperties": {"type": "string"}}, "never typed"),
-        ("constrained dictionary keys", _object(x={"type": "object", "propertyNames": {"pattern": "^a"}}), "propertyNames"),
+        ("constrained dictionary keys", _object(x={"type": "object", "propertyNames": {"pattern": "^a"}}), "enumeration of strings"),
+        ("dictionary keyed by integers", _object(x={"type": "object", "propertyNames": {"enum": [1, 2]}}), "enumeration of strings"),
+        (
+            "dictionary keyed by an enumeration class",
+            {**_object(x={"type": "object", "propertyNames": {"$ref": "#/$defs/Kind"}}), "$defs": {"Kind": {"enum": ["a"], "type": "string"}}},
+            "enumeration of strings",
+        ),
+        ("dictionary with a negative key count", _object(x={"type": "object", "minProperties": -1}), "a length is a count"),
+        ("deprecation that is not true", _object(x={"type": "string", "deprecated": "soon"}), "deprecated as `true`"),
+        ("schema extension on a property", _object(x={"type": "string", "x-unit": "cm"}), "x-unit"),
+        ("secret string", _object(x={"type": "string", "format": "password", "writeOnly": True}), "writeOnly"),
+        ("secret string without its write-only flag", _object(x={"type": "string", "format": "password"}), "format 'password'"),
+        ("path", _object(x={"type": "string", "format": "path"}), "format 'path'"),
+        ("IP address", _object(x={"type": "string", "format": "ipvanyaddress"}), "format 'ipvanyaddress'"),
+        ("JSON string", _object(x={"type": "string", "contentMediaType": "application/json", "contentSchema": {}}), "contentMediaType"),
+        ("binary with a pattern", _object(x={"type": "string", "format": "binary", "pattern": "^a"}), "pattern"),
+        ("title that is not a string", _object(x={"type": "array", "items": {"type": "string", "title": 1}}), "the title is not a string"),
         ("URL without its minimum length", _object(x={"type": "string", "format": "uri"}), "at least one character"),
         ("constraint on a boolean", _object(x={"type": "boolean", "minimum": 1}), "minimum"),
         ("bound that is not a number", _object(x={"type": "integer", "minimum": "1"}), "a bound is a number"),
@@ -256,6 +360,14 @@ class SchemaRebuildTestData:
         Tuples,
         Pets,
         ModelDefaults,
+        NestedModelDefaults,
+        RingEnd,
+        UnvalidatedDefaults,
+        MoreFormats,
+        DeprecatedFields,
+        TitledTypes,
+        BoundedDicts,
+        ModelChain,
         SharedTitles,
     ]
 
@@ -276,7 +388,26 @@ class SchemaRebuildTestData:
         (Pets, {"pet": {"kind": "cat", "lives": 9}, "maybe_pet": {"kind": "dog", "name": "Rex"}, "pets": [{"kind": "dog", "name": "Fido"}]}),
         (Pets, {"pet": {"kind": "dog", "name": "Rex"}}),
         (ModelDefaults, {}),
-        (ModelDefaults, {"counter": {"count": 3}, "rank": 1}),
+        (ModelDefaults, {"counter": {"count": 3}, "rank": 1, "pet": {"kind": "dog", "name": "Rex"}}),
+        (NestedModelDefaults, {"holder": {}}),
+        (RingEnd, {"start": {"after": {"start": {"after": {}}}}}),
+        (UnvalidatedDefaults, {"count": 3, "name": "named"}),
+        (
+            MoreFormats,
+            {
+                "payload": "bytes",
+                "version_1": "15510910-e41c-11f1-8001-000000000001",
+                "version_3": "6fa459ea-ee8a-3ca4-894e-db77e160355e",
+                "version_4": "12345678-1234-4678-9234-567812345678",
+                "version_5": "886313e1-3b8a-5372-9b90-0c9aee199e5d",
+            },
+        ),
+        (DeprecatedFields, {"current": "now", "legacy": "then", "older": "before"}),
+        (DeprecatedFields, {"current": "now"}),
+        (TitledTypes, {"names": ["a"], "counters": [{"count": 4}], "maybe_numbers": [1, None]}),
+        (BoundedDicts, {"scores": {"x": 1.5}, "by_kind": {"a": 1, "b": 2}, "only_one": {"only": "one"}}),
+        (BoundedDicts, {"scores": {"x": 1.5, "y": 2}}),
+        (ModelChain, {"label": "0", "next": [{"label": "1", "next": [{"label": "2"}, {"label": "2b", "next": None}]}]}),
     ]
 
     # Concept structures as a method declares them, built into their classes by the concept factory.

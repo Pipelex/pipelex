@@ -18,13 +18,21 @@ from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToMode
 from pipelex.system.registries.class_registry_access import get_class_registry
 from tests.unit.pipelex.cogt.content_generation.test_data import (
     AliasedProperties,
+    BoundedDicts,
     Decimals,
+    DeprecatedFields,
     FactoryDefaults,
+    ModelChain,
     ModelDefaults,
+    MoreFormats,
+    NestedModelDefaults,
     Pets,
+    RingEnd,
     SchemaRebuildTestData,
     SharedTitles,
+    TitledTypes,
     Tuples,
+    UnvalidatedDefaults,
 )
 
 
@@ -271,6 +279,105 @@ class TestSchemaToModel:
         assert instance.counter.count == 2  # type: ignore[attr-defined]
         assert type(instance.rank).__name__ == "Rank"  # type: ignore[attr-defined]
         assert instance.rank == 2  # type: ignore[attr-defined]
+        assert type(instance.pet).__name__ == "Cat"  # type: ignore[attr-defined]
+        assert instance.pet.lives == 9  # type: ignore[attr-defined]
+
+    def test_a_typed_default_holds_in_a_nested_class(self) -> None:
+        """A class holding one whose defaults are typed validates the nested class's defaults into its types too."""
+        schema, title = _unique_schema(NestedModelDefaults)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class.model_validate({"holder": {}})
+        assert type(instance.holder.counter).__name__ == "Counter"  # type: ignore[attr-defined]
+        assert type(instance.holder.rank).__name__ == "Rank"  # type: ignore[attr-defined]
+
+    def test_a_typed_default_holds_through_a_cycle(self) -> None:
+        """Classes holding one another validate each other's defaults into their types, however deep the input nests them."""
+        schema = RingEnd.model_json_schema()
+        assert set(schema) == {"$defs", "$ref"}
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="RingEnd")
+
+        assert result_class.model_json_schema() == schema
+        ring: Any = result_class.model_validate({"start": {"after": {"start": {"after": {}}}}})
+        links: list[Any] = [ring, ring.start, ring.start.after, ring.start.after.start, ring.start.after.start.after]
+        assert [type(link.counter).__name__ for link in links] == ["Counter"] * len(links)
+        assert [link.counter.count for link in links] == [6, 5, 6, 5, 6]
+
+    def test_a_default_the_original_never_validates_is_kept_as_written(self) -> None:
+        """A default its own field refuses is kept raw, so an input leaving it out is accepted exactly as by the original."""
+        schema, title = _unique_schema(UnvalidatedDefaults)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        original = UnvalidatedDefaults.model_validate({})
+        rebuilt = result_class.model_validate({})
+        assert rebuilt.model_dump() == {"count": original.count, "name": original.name} == {"count": -1, "name": None}
+        with pytest.raises(ValidationError):
+            result_class.model_validate({"count": -1})
+
+    def test_bytes_and_versioned_uuids_keep_their_constraints(self) -> None:
+        """Bytes keep their length bounds and each versioned UUID format refuses a UUID of another version."""
+        schema, title = _unique_schema(MoreFormats)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        valid = {
+            "payload": b"abc",
+            "version_1": "15510910-e41c-11f1-8001-000000000001",
+            "version_4": "12345678-1234-4678-9234-567812345678",
+            "version_5": "886313e1-3b8a-5372-9b90-0c9aee199e5d",
+        }
+        assert result_class.model_validate(valid).payload == b"abc"  # type: ignore[attr-defined]
+        invalid_cases: list[dict[str, Any]] = [{"payload": b""}, {"payload": b"123456789"}, {"version_4": valid["version_5"]}]
+        for invalid_values in invalid_cases:
+            with pytest.raises(ValidationError):
+                result_class.model_validate({**valid, **invalid_values})
+
+    def test_a_deprecated_field_stays_deprecated(self) -> None:
+        """A field the schema writes as deprecated is deprecated on the rebuilt class."""
+        schema, title = _unique_schema(DeprecatedFields)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        assert result_class.model_fields["legacy"].deprecated is True
+        assert result_class.model_fields["current"].deprecated is None
+
+    def test_a_title_on_a_type_that_is_no_property_is_kept(self) -> None:
+        """A title pydantic writes on an item type, a reference or a union, rebuilds onto the same type."""
+        schema, title = _unique_schema(TitledTypes)
+        assert schema["properties"]["counters"]["items"] == {"$ref": "#/$defs/Counter", "title": "Entry"}
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        instance = result_class.model_validate({"names": ["a"], "counters": [{"count": 2}], "maybe_numbers": [None, 1]})
+        assert type(instance.counters[0]).__name__ == "Counter"  # type: ignore[attr-defined]
+
+    def test_a_dictionary_keeps_its_key_count_and_its_literal_keys(self) -> None:
+        """`minProperties` and `maxProperties` bound a dictionary's keys, and `propertyNames` of strings allows only those keys."""
+        schema, title = _unique_schema(BoundedDicts)
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+        assert result_class.model_json_schema() == schema
+        assert get_args(result_class.model_fields["by_kind"].annotation) == (Literal["a", "b"], int)
+        valid: dict[str, Any] = {"scores": {"x": 1.0}, "by_kind": {"a": 1}}
+        assert result_class.model_validate(valid).model_dump(include={"scores", "by_kind"}) == valid
+        invalid_cases: list[dict[str, Any]] = [
+            {"scores": {}},
+            {"scores": {"a": 1, "b": 2, "c": 3, "d": 4}},
+            {"by_kind": {"c": 1}},
+            {"only_one": {"two": "x"}},
+        ]
+        for invalid_values in invalid_cases:
+            with pytest.raises(ValidationError):
+                result_class.model_validate({**valid, **invalid_values})
 
     def test_definitions_sharing_a_title_keep_their_keys(self) -> None:
         """Each definition's class is named after its `$defs` key and carries its title apart, so shared titles keep both keys."""
@@ -471,9 +578,28 @@ class TestSchemaToModel:
         with pytest.raises(UnsupportedSchemaError, match="nests deeper than"):
             SchemaToModelFactory.make_from_json_schema(schema, class_name="Abyss")
 
-    def test_references_chaining_past_the_depth_cap_are_refused(self) -> None:
+    def test_a_chain_of_definitions_counts_definitions_not_nodes(self) -> None:
+        """A chain of optional lists of distinct classes, many nodes deep per class, rebuilds exactly well below the definition cap."""
+        schema = ModelChain.model_json_schema()
+        assert len(schema["$defs"]) * 5 > _SchemaModelBuilder.MAX_DEFINITION_CHAIN
+
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=ModelChain.__name__)
+
+        assert result_class.model_json_schema() == schema
+        chain = result_class.model_validate({"label": "0", "next": [{"label": "1", "next": [{"label": "2"}]}]})
+        assert chain.next[0].next[0].label == "2"  # type: ignore[attr-defined]
+
+    def test_a_recursion_error_while_building_is_refused_as_too_deep(self, mocker: MockerFixture) -> None:
+        """Should the caps leave a rebuild past Python's recursion, the RecursionError is refused as a schema too deep."""
+        schema, title = _unique_schema(SimpleModel)
+        mocker.patch.object(_SchemaModelBuilder, "build", side_effect=RecursionError("maximum recursion depth exceeded"))
+
+        with pytest.raises(UnsupportedSchemaError, match="references chain deeper than"):
+            SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
+
+    def test_references_chaining_past_the_definition_cap_are_refused(self) -> None:
         """Definitions referencing one another in a chain longer than the cap are refused, though the schema nests shallowly."""
-        chain_length = _SchemaModelBuilder.MAX_DEPTH
+        chain_length = _SchemaModelBuilder.MAX_DEFINITION_CHAIN
         defs = {
             f"Link{index}": {"title": f"Link{index}", "type": "object", "properties": {"next": {"$ref": f"#/$defs/Link{index + 1}"}}}
             for index in range(chain_length)
