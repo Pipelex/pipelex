@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A `PipeFunc` runs in a sandbox beside a templated `PipeDocGen`**: the sandbox side of a `PipeFunc` call builds the crate's concepts and the step it calls, and no other step, so a method pairing a `PipeFunc` with a `PipeDocGen` printing from an HTML, Word, Excel or PowerPoint template no longer fails its first `PipeFunc` with `DocGenEngineMissingError` in a sandbox that has no document generation plugin. `LibraryCrate.restricted_to_pipe` returns that crate.
+
 ## [v0.109.0] - 2026-11-18
 
 ### Fixed

@@ -70,6 +70,34 @@ class LibraryCrate(BaseModel):
             fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes={}),
         )
 
+    def restricted_to_pipe(self, *, pipe_ref: str) -> "LibraryCrate | None":
+        """The crate's concepts and domains with its one pipe `pipe_ref`: what a process running that step alone loads.
+
+        A process that runs one step, such as a sandbox running a `PipeFunc` call, builds that step and no other, so no
+        check of a sibling step that depends on its environment, such as a `PipeDocGen` step's document engine, can stop it.
+        The pipe keeps its source, its tree bundle and its elaboration metadata; the fingerprint is the restricted crate's own.
+
+        Returns:
+            The restricted crate, or None when the crate holds no pipe `pipe_ref`.
+        """
+        pipe_blueprint = self.pipes.get(pipe_ref)
+        if pipe_blueprint is None:
+            return None
+        pipes = {pipe_ref: pipe_blueprint}
+        source_map = {ref: source for ref, source in self.source_map.items() if ref in self.concepts or ref == pipe_ref}
+        tree_bundle_ref = self.tree_bundles.get(pipe_ref)
+        elaboration = self.elaboration_metadata.get(pipe_ref)
+        return LibraryCrate(
+            mthds_version=self.mthds_version,
+            concepts=dict(self.concepts),
+            pipes=pipes,
+            domains=dict(self.domains),
+            source_map=source_map,
+            elaboration_metadata={pipe_ref: elaboration} if elaboration is not None else {},
+            tree_bundles={pipe_ref: tree_bundle_ref} if tree_bundle_ref is not None else {},
+            fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes=pipes),
+        )
+
     fingerprint: str = ""
     """SHA-256 hex digest of the serialized concepts + pipes content (source is intentionally excluded)."""
 
