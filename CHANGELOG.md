@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The event-style events can be switched off while tracing stays on**: `[custom_posthog.events] enabled = false` in `telemetry.toml` stops `pipeline_execute`, `pipeline_complete`, `pipe_run`, `pipe_complete`, `pipe_dry_run` and the CLI's events from reaching your PostHog, while the AI spans and generations of `[custom_posthog.tracing]` and the `$exception` events of the `posthog` error tracker still go out on the same client. It is on by default, so a self-hosted or local install's stream is unchanged; a host whose own events record each run turns it off so a run is not counted twice.
+
 ### Fixed
 
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.

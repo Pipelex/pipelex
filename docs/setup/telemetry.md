@@ -19,6 +19,31 @@ description: "Understand Pipelex telemetry — telemetry.toml never reports to P
 
 Each integration mode allows these streams or not: by default the `cli`, `docker`, `fastapi`, `mcp` and `n8n` modes allow them, and `pytest`, `ci` and `python` do not, so a test suite sends nothing unless you allow its mode under `[telemetry_allowed_modes]` in `telemetry.toml`. [Telemetry Configuration](../configuration/config-practical/telemetry-config.md) describes each destination's settings.
 
+### Your PostHog stream: events, spans and errors
+
+When your PostHog stream is on, it carries three kinds of data, each with its own switch:
+
+- **Event-style events** (`[custom_posthog.events]`, on by default): one event per thing that happened, `pipeline_execute` and `pipeline_complete` for a run, `pipe_run` and `pipe_complete` for a pipe, `pipe_dry_run` for a validation sweep, and the CLI's own events such as `pipe_show` and `pipes_list`.
+- **AI spans and generations** (`[custom_posthog.tracing]`, off by default): an `$ai_span` per pipe and an `$ai_generation` per inference call, the same spans your Langfuse and OTLP destinations receive.
+- **Errors** (`[runtime.error_tracking]` in `pipelex.toml`): the `$exception` events of the built-in `posthog` error tracker, as [Error trackers](#error-trackers) describes.
+
+A self-hosted install or a local one, where Pipelex is the only thing reporting a run, keeps all three. A host whose own events are already the record of each run, such as a platform that sends its own run event when it starts a run, switches the event-style events off so a run is not counted twice, and keeps the spans, the generations and the errors:
+
+```toml
+[custom_posthog]
+mode = "identified"
+user_id = "my-service"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.events]
+enabled = false  # no pipeline_execute, pipe_run and their kin
+
+[custom_posthog.tracing]
+enabled = true   # spans and generations still go out
+```
+
+The switch only reaches the event-style events: the spans, the generations and the `$exception` events travel on the same PostHog client, which stays up.
+
 ### Pipelex's spans in your process
 
 Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:

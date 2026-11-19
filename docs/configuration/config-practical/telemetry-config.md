@@ -60,6 +60,10 @@ redact_properties = [
     "url",
 ]                                                    # Event properties to redact
 
+# Event-style events to YOUR PostHog (pipeline_execute, pipe_run, the CLI's events...)
+[custom_posthog.events]
+enabled = true                                       # Send event-style events to your PostHog
+
 # AI span tracing to YOUR PostHog
 [custom_posthog.tracing]
 enabled = true                                       # Send AI spans to your PostHog
@@ -139,6 +143,16 @@ trackers = ["posthog"]   # remove "posthog" to keep errors off your PostHog
 ```
 
 See [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) for the other trackers a plugin can add.
+
+### `[custom_posthog.events]` Settings
+
+Controls the event-style events sent to your PostHog instance: `pipeline_execute`, `pipeline_complete`, `pipe_run`, `pipe_complete`, `pipe_dry_run` and the CLI's events, such as `pipe_show`, `pipes_list`, `backends_show` and `graph_render`.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `true` | Send event-style events to your PostHog |
+
+Switching them off leaves the AI spans and generations of `[custom_posthog.tracing]`, and the `$exception` events of the `posthog` error tracker, going to the same PostHog: it is meant for a host whose own events already record each run, so that a run is not counted twice. A file that omits the section keeps the events on. With `mode = "off"` nothing reaches your PostHog, whatever this switch says. [Telemetry Setup](../../setup/telemetry.md#your-posthog-stream-events-spans-and-errors) shows an example.
 
 ### `[custom_posthog.tracing]` Settings
 
