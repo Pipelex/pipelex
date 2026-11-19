@@ -180,8 +180,9 @@ jobs:
 # --------------------------------------------------------------------------
 # 5.  The server's image, built from the repository root as the release builds
 #     it (`make -C api docker-build`) and smoke-tested (`make -C api
-#     docker-smoke`): it boots, answers /health, and reports this version for
-#     both the server and the pipelex it runs. Nothing is pushed; the push is
+#     docker-smoke`): it boots, answers /health, reports this version for
+#     both the server and the pipelex it runs, and refuses a method shipping
+#     Python with the custom-code 501. Nothing is pushed; the push is
 #     `publish-docker-hub.yml`, from the release commit.
 # --------------------------------------------------------------------------
   api-image:
@@ -193,7 +194,7 @@ jobs:
       - name: Build the image
         run: make -C api docker-build
 
-      - name: Boot the image and check the versions it reports
+      - name: Boot the image and check its versions and its custom-code gate
         run: make -C api docker-smoke
 
 # --------------------------------------------------------------------------

@@ -151,8 +151,9 @@ jobs:
               ;;
           esac
 
-      # `deploy-docker-hub` builds the image from the repository root, smoke-tests it (it must boot and
-      # report this version for the server and the pipelex it runs), and only then pushes it.
+      # `deploy-docker-hub` builds the image from the repository root, smoke-tests it (it must boot,
+      # report this version for the server and the pipelex it runs, and refuse a method shipping Python
+      # with the custom-code 501), and only then pushes it.
       - name: Build, smoke-test and push the image
         if: steps.hub.outputs.published != 'true'
         env:

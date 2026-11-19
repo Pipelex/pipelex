@@ -197,22 +197,19 @@ class TestPipeDocGenFromCrate:
         assert pipe.template_file_text is None
         assert pipe.template_file_ref == MethodFileRef(tree_digest=tree_digest, tree_path="invoice.html")
 
-    async def test_a_transported_pipe_func_call_builds_its_sibling_template_step_by_the_crate_s_digest(self, tmp_path: Path) -> None:
-        """The tree written for the call holds no bundle and a generated `structures` module: only the called step is built in it.
+    async def test_a_transported_pipe_func_call_builds_the_called_step_alone(self, tmp_path: Path) -> None:
+        """The tree written for the call holds no bundle and a generated `structures` module: the called step alone is built.
 
-        The PipeDocGen step of the same tree is built as the crate names it, so it resolves its template file lexically and
-        names it by the digest the crate names the tree by, the one a store serves it under.
+        The PipeDocGen step of the same tree is in the crate the call carries, and is not built where the call runs.
         """
         library_manager = get_library_manager()
         with _mixed_tree_request(tmp_path=tmp_path) as request, scoped_current_library(library_id=TRANSPORTED_LIBRARY_ID):
+            assert "mixed_tree.print_greeting" in request.crate.pipes
             try:
                 response = await DirectPipeFuncExecutor().run_pipe_func_transported(request=request)
-                sibling = library_manager.get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(
-                    pipe_code="mixed_tree.print_greeting"
-                )
+                transported_pipes = library_manager.get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.root
+                assert set(transported_pipes) == {"mixed_tree.greet"}
             finally:
                 library_manager.teardown(library_id=TRANSPORTED_LIBRARY_ID)
 
         assert response.function_qualname == "greet_it"
-        assert isinstance(sibling, PipeDocGen)
-        assert sibling.template_file_ref == MethodFileRef(tree_digest=request.tree_digest or "", tree_path="templates/greeting.html")
