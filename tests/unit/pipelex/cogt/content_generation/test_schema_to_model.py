@@ -17,6 +17,8 @@ from pipelex.cogt.content_generation.exceptions import UnsupportedSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory, _SchemaModelBuilder  # pyright: ignore[reportPrivateUsage]
 from pipelex.system.registries.class_registry_access import get_class_registry
 from tests.unit.pipelex.cogt.content_generation.test_data import (
+    MODEL_CHAIN_LENGTH,
+    MODEL_CHAIN_VALUES,
     AliasedProperties,
     BoundedDicts,
     Decimals,
@@ -579,15 +581,18 @@ class TestSchemaToModel:
             SchemaToModelFactory.make_from_json_schema(schema, class_name="Abyss")
 
     def test_a_chain_of_definitions_counts_definitions_not_nodes(self) -> None:
-        """A chain of optional lists of distinct classes, many nodes deep per class, rebuilds exactly well below the definition cap."""
+        """A chain of distinct classes, several nodes deep per class, rebuilds exactly well below the definition cap."""
         schema = ModelChain.model_json_schema()
-        assert len(schema["$defs"]) * 5 > _SchemaModelBuilder.MAX_DEFINITION_CHAIN
+        assert len(schema["$defs"]) == MODEL_CHAIN_LENGTH
+        assert len(schema["$defs"]) * 3 > _SchemaModelBuilder.MAX_DEFINITION_CHAIN
 
         result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name=ModelChain.__name__)
 
         assert result_class.model_json_schema() == schema
-        chain = result_class.model_validate({"label": "0", "next": [{"label": "1", "next": [{"label": "2"}]}]})
-        assert chain.next[0].next[0].label == "2"  # type: ignore[attr-defined]
+        link: Any = result_class.model_validate(MODEL_CHAIN_VALUES)
+        for _index_link in range(MODEL_CHAIN_LENGTH):
+            link = link.next
+        assert link.label == str(MODEL_CHAIN_LENGTH)
 
     def test_a_recursion_error_while_building_is_refused_as_too_deep(self, mocker: MockerFixture) -> None:
         """Should the caps leave a rebuild past Python's recursion, the RecursionError is refused as a schema too deep."""

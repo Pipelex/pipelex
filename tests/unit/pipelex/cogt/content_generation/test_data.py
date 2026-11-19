@@ -1,7 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import IntEnum
-from types import GenericAlias
 from typing import Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
@@ -236,17 +235,29 @@ class BoundedDicts(StructuredContent):
 
 
 def _chain_of_models(*, length: int) -> type[BaseModel]:
-    """A chain of distinct classes, each holding an optional list of the next, `length` classes past the first."""
+    """A chain of distinct classes, each requiring the next, `length` classes past the first."""
     links: list[type[BaseModel]] = [create_model(f"Link{length}", label=(str, ...))]
     for index_link in reversed(range(length)):
-        next_type: Any = GenericAlias(list, (links[-1],)) | None
-        links.append(create_model(f"Link{index_link}", label=(str, ...), next=(next_type, None)))
+        links.append(create_model(f"Link{index_link}", label=(str, ...), next=(links[-1], ...)))
     return links[-1]
 
 
-# Deeper than a cap counting every node on the path allowed, and short of the depth from which pydantic's own
-# `model_json_schema()` recurses past Python's default limit on this shape, about 35 classes.
-ModelChain = _chain_of_models(length=30)
+def _chain_values(*, length: int) -> dict[str, Any]:
+    """The values of a chain of `length` classes past the first, each link labelled with its index."""
+    values: dict[str, Any] = {"label": str(length)}
+    for index_link in reversed(range(length)):
+        values = {"label": str(index_link), "next": values}
+    return values
+
+
+# The cap that counted every node on the path, 100, met three nodes per class on this shape (the property, its
+# reference and the class it names), so it refused a chain from 34 classes past the first. The plain reference is the
+# shape whose classes cost Python's stack the least: building this chain, its schema, its rebuild and its round trip
+# takes about 750 frames on Python 3.11, against about 960 left under a pytest-xdist worker at the default limit, where
+# a chain of optional lists past that cap, 21 classes, takes about 830.
+MODEL_CHAIN_LENGTH = 36
+ModelChain = _chain_of_models(length=MODEL_CHAIN_LENGTH)
+MODEL_CHAIN_VALUES = _chain_values(length=MODEL_CHAIN_LENGTH)
 
 
 # Two definitions titled `Item`, from two modules, which pydantic keys apart in `$defs`.
@@ -407,7 +418,7 @@ class SchemaRebuildTestData:
         (TitledTypes, {"names": ["a"], "counters": [{"count": 4}], "maybe_numbers": [1, None]}),
         (BoundedDicts, {"scores": {"x": 1.5}, "by_kind": {"a": 1, "b": 2}, "only_one": {"only": "one"}}),
         (BoundedDicts, {"scores": {"x": 1.5, "y": 2}}),
-        (ModelChain, {"label": "0", "next": [{"label": "1", "next": [{"label": "2"}, {"label": "2b", "next": None}]}]}),
+        (ModelChain, MODEL_CHAIN_VALUES),
     ]
 
     # Concept structures as a method declares them, built into their classes by the concept factory.
