@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **One rule validates every run id (Breaking)**: a `pipeline_run_id` must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved, wherever the runtime takes one: `RunMetadata` refuses another at construction, `PipelexMTHDSProtocol.execute` and `PipelexKernel.make` refuse it with a `RunParameterError` before the run is set up, and `POST /v1/execute` and `POST /v1/start` answer it with a `422` `request.invalid` naming `pipeline_run_id`. The rule is `validate_pipeline_run_id` in `pipelex.system.job_metadata`; a host that sent an id holding a dot, a colon, a slash or a space, which `/v1/start` accepted up to 128 characters, sends one inside the rule now.
+- **One rule validates every run id (Breaking)**: a `pipeline_run_id` must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved, wherever the runtime takes one: `RunMetadata` refuses another at construction, `PipelexMTHDSProtocol.execute` and `PipelexKernel.make` refuse it with a `RunParameterError` before the run is set up, the kernel whether it comes as `pipeline_run_id` or as a trace context's `graph_id`, and `POST /v1/execute` and `POST /v1/start` answer it with a `422` `request.invalid` naming `pipeline_run_id`. The rule is `validate_pipeline_run_id` in `pipelex.system.job_metadata`; a host that sent an id holding a dot, a colon, a slash or a space, which `/v1/start` accepted up to 128 characters, sends one inside the rule now.
 
 ### Fixed
 

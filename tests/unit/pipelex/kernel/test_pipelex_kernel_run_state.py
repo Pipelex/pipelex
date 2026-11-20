@@ -184,6 +184,15 @@ class TestPipelexKernelRunState:
         with pytest.raises(RunParameterError, match="Invalid pipeline_run_id"):
             PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id=bad_run_id)
 
+    @pytest.mark.parametrize("bad_graph_id", ["", "wf:run/1.x", "x" * 129, "untitled", "dry_run_untitled"])
+    def test_a_trace_context_graph_id_outside_the_rule_is_refused(self, bad_graph_id: str) -> None:
+        """The graph id becomes the run id, so it is held to the same rule and refused with the same error."""
+        trace_context = _trace_context().model_copy(update={"graph_id": bad_graph_id})
+        with pytest.raises(RunParameterError, match="Invalid pipeline_run_id"):
+            PipelexKernel.make(
+                storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context
+            )
+
     def test_with_neither_the_run_id_is_a_fresh_uuid4(self) -> None:
         kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")
 

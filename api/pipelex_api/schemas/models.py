@@ -19,7 +19,7 @@ from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
 from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.reporting.usage_records import TokensUsageRecord
-from pipelex.system.job_metadata import PIPELINE_RUN_ID_MAX_LENGTH, validate_pipeline_run_id
+from pipelex.system.job_metadata import PIPELINE_RUN_ID_MAX_LENGTH, PIPELINE_RUN_ID_PATTERN, validate_pipeline_run_id
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope
 from pipelex.tools.network.host_rules import classify_disallowed_host, is_disallowed_host
@@ -341,9 +341,10 @@ class RunRequest(BaseModel):
 
 
 # The one rule of a run id (`pipelex.system.job_metadata.validate_pipeline_run_id`), as the published schema states
-# it. Only for the documentation: `PipelineApiExtras` validates the wire with the runtime's own function, which also
-# refuses the reserved values a JSON Schema pattern cannot exclude.
-_PIPELINE_RUN_ID_SCHEMA_PATTERN = r"^[A-Za-z0-9_-]+$"
+# it, derived from the runtime's own pattern so the two cannot drift. `StartRequest` enforces it as well, and
+# `PipelineApiExtras` validates the wire on both routes with the runtime's own function, which also refuses the
+# reserved values a JSON Schema pattern cannot exclude.
+_PIPELINE_RUN_ID_SCHEMA_PATTERN = f"^{PIPELINE_RUN_ID_PATTERN.pattern}$"
 _PIPELINE_RUN_ID_RULE = (
     "One to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved; "
     "any other value is refused with a 422 `request.invalid` naming the field, before the run is registered."

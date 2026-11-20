@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:58e89a703f3683ad5a015bbc9976e202b8e83e75f08eb10d7971ddc0331ca2d1"
+digest = "sha256:2bb16863181bebb6e519a67b7035b495b7a0c858d683c9cadd68a42952aa4450"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-20T02:48:31Z"
-rationale = "real-catch: PipelexKernel.make now holds a supplied pipeline_run_id to validate_pipeline_run_id in place of its empty-string check; the doc's run id bullet names the rule and the RunParameterError it raises."
+reviewed_at = "2026-11-20T04:05:45Z"
+rationale = "real-catch: PipelexKernel.make now holds a trace context's graph_id to validate_pipeline_run_id too, raising RunParameterError; the doc's run id bullet names both sources and qualifies the workflow-id advice by the rule."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -23,7 +23,7 @@ rationale = "real-catch: PipelexKernel.make now holds a supplied pipeline_run_id
 "pipelex/kernel/llm_prompt_content.py" = "blob:b2843a9a27842d8a04365f259f2166f45956e368"
 "pipelex/kernel/llm_results.py" = "blob:d6bafd1a25cfb0345334b388d118ff7ba9741460"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
-"pipelex/kernel/pipelex_kernel.py" = "blob:3ced55002b636736e63c70167b50850c4b0d2462"
+"pipelex/kernel/pipelex_kernel.py" = "blob:63ea30293722bfcaeefc0675a5c5076e7b5325e5"
 "pipelex/kernel/prompt_assembly.py" = "blob:0393511808b621f33be8ac848d8c352336d08a04"
 "pipelex/kernel/prompt_references.py" = "blob:a4a8c5535c7e51a16ac6c8d1296439b331192a7f"
 "pipelex/kernel/search_ops.py" = "blob:30d2af78f0ef00c4d8b3647f52cc7cb4a01bf236"

@@ -137,10 +137,11 @@ class PipelexKernel:
         context's ``graph_id`` when one is given, else this value, else a fresh ``uuid4``. A trace
         context and a ``pipeline_run_id`` that disagree raise ``ValueError``, since neither could
         win without splitting the run's identity; equal ones are accepted. A ``pipeline_run_id``
-        outside the one rule of a run id (``validate_pipeline_run_id``: one to 128 ASCII letters,
-        digits, ``_`` or ``-``, never ``untitled`` or ``dry_run_untitled``) raises
-        ``RunParameterError``, a ``ValueError``, and an empty one with it, rather than silently
-        minting an id a replaying host did not ask for. **A host inside a
+        or a trace context's ``graph_id`` outside the one rule of a run id
+        (``validate_pipeline_run_id``: one to 128 ASCII letters, digits, ``_`` or ``-``, never
+        ``untitled`` or ``dry_run_untitled``) raises ``RunParameterError``, a ``ValueError``, and
+        an empty one with it, rather than silently minting an id a replaying host did not ask for.
+        **A host inside a
         replay-based executor must pass one of the two**: the ``uuid4`` default takes a different
         value every time the host re-executes the code, so a replayed run would name itself
         differently from the run it replays. Such a host mints the id from its own replay-safe
@@ -197,9 +198,10 @@ class PipelexKernel:
     def _resolve_pipeline_run_id(cls, *, trace_context: TraceContext | None, pipeline_run_id: str | None) -> str:
         """The run's id: the trace context's ``graph_id``, else the caller's ``pipeline_run_id``, else a fresh ``uuid4``.
 
-        A supplied id is held to the one rule of a run id (``validate_pipeline_run_id``), the one ``execute`` applies, so
-        the two host seams refuse the same values. An empty id is refused rather than replaced by a minted one, which
-        would hide the caller's bug from a replaying host.
+        A supplied id, whether passed as ``pipeline_run_id`` or carried as a trace context's ``graph_id``, is held to the
+        one rule of a run id (``validate_pipeline_run_id``), the one ``execute`` applies, so the two host seams refuse
+        the same values with the same error. An empty id is refused rather than replaced by a minted one, which would
+        hide the caller's bug from a replaying host.
         """
         if pipeline_run_id is not None:
             validate_pipeline_run_id(value=pipeline_run_id)
@@ -211,7 +213,7 @@ class PipelexKernel:
                 f"'{pipeline_run_id}': they name one run, so they must agree. Pass one of them, or the same id twice."
             )
             raise ValueError(msg)
-        return trace_context.graph_id
+        return validate_pipeline_run_id(value=trace_context.graph_id)
 
     def log_context(self) -> AbstractContextManager[LogContext]:
         """Bind this run's ``request_id`` and ``pipeline_run_id`` onto every record emitted inside the block.
