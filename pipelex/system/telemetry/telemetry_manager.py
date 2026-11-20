@@ -525,8 +525,13 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     @contextmanager
     def telemetry_context(self) -> Generator[None, None, None]:
-        """Context manager that uses PostHog's new_context when telemetry is enabled."""
-        with new_context():
+        """Context manager that uses PostHog's new_context, capturing an escaping exception on the operator's client.
+
+        A manager made for span destinations alone has no client, so the context captures nothing: PostHog's own
+        fallback, the module-level client, would otherwise be set up from no API key and raise in place of the
+        exception escaping the block, or capture it on a client the host application set up for itself.
+        """
+        with new_context(capture_exceptions=self.custom_posthog_client is not None, client=self.custom_posthog_client):
             yield
 
     @override

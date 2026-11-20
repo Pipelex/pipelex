@@ -163,6 +163,35 @@ class TestOtlpWithoutCustomPostHog:
         assert pipe_span.attributes is not None
         assert pipe_span.attributes.get(PipelexSpanAttr.RUN_ROOT) is True
 
+    async def test_an_exception_escapes_the_telemetry_context_unchanged_with_posthog_off(self, mocker: MockerFixture) -> None:
+        """With no PostHog client, the context captures nothing, so PostHog's keyless module-level fallback never replaces the error."""
+        mocker.patch.dict(MetaSingleton.instances)
+        MetaSingleton.instances.pop(TelemetryManager, None)
+        mocker.patch("opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter", return_value=InMemorySpanExporter())
+        mocker.patch("posthog.default_client", None)
+        mocker.patch("posthog.api_key", None)
+        telemetry_config = TelemetryConfig(
+            custom_posthog=PostHogConfig(mode=PostHogMode.OFF),
+            otlp=[_OTLP],
+            telemetry_allowed_modes={"fastapi": True},
+        )
+        telemetry_manager = TelemetryFactory.make_telemetry_manager(
+            secrets_provider=EnvSecretsProvider(),
+            integration_mode=IntegrationMode.FASTAPI,
+            telemetry_config=telemetry_config,
+        )
+
+        try:
+            assert isinstance(telemetry_manager, TelemetryManager)
+            assert telemetry_manager.custom_posthog_client is None
+            block_error = LookupError("the error the block raised")
+            with pytest.raises(LookupError) as exc_info, telemetry_manager.telemetry_context():
+                raise block_error
+            assert exc_info.value is block_error
+            assert posthog.default_client is None
+        finally:
+            telemetry_manager.teardown()
+
     async def test_posthog_on_without_span_tracing_sends_spans_to_otlp_but_none_to_posthog(self, mocker: MockerFixture) -> None:
         mocker.patch.dict(MetaSingleton.instances)
         MetaSingleton.instances.pop(TelemetryManager, None)
