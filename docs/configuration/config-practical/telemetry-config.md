@@ -162,7 +162,7 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 !!! warning "Privacy Note"
     These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.
 
-The capture settings never redact what a generation names about its model and its usage: the serving provider, the model id and handle, the tokens, the cost, the attempt count and the failure's category always reach your PostHog, since none of them is content. A generation's span name keeps its output type, `Text`, `Image`, `Pages` or `Document`, when the pipe code is redacted; only a structured output's class name is redacted with `output_class_names`. [Telemetry Setup](../../setup/telemetry.md#what-an-inference-call-reports) lists every property a generation carries.
+The capture settings never redact what a generation names about its model and its usage: the serving provider, the model id and handle, the tokens, the cost, the attempt count and the failure's category always reach your PostHog, since none of them is content. A generation's span name keeps its output type, `Text`, `Image`, `Pages`, `Document` or a judgment's `Object`, when the pipe code is redacted; only a structured output's class name is redacted with `output_class_names`. [Telemetry Setup](../../setup/telemetry.md#what-an-inference-call-reports) lists every property a generation carries.
 
 ---
 

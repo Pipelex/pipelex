@@ -196,7 +196,7 @@ class PostHogSpanExporter(SpanExporter):
         if output_class_name:
             display_output = OTelConstants.OUTPUT_CLASS_REDACTED if redact_class_names else output_class_name
         else:
-            # No class: the name ends with the output type, `Text`, `Image`, `Pages` or `Document`, which names no content
+            # No class: the name ends with the output type, `Text`, `Image`, `Pages`, `Document` or a judgment's `Object`, which names no content
             display_output = original_span_name.rsplit(" -> ", 1)[-1] if " -> " in original_span_name else "text"
 
         # Build redacted pipe code
