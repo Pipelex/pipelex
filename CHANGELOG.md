@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A generation span for every kind of inference call**: an image generation, an extraction or OCR, a search, a judgment and the print of a document each open a generation span, as an LLM call does, so Langfuse, every `[[otlp]]` exporter and your PostHog stream (as `$ai_generation`) receive them. Every generation span carries `pipelex.inference.kind`, `pipelex.inference.backend`, `pipelex.model.handle`, `pipelex.unit_job_id`, `pipelex.inference.attempt_count`, and the cost of its tokens at the model's declared rates as `pipelex.cost.input_usd`, `pipelex.cost.output_usd` and `pipelex.cost.total_usd`; a failed call ends with the span's error status and `error.type` set to its inference error category (`transient`, `configuration`, `content`, `capacity`, `ambiguous` or `unknown`).
+- **A structured generation reports what every attempt spent**: the tokens of a structured generation are summed over every request `instructor` made, the re-asks after an answer failed the schema included, on its span, its summary event and its job report, and a generation whose re-asks all failed reports them too, where it reported none on Google, Mistral and OpenAI Responses and only the last answer's elsewhere. `LLMJobReport.attempt_count` holds how many requests the call made.
+- **`$ai_generation` carries cost, errors and Pipelex's own properties**: your PostHog stream's generations carry `$ai_input_cost_usd`, `$ai_output_cost_usd`, `$ai_total_cost_usd`, `$ai_is_error`, `$ai_error` (the failure's category, never its message), `inference_kind`, `inference_backend`, `model_handle` and `attempt_count`, and every span and event Pipelex sends to it carries `pipelex_version`, which `redact_properties` can leave out of events. The event opening a trace carries `$ai_span_id`, derived from the trace.
+
+### Changed
+
+- **A generation span's `gen_ai.operation.name` is the operation (Breaking)**: an LLM call's span names `chat` where it named Pipelex's unit-job id, `llm_gen_text` or `llm_gen_object`, which moves to `pipelex.unit_job_id`, so the span and the call's summary event agree on it; a span query grouping by the old values groups by `pipelex.unit_job_id` instead.
+- **`gen_ai.request.model` is the model id (Breaking)**: a generation span and the inference call's summary event name, under `gen_ai.request.model`, the provider's model id the call asked for, where they named the model handle, which rides `pipelex.model.handle` on the span and `model_handle` on the event; `gen_ai.response.model` is read again when the call ends. A document print that ended before its model resolved leaves `gen_ai.request.model` off its event.
+- **`$ai_provider` is the serving provider and `$ai_model` the model id (Breaking)**: on your PostHog stream, a generation's `$ai_provider` is the backend that served it, without the `:<operation>` suffix it carried, and `$ai_model` is the model id, where it was the handle; `$ai_model_id` is gone, and the handle rides `model_handle`. A generation's redacted span name keeps its output type, `Text`, `Image`, `Pages` or `Document`.
+
 ### Fixed
 
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.

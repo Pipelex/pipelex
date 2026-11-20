@@ -1,3 +1,4 @@
+import hashlib
 import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generator, cast
@@ -21,6 +22,7 @@ from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConf
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, StreamIdentityRule, TelemetryIdentity
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
@@ -451,6 +453,9 @@ class TelemetryManager(TelemetryManagerAbstract):
             tracked_properties = {key: value for key, value in properties.items() if key not in self.telemetry_config.redact_properties}
         else:
             tracked_properties = {}
+        # Every runtime event says which runtime sent it, unless the operator redacts the version
+        if EventProperty.PIPELEX_VERSION not in self.telemetry_config.redact_properties:
+            tracked_properties.setdefault(EventProperty.PIPELEX_VERSION, get_package_version())
 
         caller_identity = self.resolve_event_caller_identity(run_metadata=run_metadata)
 
@@ -584,12 +589,22 @@ class TelemetryManager(TelemetryManagerAbstract):
     def join_host_trace(self) -> bool:
         return self._join_host_trace
 
+    @classmethod
+    def make_trace_start_span_id(cls, *, trace_id: int) -> str:
+        """The span id of a trace's start event, derived from the trace, so a second start of the same trace carries the same one.
+
+        The event is no OpenTelemetry span, so it has no span id of its own: this one is the first 16 hexadecimal digits of
+        the MD5 digest of the trace id, the width of a span id, which PostHog deduplicates the event on.
+        """
+        return hashlib.md5(f"trace-start:{trace_id:032x}".encode(), usedforsecurity=False).hexdigest()[:16]
+
     @override
     def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
         """Hook to do something when a trace starts.
 
         Emits a trace start event to establish the trace name in PostHog.
-        We send a minimal $ai_span event with the trace_name as the span name.
+        We send a minimal $ai_span event with the trace_name as the span name, a span id derived from the trace
+        (`make_trace_start_span_id`) and the runtime's version.
         This event is sent directly (not via OTel spans) to ensure it arrives
         before any batched pipe spans, establishing the correct trace name.
 
@@ -611,8 +626,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             custom_trace_name = trace_name if self.telemetry_config.custom_posthog.tracing.capture.pipe_codes else trace_name_redacted
             custom_properties: dict[str, Any] = {
                 PostHogAttr.TRACE_ID: f"{trace_id:032x}",
+                PostHogAttr.SPAN_ID: self.make_trace_start_span_id(trace_id=trace_id),
                 PostHogAttr.SPAN_NAME: custom_trace_name,
                 PostHogAttr.TRACE_NAME: custom_trace_name,
+                PostHogAttr.PIPELEX_VERSION: get_package_version(),
             }
             if run_metadata is not None:
                 custom_properties[EventProperty.PIPELINE_RUN_ID] = run_metadata.pipeline_run_id

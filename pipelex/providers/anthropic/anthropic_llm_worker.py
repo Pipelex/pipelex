@@ -23,6 +23,7 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
+from pipelex.cogt.llm.instructor_attempts import InstructorAttempts
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -36,6 +37,7 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_budget import fit_thinking_budget
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict
 from pipelex.config import get_config
 from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
 from pipelex.providers.anthropic.anthropic_exceptions import (
@@ -469,6 +471,12 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             "system": [{"type": "text", "text": "Return only the tool call and no additional text."}],
         }
 
+    def _read_answer_nb_tokens(self, *, response: Any) -> NbTokensByCategoryDict | None:
+        """The tokens one answer of a structured generation reports, for the generation's attempts to sum."""
+        if usage := getattr(response, "usage", None):
+            return AnthropicFactory.make_nb_tokens_by_category(usage=usage)
+        return None
+
     @override
     async def _gen_object(
         self,
@@ -500,6 +508,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import IncompleteOutputException, InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
+        attempts = InstructorAttempts(read_nb_tokens=self._read_answer_nb_tokens)
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=messages,
@@ -509,6 +518,8 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
                 # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
+                # Counts each request and reads the usage of each answer, so the re-asks' spend is summed whichever way the call ends
+                hooks=attempts.make_hooks(),
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature if sends_temperature else omit,
                 max_tokens=effective_max_tokens,
@@ -561,7 +572,12 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             )
             raise self._with_note(error=rendered_error, note=lowered_max_tokens_note, failure=sdk_exc) from sdk_exc
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
+        finally:
+            # Whichever way the call ended, a generation whose re-asks ran out included, its report holds what its attempts spent
+            attempts.record_into(llm_job=llm_job)
+
+        # The hooks summed the usage of every answer; the last answer's own is read only when they saw none
+        if not attempts.has_usage and (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 
         return result_object

@@ -10,12 +10,13 @@ raises, at INFO, under the fixed message ``Inference call ends``, so a log store
 and groups them by its fields.
 
 The fields are the call's dimensions. ``gen_ai.operation.name`` is the operation, OpenTelemetry's name where its
-semantic conventions define one (``chat`` for an LLM call) and the inference family's own name otherwise. The model
-rides under the ``gen_ai.*`` keys with the meaning Pipelex's LLM span gives them, the handle requested under
-``gen_ai.request.model`` and the provider's id of the model serving it under ``gen_ai.response.model``, beside
-``model_handle``, ``backend_name`` and ``sdk``. A handle names one model per model type, so a query groups by the
-operation and the model together. Then the tokens in and out, the cost in US dollars, the duration in milliseconds
-and the outcome, with ``error.type`` on failure, and ``cancelled`` for a call stopped from outside.
+semantic conventions define one (``chat`` for an LLM call) and the inference family's own name otherwise, as on the
+call's generation span (``pipelex.cogt.inference.inference_span``). The model rides under the ``gen_ai.*`` keys with the
+meaning that span gives them, the model id the call asks its backend for under ``gen_ai.request.model`` and the id of
+the model serving it under ``gen_ai.response.model``, beside ``model_handle``, ``backend_name`` and ``sdk``. A handle
+names one model per model type, so a query groups by the operation and the model together. Then the tokens in and out,
+the cost in US dollars, the duration in milliseconds and the outcome, with ``error.type`` on failure, the exception's
+class where the span names the failure's category, and ``cancelled`` for a call stopped from outside.
 
 The usage is the one the call recorded on its job report, the ``*TokensUsage`` object the base hands to
 ``ReportingProtocol.report_inference_job`` when it reports the job, priced with ``compute_tokens_usage_cost``, the
@@ -40,7 +41,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost
-from pipelex.system.telemetry.otel_constants import GenAISpanAttr
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr, InferenceKind
 from pipelex.system.usage_stats.usage_stats_runs import current_run_tally, usage_stats_failure_domain
 from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.summary_event import SummaryEvent
@@ -73,6 +74,23 @@ class InferenceOperation(StrEnum):
     JUDGMENT = "judgment"
     DOC_GEN = "doc_gen"
 
+    @property
+    def inference_kind(self) -> InferenceKind:
+        """The kind of inference the operation is, as the call's generation span and PostHog's `inference_kind` name it."""
+        match self:
+            case InferenceOperation.CHAT:
+                return InferenceKind.LLM
+            case InferenceOperation.IMG_GEN:
+                return InferenceKind.IMG_GEN
+            case InferenceOperation.EXTRACT:
+                return InferenceKind.EXTRACT
+            case InferenceOperation.SEARCH:
+                return InferenceKind.SEARCH
+            case InferenceOperation.JUDGMENT:
+                return InferenceKind.JUDGE
+            case InferenceOperation.DOC_GEN:
+                return InferenceKind.DOC_RENDER
+
 
 class InferenceCallSummary(SummaryEvent):
     """Times one inference call and logs the event it ends with, once, when it ends, however it ends.
@@ -95,8 +113,8 @@ class InferenceCallSummary(SummaryEvent):
         read_inference_model: Reads the model serving the call when it ends; ``None`` when the handle resolved to none.
         read_tokens_usage: Reads the usage the call recorded, from the job report the worker hands to the reporting
             path, when the call ends; ``None`` for a family that reports no usage.
-        read_request_model: Reads ``gen_ai.request.model`` when the call ends, the model's handle unless the worker names
-            it otherwise.
+        read_request_model: Reads ``gen_ai.request.model`` when the call ends, the provider's id of the model unless the
+            worker names it otherwise.
         read_response_model: Reads ``gen_ai.response.model`` when the call ends, the provider's id of the model unless the
             worker names it otherwise.
     """
@@ -163,15 +181,15 @@ class InferenceCallSummary(SummaryEvent):
         log.info(INFERENCE_CALL_ENDS_MESSAGE, fields=fields, layout=LogLayout.INFERENCE_CALL_END)
 
     def _model_fields(self) -> dict[str, Any]:
-        """The model under every key that names it, read now; the handle alone for a model that resolved to none."""
+        """The model under every key that names it, read now; the handle alone for a model that resolved to none, which has no id."""
         inference_model = self._read_inference_model()
         if inference_model is None:
-            return {"model_handle": self._model_handle, GenAISpanAttr.REQUEST_MODEL: self._model_handle}
+            return {"model_handle": self._model_handle}
         return {
             "model_handle": inference_model.name,
             "backend_name": inference_model.backend_name,
             "sdk": inference_model.sdk,
-            GenAISpanAttr.REQUEST_MODEL: self._read_request_model() if self._read_request_model is not None else inference_model.name,
+            GenAISpanAttr.REQUEST_MODEL: self._read_request_model() if self._read_request_model is not None else inference_model.model_id,
             GenAISpanAttr.RESPONSE_MODEL: self._read_response_model() if self._read_response_model is not None else inference_model.model_id,
         }
 

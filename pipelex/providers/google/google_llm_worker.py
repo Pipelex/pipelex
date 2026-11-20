@@ -16,6 +16,7 @@ from pipelex.cogt.inference.error_classification import (
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.completion_stop import classify_prompt_block_reason
+from pipelex.cogt.llm.instructor_attempts import InstructorAttempts
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -301,6 +302,12 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 # `from_genai` supports only TOOLS and JSON; any other mode is parsed from text like JSON.
                 return True
 
+    def _read_answer_nb_tokens(self, *, response: Any) -> NbTokensByCategoryDict | None:
+        """The tokens one answer of a structured generation reports, for the generation's attempts to sum."""
+        if usage_metadata := getattr(response, "usage_metadata", None):
+            return GoogleFactory.extract_token_usage(usage_metadata)
+        return None
+
     @override
     async def _gen_object(
         self,
@@ -320,6 +327,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
+        attempts = InstructorAttempts(read_nb_tokens=self._read_answer_nb_tokens)
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=[cast("ChatCompletionMessageParam", contents)],
@@ -329,6 +337,8 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
                 # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
+                # Counts each request and reads the usage of each answer, so the re-asks' spend is summed whichever way the call ends
+                hooks=attempts.make_hooks(),
                 model=self.inference_model.model_id,
                 # instructor's genai handlers build the Google config themselves and read these as
                 # top-level OpenAI-style kwargs: a `GenerateContentConfig` passed as `generation_config`
@@ -367,13 +377,16 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
             ) from sdk_exc
+        finally:
+            # Whichever way the call ended, a generation whose re-asks ran out included, its report holds what its attempts spent
+            attempts.record_into(llm_job=llm_job)
 
         if not isinstance(result_object, schema):
             msg = f"Google Gemini API returned an object that is not of type {schema}: a {type(result_object).__name__}"
             raise GoogleLLMWorkerError(msg)
 
-        # Track token usage if available from completion
-        if llm_job.job_report.llm_tokens_usage:
+        # The hooks summed the usage of every answer; the last answer's own is read only when they saw none
+        if not attempts.has_usage and llm_job.job_report.llm_tokens_usage:
             # Instructor may provide usage information in the completion object
             if hasattr(completion, "usage_metadata"):
                 llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = GoogleFactory.extract_token_usage(completion.usage_metadata)

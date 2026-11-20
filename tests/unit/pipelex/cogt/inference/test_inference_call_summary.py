@@ -10,9 +10,11 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
+from posthog import Posthog
 from typing_extensions import override
 
 from pipelex.cogt.content_generation import doc_gen_generate
@@ -31,6 +33,7 @@ from pipelex.cogt.doc_gen.render_job import RenderedDocument
 from pipelex.cogt.exceptions import (
     ExtractCapabilityError,
     ImgGenParameterError,
+    InferenceErrorCategory,
     LLMCapabilityError,
     LLMCompletionError,
     ModelNotFoundError,
@@ -66,7 +69,10 @@ from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.current_span import PIPELEX_SPAN_ID_KEY
-from pipelex.system.telemetry.otel_constants import GenAISpanAttr
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr, InferenceKind, PipelexSpanAttr, PostHogAttr, PostHogEvent, SpanCategory
+from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
+from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, JsonLogSink
@@ -106,7 +112,7 @@ REPORTLAB_MODEL_FIELDS: dict[str, Any] = {
     "model_handle": "reportlab-pdf",
     "backend_name": "internal",
     "sdk": "reportlab",
-    GenAISpanAttr.REQUEST_MODEL: "reportlab-pdf",
+    GenAISpanAttr.REQUEST_MODEL: "print-pdf",
     GenAISpanAttr.RESPONSE_MODEL: "print-pdf",
 }
 RUN_TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
@@ -264,7 +270,7 @@ class _BlockingEngine(DocGenWorkerAbstract):
 
 
 def _render_assignment(
-    *, model_handle: str = "reportlab-pdf", read_scope: str | None = None, image_url: str | None = None
+    *, model_handle: str = "reportlab-pdf", read_scope: str | None = None, image_url: str | None = None, otel_context: OtelContext | None = None
 ) -> RenderDocumentAssignment:
     blocks: list[LayoutBlock] = [MarkdownBlock(markdown="Hello")]
     if image_url is not None:
@@ -273,6 +279,7 @@ def _render_assignment(
         job_metadata=JobMetadata(
             run_metadata=RunMetadata(user_id="pytest", storage_scope="org_abc/run", read_scope=read_scope, pipeline_run_id="plr-summary"),
             pipe_code="print_summary",
+            otel_context=otel_context,
         ),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         composition=DocumentComposition(
@@ -303,35 +310,41 @@ def _llm_job(*, otel_context: OtelContext | None = None, llm_prompt: LLMPrompt |
     )
 
 
-def _extract_job(*, extract_input: ExtractInput | None = None) -> ExtractJob:
+def _extract_job(*, extract_input: ExtractInput | None = None, otel_context: OtelContext | None = None) -> ExtractJob:
     return ExtractJob(
         extract_input=extract_input or ExtractInput(document_uri="https://example.com/report.pdf"),
         job_params=ExtractJobParams.make_default_extract_job_params(),
         job_config=ExtractJobConfig(),
         job_report=ExtractJobReport(),
-        job_metadata=_job_metadata(),
+        job_metadata=_job_metadata(otel_context=otel_context),
     )
 
 
-def _search_job() -> SearchJob:
-    return SearchJobFactory.make_search_job("what is new", search_setting=SearchSetting(model="search-test"), job_metadata=_job_metadata())
+def _search_job(*, otel_context: OtelContext | None = None) -> SearchJob:
+    return SearchJobFactory.make_search_job(
+        "what is new", search_setting=SearchSetting(model="search-test"), job_metadata=_job_metadata(otel_context=otel_context)
+    )
 
 
-async def _run_img_gen() -> None:
-    img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents("a cat", negative_text=None, job_metadata=_job_metadata())
+async def _run_img_gen(*, otel_context: OtelContext | None = None) -> None:
+    img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
+        "a cat", negative_text=None, job_metadata=_job_metadata(otel_context=otel_context)
+    )
     await _StandInImgGenWorker().gen_image(img_gen_job=img_gen_job)
 
 
-async def _run_extract() -> None:
-    await _StandInExtractWorker(usage=OTHER_USAGE).extract_pages(extract_job=_extract_job())
+async def _run_extract(*, otel_context: OtelContext | None = None) -> None:
+    await _StandInExtractWorker(usage=OTHER_USAGE).extract_pages(extract_job=_extract_job(otel_context=otel_context))
 
 
-async def _run_search() -> None:
-    await _StandInSearchWorker().search_sourced_answer(search_job=_search_job())
+async def _run_search(*, otel_context: OtelContext | None = None) -> None:
+    await _StandInSearchWorker().search_sourced_answer(search_job=_search_job(otel_context=otel_context))
 
 
-async def _run_judgment() -> None:
-    await _StandInJudgmentWorker().judge(judgment_job=make_fake_judgment_job({"is_urgent": YesNoQuestion(instructions="Is it urgent?")}))
+async def _run_judgment(*, otel_context: OtelContext | None = None) -> None:
+    judgment_job = make_fake_judgment_job({"is_urgent": YesNoQuestion(instructions="Is it urgent?")})
+    judgment_job.job_metadata.otel_context = otel_context
+    await _StandInJudgmentWorker().judge(judgment_job=judgment_job)
 
 
 # Each family's call, its operation and its model keys. Each reports 40 tokens in and 8 out, which the stand-ins' rates
@@ -372,16 +385,17 @@ REFUSAL_CASES: list[tuple[Callable[[], Awaitable[None]], type[Exception], Infere
 ]
 REFUSAL_IDS = ["an LLM without vision given a picture", "an image model given an input image", "a PDF extractor given an image"]
 # A print each check before the engine refuses: what the assignment asks, whether the engine's plugin is installed, the
-# refusal, and the model keys the event names it by, the handle alone where the print ended before the model resolved.
+# refusal, and the model keys the event names it by, the handle alone where the print ended before the model resolved,
+# with no model id to name it by.
 FOREIGN_IMAGE = "pipelex-storage://org_other/assets/secret.png"
 DOC_GEN_REFUSAL_CASES: list[tuple[dict[str, Any], bool, type[Exception], dict[str, Any]]] = [
     (
         {"read_scope": "org_abc", "image_url": FOREIGN_IMAGE},
         True,
         UriReadRefusedError,
-        {"model_handle": "reportlab-pdf", GenAISpanAttr.REQUEST_MODEL: "reportlab-pdf"},
+        {"model_handle": "reportlab-pdf"},
     ),
-    ({"model_handle": "no-such-engine"}, True, ModelNotFoundError, {"model_handle": "no-such-engine", GenAISpanAttr.REQUEST_MODEL: "no-such-engine"}),
+    ({"model_handle": "no-such-engine"}, True, ModelNotFoundError, {"model_handle": "no-such-engine"}),
     ({}, False, DocGenEngineMissingError, REPORTLAB_MODEL_FIELDS),
 ]
 DOC_GEN_REFUSAL_IDS = ["an image outside the read scope", "an engine no model here serves", "an engine no plugin registers"]
@@ -432,6 +446,71 @@ def _read_json_lines(buffer: io.StringIO) -> list[dict[str, Any]]:
     return [json.loads(line) for line in buffer.getvalue().splitlines() if line]
 
 
+# The run's OpenTelemetry context a worker opens its generation span under.
+RUN_OTEL_CONTEXT = OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID, is_sampled=True)
+_FULL_CAPTURE = TelemetryRedactionConfig(redact_content=False, redact_pipe_codes=False, redact_output_class_names=False, content_max_length=None)
+
+
+async def _run_llm_text(*, otel_context: OtelContext | None = None) -> None:
+    await _StandInLLMWorker(usage=LLM_USAGE).gen_text(llm_job=_llm_job(otel_context=otel_context))
+
+
+# What one call of each kind puts on its span: the runner, the operation, the kind, the backend, the handle and the model
+# id, and the tokens in, the tokens out and the input, output and total costs at the stand-ins' rates.
+SPAN_CASES: list[tuple[Callable[..., Awaitable[None]], InferenceOperation, InferenceKind, str, str, str, tuple[int, int, float, float, float]]] = [
+    (_run_llm_text, InferenceOperation.CHAT, InferenceKind.LLM, "stand_in_backend", "gpt-test", "gpt-test-2026", (1200, 300, 0.0012, 0.0006, 0.0018)),
+    (
+        _run_img_gen,
+        InferenceOperation.IMG_GEN,
+        InferenceKind.IMG_GEN,
+        "stand_in_backend",
+        "img-test",
+        "img-test-2026",
+        (40, 8, 4e-05, 1.6e-05, 5.6e-05),
+    ),
+    (
+        _run_extract,
+        InferenceOperation.EXTRACT,
+        InferenceKind.EXTRACT,
+        "stand_in_backend",
+        "extract-test",
+        "extract-test-2026",
+        (40, 8, 4e-05, 1.6e-05, 5.6e-05),
+    ),
+    (
+        _run_search,
+        InferenceOperation.SEARCH,
+        InferenceKind.SEARCH,
+        "stand_in_backend",
+        "search-test",
+        "search-test-2026",
+        (40, 8, 4e-05, 1.6e-05, 5.6e-05),
+    ),
+    (
+        _run_judgment,
+        InferenceOperation.JUDGMENT,
+        InferenceKind.JUDGE,
+        "stand_in_backend",
+        "judge-test",
+        "judge-test-2026",
+        (40, 8, 4e-05, 1.6e-05, 5.6e-05),
+    ),
+]
+SPAN_IDS = ["llm", "image generation", "extraction", "search", "judgment"]
+
+
+def _exported_generation(*, span: ReadableSpan, mocker: MockerFixture) -> dict[str, Any]:
+    """The properties PostHog's exporter captures for the span, as the `$ai_generation` it sends."""
+    client = mocker.MagicMock(spec=Posthog)
+    exporter = PostHogSpanExporter(
+        posthog_client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT, redaction_config=_FULL_CAPTURE
+    )
+    exporter.export([span])
+    client.capture.assert_called_once()
+    assert client.capture.call_args.kwargs["event"] == PostHogEvent.GENERATION
+    return cast("dict[str, Any]", client.capture.call_args.kwargs["properties"])
+
+
 @pytest.mark.usefixtures("fixed_clock")
 class TestInferenceCallSummary:
     @pytest.mark.asyncio
@@ -455,7 +534,7 @@ class TestInferenceCallSummary:
             "model_handle": "gpt-test",
             "backend_name": "stand_in_backend",
             "sdk": "stand_in_sdk",
-            GenAISpanAttr.REQUEST_MODEL: "gpt-test",
+            GenAISpanAttr.REQUEST_MODEL: "gpt-test-2026",
             GenAISpanAttr.RESPONSE_MODEL: "gpt-test-2026",
             GenAISpanAttr.USAGE_INPUT_TOKENS: reported_usage.nb_tokens_by_category[TokenCategory.INPUT],
             GenAISpanAttr.USAGE_OUTPUT_TOKENS: reported_usage.nb_tokens_by_category[TokenCategory.OUTPUT],
@@ -479,7 +558,15 @@ class TestInferenceCallSummary:
         (record,) = _summaries(caplog)
         (span,) = span_exporter.get_finished_spans()
         assert span.attributes is not None
-        for key in (GenAISpanAttr.REQUEST_MODEL, GenAISpanAttr.RESPONSE_MODEL, GenAISpanAttr.USAGE_INPUT_TOKENS, GenAISpanAttr.USAGE_OUTPUT_TOKENS):
+        # The operation is the one key a span query and a log query used to disagree on: the span held the unit job's id
+        span_and_event_keys = (
+            GenAISpanAttr.OPERATION_NAME,
+            GenAISpanAttr.REQUEST_MODEL,
+            GenAISpanAttr.RESPONSE_MODEL,
+            GenAISpanAttr.USAGE_INPUT_TOKENS,
+            GenAISpanAttr.USAGE_OUTPUT_TOKENS,
+        )
+        for key in span_and_event_keys:
             assert getattr(record, key) == span.attributes[key], key
 
     @pytest.mark.asyncio
@@ -512,7 +599,7 @@ class TestInferenceCallSummary:
             "model_handle": "search-test",
             "backend_name": "stand_in_backend",
             "sdk": "stand_in_sdk",
-            GenAISpanAttr.REQUEST_MODEL: "search-test",
+            GenAISpanAttr.REQUEST_MODEL: "search-test-2026",
             GenAISpanAttr.RESPONSE_MODEL: "search-test-2026",
             **OTHER_TOKEN_FIELDS,
             "duration_ms": DURATION_MS,
@@ -541,7 +628,7 @@ class TestInferenceCallSummary:
             "model_handle": handle,
             "backend_name": "stand_in_backend",
             "sdk": "stand_in_sdk",
-            GenAISpanAttr.REQUEST_MODEL: handle,
+            GenAISpanAttr.REQUEST_MODEL: model_id,
             GenAISpanAttr.RESPONSE_MODEL: model_id,
             **OTHER_TOKEN_FIELDS,
             "duration_ms": DURATION_MS,
@@ -782,3 +869,128 @@ class TestInferenceCallSummary:
         fields = _fields(record)
         assert fields[GenAISpanAttr.REQUEST_MODEL] == span.attributes[GenAISpanAttr.REQUEST_MODEL] == ROUTED_MODEL
         assert fields[GenAISpanAttr.RESPONSE_MODEL] == SERVED_MODEL
+
+    @pytest.mark.parametrize(("run_call", "operation", "kind", "backend", "handle", "model_id", "usage"), SPAN_CASES, ids=SPAN_IDS)
+    @pytest.mark.asyncio
+    async def test_every_kind_of_call_opens_a_generation_span_with_its_model_tokens_and_cost(
+        self,
+        span_exporter: InMemorySpanExporter,
+        mocker: MockerFixture,
+        run_call: Callable[..., Awaitable[None]],
+        operation: InferenceOperation,
+        kind: InferenceKind,
+        backend: str,
+        handle: str,
+        model_id: str,
+        usage: tuple[int, int, float, float, float],
+    ) -> None:
+        await run_call(otel_context=RUN_OTEL_CONTEXT)
+
+        (span,) = span_exporter.get_finished_spans()
+        attributes = dict(span.attributes or {})
+        assert span.status.status_code == StatusCode.OK
+        assert attributes[GenAISpanAttr.OPERATION_NAME] == operation
+        assert attributes[GenAISpanAttr.PROVIDER_NAME] == backend
+        assert attributes[GenAISpanAttr.REQUEST_MODEL] == attributes[GenAISpanAttr.RESPONSE_MODEL] == model_id
+        assert attributes[PipelexSpanAttr.MODEL_HANDLE] == handle
+        assert attributes[PipelexSpanAttr.INFERENCE_BACKEND] == backend
+        assert attributes[PipelexSpanAttr.INFERENCE_KIND] == kind
+        assert attributes[PipelexSpanAttr.ATTEMPT_COUNT] == 1
+        assert attributes[PipelexSpanAttr.SPAN_CATEGORY] == SpanCategory.INFERENCE
+        assert GenAISpanAttr.ERROR_TYPE not in attributes
+        input_tokens, output_tokens, input_cost, output_cost, total_cost = usage
+        assert (attributes[GenAISpanAttr.USAGE_INPUT_TOKENS], attributes[GenAISpanAttr.USAGE_OUTPUT_TOKENS]) == (input_tokens, output_tokens)
+        assert math.isclose(cast("float", attributes[PipelexSpanAttr.INPUT_COST_USD]), input_cost)
+        assert math.isclose(cast("float", attributes[PipelexSpanAttr.OUTPUT_COST_USD]), output_cost)
+        assert math.isclose(cast("float", attributes[PipelexSpanAttr.TOTAL_COST_USD]), total_cost)
+
+        properties = _exported_generation(span=span, mocker=mocker)
+        assert properties[PostHogAttr.PROVIDER] == backend
+        assert properties[PostHogAttr.MODEL] == model_id
+        assert (properties[PostHogAttr.MODEL_HANDLE], properties[PostHogAttr.INFERENCE_BACKEND]) == (handle, backend)
+        assert properties[PostHogAttr.INFERENCE_KIND] == kind
+        assert (properties[PostHogAttr.INPUT_TOKENS], properties[PostHogAttr.OUTPUT_TOKENS]) == (input_tokens, output_tokens)
+        assert math.isclose(properties[PostHogAttr.TOTAL_COST_USD], total_cost)
+        assert (properties[PostHogAttr.IS_ERROR], properties[PostHogAttr.ERROR], properties[PostHogAttr.ATTEMPT_COUNT]) == (False, None, 1)
+        assert properties[PostHogAttr.PIPELEX_VERSION]
+        assert properties[PostHogAttr.PIPELINE_RUN_ID] == attributes[PipelexSpanAttr.PIPELINE_RUN_ID]
+
+    @pytest.mark.asyncio
+    async def test_the_operation_is_the_operation_and_the_unit_job_rides_its_own_attribute(self, span_exporter: InMemorySpanExporter) -> None:
+        """The defect of L-261009-28aa91: `gen_ai.operation.name` held `llm_gen_text`, which no GenAI query groups by."""
+        await _run_llm_text(otel_context=RUN_OTEL_CONTEXT)
+
+        (span,) = span_exporter.get_finished_spans()
+        assert span.attributes is not None
+        assert span.attributes[GenAISpanAttr.OPERATION_NAME] == "chat"
+        assert span.attributes[PipelexSpanAttr.UNIT_JOB_ID] == "llm_gen_text"
+        assert span.name == "some_pipe: llm_gen_text (gpt-test) -> Text"
+
+    @pytest.mark.asyncio
+    async def test_a_document_print_opens_a_generation_span_with_no_usage(self, span_exporter: InMemorySpanExporter, mocker: MockerFixture) -> None:
+        await render_document_and_store(
+            _render_assignment(otel_context=RUN_OTEL_CONTEXT), generated_content_factory=_generated_content_factory(mocker)
+        )
+
+        (span,) = span_exporter.get_finished_spans()
+        attributes = dict(span.attributes or {})
+        assert span.status.status_code == StatusCode.OK
+        assert attributes[GenAISpanAttr.OPERATION_NAME] == InferenceOperation.DOC_GEN
+        assert attributes[PipelexSpanAttr.INFERENCE_KIND] == InferenceKind.DOC_RENDER
+        assert attributes[GenAISpanAttr.PROVIDER_NAME] == attributes[PipelexSpanAttr.INFERENCE_BACKEND] == "internal"
+        assert attributes[GenAISpanAttr.REQUEST_MODEL] == attributes[GenAISpanAttr.RESPONSE_MODEL] == "print-pdf"
+        assert attributes[PipelexSpanAttr.MODEL_HANDLE] == "reportlab-pdf"
+        assert GenAISpanAttr.USAGE_INPUT_TOKENS not in attributes
+        assert PipelexSpanAttr.TOTAL_COST_USD not in attributes
+        assert span.name.endswith("-> Document")
+
+    @pytest.mark.asyncio
+    async def test_a_failed_call_ends_its_span_in_error_with_its_category_and_the_usage_it_was_billed(
+        self, span_exporter: InMemorySpanExporter, mocker: MockerFixture
+    ) -> None:
+        worker = _StandInLLMWorker(
+            usage=LLM_USAGE, error=LLMCompletionError(message="provider refused", error_category=InferenceErrorCategory.TRANSIENT)
+        )
+
+        with pytest.raises(LLMCompletionError):
+            await worker.gen_text(llm_job=_llm_job(otel_context=RUN_OTEL_CONTEXT))
+
+        (span,) = span_exporter.get_finished_spans()
+        attributes = dict(span.attributes or {})
+        assert span.status.status_code == StatusCode.ERROR
+        assert attributes[GenAISpanAttr.ERROR_TYPE] == "transient"
+        assert [event.name for event in span.events] == ["exception"]
+        assert (attributes[GenAISpanAttr.USAGE_INPUT_TOKENS], attributes[GenAISpanAttr.USAGE_OUTPUT_TOKENS]) == (1200, 300)
+        assert math.isclose(cast("float", attributes[PipelexSpanAttr.TOTAL_COST_USD]), 0.0018)
+
+        properties = _exported_generation(span=span, mocker=mocker)
+        assert (properties[PostHogAttr.IS_ERROR], properties[PostHogAttr.ERROR]) == (True, "transient")
+        assert math.isclose(properties[PostHogAttr.TOTAL_COST_USD], 0.0018)
+
+    @pytest.mark.asyncio
+    async def test_a_failure_with_no_category_is_unknown(self, span_exporter: InMemorySpanExporter) -> None:
+        with pytest.raises(SearchJobFailureError):
+            await _StandInSearchWorker(error=SearchJobFailureError(message="the answer had no sources")).search_sourced_answer(
+                search_job=_search_job(otel_context=RUN_OTEL_CONTEXT)
+            )
+
+        (span,) = span_exporter.get_finished_spans()
+        assert span.status.status_code == StatusCode.ERROR
+        assert span.attributes is not None
+        assert span.attributes[GenAISpanAttr.ERROR_TYPE] in set(InferenceErrorCategory)
+
+    @pytest.mark.asyncio
+    async def test_a_cancelled_call_ends_its_span_with_no_error(self, span_exporter: InMemorySpanExporter) -> None:
+        with pytest.raises(asyncio.CancelledError):
+            await _StandInLLMWorker(error=asyncio.CancelledError()).gen_text(llm_job=_llm_job(otel_context=RUN_OTEL_CONTEXT))
+
+        (span,) = span_exporter.get_finished_spans()
+        assert span.status.status_code == StatusCode.UNSET
+        assert span.attributes is not None
+        assert GenAISpanAttr.ERROR_TYPE not in span.attributes
+
+    @pytest.mark.asyncio
+    async def test_a_call_with_no_run_context_opens_no_span(self, span_exporter: InMemorySpanExporter) -> None:
+        await _run_search()
+
+        assert not span_exporter.get_finished_spans()

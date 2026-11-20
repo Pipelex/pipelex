@@ -94,7 +94,7 @@ headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 
 ## Joining the host's trace
 
-The top-level `join_host_trace` key decides whether Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run continues the current span, follows its sampling decision, and its pipe and LLM spans are made current while they run. [Telemetry Setup](../../setup/telemetry.md#joining-your-processs-trace) describes what it does and what it costs.
+The top-level `join_host_trace` key decides whether Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run continues the current span, follows its sampling decision, and its pipe and inference spans are made current while they run. [Telemetry Setup](../../setup/telemetry.md#joining-your-processs-trace) describes what it does and what it costs.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -119,7 +119,7 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 | `api_key` | string | (required) | Your PostHog project API key |
 | `geoip` | boolean | `true` | Enable GeoIP lookup for location data |
 | `debug` | boolean | `false` | Log events locally without sending |
-| `redact_properties` | array | `[]` | Event properties to redact before sending |
+| `redact_properties` | array | `[]` | Event properties to redact before sending, `pipelex_version` among them |
 
 #### Mode Options
 
@@ -161,6 +161,8 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 
 !!! warning "Privacy Note"
     These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.
+
+The capture settings never redact what a generation names about its model and its usage: the serving provider, the model id and handle, the tokens, the cost, the attempt count and the failure's category always reach your PostHog, since none of them is content. A generation's span name keeps its output type, `Text`, `Image`, `Pages` or `Document`, when the pipe code is redacted; only a structured output's class name is redacted with `output_class_names`. [Telemetry Setup](../../setup/telemetry.md#what-an-inference-call-reports) lists every property a generation carries.
 
 ---
 

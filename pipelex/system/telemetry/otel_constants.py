@@ -58,6 +58,9 @@ class GenAISpanAttr(StrEnum):
     USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
     USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
 
+    # The low-cardinality class of the error the operation ended with; on a generation span, the inference error category
+    ERROR_TYPE = "error.type"
+
     # Content attributes for PostHog compatibility (not in standard semconv)
     # PostHog UI expects these as span attributes, not events
     PROMPT_CONTENT = "gen_ai.prompt.0.content"
@@ -85,6 +88,11 @@ class PostHogAttr(StrEnum):
     PROVIDER = "$ai_provider"
     INPUT_TOKENS = "$ai_input_tokens"
     OUTPUT_TOKENS = "$ai_output_tokens"
+    INPUT_COST_USD = "$ai_input_cost_usd"
+    OUTPUT_COST_USD = "$ai_output_cost_usd"
+    TOTAL_COST_USD = "$ai_total_cost_usd"
+    IS_ERROR = "$ai_is_error"
+    ERROR = "$ai_error"
     HTTP_STATUS = "$ai_http_status"
     LATENCY = "$ai_latency"
     TRACE_ID = "$ai_trace_id"
@@ -96,11 +104,18 @@ class PostHogAttr(StrEnum):
     SPAN_NAME = "$ai_span_name"
 
     # Additional attributes with $ai prefix
-    MODEL_ID = "$ai_model_id"
     OUTPUT_TYPE = "$ai_output_type"
     TEMPERATURE = "$ai_temperature"
     MAX_TOKENS = "$ai_max_tokens"
     SEED = "$ai_seed"
+
+    # Pipelex's own properties of a span or a generation, beside PostHog's
+    PIPELEX_VERSION = "pipelex_version"
+    PIPELINE_RUN_ID = "pipeline_run_id"
+    INFERENCE_KIND = "inference_kind"
+    INFERENCE_BACKEND = "inference_backend"
+    MODEL_HANDLE = "model_handle"
+    ATTEMPT_COUNT = "attempt_count"
 
     # Standard PostHog attribute for anonymous tracking
     PROCESS_PERSON_PROFILE = "$process_person_profile"
@@ -159,6 +174,20 @@ class PipelexSpanAttr(StrEnum):
     # started inside a running pipe with join_host_trace on, whose parent is that pipe's span.
     RUN_ROOT = "pipelex.run_root"
 
+    # A generation span's own attributes, beside the GenAI conventions' ones. The unit job names the step a span is about
+    # (`llm_gen_text`), and rebuilds a span name with a redacted pipe code; the kind of inference, the backend and the
+    # handle are Pipelex's own names for what served the call. The costs are Pipelex's own, priced from the usage and
+    # the model's declared rates, since the conventions define none, and the attempt count says how many times the call
+    # asked the model, a structured generation's re-asks included.
+    UNIT_JOB_ID = "pipelex.unit_job_id"
+    INFERENCE_KIND = "pipelex.inference.kind"
+    INFERENCE_BACKEND = "pipelex.inference.backend"
+    MODEL_HANDLE = "pipelex.model.handle"
+    ATTEMPT_COUNT = "pipelex.inference.attempt_count"
+    INPUT_COST_USD = "pipelex.cost.input_usd"
+    OUTPUT_COST_USD = "pipelex.cost.output_usd"
+    TOTAL_COST_USD = "pipelex.cost.total_usd"
+
     # The run's identity, set at every span site from `RunMetadata` so the identity
     # rides the span object to every exporter instead of being correlated back to a
     # run through shared state. RUN_USER_ID is who started the run; RUN_EXTRAS is
@@ -208,6 +237,17 @@ class LangfuseSpanAttr(StrEnum):
     OBSERVATION_OUTCOME = "langfuse.observation.metadata.outcome"
     OBSERVATION_INPUT = "langfuse.observation.input"
     OBSERVATION_OUTPUT = "langfuse.observation.output"
+
+
+class InferenceKind(StrEnum):
+    """The kind of inference a generation span is about, `pipelex.inference.kind`, and the `inference_kind` PostHog reads."""
+
+    LLM = "llm"
+    IMG_GEN = "img_gen"
+    EXTRACT = "extract"
+    SEARCH = "search"
+    JUDGE = "judge"
+    DOC_RENDER = "doc_render"
 
 
 class SpanCategory(StrEnum):

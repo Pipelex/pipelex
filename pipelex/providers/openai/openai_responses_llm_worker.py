@@ -26,6 +26,7 @@ from pipelex.cogt.inference.error_classification import (
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.completion_stop import classify_responses_stop
+from pipelex.cogt.llm.instructor_attempts import InstructorAttempts
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.llm.llm_job_components import LLMJobParams
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+    from pipelex.cogt.usage.token_category import NbTokensByCategoryDict
     from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -208,6 +210,12 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
 
         return response.output_text
 
+    def _read_answer_nb_tokens(self, *, response: Any) -> NbTokensByCategoryDict | None:
+        """The tokens one answer of a structured generation reports, for the generation's attempts to sum."""
+        if usage := getattr(response, "usage", None):
+            return self.openai_responses_factory.make_nb_tokens_by_category(usage=usage)
+        return None
+
     @override
     async def _gen_object(
         self,
@@ -242,6 +250,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         # but mypy takes the attribute's type from the sync base class, where it is the sync Response, whose
         # `max_retries` refuses the AsyncRetrying below; the cast is for mypy alone
         responses_helper = cast("AsyncResponse", self.instructor_for_objects.responses)  # pyright: ignore[reportUnnecessaryCast]
+        attempts = InstructorAttempts(read_nb_tokens=self._read_answer_nb_tokens)
         try:
             result_object, completion = await responses_helper.create_with_completion(
                 input=cast("list[ChatCompletionMessageParam]", input_items),
@@ -251,6 +260,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
                 # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
+                # Counts each request and reads the usage of each answer, so the re-asks' spend is summed whichever way the call ends
+                hooks=attempts.make_hooks(),
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
                 temperature=omit if (openai_reasoning is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
@@ -286,8 +297,12 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
             ) from sdk_exc
+        finally:
+            # Whichever way the call ended, a generation whose re-asks ran out included, its report holds what its attempts spent
+            attempts.record_into(llm_job=llm_job)
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and hasattr(completion, "usage"):
+        # The hooks summed the usage of every answer; the last answer's own is read only when they saw none
+        if not attempts.has_usage and (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and hasattr(completion, "usage"):
             completion_usage = completion.usage
             if completion_usage:
                 llm_tokens_usage.nb_tokens_by_category = self.openai_responses_factory.make_nb_tokens_by_category(usage=completion_usage)

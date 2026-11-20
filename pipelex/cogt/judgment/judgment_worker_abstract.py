@@ -7,6 +7,8 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import CogtError, JudgmentAnswerMismatchError, JudgmentCapabilityError
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
+from pipelex.cogt.inference.inference_span import InferenceSpanScope, start_inference_span
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
@@ -50,6 +52,21 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
             read_tokens_usage=lambda: judgment_job.job_report.judgment_tokens_usage,
         )
 
+    def _inference_span_scope(self, *, judgment_job: JudgmentJob, call_summary: InferenceCallSummary) -> InferenceSpanScope:
+        """The block the call runs in under its generation span, which ends the span with the call's usage and outcome."""
+        return InferenceSpanScope(
+            span=start_inference_span(
+                job_metadata=judgment_job.job_metadata,
+                operation=InferenceOperation.JUDGMENT,
+                inference_model=self.inference_model,
+                request_model=self.inference_model.model_id,
+                output_type=InferenceOutputType.OBJECT,
+            ),
+            call_summary=call_summary.ends_here(),
+            read_tokens_usage=lambda: judgment_job.job_report.judgment_tokens_usage,
+            read_response_model=lambda: self.inference_model.model_id,
+        )
+
     async def judge(
         self,
         judgment_job: JudgmentJob,
@@ -60,29 +77,31 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         refusal means is the operator's policy, decided by whoever called this.
         """
         # The call ends with its summary event whichever way it ends, a refusal by the checks included
-        with self._call_summary(judgment_job=judgment_job):
+        with self._call_summary(judgment_job=judgment_job) as call_summary:
             judgment_job.validate_before_execution()
             judgment_job.job_metadata.unit_job_id = UnitJobId.JUDGMENT_ANSWER
             judgment_job.judgment_job_before_start(inference_model=self.inference_model)
 
-            try:
-                self._check_can_read_files(judgment_job=judgment_job)
-                outcomes = await self._judge(judgment_job=judgment_job)
-                _check_outcomes_match_questions(judgment_job=judgment_job, outcomes=outcomes)
-            except CogtError as exc:
-                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-                raise
-            finally:
-                # Completion and reporting belong on *every* way out, not just the happy one. The
-                # answer-shape guard above raises after the provider already answered and after usage was
-                # recorded, so that call is billed — reporting only on success would make the spend vanish
-                # from the run's cost report. A failure that never reached the provider recorded no tokens
-                # (`judgment_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as
-                # the zero-cost attempt it was rather than inventing a charge. The summary event the call
-                # ends with reads the same usage, so a billed failure carries its tokens and cost there too.
-                judgment_job.judgment_job_after_complete()
-                if self.reporting_delegate:
-                    self.reporting_delegate.report_inference_job(inference_job=judgment_job)
+            # Under the call's generation span, which the summary event names as it ends
+            with self._inference_span_scope(judgment_job=judgment_job, call_summary=call_summary):
+                try:
+                    self._check_can_read_files(judgment_job=judgment_job)
+                    outcomes = await self._judge(judgment_job=judgment_job)
+                    _check_outcomes_match_questions(judgment_job=judgment_job, outcomes=outcomes)
+                except CogtError as exc:
+                    exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                    raise
+                finally:
+                    # Completion and reporting belong on *every* way out, not just the happy one. The
+                    # answer-shape guard above raises after the provider already answered and after usage was
+                    # recorded, so that call is billed — reporting only on success would make the spend vanish
+                    # from the run's cost report. A failure that never reached the provider recorded no tokens
+                    # (`judgment_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as
+                    # the zero-cost attempt it was rather than inventing a charge. The summary event the call
+                    # ends with reads the same usage, so a billed failure carries its tokens and cost there too.
+                    judgment_job.judgment_job_after_complete()
+                    if self.reporting_delegate:
+                        self.reporting_delegate.report_inference_job(inference_job=judgment_job)
 
         return outcomes
 
