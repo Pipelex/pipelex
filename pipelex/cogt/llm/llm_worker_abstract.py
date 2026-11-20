@@ -400,14 +400,15 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # End OTel span with success status and usage data
         self._end_otel_span_with_completion_text(span=span, llm_job=llm_job, completion_text=result_text)
 
-    def _report_stopped_text_job(self, *, span: Span | None, llm_job: LLMJob) -> None:
-        """Report the usage of a text its stop check refused, and record it on the span, which is left open.
+    def _report_billed_failed_job(self, *, span: Span | None, llm_job: LLMJob) -> None:
+        """Report the usage of a call that failed after the provider billed it, and record it on the span, which is left open.
 
-        The provider answered that text and billed it: every worker reads its response's token usage into the job
-        before its stop check raises, so a text cut at its limit or refused is reported as a returned text is, once,
-        and the run's cost report and its usage event count what the provider billed. The span is ended by the
-        caller's error path, with the error. A job that recorded no usage, its worker having raised before reading
-        any, has nothing to report.
+        Two failures are billed: a text its stop check refused, since every worker reads its response's token usage
+        into the job before its stop check raises, and a structured generation whose attempts the provider answered
+        before it failed, its re-asks run out included, since every worker records the usage its attempts spent
+        however the call ends. Either is reported as a returned call is, once, so the run's cost report and its usage
+        event count what the provider billed. The span is ended by the caller's error path, with the error. A job
+        that recorded no usage, its worker having raised before reading any, has nothing to report.
         """
         tokens_usage = llm_job.job_report.llm_tokens_usage
         if tokens_usage is None or not tokens_usage.nb_tokens_by_category:
@@ -598,7 +599,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                         text_result = await self._gen_text(llm_job=llm_job)
                     except (LLMCompletionTruncatedError, LLMCompletionRefusedError):
                         # The stop check refused a text the provider answered and billed: its usage is reported all the same
-                        self._report_stopped_text_job(span=span, llm_job=llm_job)
+                        self._report_billed_failed_job(span=span, llm_job=llm_job)
                         raise
                     await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
                     return text_result
@@ -646,7 +647,13 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             with pipelex_span_active(span=span, make_current=TelemetryManagerAbstract.is_join_host_trace_enabled()), call_summary.ends_here():
                 try:
                     self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=True)
-                    object_result = await self._gen_object(llm_job=llm_job, schema=schema)
+                    try:
+                        object_result = await self._gen_object(llm_job=llm_job, schema=schema)
+                    except Exception:
+                        # The attempts the provider answered before the call failed were billed, a spent re-ask budget's
+                        # included: their usage is reported all the same
+                        self._report_billed_failed_job(span=span, llm_job=llm_job)
+                        raise
 
                     # Cleanup result
                     if hasattr(object_result, "_raw_response"):

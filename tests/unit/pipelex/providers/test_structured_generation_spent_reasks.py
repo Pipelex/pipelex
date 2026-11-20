@@ -57,6 +57,7 @@ from pipelex.providers.openai.openai_completions_factory import OpenAICompletion
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
 from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr, PipelexSpanAttr
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -358,6 +359,28 @@ class TestStructuredGenerationSpentReasks:
         assert tokens_usage is not None
         assert tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == _SPENT_INPUT_TOKENS
         assert tokens_usage.nb_tokens_by_category[TokenCategory.OUTPUT] == _SPENT_OUTPUT_TOKENS
+
+    @pytest.mark.parametrize("make_worker", _WORKERS)
+    async def test_a_spent_reask_budget_is_reported_once_to_the_runs_cost_report(
+        self, mocker: MockerFixture, span_exporter: InMemorySpanExporter, make_worker: Callable[[MockerFixture], LLMWorkerAbstract]
+    ) -> None:
+        """The provider billed every attempt: the failed generation reaches the reporting delegate once, with what they spent."""
+        worker = make_worker(mocker)
+        reporting_delegate = mocker.MagicMock(spec=ReportingProtocol)
+        worker.reporting_delegate = reporting_delegate
+        llm_job = _object_job()
+
+        with pytest.raises(CogtError):
+            await worker.gen_object(llm_job=llm_job, schema=DummySchema)
+
+        reporting_delegate.report_inference_job.assert_called_once_with(inference_job=llm_job)
+        assert llm_job.job_metadata.completed_at is not None
+        tokens_usage = llm_job.job_report.llm_tokens_usage
+        assert tokens_usage is not None
+        assert tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == _SPENT_INPUT_TOKENS
+        assert tokens_usage.nb_tokens_by_category[TokenCategory.OUTPUT] == _SPENT_OUTPUT_TOKENS
+        (span,) = span_exporter.get_finished_spans()
+        _assert_spent_reasks_on(span)
 
     async def test_openai_answers_are_summed_once_each(self) -> None:
         answers = _InvalidAnswers(body=_OPENAI_INVALID_ANSWER)
