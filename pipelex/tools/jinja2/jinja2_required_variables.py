@@ -17,7 +17,7 @@ from pydantic.dataclasses import dataclass
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_parsing import parse_jinja2_template
+from pipelex.tools.jinja2.jinja2_parsing import read_jinja2_template
 from pipelex.tools.jinja2.jinja2_scopes import ScopeBindings, dotted_attribute_path, walk_template_reads
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -84,7 +84,7 @@ def detect_jinja2_required_variables(
     )
 
     try:
-        parsed_ast = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+        parsed_ast = read_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except (Jinja2StuffError, TemplateSyntaxError, UndefinedError) as parse_error:
         raise _make_detect_variables_error(parse_error=parse_error, template_category=template_category) from parse_error
 
@@ -134,7 +134,7 @@ def detect_jinja2_read_paths(
     )
 
     try:
-        parsed_ast = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+        parsed_ast = read_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except (Jinja2StuffError, TemplateSyntaxError, UndefinedError) as parse_error:
         raise _make_detect_variables_error(parse_error=parse_error, template_category=template_category) from parse_error
 
@@ -228,7 +228,7 @@ def detect_jinja2_variable_references(
     )
 
     try:
-        parsed_ast = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+        parsed_ast = read_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except (Jinja2StuffError, TemplateSyntaxError, UndefinedError) as parse_error:
         raise _make_detect_variables_error(parse_error=parse_error, template_category=template_category) from parse_error
 
