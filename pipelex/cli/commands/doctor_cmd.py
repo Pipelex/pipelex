@@ -262,9 +262,12 @@ def check_telemetry_config(*, config_dir: Path | None = None) -> TelemetryConfig
         telemetry_config = TelemetryConfig.model_validate(toml_doc)
     except ValidationError as exc:
         return _telemetry_is_out_of_date_or_wrong(validation_error=exc, config_path=telemetry_config_path)
+    # The PostHog mode alone would read "off" for a file whose spans still reach an [[otlp]] exporter or Langfuse, so
+    # the destinations of Pipelex's spans are named beside it.
+    span_destinations = ", ".join(telemetry_config.operator_span_destinations()) or "none"
     return TelemetryConfigCheck(
         finding=TelemetryConfigFinding.HEALTHY,
-        message=f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})",
+        message=f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode}; span destinations: {span_destinations})",
     )
 
 
