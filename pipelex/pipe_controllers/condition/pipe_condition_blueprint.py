@@ -8,6 +8,7 @@ from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import TEMPLATE_NESTING_ERRORS, TEMPLATE_NESTING_FAULT, Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_parsing import are_authored_templates_trusted
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
@@ -96,6 +97,11 @@ class PipeConditionBlueprint(PipeBlueprint):
         # refusing it here would refuse an expression whose run never reaches it.
         # The message quotes neither the expression nor the parser's diagnosis, which names the token it stopped at:
         # the verdict's item shows it to the caller, and the condition may be a host library's.
+        # Both are judgments of what the author wrote, made where the method was validated: a build of templates already
+        # judged (`trusting_authored_templates`) skips them, since they parse and compile the expression again and store
+        # nothing a run reads. The built pipe reads its expression's paths itself, and the run compiles it.
+        if are_authored_templates_trusted():
+            return
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
             # Both fields or neither: the validator of the pair refuses that and says why, where a refusal of the
             # parse of one of them, which runs first, would hide it.

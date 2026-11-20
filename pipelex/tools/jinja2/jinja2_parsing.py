@@ -77,14 +77,14 @@ def sharing_template_parses() -> Generator[None, None, None]:
 
 @contextmanager
 def trusting_authored_templates() -> Generator[None, None, None]:
-    """Build the pipes inside this block from templates already judged, so the checks that only judge them are skipped.
+    """Build the pipes and blueprints inside this block from templates already judged, skipping the checks that only judge them.
 
-    The judgments of an authored template, whether it parses and what the template lints refuse, are made where its
-    method is loaded and validated. A library crate that such a load produced, loaded again by the same pipelex for
-    a run (the worker's load of the crate its runner validated), holds templates that passed them, so they are not
-    made again. Nothing a run reads is skipped: the analyses that build a pipe's state, such as the images and
-    documents a prompt presents, still run, and the render refuses a template that does not parse or reads a private
-    name. A scope opened inside another changes nothing.
+    The judgments of an authored template, whether it parses, what the template lints refuse and whether it reads
+    exactly the inputs its pipe declares, are made where its method is loaded and validated. A library crate that such
+    a load produced, decoded and loaded again by the same pipelex for a run (the worker's handling of the crate its
+    runner validated), holds templates that passed them, so they are not made again. Nothing a run reads is skipped:
+    the analyses that build a pipe's state, such as the images and documents a prompt presents, still run, and the
+    render refuses a template that does not parse or reads a private name. A scope opened inside another changes nothing.
     """
     token = _are_authored_templates_trusted.set(True)
     try:
