@@ -3,17 +3,22 @@
 An orchestrator such as Temporal runs a controller inline in its workflow code and re-executes that code from the
 start when it replays the workflow, after an eviction or on another worker. The orchestrator lends pipelex the
 workflow's deterministic sources through ``workflow_execution_slot``; here a fake workflow execution stands in for
-it: a seeded random a replay reproduces, a clock the test moves as history does, a replaying flag, and an eviction
-exception it recognises as unwinding. The provider is Pipelex's own shape, with ``ReplaySafeIdGenerator`` as its id
-generator, exporting to memory, so what the memory holds is what every exporter would have received.
+it: a seeded random a replay reproduces, a clock the test moves as history does, a replaying flag, and the answer
+Temporal's probe gives to ``is_unwinding``: an eviction unwinds, and so does an error that fails the workflow task,
+one that is neither among the worker's failure types, which list ``PipelexError``, nor a cancellation. The provider is
+Pipelex's own shape, with ``ReplaySafeIdGenerator`` as its id generator, exporting to memory, so what the memory holds
+is what every exporter would have received.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from random import Random
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -21,12 +26,13 @@ from opentelemetry.trace import TraceState
 from pydantic import Field
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PIPE_RUN_ENDS_MESSAGE, PIPE_RUN_STARTS_MESSAGE, PipeAbstract
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -34,7 +40,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants, PipelexSpanAt
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.replay_safe_id_generator import ReplaySafeIdGenerator
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
-from pipelex.system.telemetry.workflow_execution import get_workflow_execution, workflow_execution_slot
+from pipelex.system.telemetry.workflow_execution import WorkflowExecutionProtocol, get_workflow_execution, workflow_execution_slot
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 if TYPE_CHECKING:
@@ -55,8 +61,21 @@ HOST_SPAN_ID = 0x00000000000000AB
 HOST_TRACE_STATE = "vendor=host"
 
 
+PIPE_LOGGER = PipeAbstract.__module__
+
+
 class WorkflowEviction(BaseException):
     """The exception an orchestrator tears a cached workflow's code down with, as Temporal does on an eviction."""
+
+
+class PipeFailedError(PipelexError):
+    """A pipe's own failure, which the worker lists among the errors that fail the workflow."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
+class ProbeOutOfWorkflowError(RuntimeError):
+    """What a probe raises when asked from outside the workflow's event loop, as a torn-down workflow's code may be."""
 
 
 class FakeWorkflowExecution:
@@ -78,7 +97,38 @@ class FakeWorkflowExecution:
         return self._random
 
     def is_unwinding(self, *, error: BaseException) -> bool:
-        return isinstance(error, WorkflowEviction)
+        # Temporal's answer: an eviction, or an error that fails the workflow task, being neither one of the worker's
+        # failure types, tested by isinstance wherever it is raised, nor a cancellation, which ends the workflow.
+        if isinstance(error, WorkflowEviction):
+            return True
+        return not isinstance(error, (PipelexError, asyncio.CancelledError))
+
+
+class TornDownWorkflowExecution(FakeWorkflowExecution):
+    """A workflow execution whose code is being torn down: it answers that it unwinds, and every other question raises."""
+
+    @override
+    def is_replaying(self) -> bool:
+        msg = "not in the workflow's event loop"
+        raise ProbeOutOfWorkflowError(msg)
+
+    @override
+    def time_ns(self) -> int:
+        msg = "not in the workflow's event loop"
+        raise ProbeOutOfWorkflowError(msg)
+
+    @override
+    def is_unwinding(self, *, error: BaseException) -> bool:
+        return True
+
+
+class BrokenWorkflowExecution(FakeWorkflowExecution):
+    """A probe that raises whatever it is asked about a pipe's end."""
+
+    @override
+    def is_unwinding(self, *, error: BaseException) -> bool:
+        msg = "the probe broke"
+        raise ProbeOutOfWorkflowError(msg)
 
 
 class ScriptedPipe(PipeAbstract):
@@ -225,6 +275,7 @@ class TestLiveRunPipeReplaySafeSpans:
         provider = TracerProvider(id_generator=ReplaySafeIdGenerator())
         provider.add_span_processor(SimpleSpanProcessor(exporter))
         mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=provider.get_tracer("pipelex"))
+        mocker.patch.object(TelemetryManagerAbstract, "is_instance_tracer_replay_safe", return_value=True)
         mocker.patch.object(TelemetryManagerAbstract, "is_join_host_trace_enabled", return_value=False)
         return exporter
 
@@ -232,7 +283,11 @@ class TestLiveRunPipeReplaySafeSpans:
     def workflow(self) -> Iterator[dict[str, FakeWorkflowExecution]]:
         """The workflow execution the orchestrator's probe answers with, swapped as the workflow moves to another worker."""
         current: dict[str, FakeWorkflowExecution] = {}
-        workflow_execution_slot.install(probe=lambda: current.get("execution"))
+
+        def probe() -> WorkflowExecutionProtocol | None:
+            return current.get("execution")
+
+        workflow_execution_slot.install(probe=probe)
         try:
             yield current
         finally:
@@ -287,25 +342,162 @@ class TestLiveRunPipeReplaySafeSpans:
         assert outer_context.trace_id == _host_joined_otel_context().trace_id
         assert outer_context.trace_state == TraceState.from_header([HOST_TRACE_STATE])
 
-    async def test_a_pipe_failing_live_in_workflow_code_exports_its_failure(
-        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution]
+    @pytest.mark.parametrize(
+        "error",
+        [PipeFailedError("the pipe failed"), asyncio.CancelledError("the run was cancelled")],
+        ids=["a pipe failure the worker lists", "a cancellation of the run"],
+    )
+    async def test_a_nested_pipe_ending_the_workflow_live_exports_its_failure_at_every_depth(
+        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution], error: BaseException
     ) -> None:
         live = FakeWorkflowExecution(is_replaying=False)
         workflow["execution"] = live
 
         def fail() -> None:
             live.now_ns = LAST_TASK_AT_NS
-            msg = "the pipe failed"
+            raise error
+
+        inner = _make_pipe(code="inner", steps=[fail])
+        outer = _make_pipe(code="outer", steps=[inner])
+        with pytest.raises(type(error)):
+            await _run_workflow_code(outer)
+
+        spans = pipelex_spans.get_finished_spans()
+        assert sorted(span.name for span in spans) == ["ScriptedPipe: inner", "ScriptedPipe: outer"]
+        for span in spans:
+            assert span.attributes is not None
+            assert span.attributes.get(PipelexSpanAttr.OUTCOME) == SpanOutcome.FAILURE
+            assert span.start_time == STARTED_AT_NS
+            assert span.end_time == LAST_TASK_AT_NS
+        assert _parent_id_of(_span_named(spans, name="ScriptedPipe: inner")) == _span_id_of(_span_named(spans, name="ScriptedPipe: outer"))
+
+    async def test_an_error_failing_the_workflow_task_is_left_to_the_retry_that_reaches_the_real_end(
+        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution]
+    ) -> None:
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=False)
+
+        def fail_the_task() -> None:
+            msg = "a bug in workflow code"
             raise RuntimeError(msg)
 
-        with pytest.raises(RuntimeError, match="the pipe failed"):
+        with pytest.raises(RuntimeError, match="a bug in workflow code"):
+            await _run_workflow_code(_make_pipe(code="retried", steps=[fail_the_task]))
+
+        assert pipelex_spans.get_finished_spans() == ()
+
+    async def test_an_end_during_teardown_asks_unwinding_first_and_keeps_the_pipes_own_exception(
+        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution]
+    ) -> None:
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=False)
+        eviction = WorkflowEviction()
+
+        def evict() -> None:
+            # Once torn down, the probe answers that the code unwinds, and would raise on any other question: none is asked.
+            workflow["execution"] = TornDownWorkflowExecution(is_replaying=False)
+            raise eviction
+
+        with pytest.raises(WorkflowEviction) as raised:
+            await _run_workflow_code(_make_pipe(code="evicted", steps=[evict]))
+
+        assert raised.value is eviction
+        assert pipelex_spans.get_finished_spans() == ()
+
+    @pytest.mark.parametrize(
+        "error",
+        [PipeFailedError("the pipe failed"), WorkflowEviction()],
+        ids=["the pipe failed", "the code is torn down"],
+    )
+    async def test_a_probe_raising_while_a_pipe_fails_never_replaces_the_pipes_exception(
+        self,
+        pipelex_spans: InMemorySpanExporter,
+        workflow: dict[str, FakeWorkflowExecution],
+        error: BaseException,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        workflow["execution"] = BrokenWorkflowExecution(is_replaying=False)
+
+        def fail() -> None:
+            raise error
+
+        with caplog.at_level(logging.INFO, logger=PIPE_LOGGER), pytest.raises(type(error)) as raised:
             await _run_workflow_code(_make_pipe(code="failing", steps=[fail]))
 
-        (span,) = pipelex_spans.get_finished_spans()
-        assert span.attributes is not None
-        assert span.attributes.get(PipelexSpanAttr.OUTCOME) == SpanOutcome.FAILURE
-        assert span.start_time == STARTED_AT_NS
-        assert span.end_time == LAST_TASK_AT_NS
+        assert raised.value is error
+        # Neither the span nor the run's summary counts an end the probe could not classify.
+        assert pipelex_spans.get_finished_spans() == ()
+        assert not [record for record in caplog.records if record.getMessage() == PIPE_RUN_ENDS_MESSAGE]
+
+    async def test_a_coroutine_closed_in_workflow_code_ends_no_span_without_asking_the_probe(
+        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution]
+    ) -> None:
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=False)
+
+        def close() -> None:
+            # From where a torn-down coroutine is closed, the probe can only raise.
+            workflow["execution"] = BrokenWorkflowExecution(is_replaying=False)
+            raise GeneratorExit
+
+        with pytest.raises(GeneratorExit):
+            await _run_workflow_code(_make_pipe(code="closed", steps=[close]))
+
+        assert pipelex_spans.get_finished_spans() == ()
+
+    async def test_the_run_summary_is_logged_by_the_live_execution_alone(
+        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        replay = FakeWorkflowExecution(is_replaying=True)
+        workflow["execution"] = replay
+        replayed = _make_pipe(code="replayed", steps=[])
+        # `crossing` starts in replay and ends live: the execution that first ran it announced its start.
+        crossing = _make_pipe(code="crossing", steps=[_set(execution=replay, is_replaying=False)])
+
+        with caplog.at_level(logging.INFO, logger=PIPE_LOGGER):
+            await _run_workflow_code(replayed)
+            await _run_workflow_code(crossing)
+
+        pipe_records = [record for record in caplog.records if record.name == PIPE_LOGGER]
+        assert [record for record in pipe_records if record.getMessage() == PIPE_RUN_STARTS_MESSAGE] == []
+        ends = [record for record in pipe_records if record.getMessage() == PIPE_RUN_ENDS_MESSAGE]
+        assert [record.__dict__["pipe_code"] for record in ends] == ["crossing"]
+        assert [span.name for span in pipelex_spans.get_finished_spans()] == ["ScriptedPipe: crossing"]
+
+    @pytest.mark.usefixtures("pipelex_spans")
+    async def test_a_span_of_another_kind_in_workflow_code_never_shifts_the_pipe_span_ids(self, workflow: dict[str, FakeWorkflowExecution]) -> None:
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=False)
+        plain = _make_pipe(code="plain", steps=[])
+        await _run_workflow_code(plain)
+
+        # The same workflow on a worker whose configuration opens a span of its own in workflow code before the pipe.
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=False)
+        tracer = TelemetryManagerAbstract.get_instance_tracer()
+        assert tracer is not None
+        tracer.start_span("a worker's own span").end()
+        with_extra_span = _make_pipe(code="plain", steps=[])
+        await _run_workflow_code(with_extra_span)
+
+        assert with_extra_span.seen_span_ids == plain.seen_span_ids
+        assert plain.seen_span_ids == [Random(WORKFLOW_SEED).getrandbits(64)]
+
+    async def test_a_tracer_that_cannot_recompute_ids_keeps_random_ids_the_wall_clock_and_every_end(
+        self, workflow: dict[str, FakeWorkflowExecution], mocker: MockerFixture
+    ) -> None:
+        # A telemetry manager injected with a provider of its own, whose ids are not the workflow's.
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=provider.get_tracer("injected"))
+        mocker.patch.object(TelemetryManagerAbstract, "is_instance_tracer_replay_safe", return_value=False)
+        mocker.patch.object(TelemetryManagerAbstract, "is_join_host_trace_enabled", return_value=False)
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=True)
+
+        await _run_workflow_code(_make_pipe(code="replayed", steps=[]))
+
+        (span,) = exporter.get_finished_spans()
+        assert _span_id_of(span) != Random(WORKFLOW_SEED).getrandbits(64)
+        assert span.start_time is not None
+        assert span.start_time > LAST_TASK_AT_NS
+        assert span.end_time is not None
+        assert span.end_time > LAST_TASK_AT_NS
 
     async def test_a_failure_replayed_from_history_is_not_exported_again(
         self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution]

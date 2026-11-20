@@ -52,20 +52,34 @@ class WorkflowExecutionProtocol(Protocol):
     def random(self) -> Random:
         """A random generator seeded by the workflow, which a replay reproduces draw for draw.
 
-        Span ids are drawn from it, so it should be dedicated to them: drawing from the workflow's main
-        generator would shift every later draw of the workflow's own code depending on whether a tracer
+        Pipe span ids, and no other span's, are drawn from it, so it should be dedicated to them: drawing from the
+        workflow's main generator would shift every later draw of the workflow's own code depending on whether a tracer
         exists, which is configuration, not history. For Temporal, ``workflow.new_random("<a name>")`` kept on
         the workflow instance, so that it is created once per execution and reseeds with the workflow.
         """
         ...
 
     def is_unwinding(self, *, error: BaseException) -> bool:
-        """Whether ``error`` is the orchestrator unwinding the workflow code rather than the pipe failing.
+        """Whether ``error`` leaves the workflow running, so the pipes it crosses run again in a later execution.
 
-        The eviction of a cached workflow tears its code down with an exception of the orchestrator's own, and
-        a workflow task that fails rather than failing the workflow is retried by replaying it. Either way the
-        pipes in flight run again later, so a span ending on such an error is not the pipe's real end and is
-        not exported. For Temporal, an error that ``workflow.is_failure_exception`` does not recognise.
+        Two things unwind the workflow code without ending the workflow, and only these two:
+
+        - **the orchestrator tearing the code down**, on the eviction of a cached workflow, with an exception of its own,
+          ``GeneratorExit`` included, or with a cancellation it raises into the code while it evicts;
+        - **an error that fails the workflow task rather than the workflow**, which the orchestrator retries by
+          replaying the workflow, so the pipe reaches its end again in a later execution.
+
+        Anything else is the pipe's real end, and its span is exported with the failure: an error that fails the
+        workflow, at whatever depth it is raised, and a cancellation of the workflow or of the run, which ends the
+        workflow as cancelled. Answer from the orchestrator's own classification and state, never from the error's
+        type alone: a cancellation is unwinding only while the orchestrator evicts.
+
+        For Temporal: true when the workflow is being evicted, for ``GeneratorExit`` and the SDK's eviction error, and
+        for an error that ``workflow.is_failure_exception`` does not recognise and that is not an
+        ``asyncio.CancelledError``, which the SDK turns into the workflow's cancellation or failure at its top level.
+        ``is_failure_exception`` tests the worker's ``workflow_failure_exception_types`` by ``isinstance`` wherever the
+        error is raised, so a worker that lists ``PipelexError`` there fails the workflow on a pipe's failure at any
+        depth, and a nested pipe's span is exported with it.
         """
         ...
 
@@ -90,6 +104,11 @@ class WorkflowExecutionSlot:
 
     def install(self, *, probe: WorkflowExecutionProbe) -> None:
         self._probe = probe
+
+    @property
+    def is_claimed(self) -> bool:
+        """Whether a boot-orchestrator plugin installed a probe, read without calling it."""
+        return self._probe is not _never_in_workflow_code
 
     def reset(self) -> None:
         self._probe = _never_in_workflow_code
