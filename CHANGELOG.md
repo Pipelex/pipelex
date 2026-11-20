@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A `PipeBatch` branch starts with only what its pipe reads (Breaking)**: each branch gets its own copy of its item and of the values its branch pipe reads, where it got a copy of the whole working memory, the batched list included, so starting a batch costs its number of items plus the size of what a branch reads rather than the two multiplied, which on a wide batch over a large list held a durable backend's workflow step past its deadline. Branches stay isolated from the batch and from each other, and a `PipeFunc` branch looking up a value its pipe does not declare as an input no longer finds it. The new `WorkingMemory.make_deep_copy_of` copies the part of a memory a set of names reaches.
+
 ### Fixed
 
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.
