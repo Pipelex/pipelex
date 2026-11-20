@@ -7,8 +7,9 @@ facts into the `json_schema` emitted on `pipe_io_contracts`:
 - ``hop1_bundle_blueprints.json`` — parse: the `PipelexBundleBlueprint` dumps (what survived TOML).
 - ``hop2_structure_classes/`` — resolve + build: per traced concept, the structure class the loaded
   library holds for it, read off the class (name, bases, docstring, and each field's annotation,
-  requiredness, default and description): the class the runtime built from the concept's structure
-  at load time, or the class a `structure = "ClassName"` concept names.
+  requiredness, whether it admits None, default, default factory's name and description): the class
+  the runtime built from the concept's structure at load time, or the class a
+  `structure = "ClassName"` concept names.
 - ``hop2_python_structures.py.txt`` — the module the `python-structures` codegen emitter renders for
   the loaded crate, the file `pipelex build structures` would write. It agrees with the runtime's
   classes on concepts with a structure table only (see the codegen projections page).
@@ -31,6 +32,7 @@ import inspect
 import json
 import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +91,22 @@ def _capture_hop1(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path)
     return HOP1_FILE_NAME
 
 
+def _qualified_name_of(*, factory: Callable[..., Any]) -> str:
+    """A default factory's dotted name, `module.qualname`, the same on every run.
+
+    Not `repr`, which writes a function's memory address and so changes from one run to the next, and the captures are
+    diffed across runs. Not what the factory returns either: calling it could have effects or give a different value each
+    time (a timestamp, an id), and a factory may take the validated data as its argument. A callable without a name of its
+    own, such as a `functools.partial`, is named by its type.
+    """
+    qualname: str | None = getattr(factory, "__qualname__", None)
+    module: str | None = getattr(factory, "__module__", None)
+    if qualname is None:
+        qualname = type(factory).__qualname__
+        module = type(factory).__module__
+    return f"{module}.{qualname}"
+
+
 def _structure_class_dump(*, structure_class: type[BaseModel]) -> dict[str, Any]:
     """What a structure class holds, read off the class itself: its name, bases, docstring and fields."""
     fields: dict[str, Any] = {}
@@ -100,7 +118,7 @@ def _structure_class_dump(*, structure_class: type[BaseModel]) -> dict[str, Any]
             # A required field's default, and that of a field with a default factory, is pydantic's `PydanticUndefined`
             # sentinel, which is written as its repr. The factory is named, never called.
             "default": to_jsonable_python(field_info.default, fallback=repr),
-            "default_factory": repr(field_info.default_factory) if field_info.default_factory is not None else None,
+            "default_factory": _qualified_name_of(factory=field_info.default_factory) if field_info.default_factory is not None else None,
             "description": field_info.description,
         }
     return {

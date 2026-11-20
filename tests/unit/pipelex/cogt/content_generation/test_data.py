@@ -196,6 +196,28 @@ class UnvalidatedDefaults(StructuredContent):
         return "" if value is None else value
 
 
+class SetDefaults(StructuredContent):
+    """Sets with defaults, which the schema writes sorted, in another order than the validated set dumps in."""
+
+    # A default and not a factory, so the schema writes it, which is the shape under test.
+    tags: set[str] = Field(default={"zeta", "alpha", "mid", "beta", "q"})
+    nums: frozenset[int] = frozenset({30, 1, 200, 7})
+    single: set[str] = Field(default={"only"})
+
+
+class PlainDefaults(StructuredContent):
+    """Defaults that validate into equal copies of themselves, so keeping them changes nothing."""
+
+    label: str = "plain"
+    count: int = 3
+    flag: bool = True
+    nothing: str | None = None
+    # Defaults and not factories, so the schema writes them, which is the shape under test.
+    names: list[str] = Field(default=[])
+    scores: dict[str, int] = Field(default={})
+    nested: dict[str, list[int]] = Field(default={"a": [1, 2]})
+
+
 class MoreFormats(StructuredContent):
     """Bytes with a length, and the UUID formats of a version."""
 
@@ -250,12 +272,12 @@ def _chain_values(*, length: int) -> dict[str, Any]:
     return values
 
 
-# The cap that counted every node on the path, 100, met three nodes per class on this shape (the property, its
-# reference and the class it names), so it refused a chain from 34 classes past the first. The plain reference is the
-# shape whose classes cost Python's stack the least: building this chain, its schema, its rebuild and its round trip
-# takes about 750 frames on Python 3.11, against about 960 left under a pytest-xdist worker at the default limit, where
-# a chain of optional lists past that cap, 21 classes, takes about 830.
-MODEL_CHAIN_LENGTH = 36
+# Deep enough to prove that classes chain well past a handful of levels, and short enough to leave Python's stack
+# comfortable headroom on every supported interpreter under a pytest-xdist worker: pydantic recurses through the chain
+# when it builds the classes, writes their schema and validates the round trip, at a cost per class that grows with
+# the interpreter's frame size, and a chain tuned to one interpreter's budget fails on another. The plain reference is
+# the shape whose classes cost Python's stack the least.
+MODEL_CHAIN_LENGTH = 24
 ModelChain = _chain_of_models(length=MODEL_CHAIN_LENGTH)
 MODEL_CHAIN_VALUES = _chain_values(length=MODEL_CHAIN_LENGTH)
 
@@ -374,6 +396,8 @@ class SchemaRebuildTestData:
         NestedModelDefaults,
         RingEnd,
         UnvalidatedDefaults,
+        SetDefaults,
+        PlainDefaults,
         MoreFormats,
         DeprecatedFields,
         TitledTypes,
@@ -403,6 +427,9 @@ class SchemaRebuildTestData:
         (NestedModelDefaults, {"holder": {}}),
         (RingEnd, {"start": {"after": {"start": {"after": {}}}}}),
         (UnvalidatedDefaults, {"count": 3, "name": "named"}),
+        (SetDefaults, {}),
+        (SetDefaults, {"tags": ["b", "a"], "nums": [2, 1], "single": []}),
+        (PlainDefaults, {}),
         (
             MoreFormats,
             {

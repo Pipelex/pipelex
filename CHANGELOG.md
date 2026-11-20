@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.111.0] - 2026-11-20
+
+### Changed
+
+- **A `PipeBatch` branch starts with only what its pipe reads (Breaking)**: each branch gets its own copy of its item and of the values its branch pipe reads, where it got a copy of the whole working memory, the batched list included, so starting a batch costs its number of items plus the size of what a branch reads rather than the two multiplied, which on a wide batch over a large list held a durable backend's workflow step past its deadline. Branches stay isolated from the batch and from each other, and a `PipeFunc` branch looking up a value its pipe does not declare as an input no longer finds it. The new `WorkingMemory.make_deep_copy_of` copies the part of a memory a set of names reaches.
+- **A prevalidated crate load skips the judgments of authored templates**: `load_from_crate(is_crate_prevalidated=True)` no longer checks that each template parses, runs no template lint (private names, unguarded optional inputs) and no `PipeLLM` check that its prompts read exactly its declared inputs, since the library the crate came from passed them, and it still builds everything a run reads, such as the images and documents a prompt presents. Every crate load also parses each template once for all the checks and analyses that read it, where each parsed it again, so a worker loads a method with large templates several times faster; `trusting_authored_templates` and `sharing_template_parses` in `pipelex.tools.jinja2.jinja2_parsing` open the same scopes for a host that builds pipes or blueprints from a validated method elsewhere, such as while decoding a run's start argument.
+- **A process builds a crate's concept classes once**: `load_from_crate` keeps the concepts and structure classes it built for a crate in a process-level cache keyed by the crate's fingerprint, and a later load of the same crate into a fresh library, starting from the same class registry, registers the same class objects instead of building them again, so a worker's repeated loads of one method, such as every branch of a batch, cost a fraction of the first. `[interpreter.crate_class_cache] max_classes` bounds the classes kept, the least recently used crate leaving first, and zero turns the cache off.
+
+### Fixed
+
+- **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.
+- **`pipelex-dev trace-input-semantics` names a default factory the same way on every run**: a field's `default_factory` in the `hop2_structure_classes/` captures is the factory's module and qualified name, where it was its `repr`, whose memory address changed on every run, so the captures of two traces diff cleanly.
+
+### Security
+
+- **`uv.lock` moves `mail-parser` to 4.11.0**: a development checkout installing the `docling` extra, which reaches `mail-parser` through Docling's email reader, gets 4.11.0 where the lock held 4.3.0, past GHSA-fr3h-cpq2-9496, GHSA-r7w7-vpq8-c5vv, GHSA-72px-j8gh-p79x, GHSA-24mq-4vc6-2prf and GHSA-xhrq-2mqv-q8wx. The `pipelex/pipelex-api` image does not install that extra and no `pyproject.toml` range moved, so an application installing `pipelex[docling]` gets the patched release on a fresh resolve, and one whose own lock or environment already holds an older `mail-parser` upgrades it there.
+
 ## [v0.110.0] - 2026-11-19
 
 ### Changed
