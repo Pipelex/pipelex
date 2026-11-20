@@ -289,6 +289,8 @@ Before any of that Python is imported, each tree of the load that holds Python a
 
 A method of a server's own library directories that refuses to load for any other reason, such as a pipe that does not validate, a template that does not parse or a model the deck does not define, is the deployment's fault too, never the caller's. Loaded beside a caller's bundles, its refusal becomes a `HostLibraryLoadRefusalError`, carrying `pipelex.config.invalid`, which an API answers with a `500` whose message only the operator view of the problem carries, rather than an invalid verdict on the caller's bundles. The same refusal in the bundles the caller submits stays the caller's verdict, a `422`, and so does a refusal in library directories a local run declares the caller's own (`library_dirs_are_callers`), as the CLI's `-L` directories are.
 
+A process that loads the same transported method again and again, such as a hosted worker running every branch of a batch, builds the method's concept classes once: `load_from_crate` keeps them per crate and hands the same classes to every later load of it. The `max_classes` key under `[interpreter.crate_class_cache]` in `pipelex.toml` bounds the classes kept over all methods, the least recently used method leaving first, and `0` turns the cache off. Loading library directories never uses it. [Runtime Bridge & Transport](../../under-the-hood/runtime-bridge-and-transport.md) says when a load may reuse the classes.
+
 ## Project Organization
 
 **Golden rule:** Put `.mthds` files where they make sense in YOUR project. Pipelex finds them automatically.

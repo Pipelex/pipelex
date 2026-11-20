@@ -527,6 +527,20 @@
       "default": 10,
       "open_node": false
     },
+    "interpreter.crate_class_cache": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.crate_class_cache.max_classes": {
+      "value_type": "int",
+      "required": true,
+      "default": 1000,
+      "open_node": false,
+      "constraints": {
+        "ge": 0
+      }
+    },
     "interpreter.method_tree_limits": {
       "value_type": "table",
       "required": true,
