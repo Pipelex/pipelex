@@ -47,7 +47,7 @@ _PARENT_OTEL_CONTEXT = OtelContext(
 )
 
 
-async def _make_pipe_job(*, extras: dict[str, str] | None = None) -> PipeJob:
+async def _make_pipe_job(*, extras: dict[str, str] | None = None, method_id: str | None = None, capture_pipe_codes: bool | None = None) -> PipeJob:
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
     pipe_job, _, _ = await pipeline_run_setup(
         storage_scope="test/scope",
@@ -57,17 +57,20 @@ async def _make_pipe_job(*, extras: dict[str, str] | None = None) -> PipeJob:
         mthds_contents=[_MINIMAL_MTHDS],
         pipe_code="echo_topic",
         extras=extras,
+        method_id=method_id,
+        capture_pipe_codes=capture_pipe_codes,
         inputs={"subject": "a subject"},
     )
     return pipe_job
 
 
-def _start_span(*, mocker: MockerFixture, pipe_job: PipeJob) -> SdkSpan:
+def _start_span(*, mocker: MockerFixture, pipe_job: PipeJob, pipe_id: str | None = None) -> SdkSpan:
     mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=TracerProvider().get_tracer("test"))
     span, _ = pipe_job.pipe._start_pipe_span(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
         parent_otel_context=_PARENT_OTEL_CONTEXT,
         run_metadata=pipe_job.job_metadata.run_metadata,
         working_memory=pipe_job.get_working_memory(),
+        pipe_id=pipe_id,
     )
     assert isinstance(span, SdkSpan)
     return span
@@ -100,3 +103,34 @@ class TestPipeSpanIdentity:
         mocker.patch.object(TelemetryManagerAbstract, "get_langfuse_enabled", return_value=True)
 
         assert _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))[LangfuseSpanAttr.USER_ID] == "user-42"
+
+    async def test_the_method_id_the_host_supplied_reaches_the_span(self, mocker: MockerFixture) -> None:
+        pipe_job = await _make_pipe_job(method_id="mt_abc123")
+
+        assert _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))[PipelexSpanAttr.RUN_METHOD_ID] == "mt_abc123"
+
+    async def test_a_run_with_no_method_writes_no_method_attribute(self, mocker: MockerFixture) -> None:
+        pipe_job = await _make_pipe_job()
+
+        assert PipelexSpanAttr.RUN_METHOD_ID not in _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))
+
+    async def test_the_pipe_id_reaches_the_span(self, mocker: MockerFixture) -> None:
+        pipe_job = await _make_pipe_job()
+
+        assert _attributes(_start_span(mocker=mocker, pipe_job=pipe_job, pipe_id="0" * 32))[PipelexSpanAttr.PIPE_ID] == "0" * 32
+
+    async def test_a_span_with_no_pipe_id_writes_no_pipe_id_attribute(self, mocker: MockerFixture) -> None:
+        pipe_job = await _make_pipe_job()
+
+        assert PipelexSpanAttr.PIPE_ID not in _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))
+
+    @pytest.mark.parametrize("capture_pipe_codes", [True, False])
+    async def test_the_runs_pipe_code_setting_reaches_the_span(self, mocker: MockerFixture, capture_pipe_codes: bool) -> None:
+        pipe_job = await _make_pipe_job(capture_pipe_codes=capture_pipe_codes)
+
+        assert _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))[PipelexSpanAttr.RUN_CAPTURE_PIPE_CODES] is capture_pipe_codes
+
+    async def test_a_run_with_no_pipe_code_setting_writes_no_setting_attribute(self, mocker: MockerFixture) -> None:
+        pipe_job = await _make_pipe_job()
+
+        assert PipelexSpanAttr.RUN_CAPTURE_PIPE_CODES not in _attributes(_start_span(mocker=mocker, pipe_job=pipe_job))

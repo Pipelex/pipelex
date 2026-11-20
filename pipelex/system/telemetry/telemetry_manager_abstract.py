@@ -60,6 +60,49 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.capture_pipe_codes_enabled
 
     @classmethod
+    def is_capture_pipe_codes_enabled_for_run(cls, *, run_metadata: "RunMetadata") -> bool:
+        """Whether this run's pipe codes may appear in its telemetry: the run's own setting, else the deployment's.
+
+        Args:
+            run_metadata: The run, whose `capture_pipe_codes` the host may have set for it.
+
+        Returns:
+            The run's `capture_pipe_codes` when the host set it, else `is_capture_pipe_codes_enabled()`.
+        """
+        if run_metadata.capture_pipe_codes is not None:
+            return run_metadata.capture_pipe_codes
+        return cls.is_capture_pipe_codes_enabled()
+
+    @classmethod
+    def is_capture_output_class_name_enabled_for_run(cls, *, run_metadata: "RunMetadata") -> bool:
+        """Whether this run's output class names may appear in its telemetry: the run's pipe-code setting, else the deployment's.
+
+        A class name names one of the method's concepts as a pipe code names one of its pipes, so the run's own
+        `capture_pipe_codes` governs both when the host set it.
+
+        Args:
+            run_metadata: The run, whose `capture_pipe_codes` the host may have set for it.
+
+        Returns:
+            The run's `capture_pipe_codes` when the host set it, else `is_capture_output_class_name_enabled()`.
+        """
+        if run_metadata.capture_pipe_codes is not None:
+            return run_metadata.capture_pipe_codes
+        return cls.is_capture_output_class_name_enabled()
+
+    @classmethod
+    def get_pipe_id_key(cls) -> str | None:
+        """The key of the stable pipe identifier, or None when no telemetry manager is configured or it has none.
+
+        Returns:
+            The instance's `pipe_id_key`.
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return None
+        return instance.pipe_id_key
+
+    @classmethod
     def is_capture_output_class_name_enabled(cls) -> bool:
         """Check if output class name capture is enabled for telemetry.
 
@@ -174,6 +217,15 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @abstractmethod
     def capture_content_max_length(self) -> int | None:
         """Maximum length for captured content, or None if unlimited."""
+
+    @property
+    def pipe_id_key(self) -> str | None:
+        """The secret key of the stable pipe identifier (`pipelex.system.telemetry.pipe_identity`), or None for none.
+
+        Not abstract: the no-op manager, and an injected one that does not override it, configure no key, so their
+        spans carry no `pipelex.pipe.id`.
+        """
+        return None
 
     @property
     @abstractmethod

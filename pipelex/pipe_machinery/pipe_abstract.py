@@ -47,6 +47,7 @@ from pipelex.system.telemetry.otel_constants import (
     SpanOutcome,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.pipe_identity import make_pipe_id_for_run, make_run_method_span_attributes
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.console_layouts import LogLayout
@@ -1115,13 +1116,19 @@ class PipeAbstract(ABC, BaseModel):
             span: Span | None = None
             is_root_span: bool = False
 
+            this_pipe_id: str | None = None
+
             parent_otel_context = job_metadata.otel_context
             if parent_otel_context is not None:
+                # The pipe's stable identifier, computed once: its span carries it, and so does every inference span it
+                # makes, through the metadata handed down. None when the runtime has no `pipe_id_key`.
+                this_pipe_id = make_pipe_id_for_run(run_metadata=job_metadata.run_metadata, domain_code=self.domain_code, pipe_ref=self.pipe_ref)
                 # Start OTel span first
                 span, is_root_span = self._start_pipe_span(
                     parent_otel_context=parent_otel_context,
                     run_metadata=job_metadata.run_metadata,
                     working_memory=working_memory,
+                    pipe_id=this_pipe_id,
                 )
                 # Get the actual span_id from OTel (OTel generates its own span_id)
                 if span:
@@ -1144,6 +1151,7 @@ class PipeAbstract(ABC, BaseModel):
             child_metadata = job_metadata.copy_with_update(
                 otel_context=this_otel_context,
                 pipe_code=self.code,
+                pipe_id=this_pipe_id,
                 pipe_run_id=this_pipe_run_id,
             )
 
@@ -1201,7 +1209,7 @@ class PipeAbstract(ABC, BaseModel):
         # Telemetry stays live-only on purpose: `pipe_run_id` and `otel_context` belong to a real run.
         # A dry run opens no span, so `otel_context` is cleared, and explicitly, which is the point of
         # that parameter being required: inheriting the parent's would attach a dry step to a live span.
-        child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code)
+        child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code, pipe_id=None)
         return await self._dry_run_pipe(
             job_metadata=child_metadata,
             working_memory=working_memory,
@@ -1240,6 +1248,7 @@ class PipeAbstract(ABC, BaseModel):
         parent_otel_context: OtelContext,
         run_metadata: RunMetadata,
         working_memory: WorkingMemory,
+        pipe_id: str | None,
     ) -> tuple[Span | None, bool]:
         """Start an OTel span for this pipe execution.
 
@@ -1251,6 +1260,8 @@ class PipeAbstract(ABC, BaseModel):
             run_metadata: The run half of the job metadata — the pipeline run ID for
                 span attributes, and the identity every exporter attributes the span to.
             working_memory: The working memory containing input stuffs for telemetry capture.
+            pipe_id: The pipe's stable identifier (`pipelex.system.telemetry.pipe_identity`), None when the runtime
+                has no `pipe_id_key`.
 
         Returns:
             A tuple of (span, is_root_span) where span is the started span or None if tracer
@@ -1302,6 +1313,8 @@ class PipeAbstract(ABC, BaseModel):
         # rather than to the process that happens to be running it.
         is_langfuse_enabled = TelemetryManagerAbstract.get_langfuse_enabled()
         span_attributes.update(make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=is_langfuse_enabled))
+        # The run's method, the pipe's stable identifier and the run's own pipe-code setting, for every exporter.
+        span_attributes.update(make_run_method_span_attributes(run_metadata=run_metadata, pipe_id=pipe_id))
 
         # Langfuse-specific attributes: always send full data
         if is_langfuse_enabled:

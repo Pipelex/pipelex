@@ -8,10 +8,16 @@ imports every configuration model including these. See its docstring for the who
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+# The shortest `pipe_id_key` accepted: 32 characters, the length of 16 random bytes in hex, so the key cannot be
+# guessed and a guessed pipe code cannot be confirmed against a `pipe_id`.
+PIPE_ID_KEY_MIN_LENGTH = 32
+# What a `${…}` placeholder the loader could not answer still holds after substitution.
+PLACEHOLDER_MARKER = "${"
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
@@ -137,6 +143,13 @@ class TelemetryConfig(ConfigModel):
         "sampling decision, and its pipe and LLM spans are made current while they run. Refused at boot unless a span destination "
         "of this file receives Pipelex's spans. `PIPELEX_JOIN_HOST_TRACE` and `Pipelex.make(join_host_trace=...)` override it.",
     )
+    pipe_id_key: str | None = Field(
+        default=None,
+        description="The secret key of the stable pipe identifier: with it, every pipe span and every inference span carries "
+        "`pipelex.pipe.id`, a keyed digest of the method's identity and the pipe code that stays the same for one pipe across "
+        "runs and cannot be turned back into the code; without it, no span carries one. At least "
+        f"{PIPE_ID_KEY_MIN_LENGTH} characters. Changing it starts a new series of identifiers.",
+    )
     telemetry_allowed_modes: dict[str, bool] = Field(
         default_factory=lambda: {
             "ci": False,
@@ -152,6 +165,25 @@ class TelemetryConfig(ConfigModel):
         "Defaults live here so a project-level telemetry.toml that omits the section "
         "doesn't silently disable custom telemetry for everyone.",
     )
+
+    @field_validator("pipe_id_key")
+    @classmethod
+    def _validate_pipe_id_key(cls, value: str | None) -> str | None:
+        """Refuse a key that is no key: a placeholder no variable answered, or one too short to resist guessing.
+
+        The loader keeps a `${…}` placeholder whose variable is missing rather than failing, so without this a deployment
+        whose secret did not arrive would digest every pipe code under the placeholder's literal text, a key anyone can
+        read in the file. Refusing it makes a missing key a boot failure for a file that states one.
+        """
+        if value is None:
+            return None
+        if PLACEHOLDER_MARKER in value:
+            msg = "pipe_id_key holds a placeholder that no variable answered: the secret it names did not reach this process"
+            raise ValueError(msg)
+        if len(value) < PIPE_ID_KEY_MIN_LENGTH:
+            msg = f"pipe_id_key is too short: it must be at least {PIPE_ID_KEY_MIN_LENGTH} characters, such as `openssl rand -hex 32` prints"
+            raise ValueError(msg)
+        return value
 
     def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
         """Check if custom telemetry is allowed for the given integration mode.

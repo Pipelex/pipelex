@@ -576,6 +576,11 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @property
     @override
+    def pipe_id_key(self) -> str | None:
+        return self.telemetry_config.pipe_id_key
+
+    @property
+    @override
     def is_langfuse_enabled(self) -> bool:
         return self.telemetry_config.langfuse.enabled
 
@@ -607,8 +612,11 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # Send to PostHog if configured (uses full trace name based on user's capture settings)
         if self.custom_posthog_client and self.telemetry_config.custom_posthog.tracing.enabled:
-            # Use full or redacted trace name based on user's capture_pipe_codes setting
-            custom_trace_name = trace_name if self.telemetry_config.custom_posthog.tracing.capture.pipe_codes else trace_name_redacted
+            # Use the full or the redacted trace name, as the run's own pipe-code setting says, else the deployment's
+            is_capture_pipe_codes = self.telemetry_config.custom_posthog.tracing.capture.pipe_codes
+            if run_metadata is not None and run_metadata.capture_pipe_codes is not None:
+                is_capture_pipe_codes = run_metadata.capture_pipe_codes
+            custom_trace_name = trace_name if is_capture_pipe_codes else trace_name_redacted
             custom_properties: dict[str, Any] = {
                 PostHogAttr.TRACE_ID: f"{trace_id:032x}",
                 PostHogAttr.SPAN_NAME: custom_trace_name,
