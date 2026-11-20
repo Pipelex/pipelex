@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.111.1] - 2026-11-20
+
+### Changed
+
+- **`kajson` version**: The pin moves to `kajson==0.9.0`, the release adding a safe decoding mode (`safe=True`, `importable_packages`) for JSON from an untrusted source, and everyone downstream inherits that exact version. Its decoder is stricter: a malformed class marker, a `timedelta` payload with an unknown key or a non-numeric value, and an `AttributeError` raised inside a class's `__json_decode__` now raise `KajsonDecoderError` where they used to raise a bare `KeyError`, `TypeError` or `AttributeError`, or quietly decode to a plain dict or a constructor call. Release 0.8.0 also removed `class_source_code` from `loads()` and `load()`, which pipelex no longer passed. The encoded format is unchanged, so payloads cross between this version and the previous one in both directions.
+
 ## [v0.111.0] - 2026-11-20
 
 ### Changed
