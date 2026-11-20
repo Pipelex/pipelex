@@ -36,6 +36,7 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_runtime_hub
+from pipelex.system.job_metadata import UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode
@@ -110,6 +111,7 @@ model = "$testing-text"
 prompt = "Describe the company this brief is about: $brief"
 """
 BRIEF = "Acme builds reusable rockets in Toulouse."
+COMPLETION = "Acme builds reusable rockets for research labs."
 INPUTS: PipelineInputs = {"brief": BRIEF}
 
 STAND_IN_BACKEND = "stand_in"
@@ -137,7 +139,7 @@ class StandInLLMWorker(LLMWorkerAbstract):
         tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: INPUT_TOKENS, TokenCategory.OUTPUT: OUTPUT_TOKENS}
         if self._error is not None:
             raise self._error
-        return "Acme builds reusable rockets for research labs."
+        return COMPLETION
 
     @override
     async def _gen_object(self, llm_job: LLMJob, *, schema: type[BaseModelTypeVar]) -> BaseModelTypeVar:
@@ -248,6 +250,7 @@ def _assert_full_spans(spans: tuple[ReadableSpan, ...], *, is_error: bool) -> No
     assert attributes[PipelexSpanAttr.INFERENCE_KIND] == InferenceKind.LLM
     assert attributes[PipelexSpanAttr.ATTEMPT_COUNT] == 1
     assert attributes[PipelexSpanAttr.PIPE_CODE] == PIPE_CODE
+    assert attributes[PipelexSpanAttr.UNIT_JOB_ID] == UnitJobId.LLM_GEN_TEXT
     assert (attributes[GenAISpanAttr.USAGE_INPUT_TOKENS], attributes[GenAISpanAttr.USAGE_OUTPUT_TOKENS]) == (INPUT_TOKENS, OUTPUT_TOKENS)
     assert math.isclose(cast("float", attributes[PipelexSpanAttr.INPUT_COST_USD]), INPUT_COST_USD)
     assert math.isclose(cast("float", attributes[PipelexSpanAttr.OUTPUT_COST_USD]), OUTPUT_COST_USD)
@@ -271,6 +274,8 @@ def _assert_posthog_generation(destinations: Destinations, *, is_error: bool) ->
     assert properties[PostHogAttr.INFERENCE_KIND] == InferenceKind.LLM
     assert properties[PostHogAttr.INFERENCE_BACKEND] == STAND_IN_BACKEND
     assert properties[PostHogAttr.ATTEMPT_COUNT] == 1
+    (execute,) = destinations.posthog_events(EventName.PIPELINE_EXECUTE)
+    assert properties[PostHogAttr.PIPELINE_RUN_ID] == execute["properties"][EventProperty.PIPELINE_RUN_ID]
     assert properties[PostHogAttr.PIPELEX_VERSION] == get_package_version()
     assert (properties[PostHogAttr.INPUT_TOKENS], properties[PostHogAttr.OUTPUT_TOKENS]) == (INPUT_TOKENS, OUTPUT_TOKENS)
     assert math.isclose(properties[PostHogAttr.INPUT_COST_USD], INPUT_COST_USD)
@@ -278,9 +283,10 @@ def _assert_posthog_generation(destinations: Destinations, *, is_error: bool) ->
     assert math.isclose(properties[PostHogAttr.TOTAL_COST_USD], TOTAL_COST_USD)
     assert properties[PostHogAttr.IS_ERROR] is is_error
     assert properties[PostHogAttr.ERROR] == (InferenceErrorCategory.TRANSIENT if is_error else None)
-    # The stock privacy defaults hold: no pipe code and no content reach the PostHog stream.
+    # The stock privacy defaults hold: no pipe code and no content, neither the prompt nor the completion, reach the PostHog stream.
     assert PIPE_CODE not in str(properties)
     assert BRIEF not in str(properties)
+    assert COMPLETION not in str(properties)
 
 
 def _assert_posthog_run_events(destinations: Destinations, *, outcome: Outcome) -> None:
