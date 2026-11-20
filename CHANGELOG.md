@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A prevalidated crate load skips the judgments of authored templates**: `load_from_crate(is_crate_prevalidated=True)` no longer checks that each template parses, runs no template lint (private names, unguarded optional inputs) and no `PipeLLM` check that its prompts read exactly its declared inputs, since the library the crate came from passed them, and it still builds everything a run reads, such as the images and documents a prompt presents. Every crate load also parses each template once for all the checks and analyses that read it, where each parsed it again, so a worker loads a method with large templates several times faster; `trusting_authored_templates` and `sharing_template_parses` in `pipelex.tools.jinja2.jinja2_parsing` open the same scopes for a host that builds pipes or blueprints from a validated method elsewhere, such as while decoding a run's start argument.
+
 ### Fixed
 
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.

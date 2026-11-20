@@ -1,3 +1,6 @@
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Final
 
 import jinja2
@@ -12,6 +15,11 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 # exhaust it in a walk, or fail Python's compiler (`IndentationError` on deeply nested blocks). This bound is far
 # deeper than any template written by hand, and far shallower than what exhausts the recursion limit.
 MAX_TEMPLATE_NESTING_DEPTH: Final[int] = 100
+
+# The trees parsed for reading inside a `sharing_template_parses` scope, by what decides the parse; None outside every scope.
+_shared_parses: ContextVar[dict[tuple[object, ...], nodes.Template] | None] = ContextVar("_shared_parses", default=None)
+# Whether the authored templates built inside the current scope were judged already, by `trusting_authored_templates`.
+_are_authored_templates_trusted: ContextVar[bool] = ContextVar("_are_authored_templates_trusted", default=False)
 
 
 def _nesting_depth(*, parsed_template: nodes.Template, limit: int) -> tuple[int, int]:
@@ -48,15 +56,104 @@ def parse_jinja2_template(*, jinja2_env: jinja2.Environment, template_source: st
     return parsed_template
 
 
+@contextmanager
+def sharing_template_parses() -> Generator[None, None, None]:
+    """Parse each template once for every reading of it inside, such as the checks and analyses of one library load.
+
+    A pipe reads its templates several times while it is built, each reading for one purpose: the parse check, each
+    template lint, the images and documents a prompt presents, the paths a template reads. Inside this scope,
+    `read_jinja2_template` parses a template the first time it is read and hands every later reading the same tree.
+    The trees are dropped when the scope ends. A scope opened inside another shares the outer one's trees.
+    """
+    if _shared_parses.get() is not None:
+        yield
+        return
+    token = _shared_parses.set({})
+    try:
+        yield
+    finally:
+        _shared_parses.reset(token)
+
+
+@contextmanager
+def trusting_authored_templates() -> Generator[None, None, None]:
+    """Build the pipes inside this block from templates already judged, so the checks that only judge them are skipped.
+
+    The judgments of an authored template, whether it parses and what the template lints refuse, are made where its
+    method is loaded and validated. A library crate that such a load produced, loaded again by the same pipelex for
+    a run (the worker's load of the crate its runner validated), holds templates that passed them, so they are not
+    made again. Nothing a run reads is skipped: the analyses that build a pipe's state, such as the images and
+    documents a prompt presents, still run, and the render refuses a template that does not parse or reads a private
+    name. A scope opened inside another changes nothing.
+    """
+    token = _are_authored_templates_trusted.set(True)
+    try:
+        yield
+    finally:
+        _are_authored_templates_trusted.reset(token)
+
+
+def are_authored_templates_trusted() -> bool:
+    """Whether the authored templates of the pipes being built were judged already (`trusting_authored_templates`)."""
+    return _are_authored_templates_trusted.get()
+
+
+def _parse_key(*, jinja2_env: jinja2.Environment, template_source: str) -> tuple[object, ...]:
+    """What decides the tree Jinja2 parses from a source: its environment's syntax settings and extensions, and the source.
+
+    The syntax settings are those Jinja2 keys its own lexer cache on; the extensions add the tags a parse recognizes.
+    """
+    return (
+        type(jinja2_env),
+        jinja2_env.block_start_string,
+        jinja2_env.block_end_string,
+        jinja2_env.variable_start_string,
+        jinja2_env.variable_end_string,
+        jinja2_env.comment_start_string,
+        jinja2_env.comment_end_string,
+        jinja2_env.line_statement_prefix,
+        jinja2_env.line_comment_prefix,
+        jinja2_env.trim_blocks,
+        jinja2_env.lstrip_blocks,
+        jinja2_env.newline_sequence,
+        jinja2_env.keep_trailing_newline,
+        tuple(sorted(jinja2_env.extensions)),
+        template_source,
+    )
+
+
+def read_jinja2_template(*, jinja2_env: jinja2.Environment, template_source: str) -> nodes.Template:
+    """Parse a template to read it, as `parse_jinja2_template` does, once per `sharing_template_parses` scope.
+
+    The tree may be shared with every other reading of the same template in the scope, so it must never be changed:
+    a tree to compile or rewrite, as a render does, comes from `parse_jinja2_template`. A template that does not parse
+    is not remembered, so each reading raises again.
+    """
+    shared_parses = _shared_parses.get()
+    if shared_parses is None:
+        return parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+    parse_key = _parse_key(jinja2_env=jinja2_env, template_source=template_source)
+    parsed_template = shared_parses.get(parse_key)
+    if parsed_template is None:
+        parsed_template = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+        shared_parses[parse_key] = parsed_template
+    return parsed_template
+
+
 def check_jinja2_parsing(
     template_source: str,
     *,
     template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
 ):
-    """Refuse a template Jinja2 cannot parse, or one nested too deeply to parse, walk or compile, as the method's syntax."""
+    """Refuse a template Jinja2 cannot parse, or one nested too deeply to parse, walk or compile, as the method's syntax.
+
+    An authored template's judgment, so it is skipped inside `trusting_authored_templates`.
+    """
+    if are_authored_templates_trusted():
+        return
     jinja2_env = make_jinja2_env_without_loader(template_category=template_category)
     try:
-        parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+        read_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except TemplateNestingError as exc:
         # The nesting fault alone: the source of such a template can be very long, and quoting it says nothing more.
         msg = f"Could not parse Jinja2 template: {exc.message}"

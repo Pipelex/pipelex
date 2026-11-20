@@ -89,6 +89,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.tools.jinja2.jinja2_parsing import sharing_template_parses, trusting_authored_templates
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.exceptions import SemVerError
@@ -875,13 +876,20 @@ class LibraryManager(LibraryManagerAbstract):
                 nothing a run later reads), so skipping it changes no behaviour, only the cost of reaching a
                 verdict already reached. Everything else still happens: fingerprint idempotency, domain and
                 concept loading with class registration, the resolution of the structure classes' references
-                to one another, the concept-cycle check, pipe construction with each pipe's static validation,
-                and source tracking. Leave it False for any crate whose library was not validated by this
+                to one another, the concept-cycle check, pipe construction with each pipe's static validation
+                except the judgments of its authored templates, and source tracking. Those judgments, whether a
+                template parses and what the template lints refuse (`trusting_authored_templates`), were made
+                where the crate's library was validated and write nothing a run reads, so they are skipped too;
+                the analyses that build a pipe's state from its templates, such as the images and documents a
+                prompt presents, still run. Leave it False for any crate whose library was not validated by this
                 pipelex version.
             written_pipe_trees: The trees this process wrote out for a step to run in, by that step's pipe ref, such as
                 the tree of a `PipeFunc` call written for its function to import. That step is built as a member of the
                 written tree, which holds none of its tree's bundles; no other step is, a sibling of the same tree
                 included.
+
+        Each template the load reads is parsed once for the whole load (`sharing_template_parses`), whichever checks and
+        analyses read it.
 
         Every other step is built as a member of its tree when the load validates the crate and a library of this
         process holds the tree under the digest the crate names, so its checks read the files they read where the
@@ -933,8 +941,13 @@ class LibraryManager(LibraryManagerAbstract):
         """
         # Bind the target library as current for the whole load: PipeFactory and the concept
         # factories resolve concepts and the class registry through the ambient current library,
-        # so a load into a non-current library must not read the caller's binding.
-        with scoped_current_library(library_id=library_id), sharing_module_name_checks():
+        # so a load into a non-current library must not read the caller's binding. Every template the
+        # load reads, for a check or for the state a pipe holds, is parsed once for the whole load. A
+        # prevalidated crate's templates were judged where its library was validated, so the checks that
+        # only judge them are skipped: the parse check and the template lints.
+        with scoped_current_library(library_id=library_id), sharing_module_name_checks(), sharing_template_parses(), ExitStack() as trust_stack:
+            if is_crate_prevalidated:
+                trust_stack.enter_context(trusting_authored_templates())
             # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
             # workflow, which never populates _blueprints). This lets get_crate() hand the crate to the
             # sandbox executor. The blueprint-derived path (load_libraries -> load_from_blueprints) leaves
