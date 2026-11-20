@@ -22,6 +22,7 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.async_utils import gather_bounded
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
@@ -49,6 +50,20 @@ def warn_of_large_batch(*, pipe_code: str, item_count: int, max_concurrency: int
     fields[OTelLogAttr.URL_FULL] = URLs.durable_execution
     fields[USER_ACTION_FIELD] = "Consider a durable execution backend for rate-limited, resumable runs"
     log.warning("A PipeBatch fans out over a large list without durable execution", fields=fields)
+
+
+def names_read_by_branch(*, branch_pipe: "PipeAbstract", input_item_stuff_name: str) -> set[str]:
+    """The names a batch branch's pipe reads from the batch's working memory, which are all a branch is given a copy of.
+
+    They are the branch pipe's declared inputs, the inputs its tree needs and the roots of the variables it requires, so a
+    controller's children and a template's dotted paths are covered as well as the pipe's own declaration. The item's name
+    is left out: the branch is handed its item on its own, under that name, whatever the batch's memory holds there.
+    """
+    read_names = set(branch_pipe.inputs.declared_names)
+    read_names.update(branch_pipe.needed_inputs().declared_names)
+    read_names.update(get_root_from_dotted_path(variable) for variable in branch_pipe.required_variables())
+    read_names.discard(input_item_stuff_name)
+    return read_names
 
 
 class PipeBatch(PipeController):
@@ -161,17 +176,20 @@ class PipeBatch(PipeController):
             warn_of_large_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
 
         item_concept = self.inputs.get_required_stuff_spec(input_list_stuff_name).concept
+        # Worked out once for the whole batch: every branch runs the same pipe, so every branch reads the same names.
+        branch_read_names = names_read_by_branch(branch_pipe=sub_pipe, input_item_stuff_name=input_item_stuff_name)
 
         async def _run_branch(*, branch_index: int, branch_input_item_code: str, branch_output_item_code: str) -> PipeOutput:
-            branch_memory = working_memory.make_deep_copy()
-            # The item is taken from the branch's own copy of the list, never from the parent's: a branch gets
-            # its own copy of its item as it does of the rest of working memory, so a branch that rewrites its
-            # item in place (a PipeFunc can) leaves the batched list and every sibling branch as they were.
-            branch_list_content = cast("ListContent[StuffContent]", branch_memory.get_stuff(input_list_stuff_name).content)
+            # A branch starts with its own copy of what its pipe reads and of its item, never with a copy of the whole
+            # working memory: copying the batched list once per branch made a batch's start cost its width times its
+            # list's size, which on a durable backend held the workflow thread past its deadline. The copy keeps every
+            # branch isolated all the same, so a branch that rewrites an input or its item in place (a PipeFunc can)
+            # leaves the batched list, the batch's memory and every sibling branch as they were.
+            branch_memory = working_memory.make_deep_copy_of(names=branch_read_names)
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
                 concept=item_concept,
-                content=branch_list_content.items[branch_index],
+                content=input_content.items[branch_index].model_copy(deep=True),
                 name=input_item_stuff_name,
             )
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
