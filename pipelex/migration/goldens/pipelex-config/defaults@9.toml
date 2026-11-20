@@ -421,6 +421,17 @@ field_ordering = ["type", "description", "inputs", "output"]
 fetch_on_miss = true
 
 ####################################################################################################
+# Crate class cache config
+####################################################################################################
+
+[interpreter.crate_class_cache]
+# The structure classes this process builds for a crate it loads are kept and handed to every later
+# load of the same crate, which then builds none: a hosted worker loads one crate for every run of a
+# method and every batch branch. This bounds the classes kept over all crates, the least recently
+# used crate leaving first. A four-field class holds about 16 KB. Zero turns the cache off.
+max_classes = 1000
+
+####################################################################################################
 # Pipe run config
 ####################################################################################################
 
