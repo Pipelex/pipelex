@@ -9,6 +9,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE, ModelType
+from pipelex.cogt.model_backends.service_tier import ServiceTier
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel, LaxEnum
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
@@ -26,6 +27,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     variant: str | None = None
     model_type: ModelType = Field(default=DEFAULT_MODEL_TYPE, strict=False)
     model_id: str | None = None
+    service_tier: ServiceTier | None = Field(default=None, strict=False)
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
     costs: dict[LaxEnum[CostCategory], float] | None = None
@@ -83,6 +85,7 @@ class InferenceModelSpecFactory(BaseModel):
             variant=blueprint.variant,
             model_type=blueprint.model_type,
             model_id=blueprint.model_id or name,
+            service_tier=blueprint.service_tier,
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,
             costs=blueprint.costs or {},

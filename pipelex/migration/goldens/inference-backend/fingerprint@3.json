@@ -100,6 +100,20 @@
       "required": false,
       "open_node": false
     },
+    "*.service_tier": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "auto",
+        "default",
+        "fast",
+        "flex",
+        "priority",
+        "scale",
+        "standard_only"
+      ],
+      "open_node": false
+    },
     "*.structure_method": {
       "value_type": "enum",
       "required": false,
