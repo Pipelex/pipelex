@@ -141,7 +141,7 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
                 "backend_name": inference_model.backend_name,
                 "sdk": inference_model.sdk,
                 # The model keys of the LLM span and of the fixed-temperature warning, with the same meanings
-                GenAISpanAttr.REQUEST_MODEL: inference_model.name,
+                GenAISpanAttr.REQUEST_MODEL: inference_model.model_id,
                 GenAISpanAttr.RESPONSE_MODEL: inference_model.model_id,
             },
         )

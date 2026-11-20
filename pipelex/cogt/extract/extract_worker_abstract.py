@@ -8,6 +8,8 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
+from pipelex.cogt.inference.inference_span import InferenceSpanScope, start_inference_span
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.pricing_unit import PricingUnit
@@ -123,6 +125,21 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
             read_tokens_usage=lambda: extract_job.job_report.extract_tokens_usage,
         )
 
+    def _inference_span_scope(self, *, extract_job: ExtractJob, call_summary: InferenceCallSummary) -> InferenceSpanScope:
+        """The block the call runs in under its generation span, which ends the span with the call's usage and outcome."""
+        return InferenceSpanScope(
+            span=start_inference_span(
+                job_metadata=extract_job.job_metadata,
+                operation=InferenceOperation.EXTRACT,
+                inference_model=self.inference_model,
+                request_model=self.inference_model.model_id,
+                output_type=InferenceOutputType.PAGES,
+            ),
+            call_summary=call_summary.ends_here(),
+            read_tokens_usage=lambda: extract_job.job_report.extract_tokens_usage,
+            read_response_model=lambda: self.inference_model.model_id,
+        )
+
     async def extract_pages(
         self,
         extract_job: ExtractJob,
@@ -142,29 +159,30 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
             # Prepare job
             extract_job.extract_job_before_start(inference_model=self.inference_model)
 
-            # Execute job
-            try:
-                result = await self._extract_pages(extract_job=extract_job)
-            except CogtError as exc:
-                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-                raise
-            except RemoteFileFetchError as exc:
-                # The file to extract could not be fetched. The fetch knows the URL alone; the input it came from is
-                # known here, and its code's sentences name it.
-                if (input_name := extract_job.extract_input.input_name) is not None:
-                    exc.with_input(input_name=input_name)
-                raise
+            # Execute job, under the call's generation span, which the summary event names as it ends
+            with self._inference_span_scope(extract_job=extract_job, call_summary=call_summary):
+                try:
+                    result = await self._extract_pages(extract_job=extract_job)
+                except CogtError as exc:
+                    exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                    raise
+                except RemoteFileFetchError as exc:
+                    # The file to extract could not be fetched. The fetch knows the URL alone; the input it came from is
+                    # known here, and its code's sentences name it.
+                    if (input_name := extract_job.extract_input.input_name) is not None:
+                        exc.with_input(input_name=input_name)
+                    raise
 
-            call_summary.count_pages_extracted(count=len(result.pages))
+                call_summary.count_pages_extracted(count=len(result.pages))
 
-            # Price the call by its pages when the provider reported no usage
-            if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
-                record_unit_priced_usage(tokens_usage=extract_tokens_usage, pricing_unit=PricingUnit.PAGE, nb_units=len(result.pages))
+                # Price the call by its pages when the provider reported no usage
+                if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
+                    record_unit_priced_usage(tokens_usage=extract_tokens_usage, pricing_unit=PricingUnit.PAGE, nb_units=len(result.pages))
 
-            # Report job
-            extract_job.extract_job_after_complete()
-            if self.reporting_delegate:
-                self.reporting_delegate.report_inference_job(inference_job=extract_job)
+                # Report job
+                extract_job.extract_job_after_complete()
+                if self.reporting_delegate:
+                    self.reporting_delegate.report_inference_job(inference_job=extract_job)
 
         return result
 

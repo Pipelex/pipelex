@@ -21,10 +21,11 @@ from pytest_mock import MockerFixture
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.storage_scope import LOCAL_USER_ID
-from pipelex.system.telemetry.events import EventName
+from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, PostHogTracingConfig, TelemetryConfig
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+from pipelex.tools.misc.package_utils import get_package_version
 
 
 def _run_metadata(*, user_id: str = "user-42", extras: dict[str, str] | None = None) -> RunMetadata:
@@ -233,3 +234,33 @@ class TestTelemetryManagerIdentity:
         capture_kwargs = custom_client.capture.call_args.kwargs
         assert capture_kwargs["distinct_id"] == "caller-7"
         assert capture_kwargs["groups"] == {"organization": "org_caller"}
+
+    def test_an_event_carries_the_runtime_version(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
+
+        manager.track_event(EventName.PIPE_RUN, run_metadata=_run_metadata())
+
+        assert custom_client.capture.call_args.kwargs["properties"][EventProperty.PIPELEX_VERSION] == get_package_version()
+
+    def test_an_operator_redacting_the_version_sends_none(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
+        manager.telemetry_config.custom_posthog.redact_properties = [EventProperty.PIPELEX_VERSION]
+
+        manager.track_event(EventName.PIPE_RUN, run_metadata=_run_metadata())
+
+        assert EventProperty.PIPELEX_VERSION not in custom_client.capture.call_args.kwargs["properties"]
+
+    def test_the_trace_start_carries_a_span_id_derived_from_its_trace_and_the_runtime_version(self, mocker: MockerFixture) -> None:
+        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
+
+        manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
+        manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
+        manager.handle_trace_start(trace_name="other_pipe", trace_name_redacted="other", trace_id=5678)
+
+        first, again, other = [call.kwargs["properties"] for call in custom_client.capture.call_args_list]
+        span_id = first[PostHogAttr.SPAN_ID]
+        assert len(span_id) == 16
+        int(span_id, 16)
+        assert again[PostHogAttr.SPAN_ID] == span_id
+        assert other[PostHogAttr.SPAN_ID] != span_id
+        assert first[PostHogAttr.PIPELEX_VERSION] == get_package_version()
