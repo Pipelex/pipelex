@@ -14,6 +14,7 @@ answer to them before it folds that answer's usage into a running total.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from types import SimpleNamespace
@@ -381,6 +382,40 @@ class TestStructuredGenerationSpentReasks:
         assert tokens_usage.nb_tokens_by_category[TokenCategory.OUTPUT] == _SPENT_OUTPUT_TOKENS
         (span,) = span_exporter.get_finished_spans()
         _assert_spent_reasks_on(span)
+
+    async def test_a_generation_cancelled_after_billed_attempts_is_reported_once(self, mocker: MockerFixture) -> None:
+        """A run stopped during a re-ask still reports what the attempts the provider answered before it spent."""
+        worker = _openai_completions_worker(mocker)
+        reporting_delegate = mocker.MagicMock(spec=ReportingProtocol)
+        worker.reporting_delegate = reporting_delegate
+
+        def create_with_completion(**kwargs: Any) -> Any:
+            hooks = kwargs["hooks"]
+            hooks.emit_completion_arguments(model=kwargs.get("model"))
+            hooks.emit_completion_response(
+                SimpleNamespace(
+                    usage=CompletionUsage(
+                        prompt_tokens=_ANSWER_INPUT_TOKENS,
+                        completion_tokens=_ANSWER_OUTPUT_TOKENS,
+                        total_tokens=_ANSWER_INPUT_TOKENS + _ANSWER_OUTPUT_TOKENS,
+                    )
+                )
+            )
+            hooks.emit_completion_arguments(model=kwargs.get("model"))
+            raise asyncio.CancelledError
+
+        worker.instructor_for_objects.chat.completions.create_with_completion = mocker.AsyncMock(side_effect=create_with_completion)  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        llm_job = _object_job()
+
+        with pytest.raises(asyncio.CancelledError):
+            await worker.gen_object(llm_job=llm_job, schema=DummySchema)
+
+        reporting_delegate.report_inference_job.assert_called_once_with(inference_job=llm_job)
+        assert llm_job.job_report.attempt_count == 2
+        tokens_usage = llm_job.job_report.llm_tokens_usage
+        assert tokens_usage is not None
+        assert tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == _ANSWER_INPUT_TOKENS
+        assert tokens_usage.nb_tokens_by_category[TokenCategory.OUTPUT] == _ANSWER_OUTPUT_TOKENS
 
     async def test_openai_answers_are_summed_once_each(self) -> None:
         answers = _InvalidAnswers(body=_OPENAI_INVALID_ANSWER)

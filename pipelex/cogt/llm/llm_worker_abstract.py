@@ -403,11 +403,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def _report_billed_failed_job(self, *, span: Span | None, llm_job: LLMJob) -> None:
         """Report the usage of a call that failed after the provider billed it, and record it on the span, which is left open.
 
-        Two failures are billed: a text its stop check refused, since every worker reads its response's token usage
-        into the job before its stop check raises, and a structured generation whose attempts the provider answered
-        before it failed, its re-asks run out included, since every worker records the usage its attempts spent
-        however the call ends. Either is reported as a returned call is, once, so the run's cost report and its usage
-        event count what the provider billed. The span is ended by the caller's error path, with the error. A job
+        A text its stop check refused was billed, since every worker reads its response's token usage into the job
+        before its stop check raises, and so was a structured generation whose attempts the provider answered before
+        it failed or was cancelled, its re-asks run out included, since every worker records the usage its attempts
+        spent however the call ends. Such a call is reported as a returned call is, once, so the run's cost report
+        and its usage event count what the provider billed. The span is ended by the caller's error path, with the error. A job
         that recorded no usage, its worker having raised before reading any, has nothing to report.
         """
         tokens_usage = llm_job.job_report.llm_tokens_usage
@@ -647,13 +647,15 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             with pipelex_span_active(span=span, make_current=TelemetryManagerAbstract.is_join_host_trace_enabled()), call_summary.ends_here():
                 try:
                     self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=True)
+                    is_answered = False
                     try:
                         object_result = await self._gen_object(llm_job=llm_job, schema=schema)
-                    except Exception:
-                        # The attempts the provider answered before the call failed were billed, a spent re-ask budget's
-                        # included: their usage is reported all the same
-                        self._report_billed_failed_job(span=span, llm_job=llm_job)
-                        raise
+                        is_answered = True
+                    finally:
+                        if not is_answered:
+                            # The attempts the provider answered before the call failed or was cancelled were billed, a
+                            # spent re-ask budget's included: their usage is reported all the same
+                            self._report_billed_failed_job(span=span, llm_job=llm_job)
 
                     # Cleanup result
                     if hasattr(object_result, "_raw_response"):
