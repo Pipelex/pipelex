@@ -17,6 +17,7 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.test_extras.usage_stats_isolation import turn_usage_stats_off_for_the_session, usage_stats_guarded
+from tests.helpers.run_ids import run_id_for_test
 
 if TYPE_CHECKING:
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager
@@ -201,10 +202,10 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
 def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     """Provide a JobMetadata instance with test-specific values.
 
-    Uses the test node ID as pipeline_run_id for better traceability in logs.
+    Names the run after the test's node id, within the run id rule, for better traceability in logs.
     """
-    test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    test_id = str(request.node.nodeid)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     random_code: str = shortuuid.uuid()[:5]
-    pipeline_run_id: str = f"{test_id}-{random_code}"
+    pipeline_run_id: str = run_id_for_test(node_id=test_id, suffix=random_code)
 
     return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="pytest", pipeline_run_id=pipeline_run_id))

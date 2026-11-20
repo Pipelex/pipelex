@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **One rule validates every run id (Breaking)**: a `pipeline_run_id` must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved, wherever the runtime takes one: `RunMetadata` refuses another at construction, `PipelexMTHDSProtocol.execute` and `PipelexKernel.make` refuse it with a `RunParameterError` before the run is set up, and `POST /v1/execute` and `POST /v1/start` answer it with a `422` `request.invalid` naming `pipeline_run_id`. The rule is `validate_pipeline_run_id` in `pipelex.system.job_metadata`; a host that sent an id holding a dot, a colon, a slash or a space, which `/v1/start` accepted up to 128 characters, sends one inside the rule now.
+
 ### Fixed
 
 - **`SchemaToModelFactory.make_from_json_schema` keeps a set's default a set**: a `set` or `frozenset` field's default, which the schema writes sorted, holds a set on the rebuilt class where it held the schema's list, a default that validates into an equal copy of itself, such as an empty list or a plain string, no longer makes every rebuilt class build twice, and a schema whose classes chain too deep for pydantic to rebuild within Python's recursion limit is refused with an `UnsupportedSchemaError` saying so, where it claimed a chain deeper than the definition cap.

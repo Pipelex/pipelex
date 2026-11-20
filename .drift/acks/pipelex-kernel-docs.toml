@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:498c4d456c28f885e1f2323fd7f1c92b55092d327038ced4026f4bf4df80490c"
+digest = "sha256:58e89a703f3683ad5a015bbc9976e202b8e83e75f08eb10d7971ddc0331ca2d1"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-16T07:42:37Z"
-rationale = "clean-pass: load_stored_values_through_leaf now names the input on a JSON decode refusal, as load_stored_value does; the kernel doc describes what the function loads and needs no word on its error parameters."
+reviewed_at = "2026-11-20T02:48:31Z"
+rationale = "real-catch: PipelexKernel.make now holds a supplied pipeline_run_id to validate_pipeline_run_id in place of its empty-string check; the doc's run id bullet names the rule and the RunParameterError it raises."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -23,7 +23,7 @@ rationale = "clean-pass: load_stored_values_through_leaf now names the input on 
 "pipelex/kernel/llm_prompt_content.py" = "blob:b2843a9a27842d8a04365f259f2166f45956e368"
 "pipelex/kernel/llm_results.py" = "blob:d6bafd1a25cfb0345334b388d118ff7ba9741460"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
-"pipelex/kernel/pipelex_kernel.py" = "blob:c7d40db1572aaca00d1c04a1039f5e3e564d6f87"
+"pipelex/kernel/pipelex_kernel.py" = "blob:3ced55002b636736e63c70167b50850c4b0d2462"
 "pipelex/kernel/prompt_assembly.py" = "blob:0393511808b621f33be8ac848d8c352336d08a04"
 "pipelex/kernel/prompt_references.py" = "blob:a4a8c5535c7e51a16ac6c8d1296439b331192a7f"
 "pipelex/kernel/search_ops.py" = "blob:30d2af78f0ef00c4d8b3647f52cc7cb4a01bf236"

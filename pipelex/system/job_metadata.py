@@ -64,6 +64,43 @@ class SpecialPipelineId(StrEnum):
     DRY_RUN_UNTITLED = "dry_run_untitled"
 
 
+# The one rule of a run id, which `RunMetadata` applies at construction and every host seam that takes a run id applies
+# before it builds a run (`PipelexMTHDSProtocol.execute`, `PipelexKernel.make`, the API server's run routes). A run id is
+# a name as well as a correlation string: a local run's id becomes its storage scope, whose segments hold letters,
+# digits, `_` and `-` alone (`pipelex.system.storage_scope`), and a host puts it in a URL path, a storage key, a workflow
+# id and the library id. So it holds those characters alone, the characters of every id minted today (a bare `uuid4`,
+# `run_<uuid4>`, `dry_run_<uuid4>`), and never a `SpecialPipelineId`, which would silently skip the run's cost report
+# and take the reserved untitled library id.
+PIPELINE_RUN_ID_MAX_LENGTH = 128
+PIPELINE_RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def validate_pipeline_run_id(*, value: str) -> str:
+    """Return `value` if it is a usable run id, else raise `RunParameterError`.
+
+    The one statement of the rule, matched whole (`fullmatch`, which a final newline cannot slip past), so every seam
+    that takes a run id refuses exactly the same values.
+
+    Raises:
+        RunParameterError: the value is empty, longer than `PIPELINE_RUN_ID_MAX_LENGTH`, holds a character other than an
+            ASCII letter or digit, `_` or `-`, or is one of the reserved `SpecialPipelineId` values.
+    """
+    if len(value) > PIPELINE_RUN_ID_MAX_LENGTH:
+        msg = f"Invalid pipeline_run_id: it has {len(value)} characters, and at most {PIPELINE_RUN_ID_MAX_LENGTH} are allowed."
+        raise RunParameterError(msg)
+    if PIPELINE_RUN_ID_PATTERN.fullmatch(value) is None:
+        # The value is not quoted: it is the text the rule refuses to write into a log line or a storage key.
+        msg = (
+            "Invalid pipeline_run_id: expected one or more ASCII letters, digits, '_' or '-'. "
+            "A run id names the run's storage scope, its library and its URL, where any other character could escape them."
+        )
+        raise RunParameterError(msg)
+    if value in {special_id.value for special_id in SpecialPipelineId}:
+        msg = f"Invalid pipeline_run_id: '{value}' is reserved for runs that have no id of their own. Pass another id, or none to have one minted."
+        raise RunParameterError(msg)
+    return value
+
+
 class JobCategory(StrEnum):
     MOCK_JOB = "mock_job"
     LLM_JOB = "llm_job"
@@ -229,6 +266,12 @@ class RunMetadata(BaseModel):
         """Refuse a run that could not read what it writes, at construction rather than at its first read."""
         validate_storage_scope_within_read_scope(storage_scope=self.storage_scope, read_scope=self.read_scope)
         return self
+
+    @field_validator("pipeline_run_id")
+    @classmethod
+    def _validate_pipeline_run_id(cls, value: str) -> str:
+        """Refuse a run id that could not name the run's storage scope, library or URL, at construction."""
+        return validate_pipeline_run_id(value=value)
 
     @field_validator("request_id")
     @classmethod

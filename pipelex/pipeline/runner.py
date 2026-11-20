@@ -36,7 +36,7 @@ from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.caller_identity import CallerIdentity
-from pipelex.system.job_metadata import validate_request_id
+from pipelex.system.job_metadata import validate_pipeline_run_id, validate_request_id
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
@@ -353,7 +353,11 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             is registered under it, and a run still in flight under the same id
             refuses this one with ``pipelex.run.already_exists``. ``None`` lets
             the runtime generate one. An in-process host hook, like
-            ``delivery_assignment``.
+            ``delivery_assignment``. It must be one to 128 ASCII letters,
+            digits, ``_`` or ``-``, and neither ``untitled`` nor
+            ``dry_run_untitled`` (``validate_pipeline_run_id``): any other value
+            is the host's bug, refused with a ``RunParameterError`` before the
+            run is set up.
 
         Returns:
         -------
@@ -372,6 +376,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # `ValidationError` arm below would report the host's bug as the caller's invalid input.
         if request_id is not None:
             validate_request_id(value=request_id)
+        if pipeline_run_id is not None:
+            validate_pipeline_run_id(value=pipeline_run_id)
 
         created_at = datetime.now(UTC).isoformat()
 
