@@ -96,21 +96,30 @@ def pipe_span_start_time_ns() -> int | None:
     return workflow_execution.time_ns()
 
 
-def resolve_pipe_span_end(*, error: BaseException | None = None) -> PipeEnd:
+def resolve_pipe_span_end(*, is_opened_in_workflow_code: bool, error: BaseException | None = None) -> PipeEnd:
     """How a pipe span ending now, on ``error`` if it failed, ends: exported at its time, or left open and dropped.
 
-    Always a real end on the wall clock outside workflow code, and for a tracer that cannot keep the replay-safe rules.
-    The orchestrator's probe is asked without letting it change how the pipe ends: on a failure the call runs inside the
-    pipe's ``except BaseException``, possibly while the orchestrator tears the workflow code down, and on a success the
-    pipe's output is already made, so a probe that raises rather than answers leaves the end uncounted, and the pipe's
-    own exception or result goes on as it came.
+    Decided first by where the span was opened, which its start read: a span opened outside workflow code, or under a
+    tracer that cannot keep the replay-safe rules, always ends for real on the wall clock, without asking the probe. A
+    span opened in workflow code that ends on ``GeneratorExit`` is a coroutine the orchestrator's teardown closed,
+    possibly from another thread where the probe cannot even tell it runs in workflow code, so that end is not counted,
+    and the probe is not asked. Otherwise the orchestrator's probe is asked without letting it change how the pipe
+    ends: on a failure the call runs inside the pipe's ``except BaseException``, possibly while the orchestrator tears
+    the workflow code down, and on a success the pipe's output is already made, so a probe that raises rather than
+    answers leaves the end uncounted, and the pipe's own exception or result goes on as it came.
 
     Args:
+        is_opened_in_workflow_code: Whether the span started on the workflow's clock, ``pipe_span_start_time_ns`` having
+            answered a time rather than ``None``.
         error: The exception the pipe ends on, or None when it succeeded.
 
     Returns:
         Whether the span is ended, which exports it, and the time it ends at.
     """
+    if not is_opened_in_workflow_code:
+        return _REAL_END_ON_THE_WALL_CLOCK
+    if isinstance(error, GeneratorExit):
+        return _NOT_A_REAL_END
     try:
         return _ask_probe(error=error)
     except Exception as probe_error:  # ruff: ignore[blind-except]
@@ -127,10 +136,6 @@ def _ask_probe(*, error: BaseException | None) -> PipeEnd:
     workflow_execution = _get_span_workflow_execution()
     if workflow_execution is None:
         return _REAL_END_ON_THE_WALL_CLOCK
-    if isinstance(error, GeneratorExit):
-        # A coroutine of workflow code closed without finishing, as an orchestrator's teardown closes them, possibly
-        # from another thread: never a pipe's end, and answered before the workflow execution is asked anything.
-        return _NOT_A_REAL_END
     # Unwinding first: it is the question an orchestrator tearing its workflow code down can always answer.
     if error is not None and workflow_execution.is_unwinding(error=error):
         return _NOT_A_REAL_END

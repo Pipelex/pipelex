@@ -461,6 +461,21 @@ class TestLiveRunPipeReplaySafeSpans:
 
         assert pipelex_spans.get_finished_spans() == ()
 
+    async def test_a_coroutine_closed_off_the_workflow_thread_ends_no_span_although_the_probe_answers_none(
+        self, pipelex_spans: InMemorySpanExporter, workflow: dict[str, FakeWorkflowExecution]
+    ) -> None:
+        workflow["execution"] = FakeWorkflowExecution(is_replaying=False)
+
+        def close_off_thread() -> None:
+            # Closed from another thread, the probe cannot tell it runs in workflow code: the span's start decides.
+            del workflow["execution"]
+            raise GeneratorExit
+
+        with pytest.raises(GeneratorExit):
+            await _run_workflow_code(_make_pipe(code="closed_off_thread", steps=[close_off_thread]))
+
+        assert pipelex_spans.get_finished_spans() == ()
+
     @pytest.mark.usefixtures("workflow")
     async def test_a_coroutine_closed_outside_workflow_code_is_the_pipes_real_end(self, pipelex_spans: InMemorySpanExporter) -> None:
         # The slot is claimed, but the probe answers that this call runs in no workflow code, as in an activity.

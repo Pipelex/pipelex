@@ -120,11 +120,11 @@ class RecordingPipe(PipeAbstract):
         raise NotImplementedError
 
     @override
-    def _end_pipe_span_success(self, span: Any, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
+    def _end_pipe_span_success(self, span: Any, *, pipe_output: PipeOutput, is_root_span: bool, is_opened_in_workflow_code: bool) -> None:
         self._see(moment="succeeded")
 
     @override
-    def _end_pipe_span_error(self, span: Any, *, error: BaseException, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Any, *, error: BaseException, is_root_span: bool = False, is_opened_in_workflow_code: bool) -> None:
         self._see(moment="failed")
         log.info(f"{self.code} span ends in error")
 
