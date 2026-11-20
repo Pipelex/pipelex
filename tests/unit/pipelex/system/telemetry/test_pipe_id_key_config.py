@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
+from pipelex.cli.commands.doctor_cmd import check_telemetry_config
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.system.telemetry.telemetry_config import PIPE_ID_KEY_MIN_LENGTH, TelemetryConfig
 from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
@@ -60,3 +61,27 @@ class TestPipeIdKeyConfig:
 
         with pytest.raises(TelemetryConfigValidationError, match="pipe_id_key"):
             load_telemetry_config(secrets_provider=EnvSecretsProvider())
+
+    @pytest.mark.parametrize("is_variable_set", [True, False])
+    def test_doctor_takes_a_key_named_by_a_placeholder_as_a_well_formed_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, is_variable_set: bool
+    ) -> None:
+        """Doctor reads the file as written: a secret named through a placeholder, as the docs advise, is well formed."""
+        if is_variable_set:
+            monkeypatch.setenv(_KEY_ENV_VAR, "e" * PIPE_ID_KEY_MIN_LENGTH)
+        else:
+            monkeypatch.delenv(_KEY_ENV_VAR, raising=False)
+        (tmp_path / "telemetry.toml").write_text(f'pipe_id_key = "${{env:{_KEY_ENV_VAR}}}"\n')
+
+        assert check_telemetry_config(config_dir=tmp_path).is_healthy is True
+
+    def test_a_refused_key_is_never_quoted_in_the_error(self, global_dir: Path) -> None:
+        """A key refused as too short is still a secret: neither the report nor the error it was raised from quotes it."""
+        short_key = "SHORT-SECRET-KEY-VALUE"
+        (global_dir / "telemetry.toml").write_text(f'pipe_id_key = "{short_key}"\n')
+
+        with pytest.raises(TelemetryConfigValidationError, match="too short") as exc_info:
+            load_telemetry_config(secrets_provider=EnvSecretsProvider())
+
+        assert short_key not in str(exc_info.value)
+        assert short_key not in str(exc_info.value.__cause__)

@@ -624,6 +624,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             }
             if run_metadata is not None:
                 custom_properties[EventProperty.PIPELINE_RUN_ID] = run_metadata.pipeline_run_id
+                # The run's stored method, null when it has none, as on every pipe and generation span of the trace
+                custom_properties["method_id"] = run_metadata.method_id
             custom_identity = TelemetryIdentity.make_from_caller_identity(
                 caller_identity=caller_identity,
                 fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,

@@ -132,6 +132,18 @@ class TestCapturePipeCodesForRun:
         assert properties[PostHogAttr.TRACE_NAME] == expected_trace_name
         assert properties[PostHogAttr.SPAN_NAME] == expected_trace_name
 
+    @pytest.mark.parametrize("method_id", ["mt_invoices", None])
+    def test_the_trace_start_carries_the_runs_method(self, mocker: MockerFixture, method_id: str | None) -> None:
+        """The trace's first span names the run's method as its pipe and generation spans do, null when it has none."""
+        manager, custom_client = _make_manager(mocker=mocker, deployment_captures=False)
+        run_metadata = _run_metadata(capture_pipe_codes=None).model_copy(update={"method_id": method_id})
+
+        manager.handle_trace_start(trace_name="extract_invoice_abc", trace_name_redacted="abc", trace_id=1234, run_metadata=run_metadata)
+
+        properties = custom_client.capture.call_args.kwargs["properties"]
+        assert "method_id" in properties
+        assert properties["method_id"] == method_id
+
     @pytest.mark.parametrize(
         ("deployment_captures", "capture_pipe_codes", "expected_span_name"),
         [

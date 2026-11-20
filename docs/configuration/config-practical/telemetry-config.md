@@ -114,7 +114,7 @@ The top-level `pipe_id_key` key turns on `pipe_id`, the identifier every pipe sp
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `pipe_id_key` | string | (none) | The secret the identifiers are keyed with, at least 32 characters, shared by every process of a deployment. A placeholder whose variable is not set refuses the load. With no key, no span carries a `pipe_id` |
+| `pipe_id_key` | string | (none) | The secret the identifiers are keyed with, at least 32 characters, shared by every process of a deployment. A placeholder whose variable is not set refuses the load, and a refused key is never quoted in the error. With no key, no span carries a `pipe_id` |
 
 ---
 

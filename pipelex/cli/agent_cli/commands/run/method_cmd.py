@@ -211,6 +211,8 @@ def run_method_cmd(
                 with_memory=with_memory,
                 inputs_base_dir=parsed_inputs.inputs_base_dir,
                 output_dir_override=output_dir_override,
+                # A fetched or installed published method names its package, the identity behind each pipe's `pipe_id`.
+                method_address=method.provenance.address if method.provenance is not None else None,
             )
         )
         agent_success_formatted(

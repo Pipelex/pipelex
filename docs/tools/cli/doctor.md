@@ -18,7 +18,7 @@ The doctor checks the configuration a command run in the current directory would
 - **Configuration Location** - Which configuration directory is used, the project's or the global one.
 - **Configuration Files** - Whether every configuration file the kit ships is present, and whether `pipelex.toml` is valid.
 - **Configuration Migrations** - What [`pipelex migrate`](migrate.md) would change: the files a migration would bring up to the current schema, the files that need a look from you, and what a former release left for the Pipelex Gateway, which the migration cleans up first. This row covers the home configuration directory and the project's `.pipelex/` together, as `pipelex migrate` does.
-- **Telemetry Configuration** - Whether `telemetry.toml` is present and valid.
+- **Telemetry Configuration** - Whether `telemetry.toml` is present and valid, read as it is written: a secret it names through a `${…}` placeholder, such as `pipe_id_key`, is checked when a process loads the file, not here.
 - **Plugins**, **Secrets Provider** and **Log Sink** - Whether the plugins, the secrets provider and the log sink your configuration names can be set up. These rows appear once the configuration loads.
 - **Pipelex API Key** - Whether hosted runs have a key to send. This row appears only when your runs execute on the hosted Pipelex API, as described below.
 - **Backend Credentials** - Whether the provider keys of the enabled inference backends are set. When some are missing, the row says how to set them, how to disable a backend you do not need, and that a run on the hosted Pipelex API needs none of them.
