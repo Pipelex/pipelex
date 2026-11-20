@@ -159,13 +159,14 @@ class TelemetryManager(TelemetryManagerAbstract):
             self._tracer_provider = None
             log.verbose("AI tracing is disabled, and no OpenTelemetry tracer was made")
 
-        # Wrap capture_exception to sanitize before sending
+        # The process-wide PostHog settings are taken over only when the operator's stream is on: with the manager made
+        # for span destinations alone, a host application's own module-level PostHog client and privacy mode are left
+        # exactly as it set them.
         if self.custom_posthog_client:
+            # Wrap capture_exception to sanitize before sending
             self._wrap_capture_exception(self.custom_posthog_client)
-
-        # Set global PostHog settings
-        posthog.privacy_mode = True
-        posthog.default_client = self.custom_posthog_client
+            posthog.privacy_mode = True
+            posthog.default_client = self.custom_posthog_client
 
     @override
     def make_error_tracker(self) -> PostHogErrorTracker | None:

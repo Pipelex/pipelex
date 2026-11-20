@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:c3f0b9c680dffd71abbe117db6653ba4f925b299bc3c9a0fa1ea13b8776f30b6"
+digest = "sha256:39558b6cd8539fb73ab74ce068cce89d7033dce44ae50e8652637a60aa93a3ca"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-17T19:00:57Z"
-rationale = "clean-pass: the run renderer also falls back to plain data on IndexError, OverflowError and OSError from kajson's date parsers; no CLI doc describes the decoder and the rendered output is unchanged for every real result."
+reviewed_at = "2026-11-20T04:02:12Z"
+rationale = "clean-pass: the doctor's healthy telemetry row now names the span destinations beside the PostHog mode; docs/tools/cli/doctor.md and the agent-CLI guide describe the row's finding and validity, never its message text, so nothing is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -75,7 +75,7 @@ rationale = "clean-pass: the run renderer also falls back to plain data on Index
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:7e1db7c76857e77c1af2c68d0c8a14d52746fc73"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:23ad05431006dfe74ad7840b916eab74d769cebe"
 "pipelex/cli/commands/crate_loading.py" = "blob:d7bc8e226945cd9ee8fe443adbf252fb0bb14831"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:a991d210787c0df68d9cc6bac29361df89e8e9c7"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:609919444ba15ee5f6e43990a8eef2387fdc968f"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:d05eb4351f7065eaa45f63089f2daae0b02457dd"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:d7b3b6038ddf9735c6d6d38afd36f398e508459f"

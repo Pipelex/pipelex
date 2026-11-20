@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import posthog
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from typing_extensions import override
@@ -108,7 +109,9 @@ class TestOtlpWithoutCustomPostHog:
         otlp_exporter = InMemorySpanExporter()
         otlp_exporter_class = mocker.patch("opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter", return_value=otlp_exporter)
         posthog_class = mocker.patch("pipelex.system.telemetry.telemetry_manager.Posthog")
-        mocker.patch("posthog.default_client", None)
+        # A host application's own module-level PostHog client, which a manager made for span destinations alone must leave alone.
+        host_posthog_client = mocker.sentinel.host_posthog_client
+        mocker.patch("posthog.default_client", host_posthog_client)
         mocker.patch("posthog.privacy_mode", False)
         telemetry_config = TelemetryConfig(
             join_host_trace=True,
@@ -127,6 +130,8 @@ class TestOtlpWithoutCustomPostHog:
         assert telemetry_manager.join_host_trace is True
         assert telemetry_manager.custom_posthog_client is None
         posthog_class.assert_not_called()
+        assert posthog.default_client is host_posthog_client
+        assert posthog.privacy_mode is False
         otlp_exporter_class.assert_called_once_with(endpoint=_OTLP.endpoint, headers=_OTLP.headers)
         tracer = telemetry_manager.get_otel_tracer()
         assert tracer is not None
