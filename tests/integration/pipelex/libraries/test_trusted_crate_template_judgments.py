@@ -15,6 +15,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery import template_guard_lint
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
+from pipelex.tools.jinja2.jinja2_parsing import sharing_template_parses, trusting_authored_templates
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -154,3 +155,18 @@ class TestTrustedCrateTemplateJudgments:
             clear_current_library()
             for library_id in opened_library_ids:
                 library_manager.teardown(library_id=library_id)
+
+    def test_a_trusted_decode_of_a_crate_parses_no_template(self, mocker: MockerFixture) -> None:
+        """Decoding a crate as the worker decodes a run's start argument parses no template under trust, and each once without."""
+        encoded_crate = _make_crate(render_template=RENDER_TEMPLATE).model_dump_json()
+        parsed_sources = _counting_parses(mocker=mocker)
+        with sharing_template_parses():
+            untrusted_crate = LibraryCrate.model_validate_json(encoded_crate)
+        # The blueprints' input checks parse the compose template and the prompt, once each.
+        assert sum(parsed_sources.values()) == 2
+
+        parsed_sources.clear()
+        with sharing_template_parses(), trusting_authored_templates():
+            trusted_crate = LibraryCrate.model_validate_json(encoded_crate)
+        assert not parsed_sources
+        assert trusted_crate == untrusted_crate

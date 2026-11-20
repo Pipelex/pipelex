@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A blueprint built from trusted templates skips its template-input check**: inside `trusting_authored_templates()`, the validators of the `PipeCompose`, `PipeLLM`, `PipeImgGen`, `PipeSearch`, `PipeJudge` and `PipeDocGen` blueprints no longer compare the variables their templates read with the declared inputs, and a `PipeCondition` blueprint no longer parses and compiles its expression, since the method those templates came from passed both checks where it was validated. Each parsed its templates again, so a worker decoding a run's crate inside that scope now parses none of them, where a crate holding a large compose template and a large prompt cost one parse of each. Outside the scope the checks are unchanged, and a template reading an undeclared input is still refused.
+
 ## [v0.111.1] - 2026-11-20
 
 ### Changed
