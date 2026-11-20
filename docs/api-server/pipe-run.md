@@ -405,7 +405,7 @@ The caller's id is the run's person on that same stream, with one exception: a d
 
 ## Run telemetry fields
 
-Both `/execute` and `/start` accept two more optional **Pipelex-API extensions** that a host sets for the run's telemetry, beside `analytics_groups`:
+Both `/execute` and `/start` also accept optional **Pipelex-API extensions** that a host sets for the run's telemetry, beside `analytics_groups`:
 
 ```json
 {
