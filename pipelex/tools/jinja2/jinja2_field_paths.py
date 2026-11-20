@@ -21,7 +21,7 @@ from jinja2.exceptions import TemplateSyntaxError
 
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_parsing import parse_jinja2_template
+from pipelex.tools.jinja2.jinja2_parsing import read_jinja2_template
 from pipelex.tools.jinja2.jinja2_scopes import ScopeBindings, attribute_chain, resolve_bound_path, walk_template_reads
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
@@ -45,7 +45,7 @@ def detect_template_field_paths(*, template_source: str, template_category: Temp
     """
     jinja2_env = make_jinja2_env_without_loader(template_category=template_category)
     try:
-        parsed_ast = parse_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
+        parsed_ast = read_jinja2_template(jinja2_env=jinja2_env, template_source=template_source)
     except TemplateSyntaxError as syntax_error:
         msg = f"Jinja2 detect field paths — syntax error: '{syntax_error}', template_category: {template_category}"
         raise Jinja2DetectVariablesError(msg) from syntax_error
