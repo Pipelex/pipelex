@@ -87,10 +87,6 @@ class SummaryEvent(ABC):
     def _work_fields(self) -> dict[str, Any]:
         """The fields that say what the work was, read when it ends, before its duration and its outcome."""
 
-    def _is_logged(self, *, error: BaseException | None) -> bool:  # ruff: ignore[unused-method-argument]
-        """Whether the work's end, on ``error`` if it raised one, is logged; always, unless a subclass says otherwise."""
-        return True
-
     @abstractmethod
     def _log_event(self, *, fields: dict[str, Any]) -> None:
         """Log the event with ``fields``, at INFO, under its fixed message and its console layout."""
@@ -101,8 +97,6 @@ class SummaryEvent(ABC):
         Nothing raised here leaves it, the warning's own failure included, so the work's result or exception goes on as it came.
         """
         try:
-            if not self._is_logged(error=error):
-                return
             duration_ms = elapsed_ms(started_at=self._started_at)
             fields = {**self._work_fields(), DURATION_MS_FIELD: duration_ms, **outcome_fields(error=error)}
             self._log_event(fields=fields)

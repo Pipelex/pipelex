@@ -62,7 +62,7 @@ class WorkflowExecutionProtocol(Protocol):
     def is_unwinding(self, *, error: BaseException) -> bool:
         """Whether ``error`` leaves the workflow running, so the pipes it crosses run again in a later execution.
 
-        Two things unwind the workflow code without ending the workflow, and only these two:
+        Only these unwind the workflow code without ending the workflow:
 
         - **the orchestrator tearing the code down**, on the eviction of a cached workflow, with an exception of its own,
           ``GeneratorExit`` included, or with a cancellation it raises into the code while it evicts;
@@ -104,11 +104,6 @@ class WorkflowExecutionSlot:
 
     def install(self, *, probe: WorkflowExecutionProbe) -> None:
         self._probe = probe
-
-    @property
-    def is_claimed(self) -> bool:
-        """Whether a boot-orchestrator plugin installed a probe, read without calling it."""
-        return self._probe is not _never_in_workflow_code
 
     def reset(self) -> None:
         self._probe = _never_in_workflow_code
