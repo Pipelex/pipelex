@@ -101,7 +101,7 @@ The top-level `join_host_trace` key decides whether Pipelex's spans join the Ope
 | `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`; empty or blank counts as unset), itself overridden by `Pipelex.make(join_host_trace=...)`; a telemetry manager injected through `Pipelex.make(telemetry_manager=...)` states it for itself |
 
 !!! warning "A span destination is required"
-    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: an `[[otlp]]` exporter, `[langfuse]` enabled, or `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled. Any one of them is enough, so `[custom_posthog]` may stay off. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
 
 ---
 
@@ -142,7 +142,7 @@ See [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) for t
 
 ### `[custom_posthog.tracing]` Settings
 
-Controls AI span tracing to your PostHog instance.
+Controls AI span tracing to your PostHog instance. It decides only whether your PostHog receives spans: `[[otlp]]` exporters and `[langfuse]` receive them whether it is on or off.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -182,7 +182,7 @@ The `[custom_portkey]` section configures the Portkey SDK behavior when using th
 
 ## Langfuse Configuration
 
-The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability.
+The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability. It works on its own: once enabled, Langfuse receives Pipelex's spans whatever `[custom_posthog]` says, `mode = "off"` included. A boot with Langfuse enabled and its keys missing is refused.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -198,7 +198,7 @@ The `[langfuse]` section enables integration with [Langfuse](https://langfuse.co
 
 ## OTLP Exporters Configuration
 
-The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters.
+The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters. Each exporter works on its own: it receives Pipelex's spans whatever `[custom_posthog]` says, `mode = "off"` included, so a backend of your own needs no PostHog stream.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|

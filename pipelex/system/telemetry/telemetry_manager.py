@@ -136,16 +136,19 @@ class TelemetryManager(TelemetryManagerAbstract):
                 before_send=strip_exception_frame_sources,
             )
 
-        # Create OTel tracer for AI tracing if enabled
+        # The one OTel tracer feeds every span destination, so it exists whenever any is configured, each independently:
+        # the PostHog stream with its AI span tracing on, an [[otlp]] exporter, Langfuse.
         self._otel_tracer: OTelTracer | None
         self._tracer_provider: OTelTracerProvider | None
-        if telemetry_config.custom_posthog.tracing.enabled:
-            # Create redaction config from user settings
+        if telemetry_config.operator_span_destinations():
+            # The PostHog span exporter is attached only when the stream's AI span tracing is on; the client alone, for
+            # events, sends no span.
+            span_posthog_client = self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 custom_fallback_distinct_id=telemetry_config.custom_posthog.user_id,
                 custom_run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=telemetry_config.custom_posthog.mode),
-                custom_posthog_client=self.custom_posthog_client,
+                custom_posthog_client=span_posthog_client,
                 custom_redaction_config=custom_redaction_config,
                 otlp_exporters=telemetry_config.otlp,
                 langfuse_config=telemetry_config.langfuse,
