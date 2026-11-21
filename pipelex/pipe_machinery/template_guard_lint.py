@@ -8,6 +8,9 @@ PipeJudge questions, PipeCondition expressions):
   other than the metadata fields of an input, otherwise validation fails with `TEMPLATE_PRIVATE_NAME`.
   The template sandbox refuses the same reads at render time; this lint turns the visible ones into a
   located error.
+
+Both judge what the author wrote, and write nothing a run reads, so a load of templates already judged skips them
+(`trusting_authored_templates`): the worker's load of a library crate its runner validated.
 """
 
 from mthds.protocol.problem.registry import MethodOptionalUnhandledSite
@@ -18,6 +21,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_optional_guards import detect_unguarded_optional_references
+from pipelex.tools.jinja2.jinja2_parsing import are_authored_templates_trusted
 from pipelex.tools.jinja2.jinja2_private_names import detect_private_name_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -42,6 +46,8 @@ def lint_authored_template(
         template_category: The template's category (LLM_PROMPT, EXPRESSION, ...).
         template_label: Which template this is, for the message.
     """
+    if are_authored_templates_trusted():
+        return
     lint_template_private_names(
         pipe_code=pipe_code,
         domain_code=domain_code,
@@ -85,6 +91,8 @@ def lint_optional_input_guards(
         template_label: Which template this is, for the message ("prompt", "system_prompt",
             "template", "expression").
     """
+    if are_authored_templates_trusted():
+        return
     optional_variable_names = {input_name for input_name, stuff_spec in inputs.root.items() if stuff_spec.presence.is_optional}
     if not optional_variable_names:
         return
@@ -143,6 +151,8 @@ def lint_template_private_names(
         template_label: Which template this is, for the message ("prompt", "system_prompt",
             "template", "expression", "construct field 'x'").
     """
+    if are_authored_templates_trusted():
+        return
     allowed_private_names = StuffArtefact.__template_surface__.private_names
     try:
         refused_names = detect_private_name_references(

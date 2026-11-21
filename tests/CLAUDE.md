@@ -5,11 +5,10 @@ Instead of running the full suite (`make agent-test`) every time, run only the t
 ## Command template
 
 ```bash
-.venv/bin/pytest -n auto \
-  -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" \
-  -o log_level=WARNING --tb=short -q \
-  <paths>
+.venv/bin/pytest -n auto -m "<USUAL_PYTEST_MARKERS>" -o log_level=WARNING --tb=short -q <paths>
 ```
+
+Replace `<USUAL_PYTEST_MARKERS>` with the expression of that name in the `Makefile`, copied from there so it cannot drift: it is the selection `make agent-test` runs, before that target also drops the slow tests. A targeted run passes no `--slow-test-seconds`, so it keeps the slow tests, which is right for the few tests that cover your change.
 
 Replace `<paths>` with the test directories from the mapping below. Concatenate paths when multiple source areas are touched.
 
@@ -65,4 +64,5 @@ Fall back to the full suite when:
 |---|---|
 | `make tb` | Config/TOML-only changes (boot sanity check) |
 | `make agent-check` | Always run after code changes (linting, formatting, type checking) |
-| `make agent-test` | Full suite fallback for broad changes |
+| `make agent-test` | Full suite fallback for broad changes; it skips the slow tests (`docs/contribute/test-duration-map.md`) |
+| `make agent-test SLOW_TEST_SECONDS=` | The same with the slow tests, before pushing a change to what they cover |
