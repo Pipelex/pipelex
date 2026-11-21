@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:64ac0065ccc455832aefd24cc5ab078bf9cc58a1fe683591b3c97661d465da2b"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-21T14:01:19Z"
-rationale = "clean-pass: config_surface.py only moves each stale file's remedy into StaleConfigurationFile.user_action and names the warning message once, for the hosted run to print too; no config model, default or ledger change, and the boot-tolerance docs in docs/migration-ledger.md are updated in the same change"
+digest = "sha256:e3ea77cacd71d5b4a926497c0bb8d7dc28162889dd4dbdb6a1c30dc22a99da41"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-11-21T14:59:54Z"
+rationale = "clean-pass: re-ack after merging dev; the only trigger delta over dev's ack is this branch's PostHogEventsConfig ([custom_posthog.events] enabled, default true), which telemetry-config.md documents in its full example and its own settings section; additive key with a model default, so no migration ledger entry"
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:293ef22ae123266e6a1886d4ffb07f455e5be9e3"
@@ -19,7 +19,7 @@ rationale = "clean-pass: config_surface.py only moves each stale file's remedy i
 "pipelex/system/configuration/config_surface.py" = "blob:364ebcbad990f0404aa08e390e9b6935bfb597d2"
 "pipelex/system/configuration/configs.py" = "blob:8b28290ddc9332ebec6d76a8441bc2170b682f45"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:a1911617e74df158891760fbbf47171065a0934f"
-"pipelex/system/telemetry/telemetry_config.py" = "blob:cdbb6e22f6d9a88c7bfcae0a8189a471c94a90e4"
+"pipelex/system/telemetry/telemetry_config.py" = "blob:a15eadb5404380cd4e5803a9adf8b01e425768dd"
 "pipelex/tools/aws/aws_config.py" = "blob:0a7c9dbf276e61355b1fa79b9db8caf252450a39"
 "pipelex/tools/document_conversion/document_conversion_config.py" = "blob:e60253aa7073529674eb3ec3b9561b7b87d565cc"
 "pipelex/tools/log/log_config.py" = "blob:0a893b9e62737b7954a924eaed577ba5c8ef9eaf"

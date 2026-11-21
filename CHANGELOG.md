@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The event-style events can be switched off while tracing stays on**: `[custom_posthog.events] enabled = false` in `telemetry.toml` stops `pipeline_execute`, `pipeline_complete`, `pipe_run`, `pipe_complete`, `pipe_dry_run` and the CLI's events from reaching your PostHog, while the AI spans and generations of `[custom_posthog.tracing]` and the `$exception` events of the `posthog` error tracker still go out on the same client. It is on by default, so a self-hosted or local install's stream is unchanged; a host whose own events record each run turns it off so a run is not counted twice.
+
 ## [v0.112.0] - 2026-11-21
 
 ### Fixed
