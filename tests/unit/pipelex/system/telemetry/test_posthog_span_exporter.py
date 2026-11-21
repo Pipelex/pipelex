@@ -9,20 +9,30 @@ user id did not also leak into the properties, where it would be a second copy
 nobody keeps in step and a value no group-level count can use.
 """
 
+import uuid
 from typing import Any
 
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import Span as SdkSpan
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+from opentelemetry.trace import NonRecordingSpan, SpanContext, Status, StatusCode, TraceFlags
 from posthog import Posthog
 from pytest_mock import MockerFixture
 
-from pipelex.system.telemetry.otel_constants import OTelConstants, PipelexSpanAttr, PostHogAttr, PostHogEvent, SpanCategory
-from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
+from pipelex.system.telemetry.otel_constants import (
+    GenAISpanAttr,
+    InferenceKind,
+    OTelConstants,
+    PipelexSpanAttr,
+    PostHogAttr,
+    PostHogEvent,
+    SpanCategory,
+)
+from pipelex.system.telemetry.posthog_span_exporter import EVENT_UUID_NAMESPACE, PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
+from pipelex.tools.misc.package_utils import get_package_version
 
 _FULL_CAPTURE = TelemetryRedactionConfig(
     redact_content=False,
@@ -60,6 +70,29 @@ def _make_exporter(
         run_identity_policy=run_identity_policy,
         redaction_config=_FULL_CAPTURE,
     )
+
+
+def _generation_span(*, name: str, attributes: dict[str, Any]) -> SdkSpan:
+    """An ended generation span as an inference call leaves it, with `attributes` over its model and usage keys."""
+    tracer = TracerProvider().get_tracer("test")
+    span_attributes: dict[str, Any] = {
+        PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE.value,
+        PipelexSpanAttr.PIPELINE_RUN_ID: "run-1",
+        PipelexSpanAttr.PIPE_CODE: "some_pipe",
+        PipelexSpanAttr.UNIT_JOB_ID: "llm_gen_text",
+        PipelexSpanAttr.MODEL_HANDLE: "claude-4.5-sonnet",
+        PipelexSpanAttr.INFERENCE_BACKEND: "pipelex_gateway",
+        PipelexSpanAttr.INFERENCE_KIND: InferenceKind.LLM.value,
+        GenAISpanAttr.OPERATION_NAME: "chat",
+        GenAISpanAttr.PROVIDER_NAME: "pipelex_gateway",
+        GenAISpanAttr.REQUEST_MODEL: "claude-sonnet-4-5",
+        GenAISpanAttr.RESPONSE_MODEL: "claude-sonnet-4-5",
+    }
+    span_attributes.update(attributes)
+    span = tracer.start_span(name=name, attributes=span_attributes)
+    span.end()
+    assert isinstance(span, SdkSpan)
+    return span
 
 
 class TestPostHogSpanExporter:
@@ -231,3 +264,119 @@ class TestPostHogSpanExporter:
         exporter.export([span])
 
         assert client.capture.call_args.kwargs["properties"].get(PostHogAttr.PARENT_ID) == expected_parent_id
+
+    def test_the_provider_is_the_serving_provider_alone_and_the_model_its_id(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_generation_span(name="some_pipe: llm_gen_text (claude-4.5-sonnet) -> Text", attributes={})])
+
+        properties = client.capture.call_args.kwargs["properties"]
+        assert properties[PostHogAttr.PROVIDER] == "pipelex_gateway"
+        assert properties[PostHogAttr.MODEL] == "claude-sonnet-4-5"
+        assert properties[PostHogAttr.MODEL_HANDLE] == "claude-4.5-sonnet"
+        assert properties[PostHogAttr.INFERENCE_BACKEND] == "pipelex_gateway"
+        assert properties[PostHogAttr.INFERENCE_KIND] == "llm"
+        assert properties[PostHogAttr.PIPELEX_VERSION] == get_package_version()
+        assert "$ai_model_id" not in properties
+
+    def test_the_usage_cost_and_attempts_ride_the_generation(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export(
+            [
+                _generation_span(
+                    name="some_pipe: llm_gen_object (claude-4.5-sonnet) -> Invoice",
+                    attributes={
+                        GenAISpanAttr.USAGE_INPUT_TOKENS: 3600,
+                        GenAISpanAttr.USAGE_OUTPUT_TOKENS: 900,
+                        PipelexSpanAttr.INPUT_COST_USD: 0.0108,
+                        PipelexSpanAttr.OUTPUT_COST_USD: 0.0135,
+                        PipelexSpanAttr.TOTAL_COST_USD: 0.0243,
+                        PipelexSpanAttr.ATTEMPT_COUNT: 3,
+                    },
+                )
+            ]
+        )
+
+        properties = client.capture.call_args.kwargs["properties"]
+        assert (properties[PostHogAttr.INPUT_TOKENS], properties[PostHogAttr.OUTPUT_TOKENS]) == (3600, 900)
+        assert (properties[PostHogAttr.INPUT_COST_USD], properties[PostHogAttr.OUTPUT_COST_USD]) == (0.0108, 0.0135)
+        assert properties[PostHogAttr.TOTAL_COST_USD] == 0.0243
+        assert properties[PostHogAttr.ATTEMPT_COUNT] == 3
+        assert (properties[PostHogAttr.IS_ERROR], properties[PostHogAttr.ERROR]) == (False, None)
+
+    def test_a_failed_generation_names_its_category_and_never_its_message(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT)
+        tracer = TracerProvider().get_tracer("test")
+        span = tracer.start_span(
+            name="some_pipe: llm_gen_text (claude-4.5-sonnet) -> Text",
+            attributes={PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE.value, GenAISpanAttr.ERROR_TYPE: "capacity"},
+        )
+        span.set_status(Status(StatusCode.ERROR, "quota exhausted for org_secret"))
+        span.end()
+        assert isinstance(span, SdkSpan)
+
+        exporter.export([span])
+
+        properties = client.capture.call_args.kwargs["properties"]
+        assert (properties[PostHogAttr.IS_ERROR], properties[PostHogAttr.ERROR]) == (True, "capacity")
+        assert "org_secret" not in repr(properties)
+
+    def test_a_redacted_name_keeps_the_output_type_of_a_call_with_no_class(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = PostHogSpanExporter(
+            posthog_client=client,
+            fallback_distinct_id=None,
+            run_identity_policy=RunIdentityPolicy.DIRECT,
+            redaction_config=TelemetryRedactionConfig(
+                redact_content=True, redact_pipe_codes=True, redact_output_class_names=True, content_max_length=None
+            ),
+        )
+
+        exporter.export([_generation_span(name="some_pipe: img_gen (flux-pro) -> Image", attributes={PipelexSpanAttr.UNIT_JOB_ID: "img_gen"})])
+
+        assert client.capture.call_args.kwargs["properties"][PostHogAttr.SPAN_NAME] == "img_gen (claude-4.5-sonnet) -> Image"
+
+    def test_a_pipe_span_is_deduplicated_on_its_span_id(self, mocker: MockerFixture) -> None:
+        """Rule 7's backstop: `$ai_span`'s uuid is a UUIDv5 of `"$ai_span:<$ai_span_id>"`, the same for every copy of one span."""
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.DIRECT)
+        span = _make_span(span_category=SpanCategory.PIPE)
+
+        exporter.export([span])
+        exporter.export([span])
+
+        first_call, second_call = client.capture.call_args_list
+        span_id = first_call.kwargs["properties"][PostHogAttr.SPAN_ID]
+        assert first_call.kwargs["uuid"] == str(uuid.uuid5(EVENT_UUID_NAMESPACE, f"$ai_span:{span_id}"))
+        assert second_call.kwargs["uuid"] == first_call.kwargs["uuid"]
+
+    def test_an_anonymous_pipe_span_is_deduplicated_too(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_make_span(span_category=SpanCategory.PIPE)])
+
+        span_id = client.capture.call_args.kwargs["properties"][PostHogAttr.SPAN_ID]
+        assert client.capture.call_args.kwargs["uuid"] == str(uuid.uuid5(EVENT_UUID_NAMESPACE, f"$ai_span:{span_id}"))
+
+    def test_two_pipe_spans_get_two_uuids(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_make_span(span_category=SpanCategory.PIPE), _make_span(span_category=SpanCategory.PIPE)])
+
+        first_call, second_call = client.capture.call_args_list
+        assert first_call.kwargs["uuid"] != second_call.kwargs["uuid"]
+
+    def test_a_generation_names_no_uuid_the_tracking_plan_gives_it_no_key(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_make_span(span_category=SpanCategory.INFERENCE)])
+
+        assert client.capture.call_args.kwargs["event"] == PostHogEvent.GENERATION
+        assert client.capture.call_args.kwargs["uuid"] is None

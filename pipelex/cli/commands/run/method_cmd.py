@@ -228,4 +228,6 @@ def run_method_cmd(
         orchestrator=orchestrator,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
         save_csv=save_csv,
+        # A fetched or installed published method names its package, the identity behind each pipe's `pipe_id`.
+        method_address=method.provenance.address if method.provenance is not None else None,
     )

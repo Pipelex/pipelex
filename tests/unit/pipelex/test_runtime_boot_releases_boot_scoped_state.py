@@ -14,6 +14,8 @@ that claims nothing inherits rather than overwrites, and only the release stands
 Temporal worker's replay/activity split and the next thing to ask `is_in_isolated_execution()`.
 """
 
+from typing import cast
+
 import pytest
 
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, LocalMethodFileStore
@@ -28,6 +30,7 @@ from pipelex.runtime_hub import (
     is_in_isolated_execution,
 )
 from pipelex.system.runtime import IntegrationMode, runtime_manager
+from pipelex.system.telemetry.workflow_execution import WorkflowExecutionProtocol, get_workflow_execution, workflow_execution_slot
 
 
 class TestTeardownReleasesBootScopedHubState:
@@ -80,6 +83,32 @@ class TestTeardownReleasesBootScopedHubState:
                 "isolated sub-execution of a boot that no longer exists"
             )
         finally:
+            Pipelex.teardown_if_needed()
+
+    def test_teardown_releases_the_workflow_execution_probe(self) -> None:
+        """The probe a boot-orchestrator plugin claims is installed conditionally too, and a span must never read a dead boot's workflow.
+
+        Installed by hand rather than by claiming the slot, which would need the plugin installed; what is under test
+        is the release. A probe surviving its boot would give a later span a workflow's ids and clock, or drop its end
+        as a replay.
+        """
+        Pipelex.teardown_if_needed()
+        try:
+            Pipelex.make(
+                integration_mode=IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST,
+                needs_inference=False,
+            )
+            stand_in = cast("WorkflowExecutionProtocol", object())
+            workflow_execution_slot.install(probe=lambda: stand_in)
+            assert get_workflow_execution() is stand_in, "the probe was not installed — the premise is gone"
+
+            Pipelex.teardown_if_needed()
+
+            assert get_workflow_execution() is None, (
+                "teardown left the plugin's probe in its slot — a later span is told it runs in the workflow code of a boot that no longer exists"
+            )
+        finally:
+            workflow_execution_slot.reset()
             Pipelex.teardown_if_needed()
 
 

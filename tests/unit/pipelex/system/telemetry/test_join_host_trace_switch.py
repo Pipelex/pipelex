@@ -93,7 +93,10 @@ class TestJoinHostTraceSwitch:
         ("telemetry_config", "expected"),
         [
             (_config(mode=PostHogMode.OFF), []),
-            (_config(tracing_enabled=False, otlp=[_SENTRY_LIKE_OTLP], langfuse_enabled=True), []),
+            (_config(tracing_enabled=False), []),
+            (_config(mode=PostHogMode.OFF, otlp=[_SENTRY_LIKE_OTLP]), ["otlp:errors"]),
+            (_config(mode=PostHogMode.OFF, langfuse_enabled=True), ["langfuse"]),
+            (_config(tracing_enabled=False, otlp=[_SENTRY_LIKE_OTLP], langfuse_enabled=True), ["otlp:errors", "langfuse"]),
             (_config(), ["custom_posthog"]),
             (_config(otlp=[_SENTRY_LIKE_OTLP], langfuse_enabled=True), ["custom_posthog", "otlp:errors", "langfuse"]),
         ],
@@ -104,8 +107,8 @@ class TestJoinHostTraceSwitch:
     @pytest.mark.parametrize(
         "telemetry_config",
         [
-            _config(join_host_trace=True, mode=PostHogMode.OFF, otlp=[_SENTRY_LIKE_OTLP]),
-            _config(join_host_trace=True, tracing_enabled=False, otlp=[_SENTRY_LIKE_OTLP]),
+            _config(join_host_trace=True, mode=PostHogMode.OFF),
+            _config(join_host_trace=True, tracing_enabled=False),
         ],
     )
     def test_the_switch_with_no_span_destination_refuses_the_boot(self, mocker: MockerFixture, telemetry_config: TelemetryConfig) -> None:
@@ -143,6 +146,38 @@ class TestJoinHostTraceSwitch:
         )
 
         telemetry_manager_class.assert_called_once_with(telemetry_config=telemetry_config, join_host_trace=True)
+
+    @pytest.mark.parametrize(
+        "telemetry_config",
+        [
+            _config(join_host_trace=True, mode=PostHogMode.OFF, otlp=[_SENTRY_LIKE_OTLP]),
+            _config(join_host_trace=True, mode=PostHogMode.OFF, langfuse_enabled=True),
+            _config(join_host_trace=True, tracing_enabled=False, otlp=[_SENTRY_LIKE_OTLP]),
+        ],
+    )
+    def test_the_switch_boots_with_a_span_destination_and_no_posthog_tracing(self, mocker: MockerFixture, telemetry_config: TelemetryConfig) -> None:
+        """An `[[otlp]]` exporter or Langfuse is a destination of its own: the PostHog stream may be off or not tracing."""
+        telemetry_manager_class = mocker.patch("pipelex.system.telemetry.telemetry_manager.TelemetryManager")
+
+        TelemetryFactory.make_telemetry_manager(
+            secrets_provider=EnvSecretsProvider(),
+            integration_mode=IntegrationMode.FASTAPI,
+            telemetry_config=telemetry_config,
+        )
+
+        telemetry_manager_class.assert_called_once_with(telemetry_config=telemetry_config, join_host_trace=True)
+
+    def test_with_posthog_off_and_no_span_destination_telemetry_is_a_no_op(self, mocker: MockerFixture) -> None:
+        telemetry_manager_class = mocker.patch("pipelex.system.telemetry.telemetry_manager.TelemetryManager")
+
+        telemetry_manager = TelemetryFactory.make_telemetry_manager(
+            secrets_provider=EnvSecretsProvider(),
+            integration_mode=IntegrationMode.FASTAPI,
+            telemetry_config=_config(mode=PostHogMode.OFF),
+        )
+
+        assert isinstance(telemetry_manager, TelemetryManagerNoOp)
+        telemetry_manager_class.assert_not_called()
 
     def test_the_switch_off_is_passed_on_as_off(self, mocker: MockerFixture) -> None:
         telemetry_manager_class = mocker.patch("pipelex.system.telemetry.telemetry_manager.TelemetryManager")

@@ -9,7 +9,7 @@ It is also where a worker whose provider bills by the request, or an extraction 
 usage, with ``record_unit_priced_usage``, so the rates price each unit and the usage says its counts are no tokens.
 """
 
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
@@ -29,11 +29,23 @@ def compute_total_cost(*, input_non_cached_cost: float, input_cached_cost: float
     return input_non_cached_cost + input_cached_cost + output_cost
 
 
-def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
-    """Compute the canonical USD cost of a single inference call, or None when unrated.
+class TokensUsageCost(NamedTuple):
+    """The cost of one inference call's usage in US dollars, split as a generation span reports it.
+
+    ``input_cost`` is what the call read, from the cache or not, ``output_cost`` what it wrote, and ``total_cost`` their
+    sum, the canonical total every report prices a call at.
+    """
+
+    input_cost: float
+    output_cost: float
+    total_cost: float
+
+
+def compute_tokens_usage_cost_breakdown(*, tokens_usage: TokensUsage) -> TokensUsageCost | None:
+    """Compute the USD cost of a single inference call, split into what it read and what it wrote, or None when unrated.
 
     Returns ``None`` when the usage carries no rate table (``unit_costs`` is empty:
-    own-GPU models, dry/mock runs). Otherwise returns the same canonical total the cost
+    own-GPU models, dry/mock runs). Otherwise the total is the same canonical total the cost
     table reports for the call — input_non_cached + input_cached + output component
     costs, with the cached-discount fallback from ``model_cost_per_token``. Categories
     the cost engine excludes from totals (audio, reasoning, prediction) are excluded
@@ -57,11 +69,26 @@ def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
         costs=tokens_usage.unit_costs,
         cost_category=CostCategory.OUTPUT,
     )
-    return compute_total_cost(
-        input_non_cached_cost=input_non_cached_cost,
-        input_cached_cost=input_cached_cost,
+    return TokensUsageCost(
+        input_cost=input_non_cached_cost + input_cached_cost,
         output_cost=output_cost,
+        total_cost=compute_total_cost(
+            input_non_cached_cost=input_non_cached_cost,
+            input_cached_cost=input_cached_cost,
+            output_cost=output_cost,
+        ),
     )
+
+
+def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
+    """Compute the canonical USD cost of a single inference call, or None when unrated.
+
+    The total of ``compute_tokens_usage_cost_breakdown``, which says when a usage is unrated and which categories count.
+    """
+    breakdown = compute_tokens_usage_cost_breakdown(tokens_usage=tokens_usage)
+    if breakdown is None:
+        return None
+    return breakdown.total_cost
 
 
 def record_unit_priced_usage(*, tokens_usage: TokensUsage, pricing_unit: Literal[PricingUnit.REQUEST, PricingUnit.PAGE], nb_units: int) -> None:

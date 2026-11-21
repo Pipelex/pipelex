@@ -14,7 +14,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from pytest_mock import MockerFixture
 from typing_extensions import override
 
+from pipelex.cogt.inference.inference_call_summary import InferenceOperation
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
+from pipelex.cogt.inference.inference_span import start_inference_span
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -58,7 +60,13 @@ def _make_worker() -> _StubLLMWorker:
     return _StubLLMWorker(inference_model=inference_model)
 
 
-def _make_llm_job(*, extras: dict[str, str] | None = None) -> LLMJob:
+def _make_llm_job(
+    *,
+    extras: dict[str, str] | None = None,
+    method_id: str | None = None,
+    capture_pipe_codes: bool | None = None,
+    pipe_id: str | None = None,
+) -> LLMJob:
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(
             user_id="user-42",
@@ -66,8 +74,11 @@ def _make_llm_job(*, extras: dict[str, str] | None = None) -> LLMJob:
             storage_scope="tenant/run-1",
             read_scope=None,
             extras=extras or {},
+            method_id=method_id,
+            capture_pipe_codes=capture_pipe_codes,
         ),
         pipe_code="some_pipe",
+        pipe_id=pipe_id,
         unit_job_id=UnitJobId.LLM_GEN_TEXT,
         otel_context=OtelContext(
             trace_id=1234,
@@ -123,3 +134,43 @@ class TestLLMSpanIdentity:
         span = _start_span(mocker=mocker, llm_job=_make_llm_job())
 
         assert LangfuseSpanAttr.USER_ID not in _attributes(span)
+
+    def test_the_span_carries_the_runs_method_and_the_pipe_id_of_the_pipe_that_made_the_call(self, mocker: MockerFixture) -> None:
+        span = _start_span(mocker=mocker, llm_job=_make_llm_job(method_id="mt_abc", pipe_id="f" * 32))
+
+        attributes = _attributes(span)
+        assert attributes[PipelexSpanAttr.RUN_METHOD_ID] == "mt_abc"
+        assert attributes[PipelexSpanAttr.PIPE_ID] == "f" * 32
+
+    def test_a_call_with_no_method_and_no_pipe_id_writes_neither(self, mocker: MockerFixture) -> None:
+        attributes = _attributes(_start_span(mocker=mocker, llm_job=_make_llm_job()))
+
+        assert PipelexSpanAttr.RUN_METHOD_ID not in attributes
+        assert PipelexSpanAttr.PIPE_ID not in attributes
+        assert PipelexSpanAttr.RUN_CAPTURE_PIPE_CODES not in attributes
+
+    def test_the_span_carries_the_runs_pipe_code_setting(self, mocker: MockerFixture) -> None:
+        span = _start_span(mocker=mocker, llm_job=_make_llm_job(capture_pipe_codes=True))
+
+        assert _attributes(span)[PipelexSpanAttr.RUN_CAPTURE_PIPE_CODES] is True
+
+
+class TestEveryInferenceSpanCarriesTheRunsMethod:
+    def test_an_image_generation_span_carries_the_runs_method_and_the_pipe_id_of_the_pipe_that_made_the_call(self, mocker: MockerFixture) -> None:
+        """The method attributes are written where every kind of inference call opens its span, not by the LLM worker alone."""
+        mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=TracerProvider().get_tracer("test"))
+        job_metadata = _make_llm_job(method_id="mt_abc", pipe_id="f" * 32, capture_pipe_codes=False).job_metadata
+
+        span = start_inference_span(
+            job_metadata=job_metadata,
+            operation=InferenceOperation.IMG_GEN,
+            inference_model=_make_worker().inference_model,
+            request_model="gpt-test-id",
+            output_type=InferenceOutputType.IMAGE,
+        )
+
+        assert isinstance(span, SdkSpan)
+        attributes = _attributes(span)
+        assert attributes[PipelexSpanAttr.RUN_METHOD_ID] == "mt_abc"
+        assert attributes[PipelexSpanAttr.PIPE_ID] == "f" * 32
+        assert attributes[PipelexSpanAttr.RUN_CAPTURE_PIPE_CODES] is False

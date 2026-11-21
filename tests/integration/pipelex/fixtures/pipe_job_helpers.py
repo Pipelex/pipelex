@@ -12,7 +12,7 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.system.job_metadata import JobMetadata, RunMetadata, SpecialPipelineId
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_USER_ID
 
@@ -45,7 +45,7 @@ def build_pipe_job(
     pipeline_run_id: str | None = None,
 ) -> PipeJob:
     """Build a PipeJob with empty working memory and default metadata."""
-    resolved_pipeline_run_id = SpecialPipelineId.DRY_RUN_UNTITLED if pipe_run_mode.is_dry else (pipeline_run_id or _make_unique_pipeline_run_id())
+    resolved_pipeline_run_id = f"dry_run_{uuid.uuid4().hex[:8]}" if pipe_run_mode.is_dry else (pipeline_run_id or _make_unique_pipeline_run_id())
     return PipeJobFactory.make_pipe_job(
         pipe=pipe,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

@@ -250,6 +250,18 @@ class TestDoctorConfigChecks:
 
         assert check.finding is TelemetryConfigFinding.HEALTHY
 
+    def test_check_telemetry_config_names_the_span_destinations_beside_the_posthog_mode(self, tmp_path: Path) -> None:
+        """With PostHog off, an [[otlp]] exporter still receives spans, so the row must not read as telemetry being off."""
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text(
+            '[custom_posthog]\nmode = "off"\n\n[[otlp]]\nname = "collector"\nendpoint = "https://collector.example.com/v1/traces"\n',
+            encoding="utf-8",
+        )
+
+        check = check_telemetry_config(config_dir=tmp_path)
+
+        assert check.finding is TelemetryConfigFinding.HEALTHY
+        assert check.message == "Telemetry configured (mode: off; span destinations: otlp:collector)"
+
     def test_check_telemetry_config_survives_a_failure_inside_the_scan(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A packaging problem of ours must not replace every row the user came for.
 

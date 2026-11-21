@@ -94,7 +94,7 @@ class TestConstrainedJobParams:
         self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
     ) -> None:
         """The warning names the model as its description used to, with the model keys meaning what they mean on the LLM span:
-        the handle requested under `gen_ai.request.model` and the provider's model id under `gen_ai.response.model`. The json sink
+        the provider's model id, requested under `gen_ai.request.model` and serving under `gen_ai.response.model`. The json sink
         writes these OpenTelemetry keys, and the requested temperature's, as plain keys.
         """
         inference_model = _make_model(thinking_mode=ThinkingMode.MANUAL, valued_constraints={ValuedConstraint.FIXED_TEMPERATURE: 1})
@@ -122,7 +122,7 @@ class TestConstrainedJobParams:
             "model_handle": "gpt-test",
             "backend_name": "openai",
             "sdk": "openai",
-            "gen_ai.request.model": "gpt-test",
+            "gen_ai.request.model": "gpt-test-id",
             "gen_ai.response.model": "gpt-test-id",
             "gen_ai.request.temperature": 0.2,
             "fixed_temperature": 1,

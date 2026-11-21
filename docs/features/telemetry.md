@@ -13,7 +13,7 @@ Pipelex provides comprehensive telemetry and observability capabilities to monit
 
 ## Langfuse Integration
 
-Full LLM observability with complete span data. Track every LLM call, its inputs, outputs, tokens, cost, and latency. Supports both Langfuse Cloud and self-hosted instances via the OTLP exporter.
+Full observability of every inference call with complete span data. Every call opens a generation span, whether it is an LLM call, an image generation, an extraction, a search, a judgment or a document print, with its model, its inputs and outputs, its tokens summed over every attempt, its cost at the model's declared rates, its latency and, when it fails, the category of its failure. Supports both Langfuse Cloud and self-hosted instances via the OTLP exporter. [Telemetry Setup](../setup/telemetry.md#what-an-inference-call-reports) lists what a generation span carries.
 
 ## OpenTelemetry (OTLP)
 
@@ -21,7 +21,7 @@ Send execution spans to any OTLP-compatible backend for integration with your ex
 
 ## PostHog Integration
 
-Event tracking and AI span tracing with fine-grained privacy controls. Choose between anonymous and identified modes. Configure what data to capture: content, pipe codes, output class names, and content length limits.
+Event tracking and AI span tracing with fine-grained privacy controls. Every inference call reaches PostHog as an `$ai_generation` naming its serving provider, its model id, its tokens, its cost and whether it failed. Choose between anonymous and identified modes. Configure what data to capture: content, pipe codes, output class names, and content length limits.
 
 ## Per-run attribution
 

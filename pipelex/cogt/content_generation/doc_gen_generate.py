@@ -61,6 +61,7 @@ from pipelex.cogt.doc_gen.sheet_range import SHEET_RANGE_REFUSALS, SheetRangeFil
 from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding, TemplateFindingSeverity
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
+from pipelex.cogt.inference.inference_span import InferenceSpanScope, start_inference_span
 from pipelex.core.method_trees.method_files import TreeListing, read_listed_file, read_method_file, read_tree_listing
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -456,7 +457,7 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
         model_handle=model_handle,
         read_inference_model=lambda: inference_model,
         read_tokens_usage=None,
-    ):
+    ) as call_summary:
         authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
         inference_model = get_doc_gen_inference_model(
             model_handle=model_handle,
@@ -470,44 +471,58 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
             source=composition.source,
             pipe_code=pipe_code,
         )
-        engine_name = inference_model.name
-        worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-        read_template = await read_template_file(render_assignment=render_assignment, storage_provider=storage_provider)
-        if composition.template_file is not None and composition.template_file.input_file is not None and read_template.template is not None:
-            # A template a run input supplies is the run's, unknown when the method loaded: it is checked before it is
-            # filled, which catches one an earlier step produced, as run setup caught one the caller gave.
-            await check_office_template(
-                worker=worker,
-                template_file=composition.template_file,
-                template=read_template.template,
-                doc_gen_format=composition.format,
-                data=composition.data,
-                table_fill=composition.table_fill,
-                match_on=composition.match_on,
-                match_row=composition.match_row,
-                cells=composition.cells,
-                sheet_range=composition.sheet_range,
+        served_model = inference_model
+        # The print runs under its generation span, which the summary event names as it ends; an engine records no usage
+        with InferenceSpanScope(
+            span=start_inference_span(
+                job_metadata=render_assignment.job_metadata,
+                operation=InferenceOperation.DOC_GEN,
+                inference_model=served_model,
+                request_model=served_model.model_id,
+                output_type=None,
+            ),
+            call_summary=call_summary.ends_here(),
+            read_tokens_usage=None,
+            read_response_model=lambda: served_model.model_id,
+        ):
+            engine_name = inference_model.name
+            worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
+            read_template = await read_template_file(render_assignment=render_assignment, storage_provider=storage_provider)
+            if composition.template_file is not None and composition.template_file.input_file is not None and read_template.template is not None:
+                # A template a run input supplies is the run's, unknown when the method loaded: it is checked before it is
+                # filled, which catches one an earlier step produced, as run setup caught one the caller gave.
+                await check_office_template(
+                    worker=worker,
+                    template_file=composition.template_file,
+                    template=read_template.template,
+                    doc_gen_format=composition.format,
+                    data=composition.data,
+                    table_fill=composition.table_fill,
+                    match_on=composition.match_on,
+                    match_row=composition.match_row,
+                    cells=composition.cells,
+                    sheet_range=composition.sheet_range,
+                )
+            render_job = _render_job_of(composition=composition, read_template=read_template)
+            resources = RunRenderResources(
+                storage_provider=storage_provider,
+                read_scope=render_assignment.job_metadata.run_metadata.read_scope,
+                loop=asyncio.get_running_loop(),
+                document=composition,
             )
-        render_job = _render_job_of(composition=composition, read_template=read_template)
-        resources = RunRenderResources(
-            storage_provider=storage_provider,
-            read_scope=render_assignment.job_metadata.run_metadata.read_scope,
-            loop=asyncio.get_running_loop(),
-            document=composition,
-        )
-        # The context is carried into the thread, as `asyncio.to_thread` would, so the engine logs under the run.
-        run_context = contextvars.copy_context()
+            # The context is carried into the thread, as `asyncio.to_thread` would, so the engine logs under the run.
+            run_context = contextvars.copy_context()
 
-        def _render() -> RenderedDocument:
-            return run_context.run(worker.render, job=render_job, resources=resources)
+            def _render() -> RenderedDocument:
+                return run_context.run(worker.render, job=render_job, resources=resources)
 
-        try:
-            return await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _render)
-        except PipelexError:
-            # Already classified: a refused read, or a failure the engine reported as a `DocGenRenderError`.
-            raise
-        except Exception as exc:
-            # Dynamic plugin dispatch: an engine is plugin code whose exceptions cannot be enumerated, and anything
-            # else it raises is a failure to print this document.
-            msg = f"The engine '{engine_name}' could not print '{composition.filename}': {exc}"
-            raise DocGenRenderError(msg) from exc
+            try:
+                return await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _render)
+            except PipelexError:
+                # Already classified: a refused read, or a failure the engine reported as a `DocGenRenderError`.
+                raise
+            except Exception as exc:
+                # Dynamic plugin dispatch: an engine is plugin code whose exceptions cannot be enumerated, and anything
+                # else it raises is a failure to print this document.
+                msg = f"The engine '{engine_name}' could not print '{composition.filename}': {exc}"
+                raise DocGenRenderError(msg) from exc

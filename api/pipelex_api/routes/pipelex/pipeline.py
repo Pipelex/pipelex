@@ -534,6 +534,11 @@ class ApiRunner(PipelexMTHDSProtocol):
             # here, so a group left out of this call is dropped with no error
             # and the run's spans lose their groups while the ack still says 202.
             extras=self.extras,
+            # The run's method and its pipe-code setting, which the base `execute` threads too: left out of this call,
+            # the run's spans would lose their method and fall back to the deployment's pipe-code setting.
+            method_id=self.method_id,
+            method_address=self.method_address,
+            capture_pipe_codes=self.capture_pipe_codes,
             # The packages the request ships, which the base `execute` threads too.
             methods_dirs=self.methods_dirs,
             # The files submitted with the contents, such as a template file, which the base `execute` threads too.
@@ -1032,6 +1037,9 @@ async def execute(request: Request) -> JSONResponse:
             storage_scope=scopes.storage_scope,
             read_scope=scopes.read_scope,
             extras=extras.analytics_groups,
+            method_id=extras.method_key,
+            method_address=source.method_provenance.address if source.method_provenance is not None else None,
+            capture_pipe_codes=extras.capture_pipe_codes,
             library_dirs=source.library_dirs,
             library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,
@@ -1141,6 +1149,9 @@ async def start(
             storage_scope=scopes.storage_scope,
             read_scope=scopes.read_scope,
             extras=extras.analytics_groups,
+            method_id=extras.method_key,
+            method_address=source.method_provenance.address if source.method_provenance is not None else None,
+            capture_pipe_codes=extras.capture_pipe_codes,
             library_dirs=source.library_dirs,
             library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,

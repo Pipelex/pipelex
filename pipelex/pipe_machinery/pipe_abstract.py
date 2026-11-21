@@ -47,6 +47,8 @@ from pipelex.system.telemetry.otel_constants import (
     SpanOutcome,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.pipe_identity import make_pipe_id_for_run, make_run_method_span_attributes
+from pipelex.system.telemetry.replay_safe_spans import opening_pipe_span, pipe_span_start_time_ns, resolve_pipe_span_end
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.console_layouts import LogLayout
@@ -123,6 +125,17 @@ class PipeTraceNode(NamedTuple):
     tracer_manager: GraphTracerManager
     lookup_key: str
     node_id: str
+
+
+class PipeSpanStart(NamedTuple):
+    """A pipe span just started, with what its end needs to know about how it started."""
+
+    span: Span | None
+    """The started span, or None when no tracer records one."""
+    is_root_span: bool
+    """Whether the span is the root of its trace in Pipelex's own streams."""
+    is_opened_in_workflow_code: bool
+    """Whether the span started on an orchestrator's workflow clock, so its end follows the replay-safe rules."""
 
 
 class InputPresenceScan(NamedTuple):
@@ -1114,14 +1127,21 @@ class PipeAbstract(ABC, BaseModel):
             this_otel_context: OtelContext | None = None
             span: Span | None = None
             is_root_span: bool = False
+            is_span_opened_in_workflow_code: bool = False
+
+            this_pipe_id: str | None = None
 
             parent_otel_context = job_metadata.otel_context
             if parent_otel_context is not None:
+                # The pipe's stable identifier, computed once: its span carries it, and so does every inference span it
+                # makes, through the metadata handed down. None when the runtime has no `pipe_id_key`.
+                this_pipe_id = make_pipe_id_for_run(run_metadata=job_metadata.run_metadata, domain_code=self.domain_code, pipe_ref=self.pipe_ref)
                 # Start OTel span first
-                span, is_root_span = self._start_pipe_span(
+                span, is_root_span, is_span_opened_in_workflow_code = self._start_pipe_span(
                     parent_otel_context=parent_otel_context,
                     run_metadata=job_metadata.run_metadata,
                     working_memory=working_memory,
+                    pipe_id=this_pipe_id,
                 )
                 # Get the actual span_id from OTel (OTel generates its own span_id)
                 if span:
@@ -1144,6 +1164,7 @@ class PipeAbstract(ABC, BaseModel):
             child_metadata = job_metadata.copy_with_update(
                 otel_context=this_otel_context,
                 pipe_code=self.code,
+                pipe_id=this_pipe_id,
                 pipe_run_id=this_pipe_run_id,
             )
 
@@ -1173,12 +1194,14 @@ class PipeAbstract(ABC, BaseModel):
                     # Broad catch is intentional: the OTel span must be closed with ERROR status
                     # on any failure, a cancellation included, which is not an Exception.
                     # Observes-and-re-raises — see note on the catch in _run_pipe_traced.
-                    self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
+                    self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span, is_opened_in_workflow_code=is_span_opened_in_workflow_code)
                     raise
 
                 # Handle telemetry ------------------------------------------------------------
 
-                self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
+                self._end_pipe_span_success(
+                    span=span, pipe_output=pipe_output, is_root_span=is_root_span, is_opened_in_workflow_code=is_span_opened_in_workflow_code
+                )
 
         return pipe_output
 
@@ -1201,7 +1224,7 @@ class PipeAbstract(ABC, BaseModel):
         # Telemetry stays live-only on purpose: `pipe_run_id` and `otel_context` belong to a real run.
         # A dry run opens no span, so `otel_context` is cleared, and explicitly, which is the point of
         # that parameter being required: inheriting the parent's would attach a dry step to a live span.
-        child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code)
+        child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code, pipe_id=None)
         return await self._dry_run_pipe(
             job_metadata=child_metadata,
             working_memory=working_memory,
@@ -1240,7 +1263,8 @@ class PipeAbstract(ABC, BaseModel):
         parent_otel_context: OtelContext,
         run_metadata: RunMetadata,
         working_memory: WorkingMemory,
-    ) -> tuple[Span | None, bool]:
+        pipe_id: str | None,
+    ) -> PipeSpanStart:
         """Start an OTel span for this pipe execution.
 
         Always includes full (non-redacted) pipe codes and content in span attributes.
@@ -1251,14 +1275,16 @@ class PipeAbstract(ABC, BaseModel):
             run_metadata: The run half of the job metadata — the pipeline run ID for
                 span attributes, and the identity every exporter attributes the span to.
             working_memory: The working memory containing input stuffs for telemetry capture.
+            pipe_id: The pipe's stable identifier (`pipelex.system.telemetry.pipe_identity`), None when the runtime
+                has no `pipe_id_key`.
 
         Returns:
-            A tuple of (span, is_root_span) where span is the started span or None if tracer
-            is unavailable, and is_root_span indicates if this is the trace root span.
+            The started span, or None if no tracer records one, whether it is the trace root span, and whether it
+            started on an orchestrator's workflow clock, which decides how its end is read.
         """
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            return None, False
+            return PipeSpanStart(span=None, is_root_span=False, is_opened_in_workflow_code=False)
 
         pipeline_run_id = run_metadata.pipeline_run_id
 
@@ -1302,6 +1328,8 @@ class PipeAbstract(ABC, BaseModel):
         # rather than to the process that happens to be running it.
         is_langfuse_enabled = TelemetryManagerAbstract.get_langfuse_enabled()
         span_attributes.update(make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=is_langfuse_enabled))
+        # The run's method, the pipe's stable identifier and the run's own pipe-code setting, for every exporter.
+        span_attributes.update(make_run_method_span_attributes(run_metadata=run_metadata, pipe_id=pipe_id))
 
         # Langfuse-specific attributes: always send full data
         if is_langfuse_enabled:
@@ -1340,17 +1368,24 @@ class PipeAbstract(ABC, BaseModel):
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
-        # Start span with attributes - OTel generates the span_id, we capture it after
-        span = tracer.start_span(
-            name=span_name,
-            kind=SpanKind.INTERNAL,
-            context=parent_ctx,
-            attributes=span_attributes,
-        )
+        # Start span with attributes - OTel generates the span_id, we capture it after. In an orchestrator's replayable
+        # workflow code, the id comes from the workflow's deterministic random and the start from its clock, so a replay
+        # recomputes both; elsewhere the id is random and the start is the wall clock (see replay_safe_spans).
+        # A start on the workflow's clock is what marks the span as opened in workflow code: its end, which may come
+        # from a teardown where the probe can no longer tell, is read by that mark rather than by asking again.
+        start_time_ns = pipe_span_start_time_ns()
+        with opening_pipe_span():
+            span = tracer.start_span(
+                name=span_name,
+                kind=SpanKind.INTERNAL,
+                context=parent_ctx,
+                attributes=span_attributes,
+                start_time=start_time_ns,
+            )
         # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
         # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
         if span.get_span_context() == parent_span_context:
-            return None, False
+            return PipeSpanStart(span=None, is_root_span=False, is_opened_in_workflow_code=False)
 
         # Capture full input content for Langfuse, only on a span that records: one the sampler dropped, in a run the
         # host sampled out, would discard it, and serializing the inputs is the costly part of starting a span.
@@ -1365,17 +1400,23 @@ class PipeAbstract(ABC, BaseModel):
             if is_root_span:
                 span.set_attribute(LangfuseSpanAttr.TRACE_INPUT, inputs_json)
 
-        return span, is_root_span
+        return PipeSpanStart(span=span, is_root_span=is_root_span, is_opened_in_workflow_code=start_time_ns is not None)
 
-    def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
+    def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool, is_opened_in_workflow_code: bool) -> None:
         """End the pipe's OTel span with success status. Safe to call if span is None.
 
         Args:
             span: The OTel span to end, or None if telemetry is disabled.
             pipe_output: The pipe output containing the result for telemetry capture.
             is_root_span: Whether this is the root span of the trace.
+            is_opened_in_workflow_code: Whether the span started on an orchestrator's workflow clock.
         """
         if span is None:
+            return
+        # Only the pipe's real end exports its span: never a replay of workflow code that already ran it. A probe that
+        # fails while asked leaves the span unexported and the pipe's success as it came.
+        pipe_end = resolve_pipe_span_end(is_opened_in_workflow_code=is_opened_in_workflow_code)
+        if not pipe_end.is_real_end:
             return
 
         # Always capture full output content for Langfuse, on a span that records it
@@ -1396,24 +1437,32 @@ class PipeAbstract(ABC, BaseModel):
             span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTCOME, SpanOutcome.SUCCESS)
             if is_root_span:
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
-        span.end()
+        span.end(end_time=pipe_end.end_time_ns)
 
-    def _end_pipe_span_error(self, span: Span | None, *, error: BaseException, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, *, error: BaseException, is_root_span: bool = False, is_opened_in_workflow_code: bool) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:
             span: The OTel span to end, or None if telemetry is disabled.
             error: The exception that caused the error.
             is_root_span: Whether this is the root span of the trace.
+            is_opened_in_workflow_code: Whether the span started on an orchestrator's workflow clock.
         """
         if span is None:
             return
+        # Only the pipe's real end exports its span: never a replay of workflow code that already ran it, nor the
+        # workflow code unwinding on an eviction or a retried workflow task, after which the pipe runs again. Asking
+        # never replaces `error`, which the caller re-raises.
+        pipe_end = resolve_pipe_span_end(is_opened_in_workflow_code=is_opened_in_workflow_code, error=error)
+        if not pipe_end.is_real_end:
+            return
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
-        span.record_exception(error)
+        # Stamped on the clock the span ends on: the workflow's in workflow code, the wall clock (None) elsewhere.
+        span.record_exception(error, timestamp=pipe_end.end_time_ns)
         span.set_status(Status(StatusCode.ERROR, str(error)))
         if TelemetryManagerAbstract.get_langfuse_enabled():
             span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTCOME, SpanOutcome.FAILURE)
             if is_root_span:
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.FAILURE)
-        span.end()
+        span.end(end_time=pipe_end.end_time_ns)
