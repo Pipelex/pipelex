@@ -9,6 +9,10 @@ name: Tests full (pre-main gate)
 # ~4 min (faster than the old 8-core Azure box) at zero cost. The single
 # required check is the aggregator `Tests full (all)` — so shard count or
 # Python versions can change without ever touching the branch ruleset.
+#
+# Every test runs here, the slow ones included: `make gha-tests` keeps them unless
+# SKIP_SLOW_TESTS=1 is set, which only `tests-check.yml` does (see
+# docs/contribute/test-duration-map.md).
 
 on:
   pull_request:

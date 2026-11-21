@@ -18,6 +18,7 @@ from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.test_extras.usage_stats_isolation import turn_usage_stats_off_for_the_session, usage_stats_guarded
 from tests.helpers.run_ids import run_id_for_test
+from tests.helpers.slow_tests import add_slow_test_option, apply_slow_marker
 
 if TYPE_CHECKING:
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager
@@ -27,6 +28,23 @@ pytest_plugins = [
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    add_slow_test_option(parser=parser)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(  # kw-only: ignore — pytest hookimpl, invoked by pluggy as a framework entrypoint
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Mark `slow` the tests `.test_durations` records at or above `--slow-test-seconds` (tests/helpers/slow_tests.py).
+
+    First among the collection hooks, so the marker is in place before pytest's own `-m` deselection and before
+    pytest-split cuts the shards.
+    """
+    apply_slow_marker(config=config, items=items)
+
 
 # Anonymous usage statistics: no test reports to Pipelex, and none touches this machine's shared state in `~/.mthds/`.
 # Turned off in the environment when this conftest loads, before any test runs and before xdist starts its workers, so

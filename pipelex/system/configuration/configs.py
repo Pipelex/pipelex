@@ -118,6 +118,16 @@ class MethodTreeLimitsConfig(ConfigModel):
     max_file_bytes: int | None = Field(default=None, ge=0)
 
 
+class CrateClassCacheConfig(ConfigModel):
+    """`[interpreter.crate_class_cache]`: the concepts and structure classes this process keeps per crate it loaded.
+
+    `max_classes` bounds the classes kept over all crates, the least recently used crate leaving first; zero keeps none,
+    so every load of a crate builds its classes again. See `pipelex/libraries/crate_class_cache.py`.
+    """
+
+    max_classes: int = Field(ge=0)
+
+
 class BuilderConfig(ConfigModel):
     fix_loop_max_attempts: int
     default_output_dir: str
@@ -226,6 +236,7 @@ class InterpreterConfig(ConfigModel):
     pipeline_execution: PipelineExecutionConfig
     scan: ScanConfig
     method_tree_limits: MethodTreeLimitsConfig
+    crate_class_cache: CrateClassCacheConfig
     builder: BuilderConfig
 
 

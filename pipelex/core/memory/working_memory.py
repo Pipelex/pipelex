@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from operator import attrgetter
 from typing import Any, Self, cast
 
@@ -93,6 +94,42 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)
+
+    def make_deep_copy_of(self, *, names: Iterable[str]) -> Self:
+        """A deep copy of the part of this memory the given names reach, and of nothing else.
+
+        Each name brings the stuff stored under it, or, for an alias, the alias with the stuff it targets, and the absence
+        recorded under it or under its alias's target. A name this memory does not hold brings nothing. The copy costs in
+        proportion to what the names reach, not to the whole memory: a `PipeBatch` branch starts with a copy of only what its
+        branch pipe reads, never with one of the whole batched list.
+
+        Args:
+            names: The names to carry into the copy.
+
+        Returns:
+            A new working memory holding its own deep copy of what the names reach.
+        """
+        root: StuffDict = {}
+        aliases: dict[str, str] = {}
+        absences: dict[str, AbsenceRecord] = {}
+        for name in names:
+            named_stuff = self.root.get(name)
+            if named_stuff is not None:
+                root[name] = named_stuff
+            if (record := self.absences.get(name)) is not None:
+                absences[name] = record
+            target = self.aliases.get(name)
+            if target is None:
+                continue
+            aliases[name] = target
+            target_stuff = self.root.get(target)
+            if target_stuff is not None:
+                root[target] = target_stuff
+            if (target_record := self.absences.get(target)) is not None:
+                absences[target] = target_record
+        # A shallow copy holding only the parent's own objects for those names, built without validation, then deep-copied as
+        # one: the copy is the caller's alone, and a stuff reached under two names stays one object in it, as it was here.
+        return self.model_copy(update={"root": root, "aliases": aliases, "absences": absences}).model_copy(deep=True)
 
     def get_optional_stuff(self, name: str) -> Stuff | None:
         if named_stuff := self.root.get(name):

@@ -101,6 +101,31 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
             return False
         return instance.join_host_trace
 
+    @classmethod
+    def is_instance_tracer_replay_safe(cls) -> bool:
+        """Whether the singleton instance's tracer draws a pipe span's id in workflow code from the workflow's random.
+
+        Returns:
+            The instance's ``is_otel_tracer_replay_safe``, False when no telemetry manager is configured.
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return False
+        return instance.is_otel_tracer_replay_safe
+
+    @property
+    def is_otel_tracer_replay_safe(self) -> bool:
+        """Whether this manager's tracer comes from a provider whose id generator is ``ReplaySafeIdGenerator``.
+
+        Only such a tracer recomputes, on a replay of an orchestrator's workflow code, the id the live execution gave a
+        pipe span, so only its pipe spans follow the replay-safe rules (``pipelex.system.telemetry.replay_safe_spans``):
+        the workflow's clock, and an end exported by the live execution alone. Any other tracer keeps random ids, the
+        wall clock and every end, as if no orchestrator replayed anything, since dropping a replayed end it cannot
+        recompute the id of would orphan the children already exported under the id it gave first. Not abstract: an
+        injected manager that does not build its provider with ``ReplaySafeIdGenerator`` answers False.
+        """
+        return False
+
     @abstractmethod
     def setup(self, *, integration_mode: IntegrationMode):
         pass

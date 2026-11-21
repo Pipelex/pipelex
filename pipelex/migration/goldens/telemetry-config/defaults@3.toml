@@ -8,6 +8,9 @@ geoip = true
 debug = false
 redact_properties = []
 
+[custom_posthog.events]
+enabled = true
+
 [custom_posthog.tracing]
 enabled = false
 
