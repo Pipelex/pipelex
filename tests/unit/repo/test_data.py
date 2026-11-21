@@ -33,3 +33,19 @@ class HostedAccountCheckTestData:
             "expires_at": None,
         },
     }
+
+
+class SlowTestMarkerTestData:
+    """A duration map around a one-second threshold, and the node ids it holds or misses."""
+
+    THRESHOLD_SECONDS = 1.0
+    ABOVE_NODE_ID = "tests/unit/test_example.py::TestExample::test_above"
+    AT_NODE_ID = "tests/unit/test_example.py::TestExample::test_at"
+    BELOW_NODE_ID = "tests/unit/test_example.py::TestExample::test_below"
+    MISSING_NODE_ID = "tests/unit/test_example.py::TestExample::test_missing"
+
+    DURATIONS: ClassVar[dict[str, float]] = {
+        ABOVE_NODE_ID: 2.5,
+        AT_NODE_ID: 1.0,
+        BELOW_NODE_ID: 0.0042,
+    }

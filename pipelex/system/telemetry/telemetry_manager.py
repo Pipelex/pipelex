@@ -156,6 +156,9 @@ class TelemetryManager(TelemetryManagerAbstract):
             self._tracer_provider = None
             log.verbose("AI tracing is disabled, and no OpenTelemetry tracer was made")
 
+        if self.custom_posthog_client and not telemetry_config.custom_posthog.events.enabled:
+            log.verbose("The event-style events are switched off; spans, generations and exceptions still go to the custom PostHog")
+
         # Wrap capture_exception to sanitize before sending
         if self.custom_posthog_client:
             self._wrap_capture_exception(self.custom_posthog_client)
@@ -443,6 +446,11 @@ class TelemetryManager(TelemetryManagerAbstract):
         properties: dict[EventProperty, Any] | None = None,
         run_metadata: "RunMetadata | None" = None,
     ):
+        # The operator switched the event-style events off: they go nowhere, while the spans, the generations and the
+        # error tracker's `$exception`, which do not come through here, still travel on the same client.
+        if not self.telemetry_config.custom_posthog.events.enabled:
+            return
+
         # We copy the incoming properties to avoid modifying the original dictionary
         # and to convert the keys to str
         # and to remove the properties that are in the redact list

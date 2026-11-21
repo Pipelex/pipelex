@@ -121,7 +121,6 @@ ExtractInputError | one of runtime.unexpected, model.capability_unsupported
 ExtractInputFormatError | input.file_type_unsupported
 ExtractJobFailureError | inherits cause, else runtime.unexpected; or chosen: runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, provider.outcome_unknown, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
 ExtractModelNotFoundError | model.unavailable
-FatalError | abstract
 FileTypeError | one of input.file_type_unsupported, provider.response_invalid
 FixTransactionError | runtime.unexpected
 FixWriteConflictError | method.changed_concurrently
@@ -401,7 +400,6 @@ ToolError | abstract
 TraceContextRunModeError | runtime.unexpected
 TraceEventModeError | runtime.unexpected
 TraceEventTooLargeError | runtime.unexpected
-TracebackMessageError | abstract
 TreeModuleShadowingError | method.name_conflict
 TreePythonError | one of runtime.unexpected, request.unsupported, method.name_conflict
 TreePythonHeldError | runtime.unavailable

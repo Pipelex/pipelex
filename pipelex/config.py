@@ -113,6 +113,11 @@ def table_reading_limits() -> TableReadingConfig:
     return optional_config.runtime.table_reading
 
 
+def crate_class_cache_max_classes() -> int:
+    """The most structure classes this process keeps for the crates it loaded (`[interpreter.crate_class_cache]`); zero keeps none."""
+    return get_config().interpreter.crate_class_cache.max_classes
+
+
 def is_pipe_func_sandbox_hosted() -> bool:
     """Whether PipeFunc runs out-of-process in this process (non-raising; defaults to local).
 

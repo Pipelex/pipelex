@@ -4,8 +4,35 @@
 
 ### Added
 
+- **The event-style events can be switched off while tracing stays on**: `[custom_posthog.events] enabled = false` in `telemetry.toml` stops `pipeline_execute`, `pipeline_complete`, `pipe_run`, `pipe_complete`, `pipe_dry_run` and the CLI's events from reaching your PostHog, while the AI spans and generations of `[custom_posthog.tracing]` and the `$exception` events of the `posthog` error tracker still go out on the same client. It is on by default, so a self-hosted or local install's stream is unchanged; a host whose own events record each run turns it off so a run is not counted twice.
 - **Pipe spans opened in replayable workflow code are exported once, with their true start**: a boot-orchestrator plugin whose runtime replays its workflow code claims the new `HubSlot.WORKFLOW_EXECUTION_PROBE` with `PluginRegistrar.claim_workflow_execution_probe`, whose probe answers the `WorkflowExecutionProtocol` of the workflow code a call runs in (`pipelex/system/telemetry/workflow_execution.py`). A pipe span opened there takes its id from the workflow's deterministic random, through `ReplaySafeIdGenerator`, the id generator of Pipelex's tracer provider, and its start and end from the workflow's clock, and only the live execution ends it, never a replay nor the orchestrator unwinding the code on an eviction or a retried workflow task, so a controller crossing an eviction yields one span to every destination where it yielded one per execution, with the start it had before the eviction. A pipe that fails, at whatever depth, and a cancelled run still export their spans with the failure. Only pipe spans draw from the workflow's random, and only a tracer whose provider uses `ReplaySafeIdGenerator` (`TelemetryManagerAbstract.is_otel_tracer_replay_safe`, true for Pipelex's own) follows these rules; an injected telemetry manager's other tracer keeps random ids and the wall clock. Unclaimed, nothing changes. The plugin API stays at v14.
 - **A pipe's `$ai_span` carries a deterministic uuid**: the PostHog exporter derives it as a UUIDv5 of `"$ai_span:<$ai_span_id>"`, so a capture the PostHog client delivers twice carries one uuid, as the tracking plan's rule 7 asks.
+
+## [v0.112.0] - 2026-11-21
+
+### Fixed
+
+- **A stale configuration no longer prints the error it was recovered from (Breaking)**: `ConfigValidationError` logs nothing when it is raised, so a configuration file a release made out of date, which the loader carries forward through the migration ledger, no longer prints a pydantic traceback on every read, and a refused configuration is reported once, by the command that handles it. A hosted `pipelex run` now prints each stale file with its remedy, `pipelex migrate`, before the run starts, as a local run's boot already did. `TracebackMessageError`, `TracebackMessageErrorMode` and `FatalError`, which existed only to log at construction, are removed from `pipelex.exceptions` and `pipelex.system.exceptions`, and `ConfigValidationError` now derives from `PipelexError`.
+
+## [v0.111.2] - 2026-11-20
+
+### Changed
+
+- **A blueprint built from trusted templates skips its template-input check**: inside `trusting_authored_templates()`, the validators of the `PipeCompose`, `PipeLLM`, `PipeImgGen`, `PipeSearch`, `PipeJudge` and `PipeDocGen` blueprints no longer compare the variables their templates read with the declared inputs, and a `PipeCondition` blueprint no longer parses and compiles its expression, since the method those templates came from passed both checks where it was validated. Each parsed its templates again, so a worker decoding a run's crate inside that scope now parses none of them, where a crate holding a large compose template and a large prompt cost one parse of each. Outside the scope the checks are unchanged, and a template reading an undeclared input is still refused.
+
+## [v0.111.1] - 2026-11-20
+
+### Changed
+
+- **`kajson` version**: The pin moves to `kajson==0.9.0`, the release adding a safe decoding mode (`safe=True`, `importable_packages`) for JSON from an untrusted source, and everyone downstream inherits that exact version. Its decoder is stricter: a malformed class marker, a `timedelta` payload with an unknown key or a non-numeric value, and an `AttributeError` raised inside a class's `__json_decode__` now raise `KajsonDecoderError` where they used to raise a bare `KeyError`, `TypeError` or `AttributeError`, or quietly decode to a plain dict or a constructor call. Release 0.8.0 also removed `class_source_code` from `loads()` and `load()`, which pipelex no longer passed. The encoded format is unchanged, so payloads cross between this version and the previous one in both directions.
+
+## [v0.111.0] - 2026-11-20
+
+### Changed
+
+- **A `PipeBatch` branch starts with only what its pipe reads (Breaking)**: each branch gets its own copy of its item and of the values its branch pipe reads, where it got a copy of the whole working memory, the batched list included, so starting a batch costs its number of items plus the size of what a branch reads rather than the two multiplied, which on a wide batch over a large list held a durable backend's workflow step past its deadline. Branches stay isolated from the batch and from each other, and a `PipeFunc` branch looking up a value its pipe does not declare as an input no longer finds it. The new `WorkingMemory.make_deep_copy_of` copies the part of a memory a set of names reaches.
+- **A prevalidated crate load skips the judgments of authored templates**: `load_from_crate(is_crate_prevalidated=True)` no longer checks that each template parses, runs no template lint (private names, unguarded optional inputs) and no `PipeLLM` check that its prompts read exactly its declared inputs, since the library the crate came from passed them, and it still builds everything a run reads, such as the images and documents a prompt presents. Every crate load also parses each template once for all the checks and analyses that read it, where each parsed it again, so a worker loads a method with large templates several times faster; `trusting_authored_templates` and `sharing_template_parses` in `pipelex.tools.jinja2.jinja2_parsing` open the same scopes for a host that builds pipes or blueprints from a validated method elsewhere, such as while decoding a run's start argument.
+- **A process builds a crate's concept classes once**: `load_from_crate` keeps the concepts and structure classes it built for a crate in a process-level cache keyed by the crate's fingerprint, and a later load of the same crate into a fresh library, starting from the same class registry, registers the same class objects instead of building them again, so a worker's repeated loads of one method, such as every branch of a batch, cost a fraction of the first. `[interpreter.crate_class_cache] max_classes` bounds the classes kept, the least recently used crate leaving first, and zero turns the cache off.
 
 ### Fixed
 
