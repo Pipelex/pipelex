@@ -2079,7 +2079,7 @@ Pipelex provides comprehensive telemetry and observability capabilities to monit
 
 ## Langfuse Integration
 
-Full LLM observability with complete span data. Track every LLM call, its inputs, outputs, tokens, cost, and latency. Supports both Langfuse Cloud and self-hosted instances via the OTLP exporter.
+Full observability of every inference call with complete span data. Every call opens a generation span, whether it is an LLM call, an image generation, an extraction, a search, a judgment or a document print, with its model, its inputs and outputs, its tokens summed over every attempt, its cost at the model's declared rates, its latency and, when it fails, the category of its failure. Supports both Langfuse Cloud and self-hosted instances via the OTLP exporter. [Telemetry Setup](../setup/telemetry.md#what-an-inference-call-reports) lists what a generation span carries.
 
 ## OpenTelemetry (OTLP)
 
@@ -2087,7 +2087,7 @@ Send execution spans to any OTLP-compatible backend for integration with your ex
 
 ## PostHog Integration
 
-Event tracking and AI span tracing with fine-grained privacy controls. Choose between anonymous and identified modes. Configure what data to capture: content, pipe codes, output class names, and content length limits.
+Event tracking and AI span tracing with fine-grained privacy controls. Every inference call reaches PostHog as an `$ai_generation` naming its serving provider, its model id, its tokens, its cost and whether it failed. Choose between anonymous and identified modes. Configure what data to capture: content, pipe codes, output class names, and content length limits.
 
 ## Per-run attribution
 
@@ -11454,7 +11454,7 @@ The doctor checks the configuration a command run in the current directory would
 - **Configuration Location** - Which configuration directory is used, the project's or the global one.
 - **Configuration Files** - Whether every configuration file the kit ships is present, and whether `pipelex.toml` is valid.
 - **Configuration Migrations** - What [`pipelex migrate`](migrate.md) would change: the files a migration would bring up to the current schema, the files that need a look from you, and what a former release left for the Pipelex Gateway, which the migration cleans up first. This row covers the home configuration directory and the project's `.pipelex/` together, as `pipelex migrate` does.
-- **Telemetry Configuration** - Whether `telemetry.toml` is present and valid.
+- **Telemetry Configuration** - Whether `telemetry.toml` is present and valid, read as it is written: a secret it names through a `${…}` placeholder, such as `pipe_id_key`, is checked when a process loads the file, not here.
 - **Plugins**, **Secrets Provider** and **Log Sink** - Whether the plugins, the secrets provider and the log sink your configuration names can be set up. These rows appear once the configuration loads.
 - **Pipelex API Key** - Whether hosted runs have a key to send. This row appears only when your runs execute on the hosted Pipelex API, as described below.
 - **Backend Credentials** - Whether the provider keys of the enabled inference backends are set. When some are missing, the row says how to set them, how to disable a backend you do not need, and that a run on the hosted Pipelex API needs none of them.
@@ -14235,6 +14235,9 @@ Files are deep-merged, with later layers winning per leaf key. This means Langfu
 # Join the trace of the process that runs Pipelex (top-level, before any section)
 join_host_trace = false
 
+# Secret key of the stable pipe identifiers (top-level); no key, no pipe_id
+# pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+
 # PostHog Configuration (Event tracking + AI span tracing)
 [custom_posthog]
 mode = "anonymous"                                   # "off" | "anonymous" | "identified"
@@ -14250,6 +14253,10 @@ redact_properties = [
     "file_path",
     "url",
 ]                                                    # Event properties to redact
+
+# Event-style events to YOUR PostHog (pipeline_execute, pipe_run, the CLI's events...)
+[custom_posthog.events]
+enabled = true                                       # Send event-style events to your PostHog
 
 # AI span tracing to YOUR PostHog
 [custom_posthog.tracing]
@@ -14285,14 +14292,24 @@ headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 
 ## Joining the host's trace
 
-The top-level `join_host_trace` key decides whether Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run continues the current span, follows its sampling decision, and its pipe and LLM spans are made current while they run. [Telemetry Setup](../../setup/telemetry.md#joining-your-processs-trace) describes what it does and what it costs.
+The top-level `join_host_trace` key decides whether Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run continues the current span, follows its sampling decision, and its pipe and inference spans are made current while they run. [Telemetry Setup](../../setup/telemetry.md#joining-your-processs-trace) describes what it does and what it costs.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`; empty or blank counts as unset), itself overridden by `Pipelex.make(join_host_trace=...)`; a telemetry manager injected through `Pipelex.make(telemetry_manager=...)` states it for itself |
 
 !!! warning "A span destination is required"
-    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: an `[[otlp]]` exporter, `[langfuse]` enabled, or `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled. Any one of them is enough, so `[custom_posthog]` may stay off. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+
+---
+
+## Stable pipe identifiers
+
+The top-level `pipe_id_key` key turns on `pipe_id`, the identifier every pipe span carries that is stable across runs and is not the pipe code. [Telemetry Setup](../../setup/telemetry.md#stable-pipe-identifiers) describes what it is made from and how a run names its method.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `pipe_id_key` | string | (none) | The secret the identifiers are keyed with, at least 32 characters, shared by every process of a deployment. A placeholder whose variable is not set refuses the load, and a refused key is never quoted in the error. With no key, no span carries a `pipe_id` |
 
 ---
 
@@ -14310,7 +14327,7 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 | `api_key` | string | (required) | Your PostHog project API key |
 | `geoip` | boolean | `true` | Enable GeoIP lookup for location data |
 | `debug` | boolean | `false` | Log events locally without sending |
-| `redact_properties` | array | `[]` | Event properties to redact before sending |
+| `redact_properties` | array | `[]` | Event properties to redact before sending, `pipelex_version` among them |
 
 #### Mode Options
 
@@ -14331,9 +14348,19 @@ trackers = ["posthog"]   # remove "posthog" to keep errors off your PostHog
 
 See [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) for the other trackers a plugin can add.
 
+### `[custom_posthog.events]` Settings
+
+Controls the event-style events sent to your PostHog instance: `pipeline_execute`, `pipeline_complete`, `pipe_run`, `pipe_complete`, `pipe_dry_run` and the CLI's events, such as `pipe_show`, `pipes_list`, `backends_show` and `graph_render`.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `true` | Send event-style events to your PostHog |
+
+Switching them off leaves the AI spans and generations of `[custom_posthog.tracing]`, and the `$exception` events of the `posthog` error tracker, going to the same PostHog: it is meant for a host whose own events already record each run, so that a run is not counted twice. A file that omits the section keeps the events on. With `mode = "off"` nothing reaches your PostHog, whatever this switch says. [Telemetry Setup](../../setup/telemetry.md#your-posthog-stream-events-spans-and-errors) shows an example.
+
 ### `[custom_posthog.tracing]` Settings
 
-Controls AI span tracing to your PostHog instance.
+Controls AI span tracing to your PostHog instance. It decides only whether your PostHog receives spans: `[[otlp]]` exporters and `[langfuse]` receive them whether it is on or off.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -14350,8 +14377,12 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 | `pipe_codes` | boolean | `false` | Include pipe codes in span names/attributes |
 | `output_class_names` | boolean | `false` | Include output class names in spans |
 
+A run may override `pipe_codes` and `output_class_names` together with its own `capture_pipe_codes`; see [Pipe codes for one run](../../setup/telemetry.md#pipe-codes-for-one-run).
+
 !!! warning "Privacy Note"
     These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.
+
+The capture settings never redact what a generation names about its model and its usage: the serving provider, the model id and handle, the tokens, the cost, the attempt count and the failure's category always reach your PostHog, since none of them is content. A generation's span name keeps its output type, `Text`, `Image`, `Pages`, `Document` or a judgment's `Object`, when the pipe code is redacted; only a structured output's class name is redacted with `output_class_names`. [Telemetry Setup](../../setup/telemetry.md#what-an-inference-call-reports) lists every property a generation carries.
 
 ---
 
@@ -14373,7 +14404,7 @@ The `[custom_portkey]` section configures the Portkey SDK behavior when using th
 
 ## Langfuse Configuration
 
-The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability.
+The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability. It works on its own: once enabled, Langfuse receives Pipelex's spans whatever `[custom_posthog]` says, `mode = "off"` included. A boot with Langfuse enabled and its keys missing is refused.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -14389,7 +14420,7 @@ The `[langfuse]` section enables integration with [Langfuse](https://langfuse.co
 
 ## OTLP Exporters Configuration
 
-The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters.
+The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters. Each exporter works on its own: it receives Pipelex's spans whatever `[custom_posthog]` says, `mode = "off"` included, so a backend of your own needs no PostHog stream.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -16476,7 +16507,7 @@ The runtime holds each span it starts as the active Pipelex span from its start 
 - **A pipe run's span**: `live_run_pipe` starts the span, then runs the pipe with it held, so a line logged by the pipe's own work, a controller's or an operator's and the lines of the extract, image-generation, search or function call an operator makes, names the pipe's span under `pipelex.*`, and a nested pipe's lines name the nested pipe's span until it returns. The line announcing the run is logged before the span starts, under the enclosing span.
 - **An LLM call's span**: the LLM worker runs the provider call with its generation span held, so the lines of the call and of its failure name that span under `pipelex.*`, a provider SDK's own lines included.
 
-The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer, with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one, under `OTEL_SDK_DISABLED` for instance, which starts no span of its own, and a line carries no `pipelex.*` fields. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps both its spans, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits both from the code that started it.
+The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer, whenever one of your span destinations is configured, an `[[otlp]]` exporter, Langfuse or AI span tracing on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one, under `OTEL_SDK_DISABLED` for instance, which starts no span of its own, and a line carries no `pipelex.*` fields. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps both its spans, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits both from the code that started it.
 
 Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **By default Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. With [`join_host_trace`](../setup/telemetry.md#joining-your-processs-trace) on, a run joins your trace and the held span is also made current, so the standard fields and the `pipelex.*` fields of a line inside a run name the same span. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs carries `pipelex.*` fields only while the process runs a span of its own, the LLM call's for instance.
 
@@ -16686,14 +16717,14 @@ Every inference call ends with `Inference call ends`, on the logger `pipelex.cog
 | `model_handle` | string | The model's handle, as the model deck names it |
 | `backend_name` | string | The backend serving the model |
 | `sdk` | string | The SDK the backend reaches the model through |
-| `gen_ai.request.model` | string | The model requested, its handle, as on the LLM span |
-| `gen_ai.response.model` | string | The provider's id the model deck pins for the handle, the one the call is made with, as on the LLM span |
+| `gen_ai.request.model` | string | The model id the call asked its backend for, the provider's id the model deck pins for the handle, as on the call's generation span |
+| `gen_ai.response.model` | string | The model id that served the call, read when the call ends, as on the call's generation span |
 | `gen_ai.usage.input_tokens` | integer | The tokens the call read, when it reported them |
 | `gen_ai.usage.output_tokens` | integer | The tokens the call wrote, when it reported them |
 | `cost_usd` | number, in US dollars | What the call cost, when it reported usage and the model has rates |
 | `duration_ms`, `outcome`, `error.type` | | As above |
 
-A handle names one model per model type, so a query groups by `gen_ai.operation.name` and `model_handle` together. The model keys are read when the call ends, so a worker that names its model in the checks before the call is named on the event as on the call's span. Every worker writes under `gen_ai.response.model` the provider's id the deck pins for the handle, the one the call is made with, and none writes the id a provider answers with: a provider that says another model answered is named on a warning of its own, the TypeSafe judgment worker's, under `answered_model_id`. A print that ended before its handle was resolved, refused by the read scope, or whose handle resolves to no model served here, names the model by its handle alone, under `model_handle` and `gen_ai.request.model`, and leaves off `backend_name`, `sdk` and `gen_ai.response.model`, which only a served model has. The usage is the one the call recorded on its job's report, the object the base hands to `ReportingProtocol.report_inference_job` when it reports the job and the reporting manager turns into a usage event, and the event prices it with `compute_tokens_usage_cost`, the cost engine the usage records and the run's cost report read, so a usage the cost report counts has the same price there as on the event. The event carries what the job recorded, though, and the cost report only what was reported: the search and judgment bases report a job whichever way it ends, while the LLM, image-generation and extraction bases report it only when it succeeds, so a failure of theirs the provider billed carries a cost on the event that the run's cost report does not count. One failure is reported all the same: a text the LLM base's stop check refuses, cut at its limit or refused by the model or a filter, which the provider answered and billed, so its usage is reported once and recorded on its span before the error propagates. A token count or a cost the call did not record is left off, never written as zero: a call that failed before the provider answered, or that the checks before it refused, recorded no usage, a model with no rates has no price, and a document engine reports no usage at all, so a print carries neither. A failure the provider billed, a search or a judgment whose answer a guard refused, carries the usage it recorded.
+A handle names one model per model type, so a query groups by `gen_ai.operation.name` and `model_handle` together. The model keys are read when the call ends, so a worker that names its model in the checks before the call is named on the event as on the call's span. Every worker writes under `gen_ai.response.model` the provider's id the deck pins for the handle, the one the call is made with, and none writes the id a provider answers with: a provider that says another model answered is named on a warning of its own, the TypeSafe judgment worker's, under `answered_model_id`. A print that ended before its handle was resolved, refused by the read scope, or whose handle resolves to no model served here, names the model by its handle alone, under `model_handle`, and leaves off `backend_name`, `sdk`, `gen_ai.request.model` and `gen_ai.response.model`, which only a served model has. The usage is the one the call recorded on its job's report, the object the base hands to `ReportingProtocol.report_inference_job` when it reports the job and the reporting manager turns into a usage event, and the event prices it with `compute_tokens_usage_cost`, the cost engine the usage records and the run's cost report read, so a usage the cost report counts has the same price there as on the event. The event carries what the job recorded, though, and the cost report only what was reported: the search and judgment bases report a job whichever way it ends, while the LLM, image-generation and extraction bases report it only when it succeeds, so a failure of theirs the provider billed carries a cost on the event that the run's cost report does not count. The LLM base reports these billed failures all the same: a text its stop check refuses, cut at its limit or refused by the model or a filter, which the provider answered and billed, and a structured generation that failed or was cancelled after the provider answered any of its attempts, its re-asks run out included; either's usage is reported once and recorded on its span before the error propagates. A token count or a cost the call did not record is left off, never written as zero: a call that failed before the provider answered, or that the checks before it refused, recorded no usage, a model with no rates has no price, and a document engine reports no usage at all, so a print carries neither. A failure the provider billed, a search or a judgment whose answer a guard refused, carries the usage it recorded.
 
 Rates are per million tokens, so a call billed by the request or by the page records each unit as a million tokens in and out, and the rate table prices one unit: a Linkup search or fetch is one request, and an extraction whose provider reports no usage is priced by its pages. Its usage says so in its `pricing_unit`, `request` or `page` rather than `token`, and the event carries the call's cost and no token counts, since a request or a page is not a token. A worker records such a usage with `record_unit_priced_usage` (`pipelex.cogt.usage.usage_cost`), a plugin's worker as much as a provider's, and never writes the counts itself.
 
@@ -16703,10 +16734,10 @@ INFO     claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionE
 ```
 
 ```json
-{"time": "2026-10-09T23:08:37.099Z", "severity": "INFO", "logger": "pipelex.cogt.inference.inference_call_summary", "message": "Inference call ends", "pipeline_run_id": "0b2319a6-c511-4e1f-80f6-914cbab5f28b", "pipe_run_id": "0b63ab15-ff93-4c4f-9a2d-4f1c4f9901d4", "gen_ai.operation.name": "chat", "model_handle": "claude-5.5-sonnet", "backend_name": "anthropic", "sdk": "anthropic", "gen_ai.request.model": "claude-5.5-sonnet", "gen_ai.response.model": "claude-sonnet-5-5", "gen_ai.usage.input_tokens": 2048, "gen_ai.usage.output_tokens": 512, "cost_usd": 0.009216, "duration_ms": 1234.512, "outcome": "success"}
+{"time": "2026-10-09T23:08:37.099Z", "severity": "INFO", "logger": "pipelex.cogt.inference.inference_call_summary", "message": "Inference call ends", "pipeline_run_id": "0b2319a6-c511-4e1f-80f6-914cbab5f28b", "pipe_run_id": "0b63ab15-ff93-4c4f-9a2d-4f1c4f9901d4", "gen_ai.operation.name": "chat", "model_handle": "claude-5.5-sonnet", "backend_name": "anthropic", "sdk": "anthropic", "gen_ai.request.model": "claude-sonnet-5-5", "gen_ai.response.model": "claude-sonnet-5-5", "gen_ai.usage.input_tokens": 2048, "gen_ai.usage.output_tokens": 512, "cost_usd": 0.009216, "duration_ms": 1234.512, "outcome": "success"}
 ```
 
-On Pipelex's LLM span, `gen_ai.operation.name` still holds Pipelex's unit-job id, `llm_gen_text` or `llm_gen_object`, which the PostHog exporter reads back to name the span; the event carries OpenTelemetry's operation name under that key, and the span is to follow it. Every other `gen_ai.*` key means the same on both.
+Every inference call also opens a generation span, which [Telemetry](../setup/telemetry.md#what-an-inference-call-reports) describes, and every `gen_ai.*` key means the same on the span and on the event, `gen_ai.operation.name` included. The span carries Pipelex's unit-job id, `llm_gen_text` or `llm_gen_object`, under `pipelex.unit_job_id`. The one key named alike with a different value is `error.type`: the event names the exception's class, for a log query, while the span names the failure's inference error category, the closed vocabulary its backends group by.
 
 ### The pipe-run end
 
@@ -16806,7 +16837,7 @@ log.warning(
 
 ### Values in fields
 
-What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id the model deck pins for that handle, the one the call is made with, whichever model the provider says answered. `gen_ai.operation.name` is the one exception for now, as [the inference call end](#the-inference-call-end) explains. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A path is named `<what>_path`, a list of paths `<what>_paths`, a directory `<what>_dir` and a file as a declaration names it `<what>_file`, with their plurals, beside `file.path`: the console takes a field for a path by that ending and cuts its value at its start, keeping the file's name (see [Fields after the message](#fields-after-the-message)), so a field holding no path takes none of these endings. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
+What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's generation span: `gen_ai.request.model` is the provider's id the model deck pins for the handle, the one the call is made with, and `gen_ai.response.model` the one that served the call, whichever model the provider says answered, while the handle rides `model_handle`. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A path is named `<what>_path`, a list of paths `<what>_paths`, a directory `<what>_dir` and a file as a declaration names it `<what>_file`, with their plurals, beside `file.path`: the console takes a field for a path by that ending and cuts its value at its start, keeping the file's name (see [Fields after the message](#fields-after-the-message)), so a field holding no path takes none of these endings. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
 
 | Field | Type | What it names |
 | --- | --- | --- |
@@ -17043,9 +17074,34 @@ See [Observer Provider Injection](../advanced/observer-provider-injection.md) fo
 
 Each integration mode allows these streams or not: by default the `cli`, `docker`, `fastapi`, `mcp` and `n8n` modes allow them, and `pytest`, `ci` and `python` do not, so a test suite sends nothing unless you allow its mode under `[telemetry_allowed_modes]` in `telemetry.toml`. [Telemetry Configuration](../configuration/config-practical/telemetry-config.md) describes each destination's settings.
 
+### Your PostHog stream: events, spans and errors
+
+When your PostHog stream is on, it carries three kinds of data, each with its own switch:
+
+- **Event-style events** (`[custom_posthog.events]`, on by default): one event per thing that happened, `pipeline_execute` and `pipeline_complete` for a run, `pipe_run` and `pipe_complete` for a pipe, `pipe_dry_run` for a validation sweep, and the CLI's own events such as `pipe_show` and `pipes_list`.
+- **AI spans and generations** (`[custom_posthog.tracing]`, off by default): an `$ai_span` per pipe and an `$ai_generation` per inference call, the same spans your Langfuse and OTLP destinations receive.
+- **Errors** (`[runtime.error_tracking]` in `pipelex.toml`): the `$exception` events of the built-in `posthog` error tracker, as [Error trackers](#error-trackers) describes.
+
+A self-hosted install or a local one, where Pipelex is the only thing reporting a run, keeps all three. A host whose own events are already the record of each run, such as a platform that sends its own run event when it starts a run, switches the event-style events off so a run is not counted twice, and keeps the spans, the generations and the errors:
+
+```toml
+[custom_posthog]
+mode = "identified"
+user_id = "my-service"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.events]
+enabled = false  # no pipeline_execute, pipe_run and their kin
+
+[custom_posthog.tracing]
+enabled = true   # spans and generations still go out
+```
+
+The switch only reaches the event-style events: the spans, the generations and the `$exception` events travel on the same PostHog client, which stays up.
+
 ### Pipelex's spans in your process
 
-Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
+Pipelex traces a live run whenever one of your span destinations is configured: an `[[otlp]]` exporter, Langfuse with `enabled = true`, or your PostHog stream when it is on (`mode` is `anonymous` or `identified`) with its AI span tracing enabled (`[custom_posthog.tracing]`). Any one of them is enough, each independently of the others, so an `[[otlp]]` exporter or Langfuse receives Pipelex's spans with `[custom_posthog]` off; one tracer feeds all of them. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
 
 - Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
 - An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. An error tracker plugged into Pipelex's own seam receives both: the Pipelex span the error was raised in, and your current span when it was reported, as [Error trackers](#error-trackers) describes.
@@ -17058,7 +17114,7 @@ When the trace of the process is yours, and you want Pipelex to behave as one mo
 
 - **A run continues your current span.** When a run starts, Pipelex reads OpenTelemetry's current span; the run's root pipe span becomes its child, in your trace, instead of the root of a trace derived from the run's id. The trace id, the parent and your span's W3C trace state travel with the run's job metadata, so a step a distributed worker runs, in another process, stays in your trace too. With no current span, the run roots its own trace as before. A run started inside a running pipe, whose span is then the current one, becomes a subtree of the enclosing run rather than a new root in its trace.
 - **Your sampling decision is followed.** Pipelex's spans carry your span's sampled flag rather than always being sampled, so a request your sampler drops keeps none of Pipelex's spans, and none of the spans your instrumentation opens inside them.
-- **Pipe and LLM spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the LLM call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
+- **Pipe and inference spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the inference call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
 
 You turn it on in code, in the environment or in the file, and the most explicit wins: `Pipelex.make(join_host_trace=True)` in code, then the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`, in any case; an empty or blank variable counts as unset, and any other value stops the boot), then the top-level `join_host_trace` key of `telemetry.toml`, `false` by default.
 
@@ -17078,7 +17134,7 @@ endpoint = "${env:OTLP_TRACES_ENDPOINT}"
 headers = { "x-sentry-auth" = "${env:OTLP_AUTH_HEADER}" }
 ```
 
-**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. The destinations are your PostHog stream with its AI span tracing on, an `[[otlp]]` exporter and Langfuse, all fed by the one tracer that exists when `[custom_posthog]` is `anonymous` or `identified` and `[custom_posthog.tracing]` is enabled; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
+**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. Any one destination is enough: an `[[otlp]]` exporter, Langfuse when it is enabled, or your PostHog stream with its AI span tracing on, each independently of the others, so `[custom_posthog]` may stay off; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
 
 What it costs:
 
@@ -17086,6 +17142,45 @@ What it costs:
 - **Langfuse's trace-level fields** are written by each run's root span, so when runs share one of your traces, they describe the run that wrote them last.
 - **A telemetry manager you inject states the switch for itself.** With `Pipelex.make(telemetry_manager=...)`, the manager's own `join_host_trace` decides, the environment and the file are not read for it, and its destinations are yours to check; passing `join_host_trace=` beside it with a different value stops the boot.
 - **Each process states the switch for itself.** A distributed worker continues your trace whatever its own setting, since the trace id and the sampled flag travel with the job, but it makes Pipelex's spans current only when its own switch is on.
+
+### One span per pipe under a distributed orchestrator
+
+A distributed orchestrator such as Temporal runs controller pipes (`PipeSequence`, `PipeParallel`, `PipeBatch`, `PipeCondition`) in workflow code, which it re-executes from the start whenever it replays a workflow, after evicting it from a worker's cache or moving it to another worker. Every destination still receives **one span per pipe**, with its true start: a span opened in workflow code takes its id from the workflow's deterministic random and its start and end from the workflow's clock, so a replay recomputes the span the first execution opened, and only the execution that runs the pipe to its end exports it. A controller in flight across an eviction keeps its start from before the eviction, and the spans its children exported meanwhile keep pointing at it. This needs nothing from you: the orchestrator plugin lends Pipelex its workflow's clock and random, as [the orchestrator plugins](../under-the-hood/orchestrator-plugins.md#the-workflow-execution-probe-slot) describe, and a process that runs no such orchestrator keeps random ids and the wall clock.
+
+What to expect from it:
+
+- **A pipe span's times are as fine as the workflow's tasks.** The workflow's clock is the time of the workflow task being processed, so a controller's start and end fall on the task that started it and the task that saw it finish: its duration includes the time the orchestrator took to schedule those tasks, and a pipe that starts and ends in one task lasts zero. Spans opened in activities, every operator's, keep the wall clock.
+- **A pipe that fails exports its span with the failure, at whatever depth**, and so does a run that is cancelled. A span is left out only when the workflow does not end there: on an eviction, and on an error that fails the workflow task rather than the workflow, which the orchestrator retries until the pipe ends for real. The Temporal plugin lists Pipelex's own errors among the errors that fail a workflow.
+- **It holds for Pipelex's own tracer.** A telemetry manager you inject with `Pipelex.make(telemetry_manager=...)` gets the same behaviour only when its tracer's provider draws its ids through `ReplaySafeIdGenerator` (`pipelex/system/telemetry/replay_safe_id_generator.py`) and its `is_otel_tracer_replay_safe` answers `True`. Any other tracer cannot recompute a span's id on a replay, so its spans keep random ids, the wall clock and an export at every end, replays included, as before.
+- **Only pipe spans draw from the workflow's random.** Any other span opened in workflow code keeps a random id, so a span that exists on one worker and not on another, by configuration, never shifts the ids of the pipe spans after it.
+
+On your PostHog stream, each pipe's `$ai_span` event also carries a uuid derived from its `$ai_span_id`, so a capture the PostHog client delivers twice carries the same uuid.
+
+## What an inference call reports
+
+Every inference call opens one **generation span**, whatever kind of inference it is: an LLM call, an image generation, an extraction or OCR, a search, a judgment, and the print of a document by its engine. The span is an OpenTelemetry span, so your Langfuse and every `[[otlp]]` exporter receive it as it is, and your PostHog stream receives it as an `$ai_generation`. It follows the OpenTelemetry GenAI semantic conventions where they define an attribute, and carries Pipelex's own beside them:
+
+| Span attribute | What it holds |
+|---|---|
+| `gen_ai.operation.name` | The operation: `chat` for an LLM call, otherwise `img_gen`, `extract`, `search`, `judgment` or `doc_gen`, the same value the call's summary log event names |
+| `gen_ai.provider.name` | The serving provider, the Pipelex backend the call was sent to, which may differ from the model's maker |
+| `gen_ai.request.model`, `gen_ai.response.model` | The model id the backend was asked for, and the one that served the call, read again when the call ends |
+| `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | The tokens the call recorded, summed over every attempt of a structured generation |
+| `pipelex.cost.input_usd`, `pipelex.cost.output_usd`, `pipelex.cost.total_usd` | The cost of those tokens at the rates the model declares, absent for a model that declares none |
+| `pipelex.inference.attempt_count` | How many times the call asked the model, a structured generation's re-asks included |
+| `pipelex.inference.kind` | `llm`, `img_gen`, `extract`, `search`, `judge` or `doc_render` |
+| `pipelex.inference.backend`, `pipelex.model.handle` | The Pipelex backend and the model handle your method named |
+| `pipelex.unit_job_id` | The step the span is about, `llm_gen_text` for instance |
+| `pipelex.run.method_id`, `pipelex.pipe.id` | The run's method and the `pipe_id` of the pipe that made the call, each absent when there is none (see [Stable pipe identifiers](#stable-pipe-identifiers)) |
+| `error.type` | On a failed call only: the failure's category, one of `transient`, `configuration`, `content`, `capacity`, `ambiguous` or `unknown` |
+
+A failed call ends its span with the error status and the exception recorded on it, and keeps the tokens and the cost it was billed for: a structured generation whose re-asks all failed the schema reports what every attempt spent, on its span and in the run's cost report. A call stopped from outside, cancelled rather than failed, ends with no error status. A document print reports no tokens and no cost, since its engine bills none.
+
+On your PostHog stream, the `$ai_generation` maps these attributes to PostHog's own properties: `$ai_provider` is the serving provider, `$ai_model` the model id, `$ai_input_tokens` and `$ai_output_tokens` the tokens, `$ai_input_cost_usd`, `$ai_output_cost_usd` and `$ai_total_cost_usd` the cost, `$ai_is_error` whether the call failed and `$ai_error` its category, never its message. Pipelex's own properties ride beside them: `inference_kind`, `inference_backend`, `model_handle`, `attempt_count`, `pipeline_run_id`, and the run's `method_id` and the calling pipe's `pipe_id` (see [Stable pipe identifiers](#stable-pipe-identifiers)). Every span and every event Pipelex sends to your PostHog also carries `pipelex_version`, the version of the runtime that sent it, which you can leave out of events by listing it in `redact_properties`. The event that opens a trace on your stream carries a span id derived from the trace, so PostHog keeps one of them when a trace starts twice.
+
+### How this promise is checked
+
+Pipelex's test suite checks this on every change, from the file you start with. The check copies the stock `telemetry.toml` that `pipelex init telemetry` writes, turns on your PostHog stream with its AI span tracing, Langfuse and one `[[otlp]]` exporter with the keys shown in [Quick Setup](#quick-setup), and leaves every privacy default as shipped. It then runs a method live in the `cli` integration mode and asserts what each destination received: the run's `pipeline_execute` and `pipeline_complete` events, its trace start, its pipe span and its `$ai_generation` on PostHog, without the pipe code or the content, and the full pipe and generation spans on the OTLP exporter and on Langfuse, each carrying every attribute this section lists but the run's method and `pipe_id`, which a span carries only when the host names the run's method and the deployment sets a `pipe_id_key`, and which the stock file leaves unset. It does so for a call that succeeds and for one that fails, and once more with `[custom_posthog]` left off, to prove that the OTLP exporter and Langfuse still receive the spans. The check lives in `tests/integration/pipelex/system/telemetry/test_self_hosted_telemetry_check.py`, and nothing it sends leaves the test process.
 
 ## Error trackers
 
@@ -17192,6 +17287,41 @@ The rules it follows:
 - **It travels with the run.** The mapping rides the job through every nested pipe, and the bridge payload that crosses a process boundary carries it, so a distributed worker is handed the same groups the entry point was given.
 
 These are labels for grouping, not content: they land in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
+
+## Stable pipe identifiers
+
+A deployment that keeps pipe codes out of its telemetry, `[custom_posthog.tracing.capture] pipe_codes = false`, reports each pipe span by its pipe type alone, so on its own a chart cannot follow one step of a method from one run to the next. Pipelex can give every pipe a **`pipe_id`** for that: an identifier that is the same for one pipe of one method on every run, and in every process of a deployment, and that cannot be turned back into the pipe code.
+
+Set a secret key in `telemetry.toml` to turn it on:
+
+```toml
+pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+```
+
+The key is at least 32 characters. A placeholder whose variable is not set refuses the load, so a process whose secret did not arrive does not start with a different key from its siblings. With no `pipe_id_key`, which is the default, Pipelex sends no `pipe_id` at all, never a substitute value. `pipelex doctor` checks the file as it is written, so it accepts the placeholder whether or not the variable is set in its own shell; whether the secret reaches a process is what that process's start checks.
+
+What a pipe's `pipe_id` is made from:
+
+- **It is a keyed digest.** Pipe codes are short words that anyone could guess, so a plain hash of one could be confirmed by hashing candidates. `pipe_id` is the HMAC-SHA256 of the method's identity and the pipe under your key, truncated to 32 hexadecimal characters.
+- **The method's identity comes first.** It is the run's `method_id` when the host names the stored method the run belongs to, else the address of the published package the run addressed (on the API server, a `method_ref` run; on this machine, `pipelex run method` and `pipelex-agent run method` of a fetched or installed published method), else the pipe's own domain. Each kind is tagged before it is digested, so a domain never collides with a method id spelled the same way.
+- **The pipe is its domain-qualified reference**, so two pipes that share a code in different domains of one method keep separate identifiers.
+- **Every process of a deployment must share the key.** A runner and a worker with different keys would give one pipe two identifiers. Changing the key deliberately starts a new series of identifiers, so note the date where your charts will show the break.
+
+Every pipe span then carries the attribute `pipelex.pipe.id`, and every inference span carries the `pipe_id` of the pipe that made the call. Your PostHog receives it as the `pipe_id` property of each `$ai_span` and `$ai_generation`.
+
+### The run's method
+
+A host that stores methods can name the stored method a run belongs to by passing `method_id` when it starts the run: to `PipelexMTHDSProtocol(method_id=...)`, or as the `method_key` field of a run request to the [API server](../api-server/pipe-run.md#run-telemetry-fields). It is 1 to 128 letters, digits, `_` or `-`. Pipelex never resolves it; it rides the run to every process, every span carries it as `pipelex.run.method_id`, your PostHog receives it as the `method_id` property of every `$ai_span`, the trace's first included, and of every `$ai_generation`, and it is the method's identity behind each `pipe_id`.
+
+### Pipe codes for one run
+
+The `[custom_posthog.tracing.capture]` settings `pipe_codes` and `output_class_names` hold for the whole deployment. A host serving several customers may need to decide per run instead, for instance per organization. A run may carry its own `capture_pipe_codes`, passed to `PipelexMTHDSProtocol(capture_pipe_codes=...)` or as the `capture_pipe_codes` field of a run request to the API server:
+
+- **`true`** sends the real pipe codes and output class names for this run, in span and trace names, the `pipe_code` property and Portkey's span names.
+- **`false`** sends the redaction marker for this run, whatever the deployment says.
+- **Absent** keeps the deployment's settings.
+
+The setting rides every span of the run as the attribute `pipelex.run.capture_pipe_codes`, so the process that exports a span, a distributed worker included, applies the run's choice rather than its own.
 
 ## Privacy
 
@@ -18080,7 +18210,7 @@ summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary
 - **`job_metadata`** — the run-level metadata. **The two halves are now separate types, and a caller reading a field off this object must know which half it is in.** `JobMetadata.run_metadata` holds what is constant for the whole run — `user_id`, `pipeline_run_id`, `storage_scope`, `read_scope`, `request_id`, `extras` — and the rest of `JobMetadata` holds what changes per step (`pipe_code`, `pipe_run_id`, `otel_context`). So it is `kernel.job_metadata.run_metadata.pipeline_run_id`, not `kernel.job_metadata.pipeline_run_id`; there is deliberately no read-through accessor, so one fact has one spelling. `user_id`, `storage_scope`, `read_scope`, `request_id` and `extras` are supplied by the host at `PipelexKernel.make(...)` — the last of them opaque, so a multi-tenant host can attribute a kernel-driven run to its own entities without the runtime learning what they are. `request_id` is the inbound request the run serves, validated by `RunMetadata` exactly as on the pipeline entry points, and it is what a hosted deployment filters its logs on. The distinction this bullet already drew informally — run-level metadata, per-step copy — is what the split makes explicit, and it is why the per-step copy can carry the run half through untouched. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern. `make_step_metadata(pipe_code=…)` names the pipe the step is running — mirroring what the interpreter stamps on its live and dry paths — so log correlation, usage accounting, and the per-step labelling a distributed backend derives see a named step. When no `pipe_code` is supplied the key is omitted from the update rather than passed as `None`, so a run-level `pipe_code` is never silently erased; the direct-call façade (`llm_text`/`llm_object`) stays deliberately anonymous, because the caller ran no pipe.
 - **`cogt_run_params`** — the execution-mode contract (`run_mode`, and the DRY-only `is_mock_usage` sub-flag) that every cogt leaf reads off the assignment it is handed.
 - **`step_id_source`** — where each step's `pipe_run_id` comes from, defaulting to a fresh `uuid4`, which is what every in-process run wants. It exists for a kernel hosted inside a replay-based executor, where ids minted from a non-replay-safe source take different values each re-execution; such a host injects its own replay-safe source via `PipelexKernel.make(step_id_source=…)`. It is a seam, not state — the kernel never inspects what it returns.
-- **The run's own id** follows the same rule, once per run rather than once per step. `make` takes it from a `trace_context`'s `graph_id` when one is given, else from `pipeline_run_id=…`, else from a fresh `uuid4`. **A host inside a replay-based executor must pass one of the two**, because the `uuid4` default re-mints on every replay and the replayed run would then name itself differently from the run it replays. Such a host mints the id from its own replay-safe source (a workflow's deterministic random, or its workflow id) and passes the value; a value is enough here where the step id needs a callable, because the run id is minted exactly once.
+- **The run's own id** follows the same rule, once per run rather than once per step. `make` takes it from a `trace_context`'s `graph_id` when one is given, else from `pipeline_run_id=…`, else from a fresh `uuid4`. A supplied id, a `pipeline_run_id` or a trace context's `graph_id`, follows the one rule of a run id, the one `execute` and `RunMetadata` apply too (`validate_pipeline_run_id` in `pipelex/system/job_metadata.py`): one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved. Any other value, the empty string included, raises a `RunParameterError`, a `ValueError`, rather than a minted id taking its place. **A host inside a replay-based executor must pass one of the two**, because the `uuid4` default re-mints on every replay and the replayed run would then name itself differently from the run it replays. Such a host mints the id from its own replay-safe source (a workflow's deterministic random, or its workflow id when that already follows the rule) and passes the value; a value is enough here where the step id needs a callable, because the run id is minted exactly once.
 
 Nothing derived from config or the model deck is cached on the instance — resolved settings and templating styles are computed per call, because cached derived state would shadow a later config or deck change and break per-call variation.
 
@@ -23646,6 +23776,19 @@ Each `claim_*` takes a **thunk** (a zero-arg factory), never a constructed insta
 
 The first four slots swap in the runtime's implementations of core execution services. The fifth, `claim_isolated_execution_probe`, is different in kind: its thunk resolves not a service but an **ambient predicate** (`Callable[[], bool]`) reporting whether the current call runs inside an isolated sub-execution — a Temporal activity — whose side-effecting emissions must not be written into the parent run's replay-deterministic buffer. `ReportingManager` consults it (`hub.is_in_isolated_execution()`) to route an activity-side usage emission to the per-process log instead of the workflow's registered buffer. A scoped event log (`runtime_hub.scoped_event_log`) set by the activity's own code comes first: the emission goes into it and nowhere else, which is how an activity captures its leaf's usage to return it with its result (see [the scoped override](execution-graph-tracing.md#event-log-transport-and-the-scoped-override)). The override is a ContextVar, so a workflow's scope never reaches an activity, co-located or not. It exists as a hub slot for the same reason the others do: only a boot-orchestrator plugin whose runtime has a replay/activity split knows how to answer, and core names no such runtime. Unclaimed (any in-process boot), the hub's core default answers "never isolated" — the in-process orchestrator has no such split.
 
+### The workflow-execution-probe slot
+
+An orchestrator that runs controller pipes inline in workflow code, and re-executes that code from the start when it replays a workflow (a Temporal worker after an eviction or a restart), would otherwise re-open each controller's pipe span on every replay with a fresh random id and a new start, and export it again at its end. `claim_workflow_execution_probe` lends pipelex's telemetry what only the orchestrator knows. Its thunk resolves a probe, `WorkflowExecutionProbe` in `pipelex/system/telemetry/workflow_execution.py`, which answers for the current call the `WorkflowExecutionProtocol` of the workflow code it runs in, or `None` outside workflow code, in an activity for instance:
+
+- `is_replaying()`: whether the code re-executes history a previous execution already ran (Temporal's `workflow.unsafe.is_replaying_history_events()`);
+- `time_ns()`: the workflow's own clock (`workflow.time_ns()`);
+- `random()`: a random generator the workflow seeds, dedicated to span ids so that drawing from it never shifts the workflow's own draws (`workflow.new_random("<a name>")`, kept on the workflow instance);
+- `is_unwinding(error=…)`: whether an exception leaves the workflow running, so the pipe runs again in a later execution. Only these qualify: the orchestrator tearing the workflow code down on an eviction, with its own exception, `GeneratorExit` or a cancellation it raises while it evicts, and an error that fails the workflow task rather than the workflow, which the orchestrator retries by replaying. Anything else is the pipe's real end and exports its span with the failure: an error that fails the workflow, at whatever depth it is raised, and a cancellation of the workflow or the run. For Temporal, that is true while the workflow is evicted, and otherwise for an error that `workflow.is_failure_exception` does not recognise and that is not an `asyncio.CancelledError`, which the SDK turns into the workflow's cancellation or failure at its top level. `is_failure_exception` tests the worker's `workflow_failure_exception_types` by `isinstance` wherever the error is raised, so a worker listing `PipelexError` there exports a nested pipe's failure. Answer from the orchestrator's state, never from the error's type alone.
+
+With the slot claimed, a pipe span opened in workflow code takes its id from that random, through the tracer provider's id generator (`ReplaySafeIdGenerator`), which draws from it for pipe spans alone, and its start and end from the workflow's clock, the time of the task being processed, so a replay recomputes the span the live execution opened, and the children it already exported keep their parent. Only the live execution ends the span, which is what exports it: an end reached while replaying, or on an unwinding exception, leaves the span unexported, and the execution that runs the pipe to its real end exports it once (`pipelex/system/telemetry/replay_safe_spans.py`). Pipelex asks `is_unwinding` before `is_replaying`, reads where a span was opened from its start, so a span that started on the workflow's clock and ends on `GeneratorExit` is a teardown's close, never its real end, even when the probe, asked from another thread, could not tell it runs in workflow code, and a span opened anywhere else always ends for real without asking the probe, and never lets a probe that raises as a pipe ends change how the pipe ends, its error or its result: that end is then not counted, with a warning. The rules apply to a tracer whose provider draws ids through `ReplaySafeIdGenerator`, as Pipelex's own telemetry manager's does (`TelemetryManagerAbstract.is_otel_tracer_replay_safe`); an injected manager's tracer from another provider keeps random ids, the wall clock and every end. A pipe whose workflow crossed an eviction therefore yields one span, with the start it had before the eviction, under the parent it always had, the host's span included when the run joined the host's trace. The model is `temporalio.contrib.opentelemetry`'s replay-safe tracer provider, except that its spans start on the wall clock when live and on the workflow's clock when replayed, where these always read the workflow's clock, so the start is the same whichever execution exports the span.
+
+The probe lives in a slot below both hubs, `workflow_execution_slot`, because its readers, `PipeAbstract` and the id generator, cannot import `runtime_hub` (see [the hub layering](../contribute/hub-layering.md)). The boot installs the claimed probe and both teardown paths reset the slot. Unclaimed, the core default answers `None` everywhere: the in-process orchestrator never replays, and every span keeps a random id and the wall clock. The slot is kernel-tier, a probe constructing no `Pipe`.
+
 ### The method file store slot
 
 A run names the files of its method by the digest of their method tree, and a leaf reads one, such as a `PipeDocGen` step's template file at its print or the files of an out-of-process `PipeFunc` call, through the method file store (`MethodFileStoreProtocol` in `pipelex/core/method_trees/method_file_store.py`): `read_tree_listing(tree_digest=…, read_scope=…)` returns the tree's listing, and `read_blob(sha256=…, read_scope=…)` a file's bytes, each `None` when the store does not hold it for that read scope. The caller checks the listing against the digest and each blob against the listing (`pipelex/core/method_trees/method_files.py`), so a store only serves bytes. A plugin whose activities run apart from the process that loaded the method claims the slot with `claim_method_file_store`, a thunk like the others, and its store serves the trees that process listed, from wherever the host put them. The slot is kernel-tier, a store constructing no `Pipe`. Unclaimed, the hub's core default is the local store, `LOCAL_METHOD_FILES`, which serves the trees this process's libraries hold while they hold them.
@@ -23662,7 +23805,7 @@ At each ordered hub slot, `Pipelex.setup` resolves in this precedence:
 2. a plugin slot-claim thunk;
 3. the core default.
 
-A slot claim must never silently override an explicit injection. Only the content generator and pipe router take an explicit `setup()` parameter; the other slots skip step 1 — the task manager (no core default either — unclaimed means no task manager wiring at all), the isolated-execution probe (whose core default is the always-False predicate above), and the pipe run (plugin thunk or core default, nothing else). Teardown runs the plugin-registered teardown callbacks **LIFO**, before core teardown, so a worker's in-flight runtime resources release first.
+A slot claim must never silently override an explicit injection. Only the content generator and pipe router take an explicit `setup()` parameter; the other slots skip step 1 — the task manager (no core default either — unclaimed means no task manager wiring at all), the isolated-execution probe (whose core default is the always-False predicate above), the workflow-execution probe (whose core default answers `None`), and the pipe run (plugin thunk or core default, nothing else). Teardown runs the plugin-registered teardown callbacks **LIFO**, before core teardown, so a worker's in-flight runtime resources release first.
 
 ---
 
@@ -25529,7 +25672,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.112.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.113.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -26759,6 +26902,10 @@ so `concept.py` cannot import `runtime_hub` at module level. Hosting the accesso
 A run may pin a per-library `ClassRegistry` rather than the process-global Kajson one. Knowing *which* library is current is method-layer knowledge, so the kernel layer holds only a slot: `class_registry_scoping`, defaulting to a resolver that returns `None`. `set_interpreter_hub` installs the real resolver, which means scoping is live exactly when a `InterpreterHub` exists — an invariant a caller cannot forget to wire. The runtime teardown phase (`RuntimeBoot._teardown_runtime`, reached from every `teardown`) calls `class_registry_scoping.reset()` so a torn-down library manager is never reachable through a still-pinned library id. It lives on the kernel half because releasing the slot belongs to whichever teardown runs — on a kernel-only boot nothing installed a resolver and the reset is a no-op.
 
 This is the same shape as `HubSlot.ISOLATED_EXECUTION_PROBE`: a defaulted callable a higher layer replaces at boot, never an unset attribute. A process that only ever builds a `RuntimeHub` therefore degrades to the process-global registry instead of raising. That used to describe only the doctor path and most unit tests; since [the boot split](#where-the-boot-splits) it is a first-class entry point — `RuntimeBoot.make()` installs no `InterpreterHub`, and a test pins that scoping stays at its unscoped default on that boot.
+
+### The workflow-execution probe sits below both hubs too
+
+`HubSlot.WORKFLOW_EXECUTION_PROBE`, the probe a boot-orchestrator plugin claims so that pipe spans opened in replayable workflow code are replay-safe, is held in `workflow_execution_slot` (`pipelex/system/telemetry/workflow_execution.py`), a module that imports nothing from `pipelex`, rather than on `RuntimeHub`. Its readers are why: `pipe_machinery.pipe_abstract` reads it when a pipe span starts and ends, which is the same static cycle as the class registry's, and the tracer provider's id generator is built from `system.telemetry.otel_factory`, inside `runtime_hub`'s own closure. `RuntimeBoot` installs the claimed probe at its apply-point and both teardown paths reset the slot, beside `class_registry_scoping`. Its core default answers `None`, no call running in workflow code. See [the orchestrator plugins](../under-the-hood/orchestrator-plugins.md#the-workflow-execution-probe-slot).
 
 ### The print stage's template file stage crosses downward too
 
@@ -29398,7 +29545,9 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
-- `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, at most 128 characters, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one.
+- `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
+- `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
+- `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one. It must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved: any other value is a `422` `request.invalid` naming `pipeline_run_id`, before the run is registered.
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends, before the response is sent; their delivery never changes the response, but a receiver that never answers delays it by about 51 seconds at most, the delivery's three attempts of 15 seconds and its waits between them. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
@@ -29516,6 +29665,8 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
+- `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
+- `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
@@ -29531,7 +29682,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - This endpoint answers `202 Accepted` immediately with a `StartAck` carrying the `pipeline_run_id`
 - The pipeline continues executing in the background
 - `pipe_output` will be `null` in the response (pipeline hasn't completed yet)
-- The request body MAY carry a client-supplied **`pipeline_run_id`** (max 128 chars): this server honors it, and the `StartAck.pipeline_run_id` echoes it back. When absent, the server generates one. (`StartAck.pipeline_run_id` is always authoritative — protocol rule.)
+- The request body MAY carry a client-supplied **`pipeline_run_id`**: this server honors it, and the `StartAck.pipeline_run_id` echoes it back. When absent, the server generates one. (`StartAck.pipeline_run_id` is always authoritative — protocol rule.) The id follows the same rule as on `/execute`: one to 128 ASCII letters, digits, `_` or `-`, never `untitled` or `dry_run_untitled`, and any other value is a `422` `request.invalid` naming `pipeline_run_id`.
 
 **Response (202):**
 
@@ -29749,6 +29900,22 @@ Both `/execute` and `/start` accept optional fields that describe the run's tena
 A mapping outside these rules is refused with a `422` `request.invalid` naming the field `analytics_groups`, or a path into it, before any method is fetched or any library loaded. A body that fails on more than one of the extension fields at once carries one `request.invalid` item per refused field in its `errors`.
 
 The caller's id is the run's person on that same stream, with one exception: a deployment with no user model attributes every run to the literal `single-tenant`, which the runtime declines as a person and replaces with the `user_id` configured in `telemetry.toml`. The groups do not depend on it, so a single-tenant deployment that sends `analytics_groups` still has them on every capture.
+
+## Run telemetry fields
+
+Both `/execute` and `/start` also accept optional **Pipelex-API extensions** that a host sets for the run's telemetry, beside `analytics_groups`:
+
+```json
+{
+  "mthds_contents": ["..."],
+  "method_key": "invoice_extractor",
+  "capture_pipe_codes": false
+}
+```
+
+**`method_key`** is your own key of the stored method this run belongs to, sent beside the run's source. This server never resolves it into a method, which is why it is a key of your own rather than a selector: the run is still the source it sends. The runtime keeps it as the run's method id, stamps it on every span as `pipelex.run.method_id`, which the PostHog stream sends as the `method_id` property, and uses it as the method's identity behind each pipe's stable identifier (see [Telemetry](../setup/telemetry.md#stable-pipe-identifiers)). It is 1 to 128 ASCII letters, digits, `_` or `-`; anything else is a `422` `request.invalid` naming the field `method_key`. A run started by `method_ref` that carries no `method_key` uses the package's address as its method's identity.
+
+**`capture_pipe_codes`** says whether this run's telemetry may carry its pipe codes and output class names, overriding the deployment's `custom_posthog.tracing.capture.pipe_codes` for this run alone. `true` sends the real values in the span and trace names and in the `pipe_code` and `output_class_name` properties; `false` sends the redaction marker. The value travels with the run to every process that runs a part of it, so a worker's activities honour it too. Omit it, or send `null`, to keep the deployment's setting.
 
 ---
 
@@ -31155,7 +31322,7 @@ The HTTP status of a failure the runtime raised is the one its code declares in 
 A few runtime refusals worth knowing by their code:
 
 - **404** — `method.not_found`: the `method_ref` repository was fetched, but no package in it matches the requested address by manifest identity, or it holds no such tag. The problem's sentences name the reference.
-- **409** — `pipelex.run.already_exists`: the submitted `pipeline_run_id` is already registered for a run that is still in flight on this server. Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates — resubmit after the in-flight run finishes, or pick a fresh id. Only `POST /v1/start` accepts a client-supplied `pipeline_run_id`, so only `/start` can produce it.
+- **409** — `pipelex.run.already_exists`: the submitted `pipeline_run_id` is already registered for a run that is still in flight on this server. Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates — resubmit after the in-flight run finishes, or pick a fresh id. Both `POST /v1/execute` and `POST /v1/start` accept a client-supplied `pipeline_run_id`, so either can produce it.
 - **422** — the `method_ref` resolution refusals the caller can fix: `request.invalid` for a reference that does not parse, `method.ambiguous`, and `method.package_invalid` for a package past its limits or carrying a symbolic link. `security.integrity_mismatch` is a **422** too: a package the method calls by address, which the server fetched, differs from the tree digest the method's `methods.lock` records for it, and its `dependency` names the address (see [Pipe Run](pipe-run.md#sending-the-method-packages-the-method-calls)). `pipelex.deployment.python_structures_refused` is a **422** too: a method, fetched by `method_ref` or sent as a tree, declares in-process Python structure classes (`StructuredContent` subclasses), which hosted execution always refuses, sandbox or not — express the types as MTHDS concepts with inline structures instead (see [Pipe Run](pipe-run.md#running-a-method-by-address-method_ref)).
 
 The runner's own refusals answer these codes:
@@ -31497,7 +31664,7 @@ These keys come from the sink itself and are on every line written by the proces
 | `message` | The human-readable summary |
 | `exception` | The traceback, when the record carries one |
 | `trace_id`, `span_id`, `trace_flags` | The process's current OpenTelemetry span, in lowercase hex, when one names a trace. This server registers no tracer and instruments nothing, so as shipped no line carries them; they appear only when the deployment runs it under OpenTelemetry instrumentation of its own that makes a span current |
-| `pipelex.trace_id`, `pipelex.span_id` | The Pipelex span a runtime line was logged in, the pipe's or the LLM call's, in lowercase hex. Present on the runtime's lines inside a live run the runtime traces, which it does when AI span tracing is enabled on your own PostHog; never on the server's own lines, an error line included |
+| `pipelex.trace_id`, `pipelex.span_id` | The Pipelex span a runtime line was logged in, the pipe's or the LLM call's, in lowercase hex. Present on the runtime's lines inside a live run the runtime traces, which it does when one of your span destinations is configured in `telemetry.toml`, an `[[otlp]]` exporter, Langfuse or AI span tracing on your own PostHog; never on the server's own lines, an error line included |
 
 The two pairs name different traces. Pipelex's spans belong to a trace of their own, which only Pipelex's exporters receive, so if you export them to a backend of your own, such as Langfuse, an OTLP collector or your PostHog, join a line to them on `pipelex.trace_id` and `pipelex.span_id`. To gather a run's lines whether or not anything traces, use `request_id` or `pipeline_run_id`. How each sink writes both pairs is in the Pipelex documentation's [trace context](../tools/logging.md#the-trace-context) section.
 
