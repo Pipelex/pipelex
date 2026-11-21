@@ -11984,6 +11984,8 @@ Where a run executes is decided in this order:
 2. `[run] execution` in `.pipelex/pipelex.toml` (`"local"` or `"hosted"`; the project's file over the one in `~/.pipelex/`), which [`pipelex init`](init.md#where-your-runs-execute) writes from your answer, see [Run Configuration](../../configuration/config-practical/run-config.md).
 3. Local.
 
+A hosted run still reads the configuration files to decide this. When one of them is out of date, written for an earlier release, it is carried forward in memory, and the run says so on stderr before it starts, naming the file and its remedy, `pipelex migrate` (see [`pipelex migrate`](migrate.md)), as a local run does when it starts.
+
 The key is read from `PIPELEX_API_KEY`. [`pipelex login`](login.md) gets a key through your browser and saves it in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), which Pipelex loads at startup, followed by the `.env` of the working directory when there is one. When the key was checked against another API than the one that file names on its own, the login saves that `PIPELEX_BASE_URL` beside the key, so the key goes to the API it belongs to from any shell. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from.
 
 **The `.env` files win over your shell.** Each `.env` file Pipelex loads replaces the variables it sets, so for `PIPELEX_API_KEY`, `PIPELEX_BASE_URL` or any other variable, the working directory's `.env` wins over `~/.pipelex/.env`, which wins over a value exported in your shell: an exported value is read only when neither file sets the variable. To replace the saved key, run `pipelex login` again; to use another key, or another origin, in one directory, set it in that directory's `.env`.
@@ -25527,7 +25529,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.111.2` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.112.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -27167,7 +27169,7 @@ There is no escape hatch, no comment that exempts a call: a message that has to 
 
 # The Test Duration Map
 
-`.test_durations` is a committed JSON map of `pytest node id -> seconds`. Its only consumer is [`pytest-split`](https://github.com/jerry-git/pytest-split), which reads it to divide the suite into balanced CI shards. Nothing in the runtime touches it, and nobody edits it by hand.
+`.test_durations` is a committed JSON map of `pytest node id -> seconds`. It has two consumers: [`pytest-split`](https://github.com/jerry-git/pytest-split), which reads it to divide the suite into balanced CI shards, and the `slow` marker, which the everyday test runs use to skip the few tests that hold most of the suite's time. Nothing in the runtime touches it, and nobody edits it by hand.
 
 This page explains what the map is for, why it is refreshed the way it is, and what to run.
 
@@ -27182,6 +27184,47 @@ SPLITS=8 GROUP=<n> make gha-tests
 `SPLITS`/`GROUP` are what activate `pytest-split`. Without them — which is every local run — the flags expand to nothing, the map is ignored entirely, and the whole suite runs as usual.
 
 The splitting algorithm is `pytest-split`'s default, `duration_based_chunks`: it walks the tests in collection order and cuts at boundaries where the accumulated duration crosses one eighth of the total. Each shard is therefore a *contiguous* slice of the collection, and the map decides where the cuts fall.
+
+## The `slow` marker: everyday runs skip the slowest tests
+
+The suite's time is concentrated in very few tests: its median test takes about three milliseconds while its mean is near a quarter of a second. The everyday runs therefore skip the slowest tests, and the full runs keep them.
+
+**Nobody marks a test `slow` by hand.** The root `tests/conftest.py` registers a `--slow-test-seconds` option and, when it is given, marks `slow` at collection time every test whose duration recorded in `.test_durations` is at or above it. The logic lives in `tests/helpers/slow_tests.py`. Three rules follow:
+
+- **A test missing from the map is not slow.** It has not been measured yet; the next `make store-test-durations` records it, and from then on its recorded duration decides.
+- **Without the option, nothing is marked**, so `-m "not slow"` then deselects nothing.
+- **The marking happens before any deselection.** The hook runs first among the collection hooks, so pytest's own `-m` filter sees the marker, and `pytest-split`, which cuts the shards last, balances only the tests that will actually run.
+
+The threshold is `SLOW_TEST_SECONDS` in the `Makefile`, currently **0.5 seconds**, and it is the one place to change it. The everyday runs combine `and not slow` with their usual marker expression and pass the threshold:
+
+| Run | Slow tests |
+| --- | --- |
+| `make agent-test` and `make agent-test-debug` | skipped |
+| `tests-check.yml`, on every pull request, through `SKIP_SLOW_TESTS=1 make gha-tests` | skipped |
+| `tests-full-check.yml`, the gate on pull requests to `main`, through `make gha-tests` | run |
+| every other target (`make test`, `make t`, `make tp`, `make codex-tests`, the inference targets) | run |
+| the API server's tests (`make api-agent-test`, `make -C api gha-tests`) | run: they are not in the map |
+
+To run the everyday selection in full, empty the threshold: `make agent-test SLOW_TEST_SECONDS=`. A targeted run such as `.venv/bin/pytest tests/unit/...` passes no threshold, so it never skips anything.
+
+The API server's tests, under `api/tests/`, are not in `.test_durations`: `store-test-durations` measures only the library's suite, and the server's runs from its own directory and environment. Since a test missing from the map is never slow, the server's suite always runs whole, which suits it: it is small.
+
+### Why 0.5 seconds
+
+These are the numbers for the `make agent-test` selection, computed from the committed map when the marker was introduced. Of the 22,683 tests that selection collected, 22,636 had a recorded duration, together 5,272 seconds of test time.
+
+| Threshold | Tests marked slow | Share of the tests | Share of the time | Time left to run |
+| --- | --- | --- | --- | --- |
+| 0.25 s | 2,975 | 13.1% | 89.5% | 553 s |
+| 0.5 s | 2,245 | 9.9% | 84.7% | 809 s |
+| 1 s | 1,230 | 5.4% | 70.0% | 1,580 s |
+| 2 s | 426 | 1.9% | 49.4% | 2,667 s |
+
+At 0.5 seconds, one test in ten is skipped and the time left to run drops by a factor of six and a half. Going lower buys little more time for many more skipped tests, and going higher keeps twice as much time for half as many skipped tests. The slow tests are spread across the suite rather than confined to one directory: in that selection, 1,398 of them were unit tests, 668 integration tests and 178 end-to-end tests, the end-to-end tests being nearly all slow.
+
+The cost of skipping them is that a regression only a slow test catches surfaces on the full run, which is the gate on pull requests to `main`, rather than on the pull request into `dev`. Run `make agent-test SLOW_TEST_SECONDS=` before pushing a change that touches what the slow tests cover, such as whole-method runs and the CLI end to end.
+
+The figures drift as the map is refreshed. To recompute them, collect the selection with `.venv/bin/pytest --collect-only -q -m "<expression>"` and add up the durations the map records for the collected node ids at each threshold.
 
 ## Coverage matters; precision does not
 
@@ -28550,8 +28593,9 @@ The rules this encodes:
 - **Boot never writes.** Nothing writes except the explicit `migrate` command; boot, `doctor` and validation detect and report. A tolerated boot leaves no backup either, which is why the warning keeps coming back until the user runs the command.
 - **Boot tolerates only what the ledger explains.** Tolerance widens what starts, never what is silently accepted. **The re-validation is what decides**, and that is stronger than a second gate on the report would be: material an `unsafe` entry is about is still in the file, so the model refuses it and the boot fails, and a `VALUE_DOMAIN_NARROWED` report the model accepts was never a reason to refuse a boot — that report says *check this key*, and the model has now checked it.
 - **The retry honours the [schema-version floor](#schema-versions-and-why-every-run-replays-everything).** A file that declares a version below `min_supported_schema_version` is one `pipelex migrate` refuses; the retry declines it through the same predicate rather than carrying it forward under-migrated, and the user's own error — with the `migration` block naming the floor — is what they see.
+- **The refusal the retry recovers from is never printed.** The first validation raises `ConfigValidationError` before the replay carries the file forward, and that error logs nothing when it is created: whoever handles it reports it. A load that recovers says only what its warning says, and one that does not raises the user's own error, reported once by the command or the boot that handles it.
 - **The retry never becomes the failure.** Anything that goes wrong inside it — a ledger that will not load, a file that will not parse — makes it decline, and the error the *configuration* produced is what the user sees. Their error names the key to fix; ours would name our packaging. A file that cannot be re-read abandons the whole retry rather than being skipped, because skipping it would drop a layer from the merge and a re-validation that then succeeded would boot on a configuration the user does not have.
-- **The main configuration's warning waits for the logger.** That configuration is what configures logging, so when its retry succeeds there is no logger yet — the loader parks the warning (`config_manager.take_stale_configuration_warning()`) and the boot emits it right after `log.configure`. The telemetry and service loaders run after that point and warn directly. The warning is the same either way; only *when* it is said moves.
+- **The main configuration's warning waits for the logger.** That configuration is what configures logging, so when its retry succeeds there is no logger yet — the loader parks the warning (`config_manager.take_stale_configuration_warning()`) and the boot emits it right after `log.configure`. A hosted `pipelex run` never boots, yet it reads the same files before it calls the hosted API, so it takes the parked warning itself and prints each file with its remedy on stderr before the run starts. The telemetry and service loaders run after that point and warn directly. The warning is the same either way; only *when* it is said moves.
 - **The inference backend loader parks its warning too, and for a different reason: a caller, not boot order.** By the time backends load, logging has been configured for a while. What that loader has instead is `pipelex doctor`, which probes the backend files by loading the whole library **once per backend** — so a loader that logged for itself would repeat one stale directory's warning a dozen times in one report. It hands the warning over instead (`take_stale_configuration_warning()`), and the caller that owes the user a copy takes it: the models-manager setup emits it exactly once per boot, the doctor's per-backend probe simply never asks, and no abstract interface widens to carry it. One warning per load, not one per backend probe.
 - **The warning names `pipelex migrate` only for a file the command would reach.** The retry replays whatever the loader merged, and a loader pointed at a directory of its own — an embedder's `config_dir=`, or this repository's `tests/pipelex_unit_test.toml` — merges files [outside the walk](#the-commands). For those the warning says the file is the caller's to update where it lives, and does not name a command that would then report nothing to do; a load that spans both gets both remedies, each on the lines of its own files. Same rule as [the remedy on a validation error](#every-surface-reports-it-the-same-way-and-none-of-them-says-start-over): *a remedy is named only where it would write*. The walk is `config_manager.existing_config_dirs`, which is also where `config_directories_to_migrate` reads it — one derivation, read from both ends, so a boot cannot promise what the command declines. Reach is per *surface*, not per path: the file must sit in the directory **its own surface** owns under one of those roots, so a `telemetry.toml` dropped into `inference/backends/` is out of reach exactly as it was before any surface owned a subdirectory.
 - **The warning is a line per stale file.** Each line is the same fixed message, `A configuration file is out of date and was migrated in memory only`, with the file's remedy, `pipelex migrate` or an edit where the file lives, as its advice in `user_action`, the file in `file.path`, the titles of the ledger steps the replay carried in `migration_steps` and whether one of them is blocked in `has_blocked_steps`. The message follows the [log-call conventions](tools/logging.md#log-call-conventions): the files are values, so they ride fields rather than the text, and a list of paths in one field would be cut short on the console, which writes each field on one line at a fixed width. Everything on the line but the path is ledger text; nothing read from the user's file reaches it.
