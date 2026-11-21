@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.110.0
+  version: 0.112.0
 paths:
   /health:
     get:
@@ -389,12 +389,16 @@ paths:
                   anyOf:
                   - type: string
                     maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_-]+$
                   - type: 'null'
                   title: Pipeline Run Id
                   description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol on `/execute`) — the run''s id, chosen
                     by the caller, as `/start` takes it: the run and its webhooks'' events carry it, and a run still in flight
                     under the same id refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the runner generates
-                    one.'
+                    one. One to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which
+                    are reserved; any other value is refused with a 422 `request.invalid` naming the field, before the run
+                    is registered.'
                 callback_urls:
                   anyOf:
                   - items:
@@ -800,8 +804,15 @@ paths:
                   anyOf:
                   - type: string
                     maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_-]+$
                   - type: 'null'
                   title: Pipeline Run Id
+                  description: 'The run''s id, chosen by the caller: the start ack echoes it, the run and its webhooks'' events
+                    carry it, and a run still in flight under the same id refuses this one with a 409 `pipelex.run.already_exists`.
+                    Omit it and the runner generates one. One to 128 ASCII letters, digits, `_` or `-`, and neither `untitled`
+                    nor `dry_run_untitled`, which are reserved; any other value is refused with a 422 `request.invalid` naming
+                    the field, before the run is registered.'
                 callback_urls:
                   anyOf:
                   - items:

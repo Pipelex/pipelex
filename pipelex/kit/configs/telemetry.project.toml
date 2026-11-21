@@ -60,6 +60,12 @@
 #   "url",
 # ]
 
+# Event-style events to YOUR PostHog: pipeline_execute, pipeline_complete, pipe_run, pipe_complete,
+# pipe_dry_run and the CLI's events. Turning them off leaves the AI spans and generations below,
+# and the $exception events of the "posthog" error tracker, untouched.
+# [custom_posthog.events]
+# enabled = true                    # Send event-style events to your PostHog
+
 # AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)
 # [custom_posthog.tracing]
 # enabled = false                   # Send AI spans to your PostHog

@@ -112,6 +112,7 @@ from pipelex.system.telemetry.telemetry_factory import TelemetryFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
+from pipelex.system.telemetry.workflow_execution import workflow_execution_slot
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.document_conversion.document_converter_factory import make_optional_document_converter_from_config
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
@@ -680,6 +681,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if isolated_execution_probe_factory is not None:
             self.runtime_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
 
+        # --- Workflow-execution probe ----------------------------------------------------------
+        # Claimed only by a boot-orchestrator plugin whose runtime replays its workflow code (e.g. a Temporal worker):
+        # the thunk resolves the probe that answers which workflow code the current call runs in, so a pipe span
+        # opened there takes a deterministic id and start and only the live execution exports it. Unclaimed, the slot
+        # keeps its core default, which answers that no call runs in workflow code. Teardown resets it.
+        workflow_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.WORKFLOW_EXECUTION_PROBE)
+        if workflow_execution_probe_factory is not None:
+            workflow_execution_slot.install(probe=workflow_execution_probe_factory())
+
         # --- Method file store -----------------------------------------------------------------
         # Where an activity reads a method file, by its tree's digest: a PipeFunc call's tree, a PipeDocGen step's
         # template file. Claimed by a host whose activities run apart from the process that listed the run's trees
@@ -788,9 +798,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # The runtime hub releases its process-global config and boot-scoped flags. ``class_registry_scoping``
             # is reset here
             # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
-            # teardown runs — and on a kernel-only boot nothing installed it, where the reset is a no-op.
+            # teardown runs — and on a kernel-only boot nothing installed it, where the reset is a no-op. So is
+            # ``workflow_execution_slot``, which a boot-orchestrator plugin's claim installs: a torn-down worker's probe
+            # must not tell a later span it runs in workflow code.
             self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
+            workflow_execution_slot.reset()
             # The same three ``_release_after_failed_boot`` releases, deliberately kept identical: these are
             # the ones that *poison* the next boot rather than merely dangle, so they must not sit above a
             # step that can raise. ``KajsonManager`` is the sharp one, and it is easy to get backwards — it
@@ -911,6 +924,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     log.error("The telemetry teardown failed while a failed boot was being released", fields=error_fields(exc=teardown_error))
             self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
+            workflow_execution_slot.reset()
             KajsonManager.teardown()
             TemplateLoader.reset()
             TemplateRegistry.clear()

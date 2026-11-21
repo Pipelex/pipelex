@@ -49,7 +49,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
 - `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
-- `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, at most 128 characters, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one.
+- `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one. It must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved: any other value is a `422` `request.invalid` naming `pipeline_run_id`, before the run is registered.
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends, before the response is sent; their delivery never changes the response, but a receiver that never answers delays it by about 51 seconds at most, the delivery's three attempts of 15 seconds and its waits between them. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
@@ -184,7 +184,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - This endpoint answers `202 Accepted` immediately with a `StartAck` carrying the `pipeline_run_id`
 - The pipeline continues executing in the background
 - `pipe_output` will be `null` in the response (pipeline hasn't completed yet)
-- The request body MAY carry a client-supplied **`pipeline_run_id`** (max 128 chars): this server honors it, and the `StartAck.pipeline_run_id` echoes it back. When absent, the server generates one. (`StartAck.pipeline_run_id` is always authoritative — protocol rule.)
+- The request body MAY carry a client-supplied **`pipeline_run_id`**: this server honors it, and the `StartAck.pipeline_run_id` echoes it back. When absent, the server generates one. (`StartAck.pipeline_run_id` is always authoritative — protocol rule.) The id follows the same rule as on `/execute`: one to 128 ASCII letters, digits, `_` or `-`, never `untitled` or `dry_run_untitled`, and any other value is a `422` `request.invalid` naming `pipeline_run_id`.
 
 **Response (202):**
 

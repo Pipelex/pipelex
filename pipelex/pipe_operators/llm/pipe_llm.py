@@ -44,6 +44,7 @@ from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError
+from pipelex.tools.jinja2.jinja2_parsing import are_authored_templates_trusted
 from pipelex.tools.jinja2.jinja2_unknown_names import find_unknown_filters_and_tests
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -81,6 +82,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     continue
                 with self.locating_model_choice(field_name=field_name):
                     check_llm_choice_with_deck(llm_choice=llm_choice)
+
+        # What follows judges the prompts as authored, which a load of templates already judged skips: it reads each
+        # prompt again and writes nothing a run reads.
+        if are_authored_templates_trusted():
+            return
 
         needed_inputs = self.needed_inputs()
         required_variable_paths = self.required_variables()

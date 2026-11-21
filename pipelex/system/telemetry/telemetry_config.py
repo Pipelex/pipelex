@@ -90,6 +90,20 @@ class PostHogTracingConfig(BaseModel):
     )
 
 
+class PostHogEventsConfig(BaseModel):
+    """Configuration for the runtime's event-style events to your PostHog.
+
+    The event-style events are the ones `track_event` sends: `pipeline_execute`, `pipeline_complete`, `pipe_run`,
+    `pipe_complete`, `pipe_dry_run` and the CLI's events. Switching them off leaves the AI spans and generations
+    (`[custom_posthog.tracing]`) and the `$exception` events of the `posthog` error tracker untouched, which is what a
+    host whose own events are the record of a run wants.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(default=True, description="Send the runtime's event-style events to your PostHog")
+
+
 class PostHogConfig(BaseModel):
     """PostHog configuration for event tracking and span export."""
 
@@ -102,6 +116,7 @@ class PostHogConfig(BaseModel):
     geoip: bool = Field(default=True, description="Enable GeoIP lookup")
     debug: bool = Field(default=False, description="Enable PostHog debug mode")
     redact_properties: list[str] | None = Field(default_factory=list, description="Event properties to redact")
+    events: PostHogEventsConfig = Field(default_factory=PostHogEventsConfig, description="Event-style events to your PostHog")
     tracing: PostHogTracingConfig = Field(default_factory=PostHogTracingConfig, description="AI span tracing to your PostHog")
 
     @model_validator(mode="after")

@@ -66,12 +66,12 @@ async def _make_pipe_job(*, extras: dict[str, str] | None = None, method_id: str
 
 def _start_span(*, mocker: MockerFixture, pipe_job: PipeJob, pipe_id: str | None = None) -> SdkSpan:
     mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=TracerProvider().get_tracer("test"))
-    span, _ = pipe_job.pipe._start_pipe_span(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    span = pipe_job.pipe._start_pipe_span(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
         parent_otel_context=_PARENT_OTEL_CONTEXT,
         run_metadata=pipe_job.job_metadata.run_metadata,
         working_memory=pipe_job.get_working_memory(),
         pipe_id=pipe_id,
-    )
+    ).span
     assert isinstance(span, SdkSpan)
     return span
 

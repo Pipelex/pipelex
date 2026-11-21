@@ -42,6 +42,17 @@
       "default": "https://us.i.posthog.com",
       "open_node": false
     },
+    "custom_posthog.events": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.events.enabled": {
+      "value_type": "bool",
+      "required": false,
+      "default": true,
+      "open_node": false
+    },
     "custom_posthog.geoip": {
       "value_type": "bool",
       "required": false,

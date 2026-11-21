@@ -19,7 +19,7 @@ from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
 from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.reporting.usage_records import TokensUsageRecord
-from pipelex.system.job_metadata import validate_method_id
+from pipelex.system.job_metadata import PIPELINE_RUN_ID_MAX_LENGTH, PIPELINE_RUN_ID_PATTERN, validate_method_id, validate_pipeline_run_id
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope
 from pipelex.tools.network.host_rules import classify_disallowed_host, is_disallowed_host
@@ -340,6 +340,22 @@ class RunRequest(BaseModel):
         )
 
 
+# The one rule of a run id (`pipelex.system.job_metadata.validate_pipeline_run_id`), as the published schema states
+# it, derived from the runtime's own pattern so the two cannot drift. `StartRequest` enforces it as well, and
+# `PipelineApiExtras` validates the wire on both routes with the runtime's own function, which also refuses the
+# reserved values a JSON Schema pattern cannot exclude.
+_PIPELINE_RUN_ID_SCHEMA_PATTERN = f"^{PIPELINE_RUN_ID_PATTERN.pattern}$"
+_PIPELINE_RUN_ID_RULE = (
+    "One to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved; "
+    "any other value is refused with a 422 `request.invalid` naming the field, before the run is registered."
+)
+_START_PIPELINE_RUN_ID_DESCRIPTION = (
+    "The run's id, chosen by the caller: the start ack echoes it, the run and its webhooks' events carry it, and a run "
+    "still in flight under the same id refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the "
+    f"runner generates one. {_PIPELINE_RUN_ID_RULE}"
+)
+
+
 class StartRequest(RunRequest):
     """Body of `POST /start` — `RunRequest` plus the optional `pipeline_run_id`.
 
@@ -349,7 +365,13 @@ class StartRequest(RunRequest):
     `RunRequest`.
     """
 
-    pipeline_run_id: str | None = Field(default=None, max_length=128)
+    pipeline_run_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=PIPELINE_RUN_ID_MAX_LENGTH,
+        pattern=_PIPELINE_RUN_ID_SCHEMA_PATTERN,
+        description=_START_PIPELINE_RUN_ID_DESCRIPTION,
+    )
 
 
 _CALLBACK_URLS_DESCRIPTION = (
@@ -367,7 +389,7 @@ _CALLBACK_URLS_DESCRIPTION = (
 _EXECUTE_PIPELINE_RUN_ID_DESCRIPTION = (
     "PIPELEX-API EXTENSION (not part of the MTHDS Protocol on `/execute`) — the run's id, chosen by the caller, as "
     "`/start` takes it: the run and its webhooks' events carry it, and a run still in flight under the same id "
-    "refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the runner generates one."
+    f"refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the runner generates one. {_PIPELINE_RUN_ID_RULE}"
 )
 
 _STORAGE_SCOPE_DESCRIPTION = (
@@ -500,7 +522,7 @@ class PipelineApiExtras(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    pipeline_run_id: str | None = Field(default=None, max_length=128)
+    pipeline_run_id: str | None = None
     callback_urls: list[str] | None = Field(default=None, max_length=MAX_CALLBACK_URLS)
     orchestration_mode: str | None = Field(default=None, description=_ORCHESTRATION_MODE_DESCRIPTION)
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)
@@ -516,6 +538,18 @@ class PipelineApiExtras(BaseModel):
         if value is None:
             return None
         return validate_method_id(value=value)
+
+    @field_validator("pipeline_run_id")
+    @classmethod
+    def _validate_pipeline_run_id(cls, value: str | None) -> str | None:
+        """Refuse a malformed run id at the WIRE, with the runtime's own rule, before anything registers.
+
+        `RunMetadata` applies the same rule at the runtime's seam, so this is a second gate rather than the only one;
+        it is the one that answers the caller with a 422 naming the field on both run routes.
+        """
+        if value is None:
+            return None
+        return validate_pipeline_run_id(value=value)
 
     @field_validator("read_scope")
     @classmethod
@@ -633,7 +667,13 @@ class PipelexApiExecuteRequest(RunRequest):
     `read_scope`, `analytics_groups`, `method_key`, `capture_pipe_codes`, all parsed by `PipelineApiExtras`).
     """
 
-    pipeline_run_id: str | None = Field(default=None, max_length=128, description=_EXECUTE_PIPELINE_RUN_ID_DESCRIPTION)
+    pipeline_run_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=PIPELINE_RUN_ID_MAX_LENGTH,
+        pattern=_PIPELINE_RUN_ID_SCHEMA_PATTERN,
+        description=_EXECUTE_PIPELINE_RUN_ID_DESCRIPTION,
+    )
     callback_urls: list[str] | None = Field(default=None, description=_CALLBACK_URLS_DESCRIPTION)
     orchestration_mode: str | None = Field(default=None, description=_ORCHESTRATION_MODE_DESCRIPTION)
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)

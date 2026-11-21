@@ -4,7 +4,8 @@ This module provides a SpanExporter that sends OTel spans to PostHog
 as $ai_generation or $ai_span events.
 """
 
-from typing import Any, Mapping, Sequence, cast
+import uuid
+from typing import Any, Final, Mapping, Sequence, cast
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -24,6 +25,20 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
 from pipelex.tools.log.error_fields import error_fields
+
+# The namespace of the deterministic event uuids PostHog deduplicates on, the same fixed, arbitrary UUID the hosted
+# plane's own emitters derive theirs from. NEVER change it: a new namespace re-enables the double counts it stops.
+EVENT_UUID_NAMESPACE: Final[uuid.UUID] = uuid.UUID("6f5c1f3a-3a2e-4f1b-9c0d-8a7b6e5d4c3b")
+
+
+def make_span_event_uuid(*, span_id: str) -> str:
+    """The uuid of a pipe's ``$ai_span`` event, a UUIDv5 of ``"$ai_span:<$ai_span_id>"``.
+
+    A pipe's span is exported once, by the execution that ran it to its end, even across a replay of workflow code
+    (see ``pipelex.system.telemetry.replay_safe_spans``); the uuid is the tracking plan's backstop against the PostHog
+    client delivering the same capture twice, and never the guarantee.
+    """
+    return str(uuid.uuid5(EVENT_UUID_NAMESPACE, f"{PostHogEvent.SPAN}:{span_id}"))
 
 
 class PostHogSpanExporter(SpanExporter):
@@ -97,7 +112,7 @@ class PostHogSpanExporter(SpanExporter):
         if (pipe_id := attributes.get(PipelexSpanAttr.PIPE_ID)) is not None:
             properties["pipe_id"] = pipe_id
 
-    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any], identity: TelemetryIdentity) -> None:
+    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any], identity: TelemetryIdentity, event_uuid: str | None = None) -> None:
         """Capture an event to PostHog, handling anonymous vs identified users.
 
         PostHog requires a valid distinct_id - passing None will cause the event to be rejected.
@@ -107,6 +122,9 @@ class PostHogSpanExporter(SpanExporter):
         and `groups` — and in no property: a property cannot produce a group-level
         count after the fact, and a second copy of the user id is a second thing
         to keep in step.
+
+        An ``event_uuid`` is the event's deduplication key, derived from the event's own identity; without one, the
+        client generates a random uuid.
         """
         if identity.distinct_id:
             # Identified user: pass distinct_id, and the entities the run belongs to
@@ -115,6 +133,7 @@ class PostHogSpanExporter(SpanExporter):
                 event=event,
                 properties=properties,
                 groups=identity.groups or None,
+                uuid=event_uuid,
             )
         else:
             # Anonymous user: don't pass distinct_id, mark as anonymous
@@ -122,6 +141,7 @@ class PostHogSpanExporter(SpanExporter):
             self.posthog_client.capture(
                 event=event,
                 properties=properties,
+                uuid=event_uuid,
             )
 
     def _truncate_content(self, content: str) -> str:
@@ -388,10 +408,13 @@ class PostHogSpanExporter(SpanExporter):
         if redacted_pipe_code := self._get_redacted_pipe_code(pipe_code, redaction=redaction):
             properties["pipe_code"] = redacted_pipe_code
 
+        # Deduplicated on `$ai_span_id`, as the tracking plan's rule 7 backstop.
+        span_id = properties.get(PostHogAttr.SPAN_ID)
         self._capture_event(
             event=PostHogEvent.SPAN,
             properties=properties,
             identity=self._resolve_identity(attributes=attributes),
+            event_uuid=make_span_event_uuid(span_id=span_id) if isinstance(span_id, str) else None,
         )
 
     @override
