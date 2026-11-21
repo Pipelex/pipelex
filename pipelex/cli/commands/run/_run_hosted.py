@@ -35,6 +35,8 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.runtime_hub import get_console, get_error_console
+from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_surface import STALE_CONFIGURATION_MESSAGE
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.pretty import pretty_print, pretty_print_md
 
@@ -217,6 +219,21 @@ def bundle_main_pipe_code(*, bundle_path: str, library_dirs: list[str] | None) -
     return bundle_blueprint.main_pipe
 
 
+def _print_stale_configuration_warning() -> None:
+    """Say which configuration files this run carried forward in memory, and the remedy of each, on stderr.
+
+    A local run boots, and the boot emits the warning the configuration loader parks when it carries a stale file forward. A
+    hosted run never boots, so without this the file would be carried forward on every run in silence.
+    """
+    stale_warning = config_manager.take_stale_configuration_warning()
+    if stale_warning is None:
+        return
+    console = get_error_console()
+    for stale_file in stale_warning.files:
+        console.print(f"[yellow]{STALE_CONFIGURATION_MESSAGE}: {escape(str(stale_file.file_path))}[/yellow]")
+        console.print(f"  → {stale_file.user_action}")
+
+
 def execute_hosted_run(
     *,
     contents: dict[str, bytes] | None = None,
@@ -253,6 +270,7 @@ def execute_hosted_run(
         typer.Exit: If the base URL is not an origin, the inputs cannot be read, or the hosted run fails or is
             interrupted, after printing why and what next.
     """
+    _print_stale_configuration_warning()
     try:
         client = make_hosted_client(base_url=base_url)
     except PipelexError as exc:

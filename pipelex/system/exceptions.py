@@ -1,5 +1,3 @@
-import logging
-from enum import StrEnum
 from typing import ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
@@ -68,36 +66,12 @@ class CredentialsError(PipelexError):
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
-class TracebackMessageErrorMode(StrEnum):
-    ERROR = "error"
-    EXCEPTION = "exception"
+class ConfigValidationError(PipelexError):
+    """A configuration value this process refuses: the operator's configuration.
 
-
-class TracebackMessageError(PipelexError):
-    """A base whose constructor logs its message with the traceback; never raised directly."""
-
-    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    error_mode: ClassVar[TracebackMessageErrorMode] = TracebackMessageErrorMode.EXCEPTION
-
-    def __init__(self, message: str):
-        super().__init__(message)
-        logger_name = __name__
-        match self.__class__.error_mode:
-            case TracebackMessageErrorMode.ERROR:
-                logging.getLogger(logger_name).error(message)
-            case TracebackMessageErrorMode.EXCEPTION:
-                self.logger = logging.getLogger(logger_name)
-                self.logger.exception(message)
-
-
-class FatalError(TracebackMessageError):
-    """The base of the errors that stop a process; never raised directly."""
-
-    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-
-
-class ConfigValidationError(FatalError):
-    """A configuration value this process refuses: the operator's configuration."""
+    It logs nothing when it is created: whoever handles it reports it, once. A load that recovers from it, by carrying a
+    stale file forward through the migration ledger, has nothing to report but the warning it parks.
+    """
 
     error_code = PipelexErrorCode.CONFIG_INVALID
 
