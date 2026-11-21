@@ -240,6 +240,10 @@ def _is_within(*, plan: MigrationPlan, directories: Sequence[Path]) -> bool:
     return any(parent == (directory / subdirectory).resolve() for directory in directories)
 
 
+#: The one message every stale file is warned under, whoever prints it: the boot's log, or a host that never boots.
+STALE_CONFIGURATION_MESSAGE = "A configuration file is out of date and was migrated in memory only"
+
+
 class StaleConfigurationFile(NamedTuple):
     """One configuration file a boot carried forward in memory, as its warning line names it.
 
@@ -255,6 +259,17 @@ class StaleConfigurationFile(NamedTuple):
     """The titles of the ledger steps the replay carried forward, sorted."""
     has_blocked_steps: bool
     """Whether some of what the file needs cannot be applied for the user."""
+
+    @property
+    def user_action(self) -> str:
+        """The file's remedy: `pipelex migrate` where its walk reaches the file, an edit where the file lives otherwise."""
+        if self.is_reached_by_migrate and self.has_blocked_steps:
+            return "Run pipelex migrate to update it, and make by hand the changes it reports it cannot apply"
+        if self.is_reached_by_migrate:
+            return "Run pipelex migrate to update it"
+        if self.has_blocked_steps:
+            return "Update it where it lives, with the changes no migration can apply, since pipelex migrate does not reach it"
+        return "Update it where it lives, since pipelex migrate does not reach it"
 
     def log_fields(self) -> dict[str, Any]:
         return {
@@ -287,17 +302,9 @@ class StaleConfigurationWarning(NamedTuple):
         event, so a log store counts every stale file under the one message.
         """
         for stale_file in self.files:
-            if stale_file.is_reached_by_migrate and stale_file.has_blocked_steps:
-                user_action = "Run pipelex migrate to update it, and make by hand the changes it reports it cannot apply"
-            elif stale_file.is_reached_by_migrate:
-                user_action = "Run pipelex migrate to update it"
-            elif stale_file.has_blocked_steps:
-                user_action = "Update it where it lives, with the changes no migration can apply, since pipelex migrate does not reach it"
-            else:
-                user_action = "Update it where it lives, since pipelex migrate does not reach it"
             log.warning(
-                "A configuration file is out of date and was migrated in memory only",
-                fields={**stale_file.log_fields(), USER_ACTION_FIELD: user_action},
+                STALE_CONFIGURATION_MESSAGE,
+                fields={**stale_file.log_fields(), USER_ACTION_FIELD: stale_file.user_action},
             )
 
 

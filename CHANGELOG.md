@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.112.0] - 2026-11-21
+
+### Fixed
+
+- **A stale configuration no longer prints the error it was recovered from (Breaking)**: `ConfigValidationError` logs nothing when it is raised, so a configuration file a release made out of date, which the loader carries forward through the migration ledger, no longer prints a pydantic traceback on every read, and a refused configuration is reported once, by the command that handles it. A hosted `pipelex run` now prints each stale file with its remedy, `pipelex migrate`, before the run starts, as a local run's boot already did. `TracebackMessageError`, `TracebackMessageErrorMode` and `FatalError`, which existed only to log at construction, are removed from `pipelex.exceptions` and `pipelex.system.exceptions`, and `ConfigValidationError` now derives from `PipelexError`.
+
 ## [v0.111.2] - 2026-11-20
 
 ### Changed

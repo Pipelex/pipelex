@@ -9,7 +9,9 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import logging
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -34,12 +36,12 @@ from pipelex.hosted.error_rendering import HOSTED_MISSING_KEY_NEXT_STEP, describ
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
-from pipelex.system.environment import PIPELEXPATH_ENV_KEY
+from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.environment import PIPELEX_HOME_ENV_KEY, PIPELEXPATH_ENV_KEY
 from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems
 from tests.unit.pipelex.hosted.test_data import HostedRefusals, HostedStoredTexts, HostedVersions
 
 if TYPE_CHECKING:
-    from pathlib import Path
     from unittest.mock import AsyncMock
 
     from pytest_mock import MockerFixture
@@ -563,6 +565,50 @@ class TestRunHostedCli:
         printed = failure_output.getvalue()
         assert "run history" in printed
         assert not re.search(r"Run:\s", printed)
+
+    def test_a_stale_project_configuration_is_reported_once_with_its_remedy_and_the_run_goes_on(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        run_hosted: AsyncMock,
+        bundle_dir: Path,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A hosted run never boots, so nothing else emits the warning the loader parks when it carries a stale file forward.
+
+        The project file still sets the graph renderings a release retired, so every unbooted read of the configuration refuses it
+        before the ledger carries it forward: the run reads it more than once, and none of those refusals may print a traceback.
+        """
+        monkeypatch.delenv(PIPELEX_HOME_ENV_KEY, raising=False)
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        project_root = tmp_path / "project"
+        (project_root / ".git").mkdir(parents=True)
+        stale_file = project_root / ".pipelex" / "pipelex.toml"
+        stale_file.parent.mkdir()
+        stale_file.write_text(
+            '[run]\nexecution = "hosted"\n\n'
+            "[interpreter.pipeline_execution.graph.data_inclusion]\nstuff_text_content = true\nstuff_html_content = true\n",
+            encoding="utf-8",
+        )
+        mocker.patch.object(Path, "home", return_value=fake_home)
+        mocker.patch.object(Path, "cwd", return_value=project_root)
+        mocker.patch(f"{EXECUTION_MODULE}.get_optional_config", return_value=None)
+        config_manager.take_stale_configuration_warning()
+        failure_output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_error_console", return_value=Console(file=failure_output, width=250))
+
+        with caplog.at_level(logging.DEBUG):
+            run_bundle_cmd(path=str(bundle_dir), output_dir=str(tmp_path / "results"), no_pretty_print=True)
+
+        run_hosted.assert_awaited_once()
+        reported = failure_output.getvalue()
+        assert reported.count(str(stale_file)) == 1, reported
+        assert "out of date and was migrated in memory only" in reported
+        assert "Run pipelex migrate to update it" in reported
+        assert [record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING or record.exc_info] == []
+        assert config_manager.take_stale_configuration_warning() is None, "the run took the warning it printed"
 
     def test_a_hosted_run_prints_no_deck_notice_and_a_local_run_does(self, mocker: MockerFixture, run_hosted: AsyncMock, tmp_path: Path) -> None:
         """The deck notice is about this machine's inference, which a hosted run never boots."""

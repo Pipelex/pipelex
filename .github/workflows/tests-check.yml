@@ -14,17 +14,23 @@ env:
 jobs:
 # --------------------------------------------------------------------------
 # 1.  Tests — floor Python version, sharded across free GitHub-hosted runners.
-#     The full 3.11-3.14 matrix runs post-merge in `tests-full-check.yml`.
-#     Same trade as the mypy cache: fast on PRs, definitive on main.
+#     The full matrix of supported versions runs in `tests-full-check.yml`, on
+#     pull requests to main. Same trade as the mypy cache: fast on PRs,
+#     definitive on main.
 #
-#     Sharding: the CPU-bound suite (~2400s of test-time) is split into 8
-#     groups balanced by the committed .test_durations file, each running on a
-#     free ubuntu-latest runner. 8 free 4-vCPU runners beat one paid 8-vCPU
-#     Azure box on wall clock (~2m vs 6m20s) at zero cost — vertical scale is
-#     what Azure sells; horizontal scale is free and unlimited on this plan.
+#     Sharding: the CPU-bound suite is split into the groups the matrix below
+#     lists, balanced by the committed .test_durations file, each running on a
+#     free ubuntu-latest runner. Several free runners beat one paid larger
+#     Azure box on wall clock at zero cost — vertical scale is what Azure
+#     sells; horizontal scale is free and unlimited on this plan.
 #     Refresh .test_durations with `make store-test-durations` (incremental —
 #     it measures only tests missing from the map). What unbalances the groups
 #     is missing coverage, not stale values: see docs/contribute/test-duration-map.md.
+#
+#     Slow tests: SKIP_SLOW_TESTS=1 deselects every test .test_durations records
+#     at or above the Makefile's SLOW_TEST_SECONDS — a small share of the tests,
+#     holding most of the suite's time — so each group here runs only the fast
+#     rest. They run in `tests-full-check.yml`, which sets no SKIP_SLOW_TESTS.
 # --------------------------------------------------------------------------
   matrix-test:
     name: Tests (py3.11, shard ${{ matrix.group }}/8)
@@ -57,7 +63,7 @@ jobs:
         run: make tp TEST=TestFundamentals
 
       - name: Run tests (shard ${{ matrix.group }}/8)
-        run: SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
+        run: SKIP_SLOW_TESTS=1 SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
 
       - name: Show hang dumps
         if: failure()
@@ -81,7 +87,7 @@ jobs:
 #     review that way, each caught afterwards by a hand-written assertion.
 #     This job provisions a pinned toolchain and sets PIPELEX_REQUIRE_TS_GATES,
 #     under which those tests fail instead of skipping. One job, not a node
-#     step on all 8 shards: the codegen suite is seconds and lands in one shard.
+#     step on every shard: the codegen suite is seconds and lands in one shard.
 # --------------------------------------------------------------------------
   ts-emission-gates:
     name: Tests (ts emission gates)
@@ -199,7 +205,7 @@ jobs:
 
 # --------------------------------------------------------------------------
 # 6.  Aggregator job — the *single* required status check
-#     Guards against a silently-dropped shard: fails unless ALL 8 succeed, and
+#     Guards against a silently-dropped shard: fails unless EVERY shard succeeds, and
 #     carries every other test job above into the required check with them.
 # --------------------------------------------------------------------------
   tests-all:

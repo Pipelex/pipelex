@@ -43,11 +43,9 @@ from pipelex.pipeline.exceptions import (
 from pipelex.system.exceptions import (
     ConfigValidationError,
     CredentialsError,
-    FatalError,
     MissingDependencyError,
     NestedKeyConflictError,
     ToolError,
-    TracebackMessageError,
 )
 
 __all__ = [
@@ -99,8 +97,6 @@ __all__ = [
     "ToolError",
     "NestedKeyConflictError",
     "CredentialsError",
-    "TracebackMessageError",
-    "FatalError",
     "MissingDependencyError",
     "ConfigValidationError",
 ]
