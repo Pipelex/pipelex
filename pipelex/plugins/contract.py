@@ -160,6 +160,11 @@ if TYPE_CHECKING:
 # ``update``, the ``sheet_range`` capability an engine declares among its model's ``inputs``, and the shared range finder
 # (``pipelex.cogt.doc_gen.sheet_range``). An engine that does not declare the capability is never handed a sheet range,
 # since a step asking it for one is refused when the method loads.
+#
+# ``claim_workflow_execution_probe`` joined the menu under v14 without a bump, on the reasoning of ``add_log_sink``: a
+# boot-orchestrator plugin whose runtime replays its workflow code claims it with a ``WorkflowExecutionProbe``
+# (``pipelex.system.telemetry.workflow_execution``), so pipe spans opened there are replay-safe, and a plugin that does
+# not claim it keeps every span as before.
 PLUGIN_API_VERSION: int = 14
 
 

@@ -9,6 +9,7 @@ user id did not also leak into the properties, where it would be a second copy
 nobody keeps in step and a value no group-level count can use.
 """
 
+import uuid
 from typing import Any
 
 import pytest
@@ -20,7 +21,7 @@ from posthog import Posthog
 from pytest_mock import MockerFixture
 
 from pipelex.system.telemetry.otel_constants import OTelConstants, PipelexSpanAttr, PostHogAttr, PostHogEvent, SpanCategory
-from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
+from pipelex.system.telemetry.posthog_span_exporter import EVENT_UUID_NAMESPACE, PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
 
@@ -231,3 +232,44 @@ class TestPostHogSpanExporter:
         exporter.export([span])
 
         assert client.capture.call_args.kwargs["properties"].get(PostHogAttr.PARENT_ID) == expected_parent_id
+
+    def test_a_pipe_span_is_deduplicated_on_its_span_id(self, mocker: MockerFixture) -> None:
+        """Rule 7's backstop: `$ai_span`'s uuid is a UUIDv5 of `"$ai_span:<$ai_span_id>"`, the same for every copy of one span."""
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.DIRECT)
+        span = _make_span(span_category=SpanCategory.PIPE)
+
+        exporter.export([span])
+        exporter.export([span])
+
+        first_call, second_call = client.capture.call_args_list
+        span_id = first_call.kwargs["properties"][PostHogAttr.SPAN_ID]
+        assert first_call.kwargs["uuid"] == str(uuid.uuid5(EVENT_UUID_NAMESPACE, f"$ai_span:{span_id}"))
+        assert second_call.kwargs["uuid"] == first_call.kwargs["uuid"]
+
+    def test_an_anonymous_pipe_span_is_deduplicated_too(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_make_span(span_category=SpanCategory.PIPE)])
+
+        span_id = client.capture.call_args.kwargs["properties"][PostHogAttr.SPAN_ID]
+        assert client.capture.call_args.kwargs["uuid"] == str(uuid.uuid5(EVENT_UUID_NAMESPACE, f"$ai_span:{span_id}"))
+
+    def test_two_pipe_spans_get_two_uuids(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_make_span(span_category=SpanCategory.PIPE), _make_span(span_category=SpanCategory.PIPE)])
+
+        first_call, second_call = client.capture.call_args_list
+        assert first_call.kwargs["uuid"] != second_call.kwargs["uuid"]
+
+    def test_a_generation_names_no_uuid_the_tracking_plan_gives_it_no_key(self, mocker: MockerFixture) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id="deployment-hash", run_identity_policy=RunIdentityPolicy.DIRECT)
+
+        exporter.export([_make_span(span_category=SpanCategory.INFERENCE)])
+
+        assert client.capture.call_args.kwargs["event"] == PostHogEvent.GENERATION
+        assert client.capture.call_args.kwargs["uuid"] is None

@@ -564,6 +564,12 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @property
     @override
+    def is_otel_tracer_replay_safe(self) -> bool:
+        # OtelFactory.make_ai_tracer builds every provider this manager holds with ReplaySafeIdGenerator.
+        return True
+
+    @property
+    @override
     def capture_content_enabled(self) -> bool:
         return self.telemetry_config.custom_posthog.tracing.capture.content
 
