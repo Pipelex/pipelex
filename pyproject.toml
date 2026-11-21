@@ -329,6 +329,7 @@ markers = [
   "codex_disabled: tests that should not run in Codex",
   "dry_runnable: tests that can be run in dry-run mode",
   "pipelex_api: tests that require access to the Pipelex API",
+  "slow: applied at collection time, never by hand, to a test whose duration recorded in .test_durations reaches --slow-test-seconds; the everyday runs deselect it (docs/contribute/test-duration-map.md)",
   "document_conversion: tests that convert Office files through soffice or a Gotenberg container (PIPELEX_TEST_GOTENBERG_URL), skipped for a backend not present",
   "builds_problems_without_required_params(reason): the test builds a problem lacking a parameter its code requires on purpose, which the sweep of tests/unit/conftest.py otherwise fails",
 ]

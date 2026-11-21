@@ -41,10 +41,24 @@ TS_TOOLCHAIN_ZOD_VERSION ?= 4.5.4
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or judgment)) and not (pipelex_api or document_conversion)"
+USUAL_MARKER_SELECTION := (dry_runnable or not (inference or llm or img_gen or extract or search or judgment)) and not (pipelex_api or document_conversion)
+USUAL_PYTEST_MARKERS := "$(USUAL_MARKER_SELECTION)"
 # The selection the sharded CI job runs. Shared by gha-tests and store-test-durations so the map
 # can never be balanced against a different set of tests than the one it is measured from.
-GHA_PYTEST_MARKERS := "(dry_runnable or not inference) and not (gha_disabled or pipelex_api or document_conversion)"
+GHA_MARKER_SELECTION := (dry_runnable or not inference) and not (gha_disabled or pipelex_api or document_conversion)
+GHA_PYTEST_MARKERS := "$(GHA_MARKER_SELECTION)"
+
+# Slow tests. A test is `slow` when its duration recorded in the committed .test_durations reaches
+# SLOW_TEST_SECONDS: tests/conftest.py marks it at collection time, nobody marks one by hand, and a test
+# missing from the map is not slow. The everyday runs (agent-test, agent-test-debug, and gha-tests with
+# SKIP_SLOW_TESTS=1, which the pull-request workflow sets) deselect them; every other target, the full
+# pre-main workflow included, keeps every test. At 0.5 s the slow tests are about a tenth of the suite
+# and hold most of its time: see docs/contribute/test-duration-map.md for the numbers. An empty value
+# marks nothing, so `make agent-test SLOW_TEST_SECONDS=` runs the everyday selection in full.
+SLOW_TEST_SECONDS ?= 0.5
+SLOW_TEST_ARGS = $(if $(SLOW_TEST_SECONDS),--slow-test-seconds=$(SLOW_TEST_SECONDS))
+EVERYDAY_PYTEST_MARKERS := "($(USUAL_MARKER_SELECTION)) and not slow"
+GHA_SELECTION_ARGS = $(if $(filter 1,$(SKIP_SLOW_TESTS)),-m "($(GHA_MARKER_SELECTION)) and not slow" $(SLOW_TEST_ARGS),-m $(GHA_PYTEST_MARKERS))
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -151,10 +165,10 @@ make merge-check-plxt-lint    - Run plxt lint check
 
 make v                        - Shorthand -> validate
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
-make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
+make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled; SKIP_SLOW_TESTS=1 skips the slow tests)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
-make agent-test               - Run unit tests, silent on success, output on failure (for AI agents), then the server's (api-agent-test)
+make agent-test               - Run unit tests but the slow ones, silent on success, output on failure (for AI agents), then the server's (api-agent-test)
 make api-agent-check          - The api/ server's own gate: its install, ruff, pyright, mypy, OpenAPI and vendored-kit drift checks
 make api-agent-test           - The api/ server's unit tests, in its own environment
 make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
@@ -668,7 +682,7 @@ gha-tests: env
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --dist=worksteal $(if $(SPLITS),--splits $(SPLITS) --group $(GROUP)) --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m $(GHA_PYTEST_MARKERS) || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --dist=worksteal $(if $(SPLITS),--splits $(SPLITS) --group $(GROUP)) --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header $(GHA_SELECTION_ARGS) || [ $$? = 5 ]
 
 # --------------------------------------------------------------------------------------
 # The TypeScript emission gates. These are the two tests that need node, and they are the
@@ -919,9 +933,9 @@ tdc: test-document-conversion
 	@echo "> done: tdc = test-document-conversion"
 
 agent-test: env
-	@echo "• Running unit tests..."
+	@echo "• Running unit tests$(if $(SLOW_TEST_SECONDS), but the slow ones (recorded at $(SLOW_TEST_SECONDS) s or more in .test_durations))..."
 	@tmpfile=$$(mktemp); \
-	$(call WAIT_WITH_HEARTBEAT,$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1,agent-test); \
+	$(call WAIT_WITH_HEARTBEAT,$(VENV_PYTEST) -n auto -m $(EVERYDAY_PYTEST_MARKERS) $(SLOW_TEST_ARGS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1,agent-test); \
 	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
@@ -969,7 +983,7 @@ agent-test-debug: env
 	@echo "• Running with outer timeout=$(DEBUG_TIMEOUT)s, log: $(DEBUG_LOG)"
 	@echo "  Live progress: tail -f $(DEBUG_LOG)"
 	@$(TIMEOUT_CMD) $(DEBUG_TIMEOUT) $(VENV_PYTEST) -n auto --timeout=120 --timeout-method=thread \
-		-m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -v \
+		-m $(EVERYDAY_PYTEST_MARKERS) $(SLOW_TEST_ARGS) -o log_level=WARNING --tb=short -v \
 		> $(DEBUG_LOG) 2>&1; \
 	exit_code=$$?; \
 	if [ $$exit_code -eq 124 ]; then \
