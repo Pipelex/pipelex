@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.113.0] - 2026-11-21
+
+### Highlights
+
+**Telemetry you can trust across every destination.** Every kind of inference call now reports its model, tokens, cost and errors on a generation span, pipe spans carry a stable `pipe_id` and the run's `method_id`, a pipe span opened in replayable workflow code is exported once, and an `[[otlp]]` exporter or Langfuse receives Pipelex's spans without the PostHog stream being on. A host can switch the event-style events off while tracing stays on, and every run id now follows one rule.
 
 ### Added
 
