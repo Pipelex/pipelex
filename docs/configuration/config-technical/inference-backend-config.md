@@ -310,6 +310,19 @@ model_id = "gemini-3.1-pro-preview"
 listed_constraints = ["thinking_cannot_be_disabled"]
 ```
 
+#### Service tier
+
+A model on the OpenAI SDKs (or OpenAI-compatible providers like Portkey and OpenRouter) may declare a `service_tier` to select OpenAI's processing tier (`auto`, `default`, `fast`, `flex`, `scale`, `priority`, or `standard_only`):
+
+```toml
+# openai.toml
+["gpt-5.4-fast"]
+model_id = "gpt-5.4"
+service_tier = "fast"
+```
+
+When set, `service_tier` is forwarded via `extra_body` in calls to the OpenAI Responses and Chat Completions APIs.
+
 #### Sending extra request headers per model
 
 A model table may carry keys beyond the model-spec fields. A key shaped like a request header — it contains a hyphen and its value is a string — is sent to the provider **as an HTTP request header** on each call to that model; this is how, for example, the Portkey backend routes each model to its upstream provider:
