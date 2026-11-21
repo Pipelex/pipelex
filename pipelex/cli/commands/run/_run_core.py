@@ -223,13 +223,15 @@ async def _execute_run(
     save_csv: str | None = None,
     method_tree: MethodTree | None = None,
     tree_listing: MethodTreeListing | None = None,
+    method_address: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
 
     Shared between the ``method``, ``pipe`` and ``bundle`` subcommands. ``method_tree`` is the method tree the run
     reads, when the command listed one, recorded as ``method_tree.json`` in the run's output folder, and
     ``tree_listing`` the listing the command listed it through, which the run loads its trees from, so the tree recorded
-    is the tree loaded.
+    is the tree loaded. ``method_address`` is the address of the published package a ``method`` run resolved, when it
+    resolved one: the method's identity behind each pipe's ``pipe_id`` (:mod:`pipelex.system.telemetry.pipe_identity`).
     """
     # Fail fast on an unusable --save-csv target BEFORE running the pipeline, so a bad path (empty,
     # or an unsupported suffix like .xlsx) doesn't waste a full inference run. The output-shape and
@@ -300,6 +302,7 @@ async def _execute_run(
             inputs_base_dir=inputs_base_dir,
             # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
             library_dirs_are_callers=True,
+            method_address=method_address,
         )
         # The CLI reads every bundle it runs from the caller's files; a method it resolved declared its own source first.
         with method_source_scope(source=UsageStatsMethodSource.LOCAL_BUNDLE):
@@ -581,6 +584,7 @@ def execute_run(
     save_csv: str | None = None,
     method_tree: MethodTree | None = None,
     tree_listing: MethodTreeListing | None = None,
+    method_address: str | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
@@ -588,6 +592,7 @@ def execute_run(
     prints the deck staleness notice, which the root callback leaves to it: only a local run reads the deck.
     ``inputs`` is ``--inputs`` as given, or the inputs file ``run bundle`` auto-detected (see ``load_run_inputs``).
     ``tree_listing`` is the listing the command listed ``method_tree`` through, which the run loads its trees from.
+    ``method_address`` is the address of the published package a ``method`` run resolved, or ``None``.
     """
     warn_if_deck_stale()
     # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
@@ -628,6 +633,7 @@ def execute_run(
                     save_csv=save_csv,
                     method_tree=method_tree,
                     tree_listing=tree_listing,
+                    method_address=method_address,
                 )
             )
 

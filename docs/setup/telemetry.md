@@ -207,6 +207,41 @@ The rules it follows:
 
 These are labels for grouping, not content: they land in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
 
+## Stable pipe identifiers
+
+A deployment that keeps pipe codes out of its telemetry, `[custom_posthog.tracing.capture] pipe_codes = false`, reports each pipe span by its pipe type alone, so on its own a chart cannot follow one step of a method from one run to the next. Pipelex can give every pipe a **`pipe_id`** for that: an identifier that is the same for one pipe of one method on every run, and in every process of a deployment, and that cannot be turned back into the pipe code.
+
+Set a secret key in `telemetry.toml` to turn it on:
+
+```toml
+pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+```
+
+The key is at least 32 characters. A placeholder whose variable is not set refuses the load, so a process whose secret did not arrive does not start with a different key from its siblings. With no `pipe_id_key`, which is the default, Pipelex sends no `pipe_id` at all, never a substitute value. `pipelex doctor` checks the file as it is written, so it accepts the placeholder whether or not the variable is set in its own shell; whether the secret reaches a process is what that process's start checks.
+
+What a pipe's `pipe_id` is made from:
+
+- **It is a keyed digest.** Pipe codes are short words that anyone could guess, so a plain hash of one could be confirmed by hashing candidates. `pipe_id` is the HMAC-SHA256 of the method's identity and the pipe under your key, truncated to 32 hexadecimal characters.
+- **The method's identity comes first.** It is the run's `method_id` when the host names the stored method the run belongs to, else the address of the published package the run addressed (on the API server, a `method_ref` run; on this machine, `pipelex run method` and `pipelex-agent run method` of a fetched or installed published method), else the pipe's own domain. Each kind is tagged before it is digested, so a domain never collides with a method id spelled the same way.
+- **The pipe is its domain-qualified reference**, so two pipes that share a code in different domains of one method keep separate identifiers.
+- **Every process of a deployment must share the key.** A runner and a worker with different keys would give one pipe two identifiers. Changing the key deliberately starts a new series of identifiers, so note the date where your charts will show the break.
+
+Every pipe span then carries the attribute `pipelex.pipe.id`, and every inference span carries the `pipe_id` of the pipe that made the call. Your PostHog receives it as the `pipe_id` property of each `$ai_span` and `$ai_generation`.
+
+### The run's method
+
+A host that stores methods can name the stored method a run belongs to by passing `method_id` when it starts the run: to `PipelexMTHDSProtocol(method_id=...)`, or as the `method_key` field of a run request to the [API server](../api-server/pipe-run.md#run-telemetry-fields). It is 1 to 128 letters, digits, `_` or `-`. Pipelex never resolves it; it rides the run to every process, every span carries it as `pipelex.run.method_id`, your PostHog receives it as the `method_id` property of every `$ai_span`, the trace's first included, and of every `$ai_generation`, and it is the method's identity behind each `pipe_id`.
+
+### Pipe codes for one run
+
+The `[custom_posthog.tracing.capture]` settings `pipe_codes` and `output_class_names` hold for the whole deployment. A host serving several customers may need to decide per run instead, for instance per organization. A run may carry its own `capture_pipe_codes`, passed to `PipelexMTHDSProtocol(capture_pipe_codes=...)` or as the `capture_pipe_codes` field of a run request to the API server:
+
+- **`true`** sends the real pipe codes and output class names for this run, in span and trace names, the `pipe_code` property and Portkey's span names.
+- **`false`** sends the redaction marker for this run, whatever the deployment says.
+- **Absent** keeps the deployment's settings.
+
+The setting rides every span of the run as the attribute `pipelex.run.capture_pipe_codes`, so the process that exports a span, a distributed worker included, applies the run's choice rather than its own.
+
 ## Privacy
 
 We take your privacy seriously:

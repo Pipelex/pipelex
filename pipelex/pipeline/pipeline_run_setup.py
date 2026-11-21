@@ -38,6 +38,7 @@ from pipelex.runtime_hub import (
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.exceptions import RunParameterError
+from pipelex.system.job_metadata import validate_method_id
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import (
@@ -77,6 +78,9 @@ async def pipeline_run_setup(
     storage_scope: str,
     read_scope: str | None,
     extras: dict[str, str] | None = None,
+    method_id: str | None = None,
+    method_address: str | None = None,
+    capture_pipe_codes: bool | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
@@ -167,6 +171,20 @@ async def pipeline_run_setup(
         the trace-start event, so a malformed mapping registers nothing and
         emits nothing. Optional, and omitting it leaves the telemetry group facet empty.
         See :mod:`pipelex.system.run_extras`.
+    method_id:
+        The host's own id of the stored method this run belongs to, such as the
+        hosted platform's bare catalog id, or ``None``. Opaque: telemetry sends it
+        on every span of the run, and it is the method's identity behind each
+        pipe's ``pipe_id`` (:mod:`pipelex.system.telemetry.pipe_identity`).
+        Validated at the top of this function, with the extras.
+    method_address:
+        The full address of the published method package the run addressed, when
+        the host ran a method by its address, or ``None``. Never sent: it is the
+        method's identity behind each ``pipe_id`` when the run has no ``method_id``.
+    capture_pipe_codes:
+        Whether this run's telemetry may carry its pipe codes and output class
+        names, as the host states it for this run; ``None`` falls back to the
+        deployment's ``custom_posthog.tracing.capture.pipe_codes``.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -248,6 +266,9 @@ async def pipeline_run_setup(
     # This is the same lesson `storage_scope` learned one seam lower, and the
     # same cure: ordering, not absence, was the defect.
     extras = validate_run_extras(value=extras or {})
+    # And the method id beside them, which rides every span and event of the run as they do.
+    if method_id is not None:
+        method_id = validate_method_id(value=method_id)
 
     # And the scope, for the same reason and with more at stake.
     #
@@ -459,6 +480,9 @@ async def pipeline_run_setup(
             storage_scope=storage_scope,
             read_scope=read_scope,
             extras=extras,
+            method_id=method_id,
+            method_address=method_address,
+            capture_pipe_codes=capture_pipe_codes,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,

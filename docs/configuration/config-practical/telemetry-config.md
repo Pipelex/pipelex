@@ -44,6 +44,9 @@ Files are deep-merged, with later layers winning per leaf key. This means Langfu
 # Join the trace of the process that runs Pipelex (top-level, before any section)
 join_host_trace = false
 
+# Secret key of the stable pipe identifiers (top-level); no key, no pipe_id
+# pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+
 # PostHog Configuration (Event tracking + AI span tracing)
 [custom_posthog]
 mode = "anonymous"                                   # "off" | "anonymous" | "identified"
@@ -106,6 +109,16 @@ The top-level `join_host_trace` key decides whether Pipelex's spans join the Ope
 
 !!! warning "A span destination is required"
     With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+
+---
+
+## Stable pipe identifiers
+
+The top-level `pipe_id_key` key turns on `pipe_id`, the identifier every pipe span carries that is stable across runs and is not the pipe code. [Telemetry Setup](../../setup/telemetry.md#stable-pipe-identifiers) describes what it is made from and how a run names its method.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `pipe_id_key` | string | (none) | The secret the identifiers are keyed with, at least 32 characters, shared by every process of a deployment. A placeholder whose variable is not set refuses the load, and a refused key is never quoted in the error. With no key, no span carries a `pipe_id` |
 
 ---
 
@@ -172,6 +185,8 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 | `content_max_length` | integer | (unlimited) | Max length for captured content |
 | `pipe_codes` | boolean | `false` | Include pipe codes in span names/attributes |
 | `output_class_names` | boolean | `false` | Include output class names in spans |
+
+A run may override `pipe_codes` and `output_class_names` together with its own `capture_pipe_codes`; see [Pipe codes for one run](../../setup/telemetry.md#pipe-codes-for-one-run).
 
 !!! warning "Privacy Note"
     These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.

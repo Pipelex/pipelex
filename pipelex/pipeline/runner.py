@@ -36,7 +36,7 @@ from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.caller_identity import CallerIdentity
-from pipelex.system.job_metadata import validate_pipeline_run_id, validate_request_id
+from pipelex.system.job_metadata import validate_method_id, validate_pipeline_run_id, validate_request_id
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
@@ -214,6 +214,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # No local default: a laptop belongs to no organization, and inventing
         # a label here would put every such run into one shared entity.
         extras: dict[str, str] | None = None,
+        # The host's own id of the stored method the runs belong to, the address of the published package they run,
+        # and the host's pipe-code setting for them, each None when the host has nothing to say: telemetry sends the
+        # method id on every span, the id and the address are the method's identity behind each pipe's `pipe_id`, and
+        # the setting overrides the deployment's (`pipeline_run_setup` says what each is). Refused here when malformed.
+        method_id: str | None = None,
+        method_address: str | None = None,
+        capture_pipe_codes: bool | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         # The pipe run to hand each job to instead of the hub's, such as one handing it to an orchestrator outside this
         # process: the job carries no method file's bytes, its crate naming each tree by digest.
@@ -245,6 +252,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.storage_scope = storage_scope
         self.read_scope = read_scope
         self.extras = extras
+        self.method_id = validate_method_id(value=method_id) if method_id is not None else None
+        self.method_address = method_address
+        self.capture_pipe_codes = capture_pipe_codes
         self.execution_config = execution_config
         self._pipe_run = pipe_run
         # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
@@ -414,6 +424,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 storage_scope=self.storage_scope,
                 read_scope=self.read_scope,
                 extras=self.extras,
+                method_id=self.method_id,
+                method_address=self.method_address,
+                capture_pipe_codes=self.capture_pipe_codes,
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,
                 methods_dirs=self.methods_dirs,

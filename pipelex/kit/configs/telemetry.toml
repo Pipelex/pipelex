@@ -25,6 +25,18 @@
 join_host_trace = false
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Stable pipe identifier
+# With a key, every pipe span and every inference span carries `pipelex.pipe.id` (`pipe_id` in
+# PostHog): a keyed digest of the method's identity and the pipe, the same for one pipe across runs,
+# that cannot be turned back into the pipe code. Without a key, no span carries one. Use a secret of
+# at least 32 characters (`openssl rand -hex 32`), and read it from the environment rather than
+# writing it here. Changing it starts a new series of identifiers. A placeholder no variable answers
+# refuses the boot.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+
+# ──────────────────────────────────────────────────────────────────────────────
 # PostHog Configuration (Event tracking + AI span tracing)
 # ──────────────────────────────────────────────────────────────────────────────
 

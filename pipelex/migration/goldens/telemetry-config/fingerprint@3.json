@@ -158,6 +158,11 @@
       "default": [],
       "open_node": false
     },
+    "pipe_id_key": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
     "telemetry_allowed_modes": {
       "value_type": "dict[str, bool]",
       "required": false,

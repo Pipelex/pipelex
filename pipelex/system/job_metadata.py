@@ -53,6 +53,25 @@ def validate_request_id(*, value: str) -> str:
     return value
 
 
+def validate_method_id(*, value: str) -> str:
+    """Return `value` if it is a usable method id, else raise `RunParameterError`.
+
+    A method id is the host's own opaque identifier of the stored method a run belongs to, and it rides every span and
+    event of the run, so it is held to the request id's rule (`is_valid_request_id`): one to `REQUEST_ID_MAX_LENGTH`
+    ASCII letters, digits, `_` or `-`, which covers the hosted platform's `mt_…` ids and a UUID alike. Applied by
+    `RunMetadata` at construction, by `pipeline_run_setup` before the run causes anything, and by the API server at the
+    wire.
+
+    Raises:
+        RunParameterError: the value is empty, too long, or holds another character.
+    """
+    if not is_valid_request_id(value=value):
+        # The value is not quoted: it is the text the rule refuses to write into a log line.
+        msg = f"Invalid method_id: expected one to {REQUEST_ID_MAX_LENGTH} ASCII letters, digits, '_' or '-'."
+        raise RunParameterError(msg)
+    return value
+
+
 class SpecialPipelineId(StrEnum):
     """The reserved `pipeline_run_id` values, for runs that have no id of their own.
 
@@ -211,6 +230,25 @@ class RunMetadata(BaseModel):
     method_tree_digest: str | None = None
     crate_fingerprint: str | None = None
 
+    # The host's own identifier of the stored method this run belongs to, such as the hosted platform's bare
+    # catalog id (`mt_…`), or None when the run belongs to no stored method. Opaque to the runtime, which never
+    # resolves it: telemetry sends it on every span of the run, and it is the first input of each pipe's stable
+    # identifier (`pipelex.system.telemetry.pipe_identity`). Constrained by `validate_method_id`, the charset of a
+    # request id, since it rides every span and event of the run.
+    method_id: str | None = None
+
+    # The full address of the published method package the run addressed (`github.com/acme/methods/invoices`), set by
+    # a host that ran a method by its address, or None. Never sent anywhere: it is the method's identity behind each
+    # pipe's stable identifier when the run carries no `method_id`.
+    method_address: str | None = None
+
+    # Whether this run's telemetry may carry its pipe codes, as the host states it for this run, overriding the
+    # deployment's `custom_posthog.tracing.capture.pipe_codes`; None falls back to that setting. When set, it governs
+    # the output class names too, which name the method's concepts as the pipe codes name its pipes. It rides the
+    # spans as `pipelex.run.capture_pipe_codes`, so the exporter that redacts reads it from the span itself, in
+    # whichever process the span was made (`pipelex.system.telemetry.pipe_identity`).
+    capture_pipe_codes: bool | None = None
+
     # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
     # HTTP request enters Pipelex). Rides here so it crosses the Temporal
     # serialization boundary — every activity / workflow can correlate logs and
@@ -281,6 +319,14 @@ class RunMetadata(BaseModel):
             return None
         return validate_request_id(value=value)
 
+    @field_validator("method_id")
+    @classmethod
+    def _validate_method_id(cls, value: str | None) -> str | None:
+        """Refuse a method id that would forge a log line or a telemetry property, at construction."""
+        if value is None:
+            return None
+        return validate_method_id(value=value)
+
     @field_validator("extras")
     @classmethod
     def _validate_run_extras(cls, value: dict[str, str]) -> dict[str, str]:
@@ -311,6 +357,11 @@ class JobMetadata(BaseModel):
     run_metadata: RunMetadata
 
     pipe_code: str | None = None
+
+    # The stable identifier of the running pipe (`pipelex.system.telemetry.pipe_identity`), set where its span starts
+    # so the inference spans it makes, in this process or in a worker's activity, carry the same value. None when the
+    # pipe opened no span or the runtime has no `pipe_id_key`.
+    pipe_id: str | None = None
 
     # Per-process Pipelex session id (``Config.session_id``) captured at the
     # submitter dispatch boundary. Inheriting it through ``JobMetadata`` lets

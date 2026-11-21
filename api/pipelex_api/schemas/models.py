@@ -19,7 +19,7 @@ from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
 from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.reporting.usage_records import TokensUsageRecord
-from pipelex.system.job_metadata import PIPELINE_RUN_ID_MAX_LENGTH, PIPELINE_RUN_ID_PATTERN, validate_pipeline_run_id
+from pipelex.system.job_metadata import PIPELINE_RUN_ID_MAX_LENGTH, PIPELINE_RUN_ID_PATTERN, validate_method_id, validate_pipeline_run_id
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope
 from pipelex.tools.network.host_rules import classify_disallowed_host, is_disallowed_host
@@ -421,6 +421,25 @@ _ANALYTICS_GROUPS_DESCRIPTION = (
     "group, which is right for a single-tenant deployment."
 )
 
+# The host's opaque key of the stored method a run belongs to. The runtime keeps it as the run's method id
+# (`RunMetadata.method_id`), but the wire field is named apart from the hosted catalog selector on purpose: this
+# server never resolves a stored method, and the layered extension policy keeps that selector's name out of the
+# contract it publishes, so the host sends its own id under this neutral key, beside the run's source.
+_METHOD_KEY_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host's own opaque key of the stored method this run "
+    "belongs to, sent beside the run's source. This server never resolves it into a method: the runtime carries it on the "
+    "run, stamps it on every span as the run's method, and uses it as the method's identity behind each pipe's stable "
+    "identifier `pipelex.pipe.id`. 1 to 128 characters from `[A-Za-z0-9_-]`, else a 422. Omit it for a run that belongs "
+    "to no stored method."
+)
+
+_CAPTURE_PIPE_CODES_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — whether this run's telemetry may carry its pipe codes and "
+    "output class names, overriding the deployment's `custom_posthog.tracing.capture.pipe_codes` for this run alone: "
+    "`true` sends the real values, `false` the redaction marker. It travels with the run to every process that runs a "
+    "part of it. Omit it to keep the deployment's setting."
+)
+
 _CALLER_ANALYTICS_GROUPS_DESCRIPTION = (
     "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host-supplied groups the caller of this request "
     'belongs to, as a mapping of group type to group key (e.g. `{"organization": "org_acme"}`), exactly as a run '
@@ -495,7 +514,7 @@ class PipelineApiExtras(BaseModel):
     are defined and handled by the implementation that owns them). The upstream
     protocol models don't know about `callback_urls`.
 
-    `storage_scope`, `read_scope` and `analytics_groups` are the host-computed run
+    `storage_scope`, `read_scope`, `analytics_groups`, `method_key` and `capture_pipe_codes` are the host-computed run
     context: data a multi-tenant host knows about its own tenancy and sends in the
     body, as opposed to the caller's identity, which arrives on a trusted header. The
     runtime carries them opaquely and validates them again at its own seam.
@@ -509,6 +528,16 @@ class PipelineApiExtras(BaseModel):
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_READ_SCOPE_DESCRIPTION)
     analytics_groups: dict[str, str] | None = Field(default=None, description=_ANALYTICS_GROUPS_DESCRIPTION)
+    method_key: str | None = Field(default=None, description=_METHOD_KEY_DESCRIPTION)
+    capture_pipe_codes: bool | None = Field(default=None, description=_CAPTURE_PIPE_CODES_DESCRIPTION)
+
+    @field_validator("method_key")
+    @classmethod
+    def _validate_method_key(cls, value: str | None) -> str | None:
+        """Refuse a malformed method key at the WIRE, with the runtime's own rule for a run's method id, before a method is fetched."""
+        if value is None:
+            return None
+        return validate_method_id(value=value)
 
     @field_validator("pipeline_run_id")
     @classmethod
@@ -625,6 +654,8 @@ class PipelexApiStartRequest(StartRequest):
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_READ_SCOPE_DESCRIPTION)
     analytics_groups: dict[str, str] | None = Field(default=None, description=_ANALYTICS_GROUPS_DESCRIPTION)
+    method_key: str | None = Field(default=None, description=_METHOD_KEY_DESCRIPTION)
+    capture_pipe_codes: bool | None = Field(default=None, description=_CAPTURE_PIPE_CODES_DESCRIPTION)
 
 
 class PipelexApiExecuteRequest(RunRequest):
@@ -633,7 +664,7 @@ class PipelexApiExecuteRequest(RunRequest):
     Used only to publish the OpenAPI request schema: `/execute` reads the body through the raw
     `Request` (plain JSON, parsed by the route), so FastAPI cannot infer the body type; this model documents the
     extensions the route actually honors (`pipeline_run_id`, `callback_urls`, `orchestration_mode`, `storage_scope`,
-    `read_scope`, `analytics_groups`, all parsed by `PipelineApiExtras`).
+    `read_scope`, `analytics_groups`, `method_key`, `capture_pipe_codes`, all parsed by `PipelineApiExtras`).
     """
 
     pipeline_run_id: str | None = Field(
@@ -648,6 +679,8 @@ class PipelexApiExecuteRequest(RunRequest):
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_READ_SCOPE_DESCRIPTION)
     analytics_groups: dict[str, str] | None = Field(default=None, description=_ANALYTICS_GROUPS_DESCRIPTION)
+    method_key: str | None = Field(default=None, description=_METHOD_KEY_DESCRIPTION)
+    capture_pipe_codes: bool | None = Field(default=None, description=_CAPTURE_PIPE_CODES_DESCRIPTION)
 
 
 class PipeOutputWire(PipeOutput):

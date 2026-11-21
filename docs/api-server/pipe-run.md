@@ -47,6 +47,8 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
+- `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
+- `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
 - `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one. It must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved: any other value is a `422` `request.invalid` naming `pipeline_run_id`, before the run is registered.
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends, before the response is sent; their delivery never changes the response, but a receiver that never answers delays it by about 51 seconds at most, the delivery's three attempts of 15 seconds and its waits between them. See [Webhooks](webhooks.md).
 
@@ -165,6 +167,8 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
+- `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
+- `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
@@ -398,6 +402,22 @@ Both `/execute` and `/start` accept optional fields that describe the run's tena
 A mapping outside these rules is refused with a `422` `request.invalid` naming the field `analytics_groups`, or a path into it, before any method is fetched or any library loaded. A body that fails on more than one of the extension fields at once carries one `request.invalid` item per refused field in its `errors`.
 
 The caller's id is the run's person on that same stream, with one exception: a deployment with no user model attributes every run to the literal `single-tenant`, which the runtime declines as a person and replaces with the `user_id` configured in `telemetry.toml`. The groups do not depend on it, so a single-tenant deployment that sends `analytics_groups` still has them on every capture.
+
+## Run telemetry fields
+
+Both `/execute` and `/start` also accept optional **Pipelex-API extensions** that a host sets for the run's telemetry, beside `analytics_groups`:
+
+```json
+{
+  "mthds_contents": ["..."],
+  "method_key": "invoice_extractor",
+  "capture_pipe_codes": false
+}
+```
+
+**`method_key`** is your own key of the stored method this run belongs to, sent beside the run's source. This server never resolves it into a method, which is why it is a key of your own rather than a selector: the run is still the source it sends. The runtime keeps it as the run's method id, stamps it on every span as `pipelex.run.method_id`, which the PostHog stream sends as the `method_id` property, and uses it as the method's identity behind each pipe's stable identifier (see [Telemetry](../setup/telemetry.md#stable-pipe-identifiers)). It is 1 to 128 ASCII letters, digits, `_` or `-`; anything else is a `422` `request.invalid` naming the field `method_key`. A run started by `method_ref` that carries no `method_key` uses the package's address as its method's identity.
+
+**`capture_pipe_codes`** says whether this run's telemetry may carry its pipe codes and output class names, overriding the deployment's `custom_posthog.tracing.capture.pipe_codes` for this run alone. `true` sends the real values in the span and trace names and in the `pipe_code` and `output_class_name` properties; `false` sends the redaction marker. The value travels with the run to every process that runs a part of it, so a worker's activities honour it too. Omit it, or send `null`, to keep the deployment's setting.
 
 ---
 

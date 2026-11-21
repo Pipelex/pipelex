@@ -65,6 +65,7 @@ async def run_pipeline_core(
     output_dir_override: Path | None = None,
     method_tree: MethodTree | None = None,
     tree_listing: MethodTreeListing | None = None,
+    method_address: str | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -91,6 +92,8 @@ async def run_pipeline_core(
             ``method_tree_digest`` beside the run's other side effects, on disk and under ``with_memory``.
         tree_listing: The listing the command listed ``method_tree`` through, which the run loads its trees from, so
             the digest recorded is the digest of the tree the run loaded. None lists the trees for the run.
+        method_address: The address of the published package `run method` resolved, when it resolved one: the
+            method's identity behind each pipe's `pipe_id` (`pipelex.system.telemetry.pipe_identity`).
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -122,6 +125,7 @@ async def run_pipeline_core(
         inputs_base_dir=inputs_base_dir,
         # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
         library_dirs_are_callers=True,
+        method_address=method_address,
     )
     # The CLI reads every bundle it runs from the caller's files; a method it resolved declared its own source first.
     with method_source_scope(source=UsageStatsMethodSource.LOCAL_BUNDLE):
