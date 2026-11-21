@@ -32,6 +32,7 @@ from pipelex.kernel.memory_ops import (
 )
 from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.exceptions import RunParameterError
 from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -175,10 +176,22 @@ class TestPipelexKernelRunState:
         assert step_trace_context is not None
         assert step_trace_context.run_mode.is_dry
 
-    def test_an_empty_pipeline_run_id_is_refused(self) -> None:
-        """An empty id is a caller's bug, and minting one in its place would hide it from a replaying host."""
-        with pytest.raises(ValueError, match="empty pipeline_run_id"):
-            PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id="")
+    @pytest.mark.parametrize("bad_run_id", ["", "run/7", "run.7", "run 7", "x" * 129, "untitled", "dry_run_untitled"])
+    def test_a_pipeline_run_id_outside_the_rule_is_refused(self, bad_run_id: str) -> None:
+        """The kernel refuses what `execute` refuses, through the one validator; an empty id is a caller's bug, and
+        minting one in its place would hide it from a replaying host.
+        """
+        with pytest.raises(RunParameterError, match="Invalid pipeline_run_id"):
+            PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", pipeline_run_id=bad_run_id)
+
+    @pytest.mark.parametrize("bad_graph_id", ["", "wf:run/1.x", "x" * 129, "untitled", "dry_run_untitled"])
+    def test_a_trace_context_graph_id_outside_the_rule_is_refused(self, bad_graph_id: str) -> None:
+        """The graph id becomes the run id, so it is held to the same rule and refused with the same error."""
+        trace_context = _trace_context().model_copy(update={"graph_id": bad_graph_id})
+        with pytest.raises(RunParameterError, match="Invalid pipeline_run_id"):
+            PipelexKernel.make(
+                storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context
+            )
 
     def test_with_neither_the_run_id_is_a_fresh_uuid4(self) -> None:
         kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="test-user")

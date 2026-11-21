@@ -81,7 +81,6 @@ pipelex/interpreter_hub.py | InterpreterHub.get_required_pipe_run | RuntimeError
 pipelex/interpreter_hub.py | InterpreterHub.get_required_pipeline_manager | RuntimeError | invariant
 pipelex/interpreter_hub.py | get_current_library | RuntimeError | invariant
 pipelex/kernel/pipelex_kernel.py | PipelexKernel._resolve_pipeline_run_id | ValueError | invariant
-pipelex/kernel/pipelex_kernel.py | PipelexKernel._resolve_pipeline_run_id | ValueError | invariant
 pipelex/kit/single_file_agent_rules.py | build_merged_rules | ValueError | tooling
 pipelex/language/mthds_factory.py | MthdsFactory.make_table_obj_for_concept | TypeError | invariant
 pipelex/language/mthds_factory.py | MthdsFactory.make_table_obj_for_concept | TypeError | invariant
