@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.110.0
+  version: 0.112.0
 paths:
   /health:
     get:
@@ -389,12 +389,16 @@ paths:
                   anyOf:
                   - type: string
                     maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_-]+$
                   - type: 'null'
                   title: Pipeline Run Id
                   description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol on `/execute`) — the run''s id, chosen
                     by the caller, as `/start` takes it: the run and its webhooks'' events carry it, and a run still in flight
                     under the same id refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the runner generates
-                    one.'
+                    one. One to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which
+                    are reserved; any other value is refused with a 422 `request.invalid` naming the field, before the run
+                    is registered.'
                 callback_urls:
                   anyOf:
                   - items:
@@ -457,6 +461,25 @@ paths:
                     own PostHog stream, in `identified` mode, forwards it as the capture''s groups. Group types are lowercase
                     snake_case starting with a letter, at most 32 characters; group keys are 1 to 128 characters from `[A-Za-z0-9_-]`;
                     at most five entries. Omit it and the run belongs to no group, which is right for a single-tenant deployment.'
+                method_key:
+                  anyOf:
+                  - type: string
+                  - type: 'null'
+                  title: Method Key
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host''s own opaque key of the
+                    stored method this run belongs to, sent beside the run''s source. This server never resolves it into a
+                    method: the runtime carries it on the run, stamps it on every span as the run''s method, and uses it as
+                    the method''s identity behind each pipe''s stable identifier `pipelex.pipe.id`. 1 to 128 characters from
+                    `[A-Za-z0-9_-]`, else a 422. Omit it for a run that belongs to no stored method.'
+                capture_pipe_codes:
+                  anyOf:
+                  - type: boolean
+                  - type: 'null'
+                  title: Capture Pipe Codes
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — whether this run''s telemetry may
+                    carry its pipe codes and output class names, overriding the deployment''s `custom_posthog.tracing.capture.pipe_codes`
+                    for this run alone: `true` sends the real values, `false` the redaction marker. It travels with the run
+                    to every process that runs a part of it. Omit it to keep the deployment''s setting.'
               additionalProperties: true
               type: object
               title: PipelexApiExecuteRequest
@@ -469,7 +492,7 @@ paths:
 
                 extensions the route actually honors (`pipeline_run_id`, `callback_urls`, `orchestration_mode`, `storage_scope`,
 
-                `read_scope`, `analytics_groups`, all parsed by `PipelineApiExtras`).'
+                `read_scope`, `analytics_groups`, `method_key`, `capture_pipe_codes`, all parsed by `PipelineApiExtras`).'
         required: true
       responses:
         '200':
@@ -781,8 +804,15 @@ paths:
                   anyOf:
                   - type: string
                     maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_-]+$
                   - type: 'null'
                   title: Pipeline Run Id
+                  description: 'The run''s id, chosen by the caller: the start ack echoes it, the run and its webhooks'' events
+                    carry it, and a run still in flight under the same id refuses this one with a 409 `pipelex.run.already_exists`.
+                    Omit it and the runner generates one. One to 128 ASCII letters, digits, `_` or `-`, and neither `untitled`
+                    nor `dry_run_untitled`, which are reserved; any other value is refused with a 422 `request.invalid` naming
+                    the field, before the run is registered.'
                 callback_urls:
                   anyOf:
                   - items:
@@ -845,6 +875,25 @@ paths:
                     own PostHog stream, in `identified` mode, forwards it as the capture''s groups. Group types are lowercase
                     snake_case starting with a letter, at most 32 characters; group keys are 1 to 128 characters from `[A-Za-z0-9_-]`;
                     at most five entries. Omit it and the run belongs to no group, which is right for a single-tenant deployment.'
+                method_key:
+                  anyOf:
+                  - type: string
+                  - type: 'null'
+                  title: Method Key
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host''s own opaque key of the
+                    stored method this run belongs to, sent beside the run''s source. This server never resolves it into a
+                    method: the runtime carries it on the run, stamps it on every span as the run''s method, and uses it as
+                    the method''s identity behind each pipe''s stable identifier `pipelex.pipe.id`. 1 to 128 characters from
+                    `[A-Za-z0-9_-]`, else a 422. Omit it for a run that belongs to no stored method.'
+                capture_pipe_codes:
+                  anyOf:
+                  - type: boolean
+                  - type: 'null'
+                  title: Capture Pipe Codes
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — whether this run''s telemetry may
+                    carry its pipe codes and output class names, overriding the deployment''s `custom_posthog.tracing.capture.pipe_codes`
+                    for this run alone: `true` sends the real values, `false` the redaction marker. It travels with the run
+                    to every process that runs a part of it. Omit it to keep the deployment''s setting.'
               additionalProperties: true
               type: object
               title: PipelexApiStartRequest

@@ -22,13 +22,14 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
-from pipelex.config import is_pipe_func_sandbox_hosted
+from pipelex.config import crate_class_cache_max_classes, is_pipe_func_sandbox_hosted
 from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files, path_refusal_error, root_escape_of
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
@@ -44,6 +45,7 @@ from pipelex.interpreter_hub import get_current_library, get_current_library_id_
 from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items, duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
+from pipelex.libraries.crate_class_cache import CRATE_CLASS_CACHE, CrateClasses
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -89,6 +91,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.tools.jinja2.jinja2_parsing import sharing_template_parses, trusting_authored_templates
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.exceptions import SemVerError
@@ -241,6 +244,11 @@ def reachable_dependency_pipe_refs(
                 public_candidates = [candidate for candidate in candidates if candidate in public_pipe_refs]
                 pending.extend(public_candidates if len(candidates) > 1 and public_candidates else candidates)
     return reachable
+
+
+def _holds_only_native_concepts(*, library: Library) -> bool:
+    """Whether the library holds no concept but the natives every library starts with, as a freshly opened one does."""
+    return all(SpecialDomain.is_native(domain_code=concept.domain_code) for concept in library.concept_library.list_concepts())
 
 
 def _dependency_entries_first(*, concepts_by_key: "Mapping[str, Concept]") -> list["Concept"]:
@@ -456,6 +464,7 @@ class LibraryManager(LibraryManagerAbstract):
         self._fetched_dependency_trees = {}
         TREE_PYTHON_HOLD.release_all()
         LOCAL_METHOD_FILES.release_all()
+        CRATE_CLASS_CACHE.clear()
         with ExitStack() as teardown_stack:
             for library in libraries:
                 teardown_stack.callback(library.teardown)
@@ -875,13 +884,20 @@ class LibraryManager(LibraryManagerAbstract):
                 nothing a run later reads), so skipping it changes no behaviour, only the cost of reaching a
                 verdict already reached. Everything else still happens: fingerprint idempotency, domain and
                 concept loading with class registration, the resolution of the structure classes' references
-                to one another, the concept-cycle check, pipe construction with each pipe's static validation,
-                and source tracking. Leave it False for any crate whose library was not validated by this
+                to one another, the concept-cycle check, pipe construction with each pipe's static validation
+                except the judgments of its authored templates, and source tracking. Those judgments, whether a
+                template parses and what the template lints refuse (`trusting_authored_templates`), were made
+                where the crate's library was validated and write nothing a run reads, so they are skipped too;
+                the analyses that build a pipe's state from its templates, such as the images and documents a
+                prompt presents, still run. Leave it False for any crate whose library was not validated by this
                 pipelex version.
             written_pipe_trees: The trees this process wrote out for a step to run in, by that step's pipe ref, such as
                 the tree of a `PipeFunc` call written for its function to import. That step is built as a member of the
                 written tree, which holds none of its tree's bundles; no other step is, a sibling of the same tree
                 included.
+
+        Each template the load reads is parsed once for the whole load (`sharing_template_parses`), whichever checks and
+        analyses read it.
 
         Every other step is built as a member of its tree when the load validates the crate and a library of this
         process holds the tree under the digest the crate names, so its checks read the files they read where the
@@ -903,6 +919,7 @@ class LibraryManager(LibraryManagerAbstract):
             crate=crate,
             is_crate_prevalidated=is_crate_prevalidated,
             refuses_unresolved_structures=False,
+            shares_built_classes=True,
             live_trees=held_trees,
             written_pipe_trees=written_pipe_trees or {},
         )
@@ -916,6 +933,7 @@ class LibraryManager(LibraryManagerAbstract):
         refuses_unresolved_structures: bool,
         live_trees: "Mapping[str, MethodTree]",
         written_pipe_trees: "Mapping[str, MethodTree] | None" = None,
+        shares_built_classes: bool = False,
     ) -> list[PipeAbstract]:
         """The load behind load_from_crate and load_from_blueprints.
 
@@ -930,11 +948,20 @@ class LibraryManager(LibraryManagerAbstract):
                 member of it, and every other as a member of a tree the crate names by digest alone.
             written_pipe_trees: As load_from_crate describes it: a step built in a tree this process wrote out for it,
                 which wins over its tree in `live_trees`.
+            shares_built_classes: Whether a load into a library holding no concept but the natives takes the crate's
+                concepts and structure classes from this process's cache, and gives them to it (`crate_class_cache`).
+                Only load_from_crate asks: load_from_blueprints loads the bundle's dependencies first, whose concepts
+                the crate's classes may resolve to.
         """
         # Bind the target library as current for the whole load: PipeFactory and the concept
         # factories resolve concepts and the class registry through the ambient current library,
-        # so a load into a non-current library must not read the caller's binding.
-        with scoped_current_library(library_id=library_id), sharing_module_name_checks():
+        # so a load into a non-current library must not read the caller's binding. Every template the
+        # load reads, for a check or for the state a pipe holds, is parsed once for the whole load. A
+        # prevalidated crate's templates were judged where its library was validated, so the checks that
+        # only judge them are skipped: the parse check and the template lints.
+        with scoped_current_library(library_id=library_id), sharing_module_name_checks(), sharing_template_parses(), ExitStack() as trust_stack:
+            if is_crate_prevalidated:
+                trust_stack.enter_context(trusting_authored_templates())
             # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
             # workflow, which never populates _blueprints). This lets get_crate() hand the crate to the
             # sandbox executor. The blueprint-derived path (load_libraries -> load_from_blueprints) leaves
@@ -958,8 +985,30 @@ class LibraryManager(LibraryManagerAbstract):
                 all_domains.append(domain)
             library.domain_library.add_domains(domains=all_domains)
 
-            # Load concepts in topological order
-            all_concepts = self._load_concepts_from_crate(crate.concepts)
+            # Load concepts in topological order. Into a library holding no concept but the natives, the classes a
+            # crate's concepts get depend on the crate and on the registry the load starts from alone, so a process
+            # builds them once per crate and registers the same class objects for every later load of it.
+            class_cache_seed: dict[str, type[Any]] | None = None
+            built_classes: CrateClasses | None = None
+            if shares_built_classes and _holds_only_native_concepts(library=library):
+                class_cache_seed = get_class_registry().get_classes_dict()
+            cached_classes = CRATE_CLASS_CACHE.lookup(fingerprint=fingerprint, seed=class_cache_seed) if class_cache_seed is not None else None
+            if cached_classes is not None:
+                class_registry = get_class_registry()
+                for class_name, structure_class in cached_classes.classes.items():
+                    class_registry.register_class(structure_class, name=class_name)
+                all_concepts = cached_classes.concepts
+            else:
+                all_concepts = self._load_concepts_from_crate(crate.concepts)
+                if class_cache_seed is not None:
+                    built_classes = CrateClasses(
+                        concepts=all_concepts,
+                        classes={
+                            class_name: structure_class
+                            for class_name, structure_class in get_class_registry().get_classes_dict().items()
+                            if class_cache_seed.get(class_name) is not structure_class
+                        },
+                    )
             library.concept_library.add_concepts(concepts=all_concepts)
 
             # A main-package concept's forward references may name any concept the library holds: this batch's,
@@ -1047,6 +1096,11 @@ class LibraryManager(LibraryManagerAbstract):
             # Only cache fingerprint after the entire load succeeds — if loading fails
             # with an exception, subsequent retries must not be skipped.
             loaded_set.add(fingerprint)
+            # Likewise, only a crate whose whole load succeeded gives its classes to the process's cache.
+            if built_classes is not None and class_cache_seed is not None:
+                CRATE_CLASS_CACHE.insert(
+                    fingerprint=fingerprint, seed=class_cache_seed, built=built_classes, max_classes=crate_class_cache_max_classes()
+                )
             return all_pipes
 
     @override

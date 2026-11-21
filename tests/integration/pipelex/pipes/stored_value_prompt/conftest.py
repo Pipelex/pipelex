@@ -27,6 +27,7 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from tests.helpers.run_ids import run_id_for_test
 from tests.integration.pipelex.pipes.stored_value_prompt.test_data import (
     READ_SCOPE,
     STORAGE_SCOPE,
@@ -153,9 +154,14 @@ def recording_content_generator(stored_text_storage: InMemoryStorageProvider) ->
 @pytest.fixture
 def scoped_job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     """A run with a read scope, so every load of the stored text is authorized against it."""
-    test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    test_id = str(request.node.nodeid)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     return JobMetadata(
-        run_metadata=RunMetadata(storage_scope=STORAGE_SCOPE, read_scope=READ_SCOPE, user_id="pytest", pipeline_run_id=f"{test_id}-stored-prompt")
+        run_metadata=RunMetadata(
+            storage_scope=STORAGE_SCOPE,
+            read_scope=READ_SCOPE,
+            user_id="pytest",
+            pipeline_run_id=run_id_for_test(node_id=test_id, suffix="stored-prompt"),
+        )
     )
 
 

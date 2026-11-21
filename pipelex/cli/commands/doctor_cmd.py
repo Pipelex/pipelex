@@ -73,7 +73,7 @@ from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_I
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import get_optional_env
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig, telemetry_file_shape_context
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.log.log_redaction import redaction_patterns, scrub_secrets
@@ -258,8 +258,10 @@ def check_telemetry_config(*, config_dir: Path | None = None) -> TelemetryConfig
     # while booting perfectly well.
     strip_reserved_meta(config_dict=toml_doc)
 
+    # The file is read as written, with no variable substituted: this row reports on its shape, so a secret named
+    # through a placeholder is well formed here, and whether it reaches the process is the boot's to say.
     try:
-        telemetry_config = TelemetryConfig.model_validate(toml_doc)
+        telemetry_config = TelemetryConfig.model_validate(toml_doc, context=telemetry_file_shape_context())
     except ValidationError as exc:
         return _telemetry_is_out_of_date_or_wrong(validation_error=exc, config_path=telemetry_config_path)
     # The PostHog mode alone would read "off" for a file whose spans still reach an [[otlp]] exporter or Langfuse, so

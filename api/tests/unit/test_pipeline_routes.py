@@ -314,9 +314,9 @@ class TestPipelineRoutes:
         # An empty-string `pipe_code` / `pipeline_run_id` in the body must NOT reach the record
         # as an empty attribute, which a downstream query filtering on presence would read as a
         # real value. `_coerce_correlation_field` normalizes empty strings to `None`, and
-        # `_emit_api_error` drops those.
+        # `_emit_api_error` drops those. The fields are bound before the extras are validated,
+        # so the 422 an empty `pipeline_run_id` earns under the run id rule is recorded without them.
         client, _, start_mock = _build_client(mocker)
-        start_mock.side_effect = PipelexConfigError("simulated config fault")
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = client.post(
             "/v1/start",
@@ -327,9 +327,10 @@ class TestPipelineRoutes:
                 "pipeline_run_id": "",
             },
         )
-        assert response.status_code == 500
-        log_spy.error.assert_called_once()
-        fields = log_spy.error.call_args.kwargs["fields"]
+        assert response.status_code == 422
+        start_mock.assert_not_called()
+        log_spy.warning.assert_called_once()
+        fields = log_spy.warning.call_args.kwargs["fields"]
         assert "pipe_code" not in fields
         assert "pipeline_run_id" not in fields
 

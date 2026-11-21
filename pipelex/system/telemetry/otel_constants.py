@@ -197,6 +197,14 @@ class PipelexSpanAttr(StrEnum):
     RUN_USER_ID = "pipelex.run.user_id"
     RUN_EXTRAS = "pipelex.run.extras"
 
+    # The run's method and the running pipe's stable identity (`pipelex.system.telemetry.pipe_identity`): the host's
+    # id of the stored method the run belongs to, absent when it has none; the pipe's keyed digest, absent when the
+    # runtime has no `pipe_id_key`; and the run's own pipe-code setting, absent when the host set none, which the
+    # PostHog exporter reads in place of its configured redaction of pipe codes and output class names.
+    RUN_METHOD_ID = "pipelex.run.method_id"
+    PIPE_ID = "pipelex.pipe.id"
+    RUN_CAPTURE_PIPE_CODES = "pipelex.run.capture_pipe_codes"
+
 
 class LangfuseSpanAttr(StrEnum):
     """Langfuse-specific span attribute keys for enhanced observability.
