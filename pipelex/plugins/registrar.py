@@ -92,6 +92,7 @@ class HubSlot(StrEnum):
     PIPE_RUN = "pipe_run"
     TASK_MANAGER = "task_manager"
     ISOLATED_EXECUTION_PROBE = "isolated_execution_probe"
+    WORKFLOW_EXECUTION_PROBE = "workflow_execution_probe"
     METHOD_FILE_STORE = "method_file_store"
 
     @property
@@ -115,7 +116,13 @@ class HubSlot(StrEnum):
         match self:
             case HubSlot.PIPE_FUNC_EXECUTOR | HubSlot.PIPE_ROUTER | HubSlot.PIPE_RUN:
                 return True
-            case HubSlot.CONTENT_GENERATOR | HubSlot.TASK_MANAGER | HubSlot.ISOLATED_EXECUTION_PROBE | HubSlot.METHOD_FILE_STORE:
+            case (
+                HubSlot.CONTENT_GENERATOR
+                | HubSlot.TASK_MANAGER
+                | HubSlot.ISOLATED_EXECUTION_PROBE
+                | HubSlot.WORKFLOW_EXECUTION_PROBE
+                | HubSlot.METHOD_FILE_STORE
+            ):
                 return False
 
 
@@ -571,6 +578,17 @@ class PluginRegistrar:
 
     def claim_isolated_execution_probe(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.ISOLATED_EXECUTION_PROBE, factory=factory)
+
+    def claim_workflow_execution_probe(self, factory: Callable[[], Any]) -> None:
+        """Claim the probe telling pipelex's telemetry which replayable workflow code the current call runs in.
+
+        The factory returns a ``WorkflowExecutionProbe`` (``pipelex/system/telemetry/workflow_execution.py``): a
+        callable answering the ``WorkflowExecutionProtocol`` of the workflow code the current call runs in, or
+        ``None`` outside it. Claimed by a host whose orchestrator replays its workflow code (a Temporal worker), so a
+        pipe span opened there takes a deterministic id and start and is exported once, by the live execution;
+        unclaimed, every span keeps a random id and the wall clock.
+        """
+        self._claim(slot=HubSlot.WORKFLOW_EXECUTION_PROBE, factory=factory)
 
     def claim_method_file_store(self, factory: Callable[[], Any]) -> None:
         """Claim where activities read method files, by their tree's digest: the factory returns a `MethodFileStoreProtocol`.

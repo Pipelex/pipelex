@@ -4,7 +4,8 @@ This module provides a SpanExporter that sends OTel spans to PostHog
 as $ai_generation or $ai_span events.
 """
 
-from typing import Any, Mapping, Sequence, cast
+import uuid
+from typing import Any, Final, Mapping, Sequence, cast
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -24,6 +25,20 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
 from pipelex.tools.log.error_fields import error_fields
+
+# The namespace of the deterministic event uuids PostHog deduplicates on, the same fixed, arbitrary UUID the hosted
+# plane's own emitters derive theirs from. NEVER change it: a new namespace re-enables the double counts it stops.
+EVENT_UUID_NAMESPACE: Final[uuid.UUID] = uuid.UUID("6f5c1f3a-3a2e-4f1b-9c0d-8a7b6e5d4c3b")
+
+
+def make_span_event_uuid(*, span_id: str) -> str:
+    """The uuid of a pipe's ``$ai_span`` event, a UUIDv5 of ``"$ai_span:<$ai_span_id>"``.
+
+    A pipe's span is exported once, by the execution that ran it to its end, even across a replay of workflow code
+    (see ``pipelex.system.telemetry.replay_safe_spans``); the uuid is the tracking plan's backstop against the PostHog
+    client delivering the same capture twice, and never the guarantee.
+    """
+    return str(uuid.uuid5(EVENT_UUID_NAMESPACE, f"{PostHogEvent.SPAN}:{span_id}"))
 
 
 class PostHogSpanExporter(SpanExporter):
@@ -69,7 +84,35 @@ class PostHogSpanExporter(SpanExporter):
             run_identity_policy=self.run_identity_policy,
         )
 
-    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any], identity: TelemetryIdentity) -> None:
+    def _resolve_redaction(self, *, attributes: Mapping[str, OTelAttributeValue]) -> TelemetryRedactionConfig:
+        """What this span may show on this stream: the run's own pipe-code setting, when the span carries one, else the stream's.
+
+        A host may set `capture_pipe_codes` for a run (`RunMetadata.capture_pipe_codes`), and the span site writes it on
+        the span as `pipelex.run.capture_pipe_codes`, in whichever process made the span. When present it decides both
+        the pipe codes and the output class names, which name the method's concepts as the codes name its pipes; when
+        absent, the stream's configured redaction stands.
+        """
+        run_capture_pipe_codes = attributes.get(PipelexSpanAttr.RUN_CAPTURE_PIPE_CODES)
+        if not isinstance(run_capture_pipe_codes, bool):
+            return self.redaction_config
+        return self.redaction_config.model_copy(
+            update={
+                "redact_pipe_codes": not run_capture_pipe_codes,
+                "redact_output_class_names": not run_capture_pipe_codes,
+            }
+        )
+
+    def _add_method_properties(self, *, properties: dict[str, Any], attributes: Mapping[str, OTelAttributeValue]) -> None:
+        """Add the run's `method_id`, null when it has none, and the pipe's `pipe_id`, left out when the runtime has no key.
+
+        Neither is content: the host's opaque id of the stored method, and a keyed digest of the pipe
+        (`pipelex.system.telemetry.pipe_identity`). So neither is redacted.
+        """
+        properties["method_id"] = attributes.get(PipelexSpanAttr.RUN_METHOD_ID)
+        if (pipe_id := attributes.get(PipelexSpanAttr.PIPE_ID)) is not None:
+            properties["pipe_id"] = pipe_id
+
+    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any], identity: TelemetryIdentity, event_uuid: str | None = None) -> None:
         """Capture an event to PostHog, handling anonymous vs identified users.
 
         PostHog requires a valid distinct_id - passing None will cause the event to be rejected.
@@ -79,6 +122,9 @@ class PostHogSpanExporter(SpanExporter):
         and `groups` — and in no property: a property cannot produce a group-level
         count after the fact, and a second copy of the user id is a second thing
         to keep in step.
+
+        An ``event_uuid`` is the event's deduplication key, derived from the event's own identity; without one, the
+        client generates a random uuid.
         """
         if identity.distinct_id:
             # Identified user: pass distinct_id, and the entities the run belongs to
@@ -87,6 +133,7 @@ class PostHogSpanExporter(SpanExporter):
                 event=event,
                 properties=properties,
                 groups=identity.groups or None,
+                uuid=event_uuid,
             )
         else:
             # Anonymous user: don't pass distinct_id, mark as anonymous
@@ -94,6 +141,7 @@ class PostHogSpanExporter(SpanExporter):
             self.posthog_client.capture(
                 event=event,
                 properties=properties,
+                uuid=event_uuid,
             )
 
     def _truncate_content(self, content: str) -> str:
@@ -136,6 +184,7 @@ class PostHogSpanExporter(SpanExporter):
         original_span_name: str,
         *,
         pipe_type: str | None,
+        redaction: TelemetryRedactionConfig,
     ) -> str:
         """Build a redacted span name for pipe spans.
 
@@ -145,12 +194,13 @@ class PostHogSpanExporter(SpanExporter):
         Args:
             original_span_name: The original span name from OTel.
             pipe_type: The pipe type from attributes.
+            redaction: What this span may show (`_resolve_redaction`).
 
         Returns:
             The span name with redacted pipe code if redaction is enabled,
             otherwise the original span name.
         """
-        if not self.redaction_config.redact_pipe_codes:
+        if not redaction.redact_pipe_codes:
             return original_span_name
 
         # Rebuild with redacted pipe code
@@ -167,6 +217,7 @@ class PostHogSpanExporter(SpanExporter):
         unit_job_id: str | None,
         model_name: str | None,
         output_class_name: str | None,
+        redaction: TelemetryRedactionConfig,
     ) -> str:
         """Build a redacted span name for generation spans.
 
@@ -180,12 +231,13 @@ class PostHogSpanExporter(SpanExporter):
             unit_job_id: The unit job ID (e.g., "LLM_GEN_TEXT").
             model_name: The model name.
             output_class_name: The output class name (for object generation).
+            redaction: What this span may show (`_resolve_redaction`).
 
         Returns:
             The span name with redacted parts based on redaction config.
         """
-        redact_pipe_codes = self.redaction_config.redact_pipe_codes
-        redact_class_names = self.redaction_config.redact_output_class_names
+        redact_pipe_codes = redaction.redact_pipe_codes
+        redact_class_names = redaction.redact_output_class_names
 
         if not redact_pipe_codes and not redact_class_names:
             return original_span_name
@@ -204,33 +256,37 @@ class PostHogSpanExporter(SpanExporter):
         else:
             return f"{unit_job_id or 'unknown'} ({model_name or 'unknown'}) -> {display_output}"
 
-    def _get_redacted_pipe_code(self, pipe_code: str | None) -> str | None:
+    def _get_redacted_pipe_code(self, pipe_code: str | None, *, redaction: TelemetryRedactionConfig) -> str | None:
         """Get the pipe code, redacted if config requires it.
 
         Args:
             pipe_code: The original pipe code.
+            redaction: What this span may show (`_resolve_redaction`).
 
         Returns:
             The original pipe code or redacted value based on config.
         """
-        if not self.redaction_config.redact_pipe_codes:
+        if not redaction.redact_pipe_codes:
             return pipe_code
         return OTelConstants.PIPE_CODE_REDACTED if pipe_code else None
 
-    def _get_redacted_output_class_name(self, output_class_name: str | None) -> str | None:
+    def _get_redacted_output_class_name(self, output_class_name: str | None, *, redaction: TelemetryRedactionConfig) -> str | None:
         """Get the output class name, redacted if config requires it.
 
         Args:
             output_class_name: The original output class name.
+            redaction: What this span may show (`_resolve_redaction`).
 
         Returns:
             The original output class name or redacted value based on config.
         """
-        if not self.redaction_config.redact_output_class_names:
+        if not redaction.redact_output_class_names:
             return output_class_name
         return OTelConstants.PIPE_CODE_REDACTED if output_class_name else None
 
-    def _get_base_properties(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> dict[str, Any]:
+    def _get_base_properties(
+        self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue], redaction: TelemetryRedactionConfig
+    ) -> dict[str, Any]:
         """Get common properties for all span types."""
         properties: dict[str, Any] = {}
         if span.end_time and span.start_time:
@@ -242,7 +298,7 @@ class PostHogSpanExporter(SpanExporter):
             properties[PostHogAttr.TRACE_ID] = f"{span_context.trace_id:032x}"
             properties[PostHogAttr.SPAN_ID] = f"{span_context.span_id:016x}"
             # Use redacted or full trace name based on redaction config
-            if self.redaction_config.redact_pipe_codes:
+            if redaction.redact_pipe_codes:
                 properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.TRACE_NAME_REDACTED)
             else:
                 properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.TRACE_NAME)
@@ -259,7 +315,8 @@ class PostHogSpanExporter(SpanExporter):
 
     def _export_generation_span(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> None:
         """Export a GenAI generation span."""
-        properties = self._get_base_properties(span=span, attributes=attributes)
+        redaction = self._resolve_redaction(attributes=attributes)
+        properties = self._get_base_properties(span=span, attributes=attributes, redaction=redaction)
         provider_operation_combo = f"{attributes.get(GenAISpanAttr.PROVIDER_NAME)}:{attributes.get(GenAISpanAttr.OPERATION_NAME)}"
 
         # Get raw attribute values for redaction
@@ -298,18 +355,20 @@ class PostHogSpanExporter(SpanExporter):
             unit_job_id=unit_job_id,
             model_name=model_name,
             output_class_name=output_class_name,
+            redaction=redaction,
         )
         properties[PostHogAttr.SPAN_NAME] = redacted_span_name
 
         # Apply pipe code and output class name redaction to properties (only add if not None)
-        if redacted_pipe_code := self._get_redacted_pipe_code(pipe_code):
+        if redacted_pipe_code := self._get_redacted_pipe_code(pipe_code, redaction=redaction):
             properties["pipe_code"] = redacted_pipe_code
-        if redacted_output_class_name := self._get_redacted_output_class_name(output_class_name):
+        if redacted_output_class_name := self._get_redacted_output_class_name(output_class_name, redaction=redaction):
             properties["output_class_name"] = redacted_output_class_name
 
         # Add pipeline_run_id (never redacted - useful for debugging and correlation)
         pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
         properties["pipeline_run_id"] = pipeline_run_id
+        self._add_method_properties(properties=properties, attributes=attributes)
 
         self._capture_event(
             event=PostHogEvent.GENERATION,
@@ -319,7 +378,8 @@ class PostHogSpanExporter(SpanExporter):
 
     def _export_pipe_span(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> None:
         """Export a pipe execution span."""
-        properties = self._get_base_properties(span=span, attributes=attributes)
+        redaction = self._resolve_redaction(attributes=attributes)
+        properties = self._get_base_properties(span=span, attributes=attributes, redaction=redaction)
 
         # Get raw attribute values for redaction
         pipe_code = cast("str | None", attributes.get(PipelexSpanAttr.PIPE_CODE))
@@ -331,6 +391,7 @@ class PostHogSpanExporter(SpanExporter):
         redacted_span_name = self._build_redacted_pipe_span_name(
             original_span_name=span.name,
             pipe_type=pipe_type,
+            redaction=redaction,
         )
 
         # Add pipeline_run_id (never redacted - useful for debugging and correlation)
@@ -341,15 +402,19 @@ class PostHogSpanExporter(SpanExporter):
         properties["pipe_category"] = attributes.get(PipelexSpanAttr.PIPE_CATEGORY)
         properties["outcome"] = attributes.get(PipelexSpanAttr.OUTCOME)
         properties["pipeline_run_id"] = pipeline_run_id
+        self._add_method_properties(properties=properties, attributes=attributes)
 
         # Apply pipe code redaction (only add if not None, for consistency)
-        if redacted_pipe_code := self._get_redacted_pipe_code(pipe_code):
+        if redacted_pipe_code := self._get_redacted_pipe_code(pipe_code, redaction=redaction):
             properties["pipe_code"] = redacted_pipe_code
 
+        # Deduplicated on `$ai_span_id`, as the tracking plan's rule 7 backstop.
+        span_id = properties.get(PostHogAttr.SPAN_ID)
         self._capture_event(
             event=PostHogEvent.SPAN,
             properties=properties,
             identity=self._resolve_identity(attributes=attributes),
+            event_uuid=make_span_event_uuid(span_id=span_id) if isinstance(span_id, str) else None,
         )
 
     @override

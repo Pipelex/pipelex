@@ -55,13 +55,16 @@ class PortkeyFactory:
             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
 
-            # Build span name respecting privacy settings
+            # Build span name respecting privacy settings: the run's own pipe-code setting, else the deployment's
+            run_metadata = inference_job.job_metadata.run_metadata
             pipe_code = inference_job.job_metadata.pipe_code or "main"
-            if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
+            if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled_for_run(run_metadata=run_metadata):
                 pipe_code = OTelConstants.PIPE_CODE_REDACTED
 
             # Redact output class name if not "text" and capture is disabled
-            if output_desc == InferenceOutputType.TEXT or TelemetryManagerAbstract.is_capture_output_class_name_enabled():
+            if output_desc == InferenceOutputType.TEXT or TelemetryManagerAbstract.is_capture_output_class_name_enabled_for_run(
+                run_metadata=run_metadata
+            ):
                 display_output = output_desc
             else:
                 display_output = OTelConstants.OUTPUT_CLASS_REDACTED

@@ -1,6 +1,6 @@
 # The Test Duration Map
 
-`.test_durations` is a committed JSON map of `pytest node id -> seconds`. Its only consumer is [`pytest-split`](https://github.com/jerry-git/pytest-split), which reads it to divide the suite into balanced CI shards. Nothing in the runtime touches it, and nobody edits it by hand.
+`.test_durations` is a committed JSON map of `pytest node id -> seconds`. It has two consumers: [`pytest-split`](https://github.com/jerry-git/pytest-split), which reads it to divide the suite into balanced CI shards, and the `slow` marker, which the everyday test runs use to skip the few tests that hold most of the suite's time. Nothing in the runtime touches it, and nobody edits it by hand.
 
 This page explains what the map is for, why it is refreshed the way it is, and what to run.
 
@@ -15,6 +15,47 @@ SPLITS=8 GROUP=<n> make gha-tests
 `SPLITS`/`GROUP` are what activate `pytest-split`. Without them — which is every local run — the flags expand to nothing, the map is ignored entirely, and the whole suite runs as usual.
 
 The splitting algorithm is `pytest-split`'s default, `duration_based_chunks`: it walks the tests in collection order and cuts at boundaries where the accumulated duration crosses one eighth of the total. Each shard is therefore a *contiguous* slice of the collection, and the map decides where the cuts fall.
+
+## The `slow` marker: everyday runs skip the slowest tests
+
+The suite's time is concentrated in very few tests: its median test takes about three milliseconds while its mean is near a quarter of a second. The everyday runs therefore skip the slowest tests, and the full runs keep them.
+
+**Nobody marks a test `slow` by hand.** The root `tests/conftest.py` registers a `--slow-test-seconds` option and, when it is given, marks `slow` at collection time every test whose duration recorded in `.test_durations` is at or above it. The logic lives in `tests/helpers/slow_tests.py`. Three rules follow:
+
+- **A test missing from the map is not slow.** It has not been measured yet; the next `make store-test-durations` records it, and from then on its recorded duration decides.
+- **Without the option, nothing is marked**, so `-m "not slow"` then deselects nothing.
+- **The marking happens before any deselection.** The hook runs first among the collection hooks, so pytest's own `-m` filter sees the marker, and `pytest-split`, which cuts the shards last, balances only the tests that will actually run.
+
+The threshold is `SLOW_TEST_SECONDS` in the `Makefile`, currently **0.5 seconds**, and it is the one place to change it. The everyday runs combine `and not slow` with their usual marker expression and pass the threshold:
+
+| Run | Slow tests |
+| --- | --- |
+| `make agent-test` and `make agent-test-debug` | skipped |
+| `tests-check.yml`, on every pull request, through `SKIP_SLOW_TESTS=1 make gha-tests` | skipped |
+| `tests-full-check.yml`, the gate on pull requests to `main`, through `make gha-tests` | run |
+| every other target (`make test`, `make t`, `make tp`, `make codex-tests`, the inference targets) | run |
+| the API server's tests (`make api-agent-test`, `make -C api gha-tests`) | run: they are not in the map |
+
+To run the everyday selection in full, empty the threshold: `make agent-test SLOW_TEST_SECONDS=`. A targeted run such as `.venv/bin/pytest tests/unit/...` passes no threshold, so it never skips anything.
+
+The API server's tests, under `api/tests/`, are not in `.test_durations`: `store-test-durations` measures only the library's suite, and the server's runs from its own directory and environment. Since a test missing from the map is never slow, the server's suite always runs whole, which suits it: it is small.
+
+### Why 0.5 seconds
+
+These are the numbers for the `make agent-test` selection, computed from the committed map when the marker was introduced. Of the 22,683 tests that selection collected, 22,636 had a recorded duration, together 5,272 seconds of test time.
+
+| Threshold | Tests marked slow | Share of the tests | Share of the time | Time left to run |
+| --- | --- | --- | --- | --- |
+| 0.25 s | 2,975 | 13.1% | 89.5% | 553 s |
+| 0.5 s | 2,245 | 9.9% | 84.7% | 809 s |
+| 1 s | 1,230 | 5.4% | 70.0% | 1,580 s |
+| 2 s | 426 | 1.9% | 49.4% | 2,667 s |
+
+At 0.5 seconds, one test in ten is skipped and the time left to run drops by a factor of six and a half. Going lower buys little more time for many more skipped tests, and going higher keeps twice as much time for half as many skipped tests. The slow tests are spread across the suite rather than confined to one directory: in that selection, 1,398 of them were unit tests, 668 integration tests and 178 end-to-end tests, the end-to-end tests being nearly all slow.
+
+The cost of skipping them is that a regression only a slow test catches surfaces on the full run, which is the gate on pull requests to `main`, rather than on the pull request into `dev`. Run `make agent-test SLOW_TEST_SECONDS=` before pushing a change that touches what the slow tests cover, such as whole-method runs and the CLI end to end.
+
+The figures drift as the map is refreshed. To recompute them, collect the selection with `.venv/bin/pytest --collect-only -q -m "<expression>"` and add up the durations the map records for the collected node ids at each threshold.
 
 ## Coverage matters; precision does not
 

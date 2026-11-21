@@ -23,6 +23,7 @@ go on gaining entries underneath it.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -366,6 +367,7 @@ class TestWhatTheWarningSays:
         warning_spy.assert_called_once()
         assert warning_spy.call_args.args[0] == "A configuration file is out of date and was migrated in memory only", topic
         assert warning_spy.call_args.kwargs["fields"][USER_ACTION_FIELD] == expected_remedy, topic
+        assert stale_file.user_action == expected_remedy, f"{topic}: a host that prints the warning itself reads the same remedy"
         assert warning_spy.call_args.kwargs["fields"]["has_blocked_steps"] is has_blocked_steps
 
     def test_it_says_what_the_ledger_carried_and_nothing_read_from_the_file(self, tmp_path: Path) -> None:
@@ -653,6 +655,32 @@ class TestTheMainConfigurationLoader:
         assert parked is not None
         assert [stale_file.is_reached_by_migrate for stale_file in parked.files] == [False]
 
+    def test_a_load_that_recovers_logs_nothing_of_the_refusal_it_recovered_from(
+        self,
+        fake_dirs: tuple[Path, Path],
+        synthetic_migration_dir: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The first validation refuses the stale file before the replay carries it forward, and that refusal is the loader's to
+        handle: a load that recovers says only what the parked warning says, never a traceback of the error it got past.
+        """
+        global_dir, _ = fake_dirs
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
+            'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
+        )
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        loader = ConfigLoader()
+
+        with caplog.at_level(logging.DEBUG):
+            loader.load_config_validated(config_cls=PipelexConfig)
+
+        assert loader.take_stale_configuration_warning() is not None, "the load did recover"
+        assert [record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING or record.exc_info] == []
+
     @pytest.mark.usefixtures("fake_dirs")
     def test_a_healthy_configuration_parks_no_warning(self) -> None:
         loader = ConfigLoader()
@@ -687,17 +715,20 @@ class TestTheMainConfigurationLoader:
         assert config.runtime.log.default_log_level is LogLevel.WARNING
 
     @pytest.mark.usefixtures("fake_dirs", "synthetic_migration_dir")
-    def test_a_configuration_the_ledger_cannot_explain_still_raises_the_users_own_error(self) -> None:
+    def test_a_configuration_the_ledger_cannot_explain_still_raises_the_users_own_error(self, caplog: pytest.LogCaptureFixture) -> None:
         """And the message still names the key, which is the only thing that tells them what to fix.
 
         The migration directory here holds no ledger at all, so the retry cannot even be attempted
         — the case that proves a failure *inside* the retry never replaces the failure outside it.
+        Raising it logs nothing: the error is reported where it is handled, once.
         """
-        with pytest.raises(ConfigValidationError, match="not_a_real_setting"):
+        with caplog.at_level(logging.DEBUG), pytest.raises(ConfigValidationError, match="not_a_real_setting"):
             ConfigLoader().load_config_validated(
                 config_cls=PipelexConfig,
                 extra_overrides={"not_a_real_setting": True},
             )
+
+        assert [record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING or record.exc_info] == []
 
     @pytest.mark.usefixtures("fake_dirs")
     def test_a_healthy_configuration_never_reaches_the_ledger(self, mocker: MockerFixture) -> None:

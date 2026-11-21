@@ -10,7 +10,7 @@ from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.pipe_machinery.validation import check_inputs_match_variables
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
-from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_parsing import are_authored_templates_trusted, check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -40,6 +40,11 @@ class PipeSearchBlueprint(PipeBlueprint):
 
     @override
     def validate_inputs(self):
+        # Whether the templates read exactly the declared inputs is a judgment of what the author wrote, made where the method
+        # was validated: a build of templates already judged (`trusting_authored_templates`) skips it, since it parses each
+        # template again and stores nothing a run reads.
+        if are_authored_templates_trusted():
+            return
         template_category = TemplateCategory.BASIC
         declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
         try:

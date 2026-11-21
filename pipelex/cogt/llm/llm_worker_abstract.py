@@ -42,6 +42,7 @@ from pipelex.system.telemetry.otel_constants import (
     make_otel_gen_ai_output_type,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.pipe_identity import make_run_method_span_attributes
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
@@ -275,6 +276,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # rather than on the process that served it.
         is_langfuse_enabled = TelemetryManagerAbstract.get_langfuse_enabled()
         span_attributes.update(make_run_identity_span_attributes(run_metadata=run_metadata, is_langfuse_enabled=is_langfuse_enabled))
+        # The run's method, the stable identifier of the pipe that made this call, and the run's own pipe-code setting.
+        span_attributes.update(make_run_method_span_attributes(run_metadata=run_metadata, pipe_id=job_metadata.pipe_id))
 
         if is_langfuse_enabled:
             span_attributes[LangfuseSpanAttr.TRACE_NAME] = otel_context.trace_name

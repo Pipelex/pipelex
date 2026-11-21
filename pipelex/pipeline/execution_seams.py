@@ -391,6 +391,9 @@ async def prepare_pipe_job(
     storage_scope: str,
     read_scope: str | None,
     extras: dict[str, str] | None = None,
+    method_id: str | None = None,
+    method_address: str | None = None,
+    capture_pipe_codes: bool | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_scope: str | None = None,
     trace_context: "TraceContext | None" = None,
@@ -571,6 +574,10 @@ async def prepare_pipe_job(
             # function; the parameter stays nullable only so every existing call
             # site can keep omitting it.
             extras=extras,
+            # The run's method and its pipe-code setting, as the host stated them (`pipeline_run_setup` says what each is).
+            method_id=method_id,
+            method_address=method_address,
+            capture_pipe_codes=capture_pipe_codes,
             method_tree_digest=tree_bundle_ref.tree_digest if tree_bundle_ref is not None else None,
             crate_fingerprint=library_crate.fingerprint if library_crate is not None else None,
         ),
