@@ -21,6 +21,7 @@ from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.exceptions import RunParameterError
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
@@ -235,3 +236,28 @@ class TestRunnerExecuteErrorPaths:
         assert format_validation_error_without_input(validation_error=validation_error) in wrapped.message
         assert "not-a-number" not in wrapped.message
         env.telemetry_manager.track_event.assert_not_called()
+
+    @pytest.mark.parametrize("bad_run_id", ["", "run/7", "run 7", "x" * 129, "untitled", "dry_run_untitled"])
+    async def test_a_malformed_pipeline_run_id_is_the_host_s_error_before_setup(self, mocker: MockerFixture, bad_run_id: str) -> None:
+        """A run id outside the rule is refused before the `try`, so nothing is set up or registered, and it is the
+        host's `RunParameterError`, never wrapped as the caller's invalid input.
+        """
+        env = self._patch_env(mocker)
+        runner = PipelexMTHDSProtocol(execution_config=env.execution_config)
+
+        with pytest.raises(RunParameterError, match="Invalid pipeline_run_id"):
+            await runner.execute(pipe_code="echo_pipe", pipeline_run_id=bad_run_id)
+
+        env.setup_mock.assert_not_called()
+        env.telemetry_manager.track_event.assert_not_called()
+
+    async def test_a_well_formed_pipeline_run_id_reaches_the_setup(self, mocker: MockerFixture) -> None:
+        env = self._patch_env(mocker)
+        runner = PipelexMTHDSProtocol(execution_config=env.execution_config, pipe_run=_RaisingPipeRun(PipeExecutionError("stop after setup")))
+
+        with pytest.raises(PipelineExecutionError):
+            await runner.execute(pipe_code="echo_pipe", pipeline_run_id="run_7Qd2kV")
+
+        env.setup_mock.assert_awaited_once()
+        assert env.setup_mock.await_args is not None
+        assert env.setup_mock.await_args.kwargs["pipeline_run_id"] == "run_7Qd2kV"

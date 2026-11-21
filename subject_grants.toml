@@ -4628,6 +4628,10 @@ rationale = "Registers the factory callable as the sole operand."
 param = "factory"
 rationale = "Registers the factory callable as the sole operand."
 
+["pipelex/plugins/registrar.py::PluginRegistrar.claim_workflow_execution_probe"]
+param = "factory"
+rationale = "Registers the factory callable as the sole operand."
+
 ["pipelex/plugins/sdk_client_registry.py::SdkClientRegistry.get"]
 param = "model_handle"
 rationale = "Registry getter keyed by the model handle."

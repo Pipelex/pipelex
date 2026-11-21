@@ -42,6 +42,17 @@
       "default": "https://us.i.posthog.com",
       "open_node": false
     },
+    "custom_posthog.events": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.events.enabled": {
+      "value_type": "bool",
+      "required": false,
+      "default": true,
+      "open_node": false
+    },
     "custom_posthog.geoip": {
       "value_type": "bool",
       "required": false,
@@ -145,6 +156,11 @@
       "value_type": "list[table]",
       "required": false,
       "default": [],
+      "open_node": false
+    },
+    "pipe_id_key": {
+      "value_type": "str",
+      "required": false,
       "open_node": false
     },
     "telemetry_allowed_modes": {

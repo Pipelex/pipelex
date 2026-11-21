@@ -19,9 +19,34 @@ description: "Understand Pipelex telemetry — telemetry.toml never reports to P
 
 Each integration mode allows these streams or not: by default the `cli`, `docker`, `fastapi`, `mcp` and `n8n` modes allow them, and `pytest`, `ci` and `python` do not, so a test suite sends nothing unless you allow its mode under `[telemetry_allowed_modes]` in `telemetry.toml`. [Telemetry Configuration](../configuration/config-practical/telemetry-config.md) describes each destination's settings.
 
+### Your PostHog stream: events, spans and errors
+
+When your PostHog stream is on, it carries three kinds of data, each with its own switch:
+
+- **Event-style events** (`[custom_posthog.events]`, on by default): one event per thing that happened, `pipeline_execute` and `pipeline_complete` for a run, `pipe_run` and `pipe_complete` for a pipe, `pipe_dry_run` for a validation sweep, and the CLI's own events such as `pipe_show` and `pipes_list`.
+- **AI spans and generations** (`[custom_posthog.tracing]`, off by default): an `$ai_span` per pipe and an `$ai_generation` per inference call, the same spans your Langfuse and OTLP destinations receive.
+- **Errors** (`[runtime.error_tracking]` in `pipelex.toml`): the `$exception` events of the built-in `posthog` error tracker, as [Error trackers](#error-trackers) describes.
+
+A self-hosted install or a local one, where Pipelex is the only thing reporting a run, keeps all three. A host whose own events are already the record of each run, such as a platform that sends its own run event when it starts a run, switches the event-style events off so a run is not counted twice, and keeps the spans, the generations and the errors:
+
+```toml
+[custom_posthog]
+mode = "identified"
+user_id = "my-service"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.events]
+enabled = false  # no pipeline_execute, pipe_run and their kin
+
+[custom_posthog.tracing]
+enabled = true   # spans and generations still go out
+```
+
+The switch only reaches the event-style events: the spans, the generations and the `$exception` events travel on the same PostHog client, which stays up.
+
 ### Pipelex's spans in your process
 
-Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
+Pipelex traces a live run whenever one of your span destinations is configured: an `[[otlp]]` exporter, Langfuse with `enabled = true`, or your PostHog stream when it is on (`mode` is `anonymous` or `identified`) with its AI span tracing enabled (`[custom_posthog.tracing]`). Any one of them is enough, each independently of the others, so an `[[otlp]]` exporter or Langfuse receives Pipelex's spans with `[custom_posthog]` off; one tracer feeds all of them. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
 
 - Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
 - An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. An error tracker plugged into Pipelex's own seam receives both: the Pipelex span the error was raised in, and your current span when it was reported, as [Error trackers](#error-trackers) describes.
@@ -54,7 +79,7 @@ endpoint = "${env:OTLP_TRACES_ENDPOINT}"
 headers = { "x-sentry-auth" = "${env:OTLP_AUTH_HEADER}" }
 ```
 
-**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. The destinations are your PostHog stream with its AI span tracing on, an `[[otlp]]` exporter and Langfuse, all fed by the one tracer that exists when `[custom_posthog]` is `anonymous` or `identified` and `[custom_posthog.tracing]` is enabled; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
+**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. Any one destination is enough: an `[[otlp]]` exporter, Langfuse when it is enabled, or your PostHog stream with its AI span tracing on, each independently of the others, so `[custom_posthog]` may stay off; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
 
 What it costs:
 
@@ -62,6 +87,19 @@ What it costs:
 - **Langfuse's trace-level fields** are written by each run's root span, so when runs share one of your traces, they describe the run that wrote them last.
 - **A telemetry manager you inject states the switch for itself.** With `Pipelex.make(telemetry_manager=...)`, the manager's own `join_host_trace` decides, the environment and the file are not read for it, and its destinations are yours to check; passing `join_host_trace=` beside it with a different value stops the boot.
 - **Each process states the switch for itself.** A distributed worker continues your trace whatever its own setting, since the trace id and the sampled flag travel with the job, but it makes Pipelex's spans current only when its own switch is on.
+
+### One span per pipe under a distributed orchestrator
+
+A distributed orchestrator such as Temporal runs controller pipes (`PipeSequence`, `PipeParallel`, `PipeBatch`, `PipeCondition`) in workflow code, which it re-executes from the start whenever it replays a workflow, after evicting it from a worker's cache or moving it to another worker. Every destination still receives **one span per pipe**, with its true start: a span opened in workflow code takes its id from the workflow's deterministic random and its start and end from the workflow's clock, so a replay recomputes the span the first execution opened, and only the execution that runs the pipe to its end exports it. A controller in flight across an eviction keeps its start from before the eviction, and the spans its children exported meanwhile keep pointing at it. This needs nothing from you: the orchestrator plugin lends Pipelex its workflow's clock and random, as [the orchestrator plugins](../under-the-hood/orchestrator-plugins.md#the-workflow-execution-probe-slot) describe, and a process that runs no such orchestrator keeps random ids and the wall clock.
+
+What to expect from it:
+
+- **A pipe span's times are as fine as the workflow's tasks.** The workflow's clock is the time of the workflow task being processed, so a controller's start and end fall on the task that started it and the task that saw it finish: its duration includes the time the orchestrator took to schedule those tasks, and a pipe that starts and ends in one task lasts zero. Spans opened in activities, every operator's, keep the wall clock.
+- **A pipe that fails exports its span with the failure, at whatever depth**, and so does a run that is cancelled. A span is left out only when the workflow does not end there: on an eviction, and on an error that fails the workflow task rather than the workflow, which the orchestrator retries until the pipe ends for real. The Temporal plugin lists Pipelex's own errors among the errors that fail a workflow.
+- **It holds for Pipelex's own tracer.** A telemetry manager you inject with `Pipelex.make(telemetry_manager=...)` gets the same behaviour only when its tracer's provider draws its ids through `ReplaySafeIdGenerator` (`pipelex/system/telemetry/replay_safe_id_generator.py`) and its `is_otel_tracer_replay_safe` answers `True`. Any other tracer cannot recompute a span's id on a replay, so its spans keep random ids, the wall clock and an export at every end, replays included, as before.
+- **Only pipe spans draw from the workflow's random.** Any other span opened in workflow code keeps a random id, so a span that exists on one worker and not on another, by configuration, never shifts the ids of the pipe spans after it.
+
+On your PostHog stream, each pipe's `$ai_span` event also carries a uuid derived from its `$ai_span_id`, so a capture the PostHog client delivers twice carries the same uuid.
 
 ## What an inference call reports
 
@@ -78,11 +116,12 @@ Every inference call opens one **generation span**, whatever kind of inference i
 | `pipelex.inference.kind` | `llm`, `img_gen`, `extract`, `search`, `judge` or `doc_render` |
 | `pipelex.inference.backend`, `pipelex.model.handle` | The Pipelex backend and the model handle your method named |
 | `pipelex.unit_job_id` | The step the span is about, `llm_gen_text` for instance |
+| `pipelex.run.method_id`, `pipelex.pipe.id` | The run's method and the `pipe_id` of the pipe that made the call, each absent when there is none (see [Stable pipe identifiers](#stable-pipe-identifiers)) |
 | `error.type` | On a failed call only: the failure's category, one of `transient`, `configuration`, `content`, `capacity`, `ambiguous` or `unknown` |
 
 A failed call ends its span with the error status and the exception recorded on it, and keeps the tokens and the cost it was billed for: a structured generation whose re-asks all failed the schema reports what every attempt spent, on its span and in the run's cost report. A call stopped from outside, cancelled rather than failed, ends with no error status. A document print reports no tokens and no cost, since its engine bills none.
 
-On your PostHog stream, the `$ai_generation` maps these attributes to PostHog's own properties: `$ai_provider` is the serving provider, `$ai_model` the model id, `$ai_input_tokens` and `$ai_output_tokens` the tokens, `$ai_input_cost_usd`, `$ai_output_cost_usd` and `$ai_total_cost_usd` the cost, `$ai_is_error` whether the call failed and `$ai_error` its category, never its message. Pipelex's own properties ride beside them: `inference_kind`, `inference_backend`, `model_handle`, `attempt_count` and `pipeline_run_id`. Every span and every event Pipelex sends to your PostHog also carries `pipelex_version`, the version of the runtime that sent it, which you can leave out of events by listing it in `redact_properties`. The event that opens a trace on your stream carries a span id derived from the trace, so PostHog keeps one of them when a trace starts twice.
+On your PostHog stream, the `$ai_generation` maps these attributes to PostHog's own properties: `$ai_provider` is the serving provider, `$ai_model` the model id, `$ai_input_tokens` and `$ai_output_tokens` the tokens, `$ai_input_cost_usd`, `$ai_output_cost_usd` and `$ai_total_cost_usd` the cost, `$ai_is_error` whether the call failed and `$ai_error` its category, never its message. Pipelex's own properties ride beside them: `inference_kind`, `inference_backend`, `model_handle`, `attempt_count`, `pipeline_run_id`, and the run's `method_id` and the calling pipe's `pipe_id` (see [Stable pipe identifiers](#stable-pipe-identifiers)). Every span and every event Pipelex sends to your PostHog also carries `pipelex_version`, the version of the runtime that sent it, which you can leave out of events by listing it in `redact_properties`. The event that opens a trace on your stream carries a span id derived from the trace, so PostHog keeps one of them when a trace starts twice.
 
 ## Error trackers
 
@@ -189,6 +228,41 @@ The rules it follows:
 - **It travels with the run.** The mapping rides the job through every nested pipe, and the bridge payload that crosses a process boundary carries it, so a distributed worker is handed the same groups the entry point was given.
 
 These are labels for grouping, not content: they land in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
+
+## Stable pipe identifiers
+
+A deployment that keeps pipe codes out of its telemetry, `[custom_posthog.tracing.capture] pipe_codes = false`, reports each pipe span by its pipe type alone, so on its own a chart cannot follow one step of a method from one run to the next. Pipelex can give every pipe a **`pipe_id`** for that: an identifier that is the same for one pipe of one method on every run, and in every process of a deployment, and that cannot be turned back into the pipe code.
+
+Set a secret key in `telemetry.toml` to turn it on:
+
+```toml
+pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+```
+
+The key is at least 32 characters. A placeholder whose variable is not set refuses the load, so a process whose secret did not arrive does not start with a different key from its siblings. With no `pipe_id_key`, which is the default, Pipelex sends no `pipe_id` at all, never a substitute value. `pipelex doctor` checks the file as it is written, so it accepts the placeholder whether or not the variable is set in its own shell; whether the secret reaches a process is what that process's start checks.
+
+What a pipe's `pipe_id` is made from:
+
+- **It is a keyed digest.** Pipe codes are short words that anyone could guess, so a plain hash of one could be confirmed by hashing candidates. `pipe_id` is the HMAC-SHA256 of the method's identity and the pipe under your key, truncated to 32 hexadecimal characters.
+- **The method's identity comes first.** It is the run's `method_id` when the host names the stored method the run belongs to, else the address of the published package the run addressed (on the API server, a `method_ref` run; on this machine, `pipelex run method` and `pipelex-agent run method` of a fetched or installed published method), else the pipe's own domain. Each kind is tagged before it is digested, so a domain never collides with a method id spelled the same way.
+- **The pipe is its domain-qualified reference**, so two pipes that share a code in different domains of one method keep separate identifiers.
+- **Every process of a deployment must share the key.** A runner and a worker with different keys would give one pipe two identifiers. Changing the key deliberately starts a new series of identifiers, so note the date where your charts will show the break.
+
+Every pipe span then carries the attribute `pipelex.pipe.id`, and every inference span carries the `pipe_id` of the pipe that made the call. Your PostHog receives it as the `pipe_id` property of each `$ai_span` and `$ai_generation`.
+
+### The run's method
+
+A host that stores methods can name the stored method a run belongs to by passing `method_id` when it starts the run: to `PipelexMTHDSProtocol(method_id=...)`, or as the `method_key` field of a run request to the [API server](../api-server/pipe-run.md#run-telemetry-fields). It is 1 to 128 letters, digits, `_` or `-`. Pipelex never resolves it; it rides the run to every process, every span carries it as `pipelex.run.method_id`, your PostHog receives it as the `method_id` property of every `$ai_span`, the trace's first included, and of every `$ai_generation`, and it is the method's identity behind each `pipe_id`.
+
+### Pipe codes for one run
+
+The `[custom_posthog.tracing.capture]` settings `pipe_codes` and `output_class_names` hold for the whole deployment. A host serving several customers may need to decide per run instead, for instance per organization. A run may carry its own `capture_pipe_codes`, passed to `PipelexMTHDSProtocol(capture_pipe_codes=...)` or as the `capture_pipe_codes` field of a run request to the API server:
+
+- **`true`** sends the real pipe codes and output class names for this run, in span and trace names, the `pipe_code` property and Portkey's span names.
+- **`false`** sends the redaction marker for this run, whatever the deployment says.
+- **Absent** keeps the deployment's settings.
+
+The setting rides every span of the run as the attribute `pipelex.run.capture_pipe_codes`, so the process that exports a span, a distributed worker included, applies the run's choice rather than its own.
 
 ## Privacy
 

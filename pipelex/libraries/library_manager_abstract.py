@@ -153,7 +153,8 @@ class LibraryManagerAbstract(ABC):
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
-            is_crate_prevalidated: Skip the library validation that ends the load. Precondition: the crate
+            is_crate_prevalidated: Skip the library validation that ends the load, and the judgments of each pipe's
+                authored templates (whether one parses, what the template lints refuse). Precondition: the crate
                 was built from a library that this same pipelex version loaded and validated (a runner's
                 crate, handed to the worker that executes it). Everything else the load does still happens.
             written_pipe_trees: The trees this process wrote out for a step to run in, by that step's pipe ref, such

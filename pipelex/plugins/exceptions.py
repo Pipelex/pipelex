@@ -342,7 +342,7 @@ class PluginLayerViolationError(PluginError):
             f"an interpreter-layer capability ({capability}). Publish it under '{interpreter_group}' instead — a "
             "kernel-group plugin may only contribute kernel-layer capabilities (inference backends, model listers, "
             "storage and secrets providers, HTTP-error mappers, teardown callbacks, and the content_generator, "
-            "task_manager and isolated_execution_probe hub slots)."
+            "task_manager, isolated_execution_probe, workflow_execution_probe and method_file_store hub slots)."
         )
         super().__init__(message)
 

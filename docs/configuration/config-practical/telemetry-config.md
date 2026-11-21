@@ -44,6 +44,9 @@ Files are deep-merged, with later layers winning per leaf key. This means Langfu
 # Join the trace of the process that runs Pipelex (top-level, before any section)
 join_host_trace = false
 
+# Secret key of the stable pipe identifiers (top-level); no key, no pipe_id
+# pipe_id_key = "${env:PIPELEX_PIPE_ID_KEY}"
+
 # PostHog Configuration (Event tracking + AI span tracing)
 [custom_posthog]
 mode = "anonymous"                                   # "off" | "anonymous" | "identified"
@@ -59,6 +62,10 @@ redact_properties = [
     "file_path",
     "url",
 ]                                                    # Event properties to redact
+
+# Event-style events to YOUR PostHog (pipeline_execute, pipe_run, the CLI's events...)
+[custom_posthog.events]
+enabled = true                                       # Send event-style events to your PostHog
 
 # AI span tracing to YOUR PostHog
 [custom_posthog.tracing]
@@ -101,7 +108,17 @@ The top-level `join_host_trace` key decides whether Pipelex's spans join the Ope
 | `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`; empty or blank counts as unset), itself overridden by `Pipelex.make(join_host_trace=...)`; a telemetry manager injected through `Pipelex.make(telemetry_manager=...)` states it for itself |
 
 !!! warning "A span destination is required"
-    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: an `[[otlp]]` exporter, `[langfuse]` enabled, or `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled. Any one of them is enough, so `[custom_posthog]` may stay off. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+
+---
+
+## Stable pipe identifiers
+
+The top-level `pipe_id_key` key turns on `pipe_id`, the identifier every pipe span carries that is stable across runs and is not the pipe code. [Telemetry Setup](../../setup/telemetry.md#stable-pipe-identifiers) describes what it is made from and how a run names its method.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `pipe_id_key` | string | (none) | The secret the identifiers are keyed with, at least 32 characters, shared by every process of a deployment. A placeholder whose variable is not set refuses the load, and a refused key is never quoted in the error. With no key, no span carries a `pipe_id` |
 
 ---
 
@@ -140,9 +157,19 @@ trackers = ["posthog"]   # remove "posthog" to keep errors off your PostHog
 
 See [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) for the other trackers a plugin can add.
 
+### `[custom_posthog.events]` Settings
+
+Controls the event-style events sent to your PostHog instance: `pipeline_execute`, `pipeline_complete`, `pipe_run`, `pipe_complete`, `pipe_dry_run` and the CLI's events, such as `pipe_show`, `pipes_list`, `backends_show` and `graph_render`.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `true` | Send event-style events to your PostHog |
+
+Switching them off leaves the AI spans and generations of `[custom_posthog.tracing]`, and the `$exception` events of the `posthog` error tracker, going to the same PostHog: it is meant for a host whose own events already record each run, so that a run is not counted twice. A file that omits the section keeps the events on. With `mode = "off"` nothing reaches your PostHog, whatever this switch says. [Telemetry Setup](../../setup/telemetry.md#your-posthog-stream-events-spans-and-errors) shows an example.
+
 ### `[custom_posthog.tracing]` Settings
 
-Controls AI span tracing to your PostHog instance.
+Controls AI span tracing to your PostHog instance. It decides only whether your PostHog receives spans: `[[otlp]]` exporters and `[langfuse]` receive them whether it is on or off.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -158,6 +185,8 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 | `content_max_length` | integer | (unlimited) | Max length for captured content |
 | `pipe_codes` | boolean | `false` | Include pipe codes in span names/attributes |
 | `output_class_names` | boolean | `false` | Include output class names in spans |
+
+A run may override `pipe_codes` and `output_class_names` together with its own `capture_pipe_codes`; see [Pipe codes for one run](../../setup/telemetry.md#pipe-codes-for-one-run).
 
 !!! warning "Privacy Note"
     These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.
@@ -184,7 +213,7 @@ The `[custom_portkey]` section configures the Portkey SDK behavior when using th
 
 ## Langfuse Configuration
 
-The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability.
+The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability. It works on its own: once enabled, Langfuse receives Pipelex's spans whatever `[custom_posthog]` says, `mode = "off"` included. A boot with Langfuse enabled and its keys missing is refused.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -200,7 +229,7 @@ The `[langfuse]` section enables integration with [Langfuse](https://langfuse.co
 
 ## OTLP Exporters Configuration
 
-The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters.
+The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters. Each exporter works on its own: it receives Pipelex's spans whatever `[custom_posthog]` says, `mode = "off"` included, so a backend of your own needs no PostHog stream.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|

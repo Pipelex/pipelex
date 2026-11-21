@@ -138,16 +138,19 @@ class TelemetryManager(TelemetryManagerAbstract):
                 before_send=strip_exception_frame_sources,
             )
 
-        # Create OTel tracer for AI tracing if enabled
+        # The one OTel tracer feeds every span destination, so it exists whenever any is configured, each independently:
+        # the PostHog stream with its AI span tracing on, an [[otlp]] exporter, Langfuse.
         self._otel_tracer: OTelTracer | None
         self._tracer_provider: OTelTracerProvider | None
-        if telemetry_config.custom_posthog.tracing.enabled:
-            # Create redaction config from user settings
+        if telemetry_config.operator_span_destinations():
+            # The PostHog span exporter is attached only when the stream's AI span tracing is on; the client alone, for
+            # events, sends no span.
+            span_posthog_client = self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 custom_fallback_distinct_id=telemetry_config.custom_posthog.user_id,
                 custom_run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=telemetry_config.custom_posthog.mode),
-                custom_posthog_client=self.custom_posthog_client,
+                custom_posthog_client=span_posthog_client,
                 custom_redaction_config=custom_redaction_config,
                 otlp_exporters=telemetry_config.otlp,
                 langfuse_config=telemetry_config.langfuse,
@@ -158,13 +161,17 @@ class TelemetryManager(TelemetryManagerAbstract):
             self._tracer_provider = None
             log.verbose("AI tracing is disabled, and no OpenTelemetry tracer was made")
 
-        # Wrap capture_exception to sanitize before sending
-        if self.custom_posthog_client:
-            self._wrap_capture_exception(self.custom_posthog_client)
+        if self.custom_posthog_client and not telemetry_config.custom_posthog.events.enabled:
+            log.verbose("The event-style events are switched off; spans, generations and exceptions still go to the custom PostHog")
 
-        # Set global PostHog settings
-        posthog.privacy_mode = True
-        posthog.default_client = self.custom_posthog_client
+        # The process-wide PostHog settings are taken over only when the operator's stream is on: with the manager made
+        # for span destinations alone, a host application's own module-level PostHog client and privacy mode are left
+        # exactly as it set them.
+        if self.custom_posthog_client:
+            # Wrap capture_exception to sanitize before sending
+            self._wrap_capture_exception(self.custom_posthog_client)
+            posthog.privacy_mode = True
+            posthog.default_client = self.custom_posthog_client
 
     @override
     def make_error_tracker(self) -> PostHogErrorTracker | None:
@@ -445,6 +452,11 @@ class TelemetryManager(TelemetryManagerAbstract):
         properties: dict[EventProperty, Any] | None = None,
         run_metadata: "RunMetadata | None" = None,
     ):
+        # The operator switched the event-style events off: they go nowhere, while the spans, the generations and the
+        # error tracker's `$exception`, which do not come through here, still travel on the same client.
+        if not self.telemetry_config.custom_posthog.events.enabled:
+            return
+
         # We copy the incoming properties to avoid modifying the original dictionary
         # and to convert the keys to str
         # and to remove the properties that are in the redact list
@@ -526,8 +538,13 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     @contextmanager
     def telemetry_context(self) -> Generator[None, None, None]:
-        """Context manager that uses PostHog's new_context when telemetry is enabled."""
-        with new_context():
+        """Context manager that uses PostHog's new_context, capturing an escaping exception on the operator's client.
+
+        A manager made for span destinations alone has no client, so the context captures nothing: PostHog's own
+        fallback, the module-level client, would otherwise be set up from no API key and raise in place of the
+        exception escaping the block, or capture it on a client the host application set up for itself.
+        """
+        with new_context(capture_exceptions=self.custom_posthog_client is not None, client=self.custom_posthog_client):
             yield
 
     @override
@@ -561,6 +578,12 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @property
     @override
+    def is_otel_tracer_replay_safe(self) -> bool:
+        # OtelFactory.make_ai_tracer builds every provider this manager holds with ReplaySafeIdGenerator.
+        return True
+
+    @property
+    @override
     def capture_content_enabled(self) -> bool:
         return self.telemetry_config.custom_posthog.tracing.capture.content
 
@@ -578,6 +601,11 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def capture_content_max_length(self) -> int | None:
         return self.telemetry_config.custom_posthog.tracing.capture.content_max_length
+
+    @property
+    @override
+    def pipe_id_key(self) -> str | None:
+        return self.telemetry_config.pipe_id_key
 
     @property
     @override
@@ -622,8 +650,11 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # Send to PostHog if configured (uses full trace name based on user's capture settings)
         if self.custom_posthog_client and self.telemetry_config.custom_posthog.tracing.enabled:
-            # Use full or redacted trace name based on user's capture_pipe_codes setting
-            custom_trace_name = trace_name if self.telemetry_config.custom_posthog.tracing.capture.pipe_codes else trace_name_redacted
+            # Use the full or the redacted trace name, as the run's own pipe-code setting says, else the deployment's
+            is_capture_pipe_codes = self.telemetry_config.custom_posthog.tracing.capture.pipe_codes
+            if run_metadata is not None and run_metadata.capture_pipe_codes is not None:
+                is_capture_pipe_codes = run_metadata.capture_pipe_codes
+            custom_trace_name = trace_name if is_capture_pipe_codes else trace_name_redacted
             custom_properties: dict[str, Any] = {
                 PostHogAttr.TRACE_ID: f"{trace_id:032x}",
                 PostHogAttr.SPAN_ID: self.make_trace_start_span_id(trace_id=trace_id),
@@ -633,6 +664,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             }
             if run_metadata is not None:
                 custom_properties[EventProperty.PIPELINE_RUN_ID] = run_metadata.pipeline_run_id
+                # The run's stored method, null when it has none, as on every pipe and generation span of the trace
+                custom_properties["method_id"] = run_metadata.method_id
             custom_identity = TelemetryIdentity.make_from_caller_identity(
                 caller_identity=caller_identity,
                 fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,

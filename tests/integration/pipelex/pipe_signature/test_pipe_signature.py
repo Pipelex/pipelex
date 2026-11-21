@@ -11,7 +11,7 @@ from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
-from pipelex.system.job_metadata import JobMetadata, RunMetadata, SpecialPipelineId
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_USER_ID
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
@@ -102,9 +102,7 @@ class TestPipeSignature:
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed)
         await runtime.run_pipe(
             job_metadata=JobMetadata(
-                run_metadata=RunMetadata(
-                    storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED
-                )
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id="dry_run_signature")
             ),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -125,9 +123,7 @@ class TestPipeSignature:
         working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed)
         await runtime.run_pipe(
             job_metadata=JobMetadata(
-                run_metadata=RunMetadata(
-                    storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED
-                )
+                run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id="dry_run_signature")
             ),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -151,7 +147,7 @@ class TestPipeSignature:
             await runtime._live_run_pipe(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 job_metadata=JobMetadata(
                     run_metadata=RunMetadata(
-                        storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED
+                        storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id="live_run_signature"
                     )
                 ),
                 working_memory=working_memory,
@@ -176,7 +172,7 @@ class TestPipeSignature:
             await runtime.run_pipe(
                 job_metadata=JobMetadata(
                     run_metadata=RunMetadata(
-                        storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED
+                        storage_scope="test/scope", read_scope=None, user_id=DRY_RUN_USER_ID, pipeline_run_id="live_run_signature"
                     )
                 ),
                 working_memory=working_memory,

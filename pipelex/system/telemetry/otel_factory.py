@@ -320,6 +320,7 @@ class OtelFactory:
         from opentelemetry.semconv.attributes import service_attributes  # ruff: ignore[import-outside-top-level]
 
         from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter  # ruff: ignore[import-outside-top-level]
+        from pipelex.system.telemetry.replay_safe_id_generator import ReplaySafeIdGenerator  # ruff: ignore[import-outside-top-level]
 
         # Define Resource (Identity)
         resource = OTelResource.create(
@@ -331,8 +332,9 @@ class OtelFactory:
             }
         )
 
-        # Create Provider
-        provider = OTelTracerProvider(resource=resource)
+        # Create Provider. Its ids come from the workflow's deterministic random when a span opens in an orchestrator's
+        # replayable workflow code, so a replay recomputes them (see pipelex.system.telemetry.replay_safe_spans).
+        provider = OTelTracerProvider(resource=resource, id_generator=ReplaySafeIdGenerator())
 
         # Add Custom PostHog Exporter if client is provided (custom telemetry)
         # Uses user's redaction config (may capture content/pipe codes based on user settings)
