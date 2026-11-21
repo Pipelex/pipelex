@@ -133,7 +133,7 @@ class TestCheckLLMSettingWithServedModel:
                 "model_handle": "some-model",
                 "backend_name": "some_backend",
                 "sdk": "some_sdk",
-                GenAISpanAttr.REQUEST_MODEL: "some-model",
+                GenAISpanAttr.REQUEST_MODEL: "some-model-id",
                 GenAISpanAttr.RESPONSE_MODEL: "some-model-id",
             },
         )

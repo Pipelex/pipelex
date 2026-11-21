@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:2bb16863181bebb6e519a67b7035b495b7a0c858d683c9cadd68a42952aa4450"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-20T04:05:45Z"
-rationale = "real-catch: PipelexKernel.make now holds a trace context's graph_id to validate_pipeline_run_id too, raising RunParameterError; the doc's run id bullet names both sources and qualifies the workflow-id advice by the rule."
+digest = "sha256:fb4ddd3ba2f6665dc45f4ee7cacd8931cd2ad2d92ff7fed1e9bff9a299dc6f44"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-11-21T16:20:02Z"
+rationale = "clean-pass: re-ack after merging dev, whose run id rule in the kernel is already in pipelex-kernel.md; this branch's llm_ops.py change only names the model id under gen_ai.request.model in the fixed-temperature warning, and the kernel doc names no log field, so nothing is stale"
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -19,7 +19,7 @@ rationale = "real-catch: PipelexKernel.make now holds a trace context's graph_id
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:edb81f9748748d537381a3e39e81463c1213db42"
 "pipelex/kernel/judgment_results.py" = "blob:4dbbcb204309265999de59a179f4420a0f83be93"
-"pipelex/kernel/llm_ops.py" = "blob:b3071003cb7cdc7879709a7fc4106d9db1595f72"
+"pipelex/kernel/llm_ops.py" = "blob:25e51845370f0de5a9a9e76da9bc0938445b9a7d"
 "pipelex/kernel/llm_prompt_content.py" = "blob:b2843a9a27842d8a04365f259f2166f45956e368"
 "pipelex/kernel/llm_results.py" = "blob:d6bafd1a25cfb0345334b388d118ff7ba9741460"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"

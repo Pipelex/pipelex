@@ -18,12 +18,14 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
+from pipelex.cogt.llm.instructor_attempts import InstructorAttempts
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict
 from pipelex.config import get_config
 from pipelex.providers.mistral.mistral_exceptions import MistralWorkerConfigurationError
 from pipelex.providers.mistral.mistral_factory import MistralFactory
@@ -254,6 +256,12 @@ class MistralLLMWorker(LLMWorkerAbstract):
 
         return result_text
 
+    def _read_answer_nb_tokens(self, *, response: Any) -> NbTokensByCategoryDict | None:
+        """The tokens one answer of a structured generation reports, for the generation's attempts to sum."""
+        if usage := getattr(response, "usage", None):
+            return self.mistral_factory.make_nb_tokens_by_category(usage=usage)
+        return None
+
     @override
     async def _gen_object(
         self,
@@ -270,6 +278,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         max_tokens = job_params.max_tokens or self.default_max_tokens
 
+        attempts = InstructorAttempts(read_nb_tokens=self._read_answer_nb_tokens)
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 response_model=schema,
@@ -284,6 +293,8 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 # SDK client floor (Tier 1) alone. Without this
                 # the Mistral worker passed no max_retries at all, so structured Mistral got no re-ask.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
+                # Counts each request and reads the usage of each answer, so the re-asks' spend is summed whichever way the call ends
+                hooks=attempts.make_hooks(),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying
@@ -315,8 +326,12 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
             ) from sdk_exc
+        finally:
+            # Whichever way the call ended, a generation whose re-asks ran out included, its report holds what its attempts spent
+            attempts.record_into(llm_job=llm_job)
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
+        # The hooks summed the usage of every answer; the last answer's own is read only when they saw none
+        if not attempts.has_usage and (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_object

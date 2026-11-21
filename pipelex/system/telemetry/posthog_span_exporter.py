@@ -9,6 +9,7 @@ from typing import Any, Final, Mapping, Sequence, cast
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+from opentelemetry.trace import StatusCode
 from posthog import Posthog
 from typing_extensions import override
 
@@ -25,6 +26,7 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.misc.package_utils import get_package_version
 
 # The namespace of the deterministic event uuids PostHog deduplicates on, the same fixed, arbitrary UUID the hosted
 # plane's own emitters derive theirs from. NEVER change it: a new namespace re-enables the double counts it stops.
@@ -222,8 +224,8 @@ class PostHogSpanExporter(SpanExporter):
         """Build a redacted span name for generation spans.
 
         Generation span names follow the format:
-        "{pipe_code}: {unit_job_id} ({model_name}) -> {output_desc}"
-        where output_desc is either "text" or the output class name.
+        "{pipe_code}: {unit_job_id} ({model_handle}) -> {output_desc}"
+        where output_desc is the output type or the output class name.
 
         Args:
             original_span_name: The original span name from OTel.
@@ -246,7 +248,8 @@ class PostHogSpanExporter(SpanExporter):
         if output_class_name:
             display_output = OTelConstants.OUTPUT_CLASS_REDACTED if redact_class_names else output_class_name
         else:
-            display_output = "text"
+            # No class: the name ends with the output type, `Text`, `Image`, `Pages`, `Document` or a judgment's `Object`, which names no content
+            display_output = original_span_name.rsplit(" -> ", 1)[-1] if " -> " in original_span_name else "text"
 
         # Build redacted pipe code
         if redact_pipe_codes:
@@ -287,8 +290,8 @@ class PostHogSpanExporter(SpanExporter):
     def _get_base_properties(
         self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue], redaction: TelemetryRedactionConfig
     ) -> dict[str, Any]:
-        """Get common properties for all span types."""
-        properties: dict[str, Any] = {}
+        """Get common properties for all span types, the runtime's version among them."""
+        properties: dict[str, Any] = {PostHogAttr.PIPELEX_VERSION: get_package_version()}
         if span.end_time and span.start_time:
             properties[PostHogAttr.LATENCY] = (span.end_time - span.start_time) / 1e9
 
@@ -314,28 +317,42 @@ class PostHogSpanExporter(SpanExporter):
         return properties
 
     def _export_generation_span(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> None:
-        """Export a GenAI generation span."""
+        """Export a generation span, one inference call of any kind, as `$ai_generation`.
+
+        `$ai_provider` is the span's `gen_ai.provider.name`, the serving provider, and `$ai_model` the model id the call
+        asked it for; the Pipelex handle and backend ride `model_handle` and `inference_backend`. The tokens and their
+        cost are the ones the span recorded, summed over every attempt of the call. A failed call says so in
+        `$ai_is_error`, and names its inference error category, the span's `error.type`, in `$ai_error`, never a message.
+        """
         redaction = self._resolve_redaction(attributes=attributes)
         properties = self._get_base_properties(span=span, attributes=attributes, redaction=redaction)
-        provider_operation_combo = f"{attributes.get(GenAISpanAttr.PROVIDER_NAME)}:{attributes.get(GenAISpanAttr.OPERATION_NAME)}"
 
         # Get raw attribute values for redaction
         pipe_code = cast("str | None", attributes.get(PipelexSpanAttr.PIPE_CODE))
         output_class_name = cast("str | None", attributes.get(PipelexSpanAttr.OUTPUT_CLASS_NAME))
-        unit_job_id = cast("str | None", attributes.get(GenAISpanAttr.OPERATION_NAME))
-        model_name = cast("str | None", attributes.get(GenAISpanAttr.REQUEST_MODEL))
+        unit_job_id = cast("str | None", attributes.get(PipelexSpanAttr.UNIT_JOB_ID) or attributes.get(GenAISpanAttr.OPERATION_NAME))
+        model_handle = cast("str | None", attributes.get(PipelexSpanAttr.MODEL_HANDLE))
+        is_error = span.status.status_code == StatusCode.ERROR
 
         properties.update(
             {
-                PostHogAttr.MODEL: model_name,
-                PostHogAttr.MODEL_ID: attributes.get(GenAISpanAttr.RESPONSE_MODEL),
-                PostHogAttr.PROVIDER: provider_operation_combo,
+                PostHogAttr.MODEL: attributes.get(GenAISpanAttr.REQUEST_MODEL),
+                PostHogAttr.PROVIDER: attributes.get(GenAISpanAttr.PROVIDER_NAME),
                 PostHogAttr.TEMPERATURE: attributes.get(GenAISpanAttr.REQUEST_TEMPERATURE),
                 PostHogAttr.MAX_TOKENS: attributes.get(GenAISpanAttr.REQUEST_MAX_TOKENS),
                 PostHogAttr.SEED: attributes.get(GenAISpanAttr.REQUEST_SEED),
                 PostHogAttr.OUTPUT_TYPE: attributes.get(GenAISpanAttr.OUTPUT_TYPE),
                 PostHogAttr.INPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_INPUT_TOKENS),
                 PostHogAttr.OUTPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS),
+                PostHogAttr.INPUT_COST_USD: attributes.get(PipelexSpanAttr.INPUT_COST_USD),
+                PostHogAttr.OUTPUT_COST_USD: attributes.get(PipelexSpanAttr.OUTPUT_COST_USD),
+                PostHogAttr.TOTAL_COST_USD: attributes.get(PipelexSpanAttr.TOTAL_COST_USD),
+                PostHogAttr.ATTEMPT_COUNT: attributes.get(PipelexSpanAttr.ATTEMPT_COUNT, 1),
+                PostHogAttr.IS_ERROR: is_error,
+                PostHogAttr.ERROR: attributes.get(GenAISpanAttr.ERROR_TYPE) if is_error else None,
+                PostHogAttr.INFERENCE_KIND: attributes.get(PipelexSpanAttr.INFERENCE_KIND),
+                PostHogAttr.INFERENCE_BACKEND: attributes.get(PipelexSpanAttr.INFERENCE_BACKEND),
+                PostHogAttr.MODEL_HANDLE: model_handle,
             }
         )
 
@@ -353,7 +370,7 @@ class PostHogSpanExporter(SpanExporter):
             original_span_name=span.name,
             pipe_code=pipe_code,
             unit_job_id=unit_job_id,
-            model_name=model_name,
+            model_name=model_handle,
             output_class_name=output_class_name,
             redaction=redaction,
         )
@@ -366,8 +383,7 @@ class PostHogSpanExporter(SpanExporter):
             properties["output_class_name"] = redacted_output_class_name
 
         # Add pipeline_run_id (never redacted - useful for debugging and correlation)
-        pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
-        properties["pipeline_run_id"] = pipeline_run_id
+        properties[PostHogAttr.PIPELINE_RUN_ID] = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
         self._add_method_properties(properties=properties, attributes=attributes)
 
         self._capture_event(

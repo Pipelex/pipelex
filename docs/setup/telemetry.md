@@ -59,7 +59,7 @@ When the trace of the process is yours, and you want Pipelex to behave as one mo
 
 - **A run continues your current span.** When a run starts, Pipelex reads OpenTelemetry's current span; the run's root pipe span becomes its child, in your trace, instead of the root of a trace derived from the run's id. The trace id, the parent and your span's W3C trace state travel with the run's job metadata, so a step a distributed worker runs, in another process, stays in your trace too. With no current span, the run roots its own trace as before. A run started inside a running pipe, whose span is then the current one, becomes a subtree of the enclosing run rather than a new root in its trace.
 - **Your sampling decision is followed.** Pipelex's spans carry your span's sampled flag rather than always being sampled, so a request your sampler drops keeps none of Pipelex's spans, and none of the spans your instrumentation opens inside them.
-- **Pipe and LLM spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the LLM call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
+- **Pipe and inference spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the inference call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
 
 You turn it on in code, in the environment or in the file, and the most explicit wins: `Pipelex.make(join_host_trace=True)` in code, then the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`, in any case; an empty or blank variable counts as unset, and any other value stops the boot), then the top-level `join_host_trace` key of `telemetry.toml`, `false` by default.
 
@@ -100,6 +100,28 @@ What to expect from it:
 - **Only pipe spans draw from the workflow's random.** Any other span opened in workflow code keeps a random id, so a span that exists on one worker and not on another, by configuration, never shifts the ids of the pipe spans after it.
 
 On your PostHog stream, each pipe's `$ai_span` event also carries a uuid derived from its `$ai_span_id`, so a capture the PostHog client delivers twice carries the same uuid.
+
+## What an inference call reports
+
+Every inference call opens one **generation span**, whatever kind of inference it is: an LLM call, an image generation, an extraction or OCR, a search, a judgment, and the print of a document by its engine. The span is an OpenTelemetry span, so your Langfuse and every `[[otlp]]` exporter receive it as it is, and your PostHog stream receives it as an `$ai_generation`. It follows the OpenTelemetry GenAI semantic conventions where they define an attribute, and carries Pipelex's own beside them:
+
+| Span attribute | What it holds |
+|---|---|
+| `gen_ai.operation.name` | The operation: `chat` for an LLM call, otherwise `img_gen`, `extract`, `search`, `judgment` or `doc_gen`, the same value the call's summary log event names |
+| `gen_ai.provider.name` | The serving provider, the Pipelex backend the call was sent to, which may differ from the model's maker |
+| `gen_ai.request.model`, `gen_ai.response.model` | The model id the backend was asked for, and the one that served the call, read again when the call ends |
+| `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | The tokens the call recorded, summed over every attempt of a structured generation |
+| `pipelex.cost.input_usd`, `pipelex.cost.output_usd`, `pipelex.cost.total_usd` | The cost of those tokens at the rates the model declares, absent for a model that declares none |
+| `pipelex.inference.attempt_count` | How many times the call asked the model, a structured generation's re-asks included |
+| `pipelex.inference.kind` | `llm`, `img_gen`, `extract`, `search`, `judge` or `doc_render` |
+| `pipelex.inference.backend`, `pipelex.model.handle` | The Pipelex backend and the model handle your method named |
+| `pipelex.unit_job_id` | The step the span is about, `llm_gen_text` for instance |
+| `pipelex.run.method_id`, `pipelex.pipe.id` | The run's method and the `pipe_id` of the pipe that made the call, each absent when there is none (see [Stable pipe identifiers](#stable-pipe-identifiers)) |
+| `error.type` | On a failed call only: the failure's category, one of `transient`, `configuration`, `content`, `capacity`, `ambiguous` or `unknown` |
+
+A failed call ends its span with the error status and the exception recorded on it, and keeps the tokens and the cost it was billed for: a structured generation whose re-asks all failed the schema reports what every attempt spent, on its span and in the run's cost report. A call stopped from outside, cancelled rather than failed, ends with no error status. A document print reports no tokens and no cost, since its engine bills none.
+
+On your PostHog stream, the `$ai_generation` maps these attributes to PostHog's own properties: `$ai_provider` is the serving provider, `$ai_model` the model id, `$ai_input_tokens` and `$ai_output_tokens` the tokens, `$ai_input_cost_usd`, `$ai_output_cost_usd` and `$ai_total_cost_usd` the cost, `$ai_is_error` whether the call failed and `$ai_error` its category, never its message. Pipelex's own properties ride beside them: `inference_kind`, `inference_backend`, `model_handle`, `attempt_count`, `pipeline_run_id`, and the run's `method_id` and the calling pipe's `pipe_id` (see [Stable pipe identifiers](#stable-pipe-identifiers)). Every span and every event Pipelex sends to your PostHog also carries `pipelex_version`, the version of the runtime that sent it, which you can leave out of events by listing it in `redact_properties`. The event that opens a trace on your stream carries a span id derived from the trace, so PostHog keeps one of them when a trace starts twice.
 
 ## Error trackers
 

@@ -113,8 +113,8 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
                     "model_handle": self.inference_model.name,
                     "backend_name": self.inference_model.backend_name,
                     "sdk": self.inference_model.sdk,
-                    # The model keys mean what they mean on the LLM span: the handle, then the provider's id the deck pins
-                    GenAISpanAttr.REQUEST_MODEL: self.inference_model.name,
+                    # The model keys mean what they mean on the generation span: the provider's id the deck pins, asked and serving
+                    GenAISpanAttr.REQUEST_MODEL: self.inference_model.model_id,
                     GenAISpanAttr.RESPONSE_MODEL: self.inference_model.model_id,
                     "answered_model_id": response.model,
                 },

@@ -54,3 +54,6 @@ class LLMJobConfig(BaseModel):
 
 class LLMJobReport(BaseModel):
     llm_tokens_usage: LLMTokensUsage | None = None
+    # How many times the call asked the model, a structured generation's re-asks included, when its worker counted them;
+    # None for a call that asks once. Its usage above is summed over those attempts.
+    attempt_count: int | None = None
