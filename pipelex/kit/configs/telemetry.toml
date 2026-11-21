@@ -83,6 +83,7 @@ force_tracing_enabled = false
 # ──────────────────────────────────────────────────────────────────────────────
 # Langfuse Integration
 # Note: Langfuse receives FULL span data (no redaction)
+# Works on its own: enabled, it receives Pipelex's spans whatever [custom_posthog] says
 # ──────────────────────────────────────────────────────────────────────────────
 
 [langfuse]
@@ -94,6 +95,7 @@ enabled = false
 # ──────────────────────────────────────────────────────────────────────────────
 # Additional OTLP Exporters (array for multiple)
 # Note: OTLP exporters receive FULL span data (no redaction)
+# Works on its own: each exporter receives Pipelex's spans whatever [custom_posthog] says
 # ──────────────────────────────────────────────────────────────────────────────
 
 # [[otlp]]

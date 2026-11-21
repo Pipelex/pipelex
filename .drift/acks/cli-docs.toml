@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:0a952b1fa8a1a56368f6eaba6c7270efabbbbfcbeed3c84b0660edc3fa82143b"
+digest = "sha256:35d3c025a160d05e72070cabf7ad486f7ac23a99591d91b516ad4b6005d6390f"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-11-21T15:40:56Z"
-rationale = "clean-pass: re-ack after merging dev, whose hosted-run stale-file notice is already in docs/tools/cli/run.md; this branch's doctor telemetry row reading pipe_id_key's placeholder as written is in docs/tools/cli/doctor.md, and run method passing its package address changes no CLI surface"
+reviewed_at = "2026-11-21T15:53:53Z"
+rationale = "clean-pass: re-ack after merging dev; the merged doctor telemetry row keeps dev's pipe_id_key placeholder handling and adds this branch's span destinations to its message, and docs/tools/cli/doctor.md describes the row's finding, not its message text, so nothing is stale"
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -75,7 +75,7 @@ rationale = "clean-pass: re-ack after merging dev, whose hosted-run stale-file n
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:7e1db7c76857e77c1af2c68d0c8a14d52746fc73"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:23ad05431006dfe74ad7840b916eab74d769cebe"
 "pipelex/cli/commands/crate_loading.py" = "blob:d7bc8e226945cd9ee8fe443adbf252fb0bb14831"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:656cb757e23e68c520a8fe9b6534a46c104e197d"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:bb0a37a98b4527212805aa2ceee8bb1c996f8041"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:d05eb4351f7065eaa45f63089f2daae0b02457dd"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:d7b3b6038ddf9735c6d6d38afd36f398e508459f"

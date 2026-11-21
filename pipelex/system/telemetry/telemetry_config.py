@@ -233,16 +233,25 @@ class TelemetryConfig(ConfigModel):
     def operator_span_destinations(self) -> list[str]:
         """The destinations of this file that receive Pipelex's spans, by name, or nothing.
 
-        They all hang off the one tracer, which exists only when the operator's PostHog stream is on and its AI span
-        tracing is enabled: the PostHog stream itself, each `[[otlp]]` exporter, and Langfuse when it is enabled.
+        They all hang off the one tracer, which exists whenever any of them is configured, each independently of the
+        others: the operator's PostHog stream when it is on (`anonymous` or `identified`) with its AI span tracing
+        enabled, each `[[otlp]]` exporter, and Langfuse when it is enabled.
         """
-        if not self.custom_posthog.mode.is_enabled or not self.custom_posthog.tracing.enabled:
-            return []
-        destinations = ["custom_posthog"]
+        destinations: list[str] = []
+        if self.custom_posthog.mode.is_enabled and self.custom_posthog.tracing.enabled:
+            destinations.append("custom_posthog")
         destinations.extend(f"otlp:{exporter_config.name}" for exporter_config in self.otlp)
         if self.langfuse.enabled:
             destinations.append("langfuse")
         return destinations
+
+    @property
+    def is_custom_telemetry_configured(self) -> bool:
+        """Whether this file turns on any of the operator's own telemetry: the PostHog stream, or a destination of Pipelex's spans.
+
+        The telemetry manager is made only then; with neither, telemetry is a no-op.
+        """
+        return self.custom_posthog.mode.is_enabled or bool(self.operator_span_destinations())
 
     @property
     def redact_properties(self) -> list[str]:

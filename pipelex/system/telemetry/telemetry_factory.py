@@ -3,7 +3,7 @@ from pipelex.system.environment import get_optional_env, is_env_var_truthy
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.system.telemetry.otel_constants import OTelConstants
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode, TelemetryConfig
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.system.telemetry.telemetry_loader import TELEMETRY_SURFACE, load_telemetry_config
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
@@ -85,17 +85,15 @@ class TelemetryFactory:
         # Deferred import: avoid pulling heavy SDK at module-load time
         from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # ruff: ignore[import-outside-top-level]
 
-        chosen_telemetry_manager: TelemetryManagerAbstract
-        match telemetry_config.custom_posthog.mode:
-            case PostHogMode.OFF:
-                chosen_telemetry_manager = TelemetryManagerNoOp()
-                log.debug("Telemetry is disabled because posthog.mode is set to 'off'")
-            case PostHogMode.ANONYMOUS | PostHogMode.IDENTIFIED:
-                chosen_telemetry_manager = injected_telemetry_manager or TelemetryManager(
-                    telemetry_config=telemetry_config,
-                    join_host_trace=is_join_host_trace,
-                )
-        return chosen_telemetry_manager
+        # The PostHog stream and the span destinations are independent: either one is enough to make the manager, so
+        # spans reach an [[otlp]] exporter or Langfuse with [custom_posthog] off.
+        if not telemetry_config.is_custom_telemetry_configured:
+            log.debug("Telemetry is disabled because posthog.mode is 'off' and no span destination is configured")
+            return TelemetryManagerNoOp()
+        return injected_telemetry_manager or TelemetryManager(
+            telemetry_config=telemetry_config,
+            join_host_trace=is_join_host_trace,
+        )
 
     @classmethod
     def resolve_join_host_trace(cls, *, telemetry_config: TelemetryConfig, join_host_trace: bool | None) -> bool:
@@ -133,8 +131,8 @@ class TelemetryFactory:
             return
         msg = (
             "join_host_trace is on, but no destination of yours receives Pipelex's spans, so the host's spans made their "
-            "children would reach your backend with a parent nobody has. Turn on [custom_posthog] (mode 'anonymous' or "
-            "'identified') with [custom_posthog.tracing] enabled, which also feeds any [[otlp]] exporter and [langfuse], "
+            "children would reach your backend with a parent nobody has. Configure an [[otlp]] exporter, enable [langfuse], "
+            "or turn on [custom_posthog] (mode 'anonymous' or 'identified') with [custom_posthog.tracing] enabled; "
             "or turn join_host_trace off."
         )
         raise TelemetryConfigValidationError(msg, surface=TELEMETRY_SURFACE, file=TELEMETRY_CONFIG_FILE_NAME, setting=JOIN_HOST_TRACE_SETTING)

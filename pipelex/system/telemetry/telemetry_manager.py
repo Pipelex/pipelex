@@ -136,16 +136,19 @@ class TelemetryManager(TelemetryManagerAbstract):
                 before_send=strip_exception_frame_sources,
             )
 
-        # Create OTel tracer for AI tracing if enabled
+        # The one OTel tracer feeds every span destination, so it exists whenever any is configured, each independently:
+        # the PostHog stream with its AI span tracing on, an [[otlp]] exporter, Langfuse.
         self._otel_tracer: OTelTracer | None
         self._tracer_provider: OTelTracerProvider | None
-        if telemetry_config.custom_posthog.tracing.enabled:
-            # Create redaction config from user settings
+        if telemetry_config.operator_span_destinations():
+            # The PostHog span exporter is attached only when the stream's AI span tracing is on; the client alone, for
+            # events, sends no span.
+            span_posthog_client = self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 custom_fallback_distinct_id=telemetry_config.custom_posthog.user_id,
                 custom_run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=telemetry_config.custom_posthog.mode),
-                custom_posthog_client=self.custom_posthog_client,
+                custom_posthog_client=span_posthog_client,
                 custom_redaction_config=custom_redaction_config,
                 otlp_exporters=telemetry_config.otlp,
                 langfuse_config=telemetry_config.langfuse,
@@ -159,13 +162,14 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self.custom_posthog_client and not telemetry_config.custom_posthog.events.enabled:
             log.verbose("The event-style events are switched off; spans, generations and exceptions still go to the custom PostHog")
 
-        # Wrap capture_exception to sanitize before sending
+        # The process-wide PostHog settings are taken over only when the operator's stream is on: with the manager made
+        # for span destinations alone, a host application's own module-level PostHog client and privacy mode are left
+        # exactly as it set them.
         if self.custom_posthog_client:
+            # Wrap capture_exception to sanitize before sending
             self._wrap_capture_exception(self.custom_posthog_client)
-
-        # Set global PostHog settings
-        posthog.privacy_mode = True
-        posthog.default_client = self.custom_posthog_client
+            posthog.privacy_mode = True
+            posthog.default_client = self.custom_posthog_client
 
     @override
     def make_error_tracker(self) -> PostHogErrorTracker | None:
@@ -529,8 +533,13 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     @contextmanager
     def telemetry_context(self) -> Generator[None, None, None]:
-        """Context manager that uses PostHog's new_context when telemetry is enabled."""
-        with new_context():
+        """Context manager that uses PostHog's new_context, capturing an escaping exception on the operator's client.
+
+        A manager made for span destinations alone has no client, so the context captures nothing: PostHog's own
+        fallback, the module-level client, would otherwise be set up from no API key and raise in place of the
+        exception escaping the block, or capture it on a client the host application set up for itself.
+        """
+        with new_context(capture_exceptions=self.custom_posthog_client is not None, client=self.custom_posthog_client):
             yield
 
     @override
