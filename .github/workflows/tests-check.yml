@@ -25,6 +25,11 @@ jobs:
 #     Refresh .test_durations with `make store-test-durations` (incremental —
 #     it measures only tests missing from the map). What unbalances the groups
 #     is missing coverage, not stale values: see docs/contribute/test-duration-map.md.
+#
+#     Slow tests: SKIP_SLOW_TESTS=1 deselects every test .test_durations records
+#     at or above the Makefile's SLOW_TEST_SECONDS — about a tenth of the tests,
+#     holding most of the suite's time. They run in `tests-full-check.yml`, the
+#     gate on pull requests to main, which sets no SKIP_SLOW_TESTS.
 # --------------------------------------------------------------------------
   matrix-test:
     name: Tests (py3.11, shard ${{ matrix.group }}/8)
@@ -57,7 +62,7 @@ jobs:
         run: make tp TEST=TestFundamentals
 
       - name: Run tests (shard ${{ matrix.group }}/8)
-        run: SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
+        run: SKIP_SLOW_TESTS=1 SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
 
       - name: Show hang dumps
         if: failure()
