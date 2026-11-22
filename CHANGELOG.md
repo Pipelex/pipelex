@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`TelemetryManagerAbstract.handle_trace_start` is gone (Breaking)**: `pipeline_run_setup` no longer announces a trace when a run starts, and `OtelContext.is_trace_root_announced` and `TelemetryManager.make_trace_start_span_id` are gone with it; the PostHog span exporter sends the trace's root itself (see Fixed), so a telemetry manager you inject drops its override of the hook.
+
+### Fixed
+
+- **A run's trace is one tree on your PostHog stream**: a run's root pipe span named no parent, beside the trace-start `$ai_span` that named none either, so PostHog showed two roots, and that trace-start carried no `$ai_latency`. The trace's root is now one `$ai_span`, sent by the span exporter with the run's root pipe span from whichever process ran it, a distributed orchestrator's worker included, with the root pipe's latency, dated at its start and under a span id derived from the trace and the run; the run's root pipe span names it as its `$ai_parent_id`, and every `$ai_span` and `$ai_generation` carries a non-negative `$ai_latency`.
+
 ## [v0.113.0] - 2026-11-21
 
 ### Highlights

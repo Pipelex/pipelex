@@ -8,7 +8,6 @@ from pytest_mock import MockerFixture
 
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.telemetry.events import EventName
-from pipelex.system.telemetry.otel_constants import PostHogEvent
 from pipelex.system.telemetry.posthog_error_tracker import PostHogErrorTracker
 from pipelex.system.telemetry.telemetry_config import (
     PostHogConfig,
@@ -87,13 +86,6 @@ class TestEventsSwitch:
         assert manager.custom_posthog_client is posthog_client
         assert make_ai_tracer.call_args.kwargs["custom_posthog_client"] is posthog_client
         assert manager.get_otel_tracer() is not None
-
-    def test_switched_off_the_trace_start_span_still_goes_out(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        manager, posthog_client, _ = _build_manager(mocker=mocker, monkeypatch=monkeypatch, telemetry_config=_telemetry_config(events_enabled=False))
-
-        manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
-
-        assert posthog_client.capture.call_args.kwargs["event"] == PostHogEvent.SPAN
 
     def test_switched_off_the_error_tracker_stays_on(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
         """`$exception` is not an event-style event: the `posthog` error tracker keeps its client."""
