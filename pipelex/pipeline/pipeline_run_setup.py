@@ -168,7 +168,7 @@ async def pipeline_run_setup(
         Never read by name here; telemetry forwards it whole as the groups of
         each capture. Validated
         at the TOP of this function, above the pipeline registration and above
-        the trace-start event, so a malformed mapping registers nothing and
+        the ``pipeline_execute`` event, so a malformed mapping registers nothing and
         emits nothing. Optional, and omitting it leaves the telemetry group facet empty.
         See :mod:`pipelex.system.run_extras`.
     method_id:
@@ -260,8 +260,10 @@ async def pipeline_run_setup(
     # its own top — but BOTH run below `add_new_pipeline` and the open tracer, so
     # a malformed mapping used to abort a run that had already registered itself
     # and opened a library and a tracer. The teardown below releases that state.
-    # What it could not take back was the trace-start event, which this seam
-    # emitted from up there too until the emission moved below the job build.
+    # What it could not take back was a trace-start event, which this seam
+    # emitted from up there too until the emission moved below the job build;
+    # a run's trace root is now sent by the PostHog span exporter, with the
+    # run's root pipe span.
     #
     # This is the same lesson `storage_scope` learned one seam lower, and the
     # same cure: ordering, not absence, was the defect.
@@ -340,7 +342,7 @@ async def pipeline_run_setup(
         # chooses the storage scope through the back door. The gate above saw
         # only the sentinel, so this is the first look at what the scope has
         # actually become — and it still sits above the library, the tracer and
-        # the trace-start.
+        # the run's first event.
         storage_scope = validate_storage_scope(value=pipeline_run_id)
 
     if not library_id:
@@ -493,27 +495,6 @@ async def pipeline_run_setup(
             request_id=request_id,
             inputs_base_dir=inputs_base_dir,
         )
-
-        # Emit the trace start event to establish the trace name in the backend. It
-        # must arrive before any pipe span, which is comfortably satisfied here: the
-        # pipe has not run yet, and no span is created until it does.
-        #
-        # It sits BELOW `prepare_pipe_job` deliberately, although nothing between the
-        # two emits anything. That seam is where the run's `RunMetadata` is built, and
-        # the trace-start has to be attributed to the same person its spans will be —
-        # so the event waits for the one object that says who that is, rather than a
-        # second one assembled here from the same parameters. Waiting also means a
-        # failure inside that seam no longer announces a trace for a run that never
-        # started, which is the event that cannot be unsent.
-        # A run the host sampled out keeps no span, so no trace is announced for it either, and a run started
-        # inside a running pipe of this process joins a trace its enclosing run has already announced.
-        if otel_context is not None and otel_context.is_trace_root_announced:
-            get_telemetry_manager().handle_trace_start(
-                trace_name=otel_context.trace_name,
-                trace_name_redacted=otel_context.trace_name_redacted,
-                trace_id=otel_context.trace_id,
-                run_metadata=pipe_job.job_metadata.run_metadata,
-            )
 
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,

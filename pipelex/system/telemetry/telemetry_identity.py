@@ -99,8 +99,7 @@ class RunIdentityPolicy(StrEnum):
         """The policy an operator's own stream carries, read from the mode they set.
 
         Stated once, because the operator's stream resolves an identity from
-        three places — the event tracker, the trace-start capture and the span
-        exporter — and a mode that meant one thing in one of them and something
+        more than one place — the event tracker and the span exporter — and a mode that meant one thing in one of them and something
         else in another is exactly the drift this module exists to prevent.
         """
         return cls.DIRECT if posthog_mode.is_identified else cls.NONE

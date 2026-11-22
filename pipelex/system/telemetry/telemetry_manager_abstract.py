@@ -262,18 +262,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     def join_host_trace(self) -> bool:
         """Whether Pipelex's spans join the host process's OpenTelemetry trace (see ``TelemetryFactory.resolve_join_host_trace``)."""
 
-    @abstractmethod
-    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
-        """Hook to do something when a trace starts.
-
-        Args:
-            trace_name: Full trace name with pipe code (for custom telemetry).
-            trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
-            trace_id: The trace ID.
-            run_metadata: The run this trace belongs to, carrying the identity the
-                event is attributed to. None leaves the stream's fallback.
-        """
-
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
@@ -343,7 +331,3 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     def join_host_trace(self) -> bool:
         # No telemetry starts no span, so there is nothing to make current or to join.
         return False
-
-    @override
-    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
-        pass

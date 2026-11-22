@@ -1,4 +1,4 @@
-"""Unit tests for the tracker half: `track_event` and `handle_trace_start`.
+"""Unit tests for the tracker half: `track_event`.
 
 Events resolve their identity exactly as spans do, from the run in hand, so a
 run's `pipe_run` and its `$ai_span` land on the same person. The emitters that
@@ -9,8 +9,8 @@ The manager is built WITHOUT its constructor. `TelemetryManager.__init__` create
 live PostHog clients, installs an `sys.excepthook`, writes `posthog.default_client`
 and registers a process-wide singleton — none of which these tests are about, and
 all of which would leak into the rest of the suite. What they are about is the
-resolution the two methods perform, so the instance is assembled with exactly the
-attributes those methods read.
+resolution `track_event` performs, so the instance is assembled with exactly the
+attributes it reads.
 """
 
 from typing import Any
@@ -107,76 +107,6 @@ class TestTelemetryManagerIdentity:
 
         custom_client.capture.assert_not_called()
 
-    def test_the_trace_start_is_attributed_to_the_run(self, mocker: MockerFixture) -> None:
-        """It is the first event of the trace, so it has to land on the same person its spans will."""
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
-
-        manager.handle_trace_start(
-            trace_name="some_pipe_abc12345",
-            trace_name_redacted="abc12345",
-            trace_id=1234,
-            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
-        )
-
-        capture_kwargs = custom_client.capture.call_args.kwargs
-        assert capture_kwargs["distinct_id"] == "user-42"
-        assert capture_kwargs["groups"] == {"organization": "org_acme"}
-
-    def test_without_a_run_it_keeps_the_configured_identity(self, mocker: MockerFixture) -> None:
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
-
-        manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
-
-        assert custom_client.capture.call_args.kwargs["distinct_id"] == "configured-id"
-
-    def test_an_anonymous_operator_stream_still_identifies_nobody(self, mocker: MockerFixture) -> None:
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.ANONYMOUS, configured_user_id=None)
-
-        manager.handle_trace_start(
-            trace_name="some_pipe_abc12345",
-            trace_name_redacted="abc12345",
-            trace_id=1234,
-            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
-        )
-
-        capture_kwargs = custom_client.capture.call_args.kwargs
-        assert "distinct_id" not in capture_kwargs
-        assert capture_kwargs["properties"][PostHogAttr.PROCESS_PERSON_PROFILE] is False
-
-    def test_an_anonymous_stream_ignores_a_user_id_left_behind_in_the_config(self, mocker: MockerFixture) -> None:
-        """`anonymous` mode does not forbid a `user_id`, so one survives a mode switch.
-
-        While the trace-start and the span exporter read that leftover as their
-        fallback, a stream documented as identifying nobody created a person
-        profile on every capture but its ordinary events.
-        """
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.ANONYMOUS, configured_user_id="left-behind-id")
-
-        manager.handle_trace_start(
-            trace_name="some_pipe_abc12345",
-            trace_name_redacted="abc12345",
-            trace_id=1234,
-            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
-        )
-
-        capture_kwargs = custom_client.capture.call_args.kwargs
-        assert "distinct_id" not in capture_kwargs
-        assert capture_kwargs["properties"][PostHogAttr.PROCESS_PERSON_PROFILE] is False
-
-    def test_the_identity_never_becomes_a_property(self, mocker: MockerFixture) -> None:
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
-
-        manager.handle_trace_start(
-            trace_name="some_pipe_abc12345",
-            trace_name_redacted="abc12345",
-            trace_id=1234,
-            run_metadata=_run_metadata(extras={"organization": "org_acme"}),
-        )
-
-        rendered = repr(custom_client.capture.call_args.kwargs["properties"])
-        assert "user-42" not in rendered
-        assert "org_acme" not in rendered
-
     def test_an_event_with_no_run_is_attributed_to_the_caller_in_scope(self, mocker: MockerFixture) -> None:
         manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-runner")
 
@@ -225,16 +155,6 @@ class TestTelemetryManagerIdentity:
         assert "caller-7" not in repr(properties)
         assert "org_caller" not in repr(properties)
 
-    def test_a_trace_start_with_no_run_is_attributed_to_the_caller_in_scope(self, mocker: MockerFixture) -> None:
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="pipelex-runner")
-
-        with scoped_caller_identity(caller_identity=_CALLER):
-            manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
-
-        capture_kwargs = custom_client.capture.call_args.kwargs
-        assert capture_kwargs["distinct_id"] == "caller-7"
-        assert capture_kwargs["groups"] == {"organization": "org_caller"}
-
     def test_an_event_carries_the_runtime_version(self, mocker: MockerFixture) -> None:
         manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
 
@@ -249,18 +169,3 @@ class TestTelemetryManagerIdentity:
         manager.track_event(EventName.PIPE_RUN, run_metadata=_run_metadata())
 
         assert EventProperty.PIPELEX_VERSION not in custom_client.capture.call_args.kwargs["properties"]
-
-    def test_the_trace_start_carries_a_span_id_derived_from_its_trace_and_the_runtime_version(self, mocker: MockerFixture) -> None:
-        manager, custom_client = _make_manager(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
-
-        manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
-        manager.handle_trace_start(trace_name="some_pipe_abc12345", trace_name_redacted="abc12345", trace_id=1234)
-        manager.handle_trace_start(trace_name="other_pipe", trace_name_redacted="other", trace_id=5678)
-
-        first, again, other = [call.kwargs["properties"] for call in custom_client.capture.call_args_list]
-        span_id = first[PostHogAttr.SPAN_ID]
-        assert len(span_id) == 16
-        int(span_id, 16)
-        assert again[PostHogAttr.SPAN_ID] == span_id
-        assert other[PostHogAttr.SPAN_ID] != span_id
-        assert first[PostHogAttr.PIPELEX_VERSION] == get_package_version()

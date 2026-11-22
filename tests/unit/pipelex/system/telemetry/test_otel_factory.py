@@ -178,18 +178,17 @@ class TestOtelFactory:
         assert otel_context.trace_state is None
         assert otel_context.host_span_id is None
         assert otel_context.is_host_span_pipelex is False
-        assert otel_context.is_trace_root_announced is True
 
     @pytest.mark.parametrize(
-        ("is_sampled", "trace_state", "is_pipelex_span", "is_announced"),
+        ("is_sampled", "trace_state", "is_pipelex_span"),
         [
-            (True, TraceState([("vendor", "value"), ("other", "1")]), False, True),
-            (False, TraceState(), False, False),
-            (True, TraceState(), True, False),
+            (True, TraceState([("vendor", "value"), ("other", "1")]), False),
+            (False, TraceState(), False),
+            (True, TraceState(), True),
         ],
     )
     def test_a_run_joining_a_host_span_carries_its_trace_its_span_and_its_decision_across_a_process_boundary(
-        self, is_sampled: bool, trace_state: TraceState, is_pipelex_span: bool, is_announced: bool
+        self, is_sampled: bool, trace_state: TraceState, is_pipelex_span: bool
     ) -> None:
         host_span_context = SpanContext(
             trace_id=0x0123456789ABCDEF0123456789ABCDEF,
@@ -212,7 +211,6 @@ class TestOtelFactory:
         assert carried.host_span_id == host_span_context.span_id
         assert carried.is_sampled is is_sampled
         assert carried.is_host_span_pipelex is is_pipelex_span
-        assert carried.is_trace_root_announced is is_announced
         # The W3C trace state crosses as its header and is rebuilt as the same trace state for a synthetic parent.
         rebuilt_trace_state = OtelFactory.make_trace_state(trace_state_header=carried.trace_state)
         if trace_state:
