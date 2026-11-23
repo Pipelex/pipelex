@@ -50,6 +50,7 @@ from pipelex.system.telemetry.otel_constants import (
     PostHogEvent,
     SpanCategory,
 )
+from pipelex.system.telemetry.posthog_span_exporter import make_trace_root_span_id
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_CONFIG_OVERRIDE_FILE_NAME, PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_factory import TelemetryFactory
 from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
@@ -290,26 +291,29 @@ def _assert_posthog_generation(destinations: Destinations, *, is_error: bool) ->
 
 
 def _assert_posthog_run_events(destinations: Destinations, *, outcome: Outcome) -> None:
-    """The run's trace start and its two events reach the operator's PostHog, on the configured user, with the runtime's version."""
+    """The run's trace, one tree, and its two events reach the operator's PostHog, on the configured user, with the runtime's version."""
     (execute,) = destinations.posthog_events(EventName.PIPELINE_EXECUTE)
     (complete,) = destinations.posthog_events(EventName.PIPELINE_COMPLETE)
     assert complete["properties"][EventProperty.PIPELINE_OUTCOME] == outcome
     run_id = execute["properties"][EventProperty.PIPELINE_RUN_ID]
     assert complete["properties"][EventProperty.PIPELINE_RUN_ID] == run_id
-    # The trace start is the `$ai_span` whose span id is the one derived from its trace, sent before any pipe span.
-    (trace_start,) = [
-        span
-        for span in destinations.posthog_events(PostHogEvent.SPAN)
-        if span["properties"][PostHogAttr.SPAN_ID]
-        == TelemetryManager.make_trace_start_span_id(trace_id=int(span["properties"][PostHogAttr.TRACE_ID], 16))
-    ]
-    assert trace_start["properties"][EventProperty.PIPELINE_RUN_ID] == run_id
-    # The pipe's own span follows, in the same trace, its pipe code redacted by the stock defaults.
-    trace_start_span_id = trace_start["properties"][PostHogAttr.SPAN_ID]
-    (pipe_span,) = [span for span in destinations.posthog_events(PostHogEvent.SPAN) if span["properties"][PostHogAttr.SPAN_ID] != trace_start_span_id]
-    assert pipe_span["properties"][PostHogAttr.TRACE_ID] == trace_start["properties"][PostHogAttr.TRACE_ID]
+    spans = destinations.posthog_events(PostHogEvent.SPAN)
+    # The trace's root is the one `$ai_span` without a parent, under the span id derived from its trace and its run.
+    (trace_root,) = [span for span in spans if PostHogAttr.PARENT_ID not in span["properties"]]
+    assert trace_root["properties"][EventProperty.PIPELINE_RUN_ID] == run_id
+    assert trace_root["properties"][PostHogAttr.SPAN_ID] == make_trace_root_span_id(
+        trace_id=int(trace_root["properties"][PostHogAttr.TRACE_ID], 16), pipeline_run_id=run_id
+    )
+    # The pipe's own span hangs from it, in the same trace, its pipe code redacted by the stock defaults.
+    (pipe_span,) = [span for span in spans if span is not trace_root]
+    assert pipe_span["properties"][PostHogAttr.TRACE_ID] == trace_root["properties"][PostHogAttr.TRACE_ID]
+    assert pipe_span["properties"][PostHogAttr.PARENT_ID] == trace_root["properties"][PostHogAttr.SPAN_ID]
     assert PIPE_CODE not in str(pipe_span["properties"])
-    for event in (execute, complete, trace_start, pipe_span):
+    # The root lasts as long as the run's root pipe, and every span says how long it took.
+    assert trace_root["properties"][PostHogAttr.LATENCY] == pipe_span["properties"][PostHogAttr.LATENCY]
+    for span in spans:
+        assert span["properties"][PostHogAttr.LATENCY] >= 0
+    for event in (execute, complete, trace_root, pipe_span):
         assert event["distinct_id"] == SELF_HOSTER_ID
         assert event["properties"][PostHogAttr.PIPELEX_VERSION] == get_package_version()
 

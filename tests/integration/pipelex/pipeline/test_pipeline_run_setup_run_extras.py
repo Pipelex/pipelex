@@ -12,10 +12,7 @@ accepts the field on the wire.
 It also pins WHERE the refusal happens. Validation sits above
 ``add_new_pipeline`` deliberately: a malformed mapping must not register a run.
 Asserting only that a ``ValueError`` escapes would pass with the validation at
-the bottom of ``prepare_pipe_job``, which is where it used to be. It sits above
-``handle_trace_start`` too, but that clause no longer distinguishes anything —
-the trace-start has since moved below ``prepare_pipe_job``, so every gate in
-this function precedes it.
+the bottom of ``prepare_pipe_job``, which is where it used to be.
 """
 
 import pytest
@@ -93,16 +90,14 @@ class TestPipelineRunSetupRunExtras:
                 extras={"Organization": "org_acme"},
             )
 
-    async def test_the_refusal_registers_no_run_and_emits_no_trace_start(self, mocker: MockerFixture) -> None:
+    async def test_the_refusal_registers_no_run_and_emits_no_event(self, mocker: MockerFixture) -> None:
         """A rejected mapping must leave NOTHING behind — not a pipeline entry, not a telemetry event.
 
         The teardown can release a registered pipeline and an opened tracer; it cannot
-        unsend a ``handle_trace_start`` that already reached the backend. The pipeline
-        half is what bites today: ``add_new_pipeline`` runs above ``prepare_pipe_job``,
-        so this test fails if the gate is moved back down there, where the mapping was
-        first validated. The telemetry half is now satisfied by the ordering whatever
-        the gate does — the trace-start sits below ``prepare_pipe_job`` — and stays as a
-        guard against that ordering moving back.
+        unsend an event that already reached the backend. The pipeline half is what
+        bites: ``add_new_pipeline`` runs above ``prepare_pipe_job``, so this test fails
+        if the gate is moved back down there, where the mapping was first validated.
+        The telemetry half guards against an event moving above the gate.
         """
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,

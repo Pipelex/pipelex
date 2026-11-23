@@ -287,7 +287,7 @@ class TestLiveRunPipeJoinHostTrace:
     async def test_a_run_started_inside_a_running_pipe_is_a_subtree_of_the_enclosing_run(
         self, mocker: MockerFixture, pipelex_spans: InMemorySpanExporter
     ) -> None:
-        """The inner run joins the outer pipe's span, which Pipelex's streams receive: it is neither a root nor announced."""
+        """The inner run joins the outer pipe's span, which Pipelex's streams receive: it is no root."""
         self._switch(mocker, is_on=True)
         host_tracer = TracerProvider().get_tracer("host")
         inner_run_pipe = _make_pipe(code="inner_run", host_tracer=host_tracer)
@@ -302,9 +302,7 @@ class TestLiveRunPipeJoinHostTrace:
         (outer_context,) = outer.started_contexts
         (inner_context,) = inner_run_pipe.started_contexts
         assert outer_context.is_host_span_pipelex is False
-        assert outer_context.is_trace_root_announced is True
         assert inner_context.is_host_span_pipelex is True
-        assert inner_context.is_trace_root_announced is False
         assert _parent_of(inner_run_span).span_id == _context_of(outer_span).span_id
         assert _context_of(inner_run_span).trace_id == _context_of(outer_span).trace_id
         assert outer_span.attributes is not None

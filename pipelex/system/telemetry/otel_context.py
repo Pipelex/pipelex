@@ -28,8 +28,3 @@ class OtelContext(BaseModel):
         description="On the root context of a run started inside a running pipe of this process with join_host_trace on: the span the "
         "run joined is that pipe's Pipelex span, which Pipelex's own streams receive, so the run's root span is not the trace's root",
     )
-
-    @property
-    def is_trace_root_announced(self) -> bool:
-        """Whether a run starting from this context announces its trace: not when the host sampled it out or an enclosing run already did."""
-        return self.is_sampled and not self.is_host_span_pipelex

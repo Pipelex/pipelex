@@ -1,7 +1,4 @@
-from typing import Any
-
 import pytest
-from posthog import Posthog
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -10,15 +7,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.providers.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.providers.portkey.portkey_factory import PortkeyFactory
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata, UnitJobId
-from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr
-from pipelex.system.telemetry.telemetry_config import (
-    PostHogConfig,
-    PostHogMode,
-    PostHogTracingCaptureConfig,
-    PostHogTracingConfig,
-    TelemetryConfig,
-)
-from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 
@@ -30,23 +19,6 @@ def _run_metadata(*, capture_pipe_codes: bool | None) -> RunMetadata:
         read_scope=None,
         capture_pipe_codes=capture_pipe_codes,
     )
-
-
-def _make_manager(*, mocker: MockerFixture, deployment_captures: bool) -> tuple[TelemetryManager, Any]:
-    """A manager with a stub client, built without its constructor's process-wide side effects."""
-    telemetry_config = TelemetryConfig(
-        custom_posthog=PostHogConfig(
-            mode=PostHogMode.IDENTIFIED,
-            user_id="configured-id",
-            api_key="phc_test",
-            tracing=PostHogTracingConfig(enabled=True, capture=PostHogTracingCaptureConfig(pipe_codes=deployment_captures)),
-        )
-    )
-    manager = TelemetryManager.__new__(TelemetryManager)
-    manager.telemetry_config = telemetry_config
-    custom_client = mocker.MagicMock(spec=Posthog)
-    manager.custom_posthog_client = custom_client
-    return manager, custom_client
 
 
 def _make_llm_job(*, capture_pipe_codes: bool | None) -> LLMJob:
@@ -106,43 +78,6 @@ class TestCapturePipeCodesForRun:
 
         assert TelemetryManagerAbstract.is_capture_pipe_codes_enabled_for_run(run_metadata=run_metadata) is expected
         assert TelemetryManagerAbstract.is_capture_output_class_name_enabled_for_run(run_metadata=run_metadata) is expected
-
-    @pytest.mark.parametrize(
-        ("deployment_captures", "capture_pipe_codes", "expected_trace_name"),
-        [
-            (False, None, "abc"),
-            (True, None, "extract_invoice_abc"),
-            (False, True, "extract_invoice_abc"),
-            (True, False, "abc"),
-        ],
-    )
-    def test_the_trace_start_names_the_trace_as_the_run_allows(
-        self, mocker: MockerFixture, deployment_captures: bool, capture_pipe_codes: bool | None, expected_trace_name: str
-    ) -> None:
-        manager, custom_client = _make_manager(mocker=mocker, deployment_captures=deployment_captures)
-
-        manager.handle_trace_start(
-            trace_name="extract_invoice_abc",
-            trace_name_redacted="abc",
-            trace_id=1234,
-            run_metadata=_run_metadata(capture_pipe_codes=capture_pipe_codes),
-        )
-
-        properties = custom_client.capture.call_args.kwargs["properties"]
-        assert properties[PostHogAttr.TRACE_NAME] == expected_trace_name
-        assert properties[PostHogAttr.SPAN_NAME] == expected_trace_name
-
-    @pytest.mark.parametrize("method_id", ["mt_invoices", None])
-    def test_the_trace_start_carries_the_runs_method(self, mocker: MockerFixture, method_id: str | None) -> None:
-        """The trace's first span names the run's method as its pipe and generation spans do, null when it has none."""
-        manager, custom_client = _make_manager(mocker=mocker, deployment_captures=False)
-        run_metadata = _run_metadata(capture_pipe_codes=None).model_copy(update={"method_id": method_id})
-
-        manager.handle_trace_start(trace_name="extract_invoice_abc", trace_name_redacted="abc", trace_id=1234, run_metadata=run_metadata)
-
-        properties = custom_client.capture.call_args.kwargs["properties"]
-        assert "method_id" in properties
-        assert properties["method_id"] == method_id
 
     @pytest.mark.parametrize(
         ("deployment_captures", "capture_pipe_codes", "expected_span_name"),

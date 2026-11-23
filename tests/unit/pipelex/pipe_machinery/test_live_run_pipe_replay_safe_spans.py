@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 from random import Random
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +25,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.sdk.trace.id_generator import IdGenerator, RandomIdGenerator
 from opentelemetry.trace import TraceState
+from posthog import Posthog
 from pydantic import Field
 from typing_extensions import override
 
@@ -37,9 +39,12 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.telemetry.otel_constants import OTelConstants, PipelexSpanAttr, SpanOutcome
+from pipelex.system.telemetry.otel_constants import OTelConstants, PipelexSpanAttr, PostHogAttr, SpanOutcome
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter, make_trace_root_span_id
 from pipelex.system.telemetry.replay_safe_id_generator import ReplaySafeIdGenerator
+from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.system.telemetry.workflow_execution import WorkflowExecutionProtocol, get_workflow_execution, workflow_execution_slot
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -280,6 +285,25 @@ class TestLiveRunPipeReplaySafeSpans:
         return exporter
 
     @pytest.fixture
+    def posthog_client(self, mocker: MockerFixture) -> Any:
+        """Pipelex's own tracer provider, with its replay-safe id generator, exporting to a PostHog stream whose client is a stub."""
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = PostHogSpanExporter(
+            posthog_client=client,
+            fallback_distinct_id=None,
+            run_identity_policy=RunIdentityPolicy.DIRECT,
+            redaction_config=TelemetryRedactionConfig(
+                redact_content=True, redact_pipe_codes=True, redact_output_class_names=True, content_max_length=None
+            ),
+        )
+        provider = TracerProvider(id_generator=ReplaySafeIdGenerator())
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        mocker.patch.object(TelemetryManagerAbstract, "get_instance_tracer", return_value=provider.get_tracer("pipelex"))
+        mocker.patch.object(TelemetryManagerAbstract, "is_instance_tracer_replay_safe", return_value=True)
+        mocker.patch.object(TelemetryManagerAbstract, "is_join_host_trace_enabled", return_value=False)
+        return client
+
+    @pytest.fixture
     def workflow(self) -> Iterator[dict[str, FakeWorkflowExecution]]:
         """The workflow execution the orchestrator's probe answers with, swapped as the workflow moves to another worker."""
         current: dict[str, FakeWorkflowExecution] = {}
@@ -341,6 +365,60 @@ class TestLiveRunPipeReplaySafeSpans:
         assert outer_context is not None
         assert outer_context.trace_id == _host_joined_otel_context().trace_id
         assert outer_context.trace_state == TraceState.from_header([HOST_TRACE_STATE])
+
+    async def test_a_run_crossing_an_eviction_reaches_posthog_as_one_tree_with_its_true_latency(
+        self, posthog_client: Any, workflow: dict[str, FakeWorkflowExecution]
+    ) -> None:
+        """The orchestrator's path: the runner set the run up in another process, and the worker's workflow code runs it.
+
+        The trace's root is sent with the run's root pipe span, by the execution that really ends it, so a replay sends
+        no second root, the root lasts as long as the run's root pipe did from its first start, and every other span
+        hangs from a span of the trace.
+        """
+        live = FakeWorkflowExecution(is_replaying=False)
+        workflow["execution"] = live
+        first = _make_pipe(code="first", steps=[_set(execution=live, now_ns=SECOND_TASK_AT_NS)])
+        second = _make_pipe(code="second", steps=[_evict])
+        outer = _make_pipe(code="outer", steps=[first, second])
+        with pytest.raises(WorkflowEviction):
+            await _run_workflow_code(outer)
+        replay = FakeWorkflowExecution(is_replaying=True)
+        workflow["execution"] = replay
+        first.steps = [_set(execution=replay, now_ns=SECOND_TASK_AT_NS)]
+        second.steps = [_set(execution=replay, is_replaying=False, now_ns=LAST_TASK_AT_NS)]
+        await _run_workflow_code(outer)
+
+        captures = [call.kwargs for call in posthog_client.capture.call_args_list]
+        assert len(captures) == 4
+        roots = [capture for capture in captures if PostHogAttr.PARENT_ID not in capture["properties"]]
+        assert len(roots) == 1
+        (root,) = roots
+        assert root["properties"][PostHogAttr.SPAN_ID] == make_trace_root_span_id(
+            trace_id=_host_joined_otel_context().trace_id, pipeline_run_id=PIPELINE_RUN_ID
+        )
+        assert root["properties"][PostHogAttr.LATENCY] == (LAST_TASK_AT_NS - STARTED_AT_NS) / 1e9
+        assert root["timestamp"] == datetime.fromtimestamp(STARTED_AT_NS / 1e9, tz=UTC)
+        span_ids = {capture["properties"][PostHogAttr.SPAN_ID] for capture in captures}
+        for capture in captures:
+            assert capture["properties"][PostHogAttr.LATENCY] >= 0
+            if capture is not root:
+                assert capture["properties"][PostHogAttr.PARENT_ID] in span_ids
+
+    async def test_a_run_outside_workflow_code_reaches_posthog_as_one_tree(self, posthog_client: Any) -> None:
+        """The in-process path: the run's root pipe span, exported where the run ran, sends the trace's root beside it."""
+        assert get_workflow_execution() is None
+        outer = _make_pipe(code="outer", steps=[_make_pipe(code="inner", steps=[])])
+
+        await _run_workflow_code(outer)
+
+        captures = [call.kwargs for call in posthog_client.capture.call_args_list]
+        assert len(captures) == 3
+        (root,) = [capture for capture in captures if PostHogAttr.PARENT_ID not in capture["properties"]]
+        span_ids = {capture["properties"][PostHogAttr.SPAN_ID] for capture in captures}
+        for capture in captures:
+            assert capture["properties"][PostHogAttr.LATENCY] >= 0
+            if capture is not root:
+                assert capture["properties"][PostHogAttr.PARENT_ID] in span_ids
 
     @pytest.mark.parametrize(
         "error",

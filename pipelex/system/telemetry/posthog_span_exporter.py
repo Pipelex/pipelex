@@ -1,10 +1,20 @@
 """PostHog span exporter for OpenTelemetry.
 
 This module provides a SpanExporter that sends OTel spans to PostHog
-as $ai_generation or $ai_span events.
+as $ai_generation or $ai_span events, plus one root `$ai_span` per run's trace.
+
+A run's trace on this stream is one tree. Its root is the trace's own `$ai_span`, which no OpenTelemetry span
+backs: the exporter sends it when it exports the run's root pipe span, the span marked `pipelex.run_root`, with that
+pipe's latency, timestamped at that pipe's start so it is the trace's earliest event, and under a span id derived from
+the trace and the run (`make_trace_root_span_id`). The run's root pipe span names that root as its parent, and every other span
+names the Pipelex span it ran under, so the tracking plan's "exactly one root per run's trace" holds whichever
+process exports the root pipe span: the one that ran the run in process, or an orchestrator's worker that ran it in
+workflow code, where only the live execution exports it (`pipelex.system.telemetry.replay_safe_spans`).
 """
 
+import hashlib
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Final, Mapping, Sequence, cast
 
 from opentelemetry.sdk.trace import ReadableSpan
@@ -31,6 +41,17 @@ from pipelex.tools.misc.package_utils import get_package_version
 # The namespace of the deterministic event uuids PostHog deduplicates on, the same fixed, arbitrary UUID the hosted
 # plane's own emitters derive theirs from. NEVER change it: a new namespace re-enables the double counts it stops.
 EVENT_UUID_NAMESPACE: Final[uuid.UUID] = uuid.UUID("6f5c1f3a-3a2e-4f1b-9c0d-8a7b6e5d4c3b")
+
+
+def make_trace_root_span_id(*, trace_id: int, pipeline_run_id: str) -> str:
+    """The span id of a run's trace root `$ai_span`, derived from the trace and the run, so every copy of one root carries the same one.
+
+    The root is no OpenTelemetry span, so it has no span id of its own: this one is the first 16 hexadecimal digits of
+    the MD5 digest of the trace id and the run id, the width of a span id. The run id is in it because several runs can
+    share one trace, those that joined one host's trace, and each keeps a root of its own. The run's root pipe span names
+    it as its parent.
+    """
+    return hashlib.md5(f"trace-root:{trace_id:032x}:{pipeline_run_id}".encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 def make_span_event_uuid(*, span_id: str) -> str:
@@ -114,7 +135,15 @@ class PostHogSpanExporter(SpanExporter):
         if (pipe_id := attributes.get(PipelexSpanAttr.PIPE_ID)) is not None:
             properties["pipe_id"] = pipe_id
 
-    def _capture_event(self, event: PostHogEvent, *, properties: dict[str, Any], identity: TelemetryIdentity, event_uuid: str | None = None) -> None:
+    def _capture_event(
+        self,
+        event: PostHogEvent,
+        *,
+        properties: dict[str, Any],
+        identity: TelemetryIdentity,
+        event_uuid: str | None = None,
+        timestamp: datetime | None = None,
+    ) -> None:
         """Capture an event to PostHog, handling anonymous vs identified users.
 
         PostHog requires a valid distinct_id - passing None will cause the event to be rejected.
@@ -126,7 +155,8 @@ class PostHogSpanExporter(SpanExporter):
         to keep in step.
 
         An ``event_uuid`` is the event's deduplication key, derived from the event's own identity; without one, the
-        client generates a random uuid.
+        client generates a random uuid. A ``timestamp`` dates the event when it happened before it is sent; without
+        one, the client dates it now.
         """
         if identity.distinct_id:
             # Identified user: pass distinct_id, and the entities the run belongs to
@@ -136,6 +166,7 @@ class PostHogSpanExporter(SpanExporter):
                 properties=properties,
                 groups=identity.groups or None,
                 uuid=event_uuid,
+                timestamp=timestamp,
             )
         else:
             # Anonymous user: don't pass distinct_id, mark as anonymous
@@ -144,6 +175,7 @@ class PostHogSpanExporter(SpanExporter):
                 event=event,
                 properties=properties,
                 uuid=event_uuid,
+                timestamp=timestamp,
             )
 
     def _truncate_content(self, content: str) -> str:
@@ -290,31 +322,50 @@ class PostHogSpanExporter(SpanExporter):
     def _get_base_properties(
         self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue], redaction: TelemetryRedactionConfig
     ) -> dict[str, Any]:
-        """Get common properties for all span types, the runtime's version among them."""
-        properties: dict[str, Any] = {PostHogAttr.PIPELEX_VERSION: get_package_version()}
-        if span.end_time and span.start_time:
-            properties[PostHogAttr.LATENCY] = (span.end_time - span.start_time) / 1e9
+        """Get common properties for all span types, the runtime's version and the span's latency among them."""
+        properties: dict[str, Any] = {
+            PostHogAttr.PIPELEX_VERSION: get_package_version(),
+            PostHogAttr.LATENCY: self._get_latency_seconds(span=span),
+        }
 
         # Add trace/span IDs for PostHog trace grouping
         span_context = span.get_span_context()
         if span_context and span_context.is_valid:
             properties[PostHogAttr.TRACE_ID] = f"{span_context.trace_id:032x}"
             properties[PostHogAttr.SPAN_ID] = f"{span_context.span_id:016x}"
-            # Use redacted or full trace name based on redaction config
-            if redaction.redact_pipe_codes:
-                properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.TRACE_NAME_REDACTED)
-            else:
-                properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.TRACE_NAME)
+            properties[PostHogAttr.TRACE_NAME] = self._get_trace_name(attributes=attributes, redaction=redaction)
 
-        # Add parent span ID for trace hierarchy. A run's root span has a parent this stream never receives,
-        # the virtual root parent that sets a run's own trace id, or a host's span the run joined, so it is
-        # left out and the run keeps the same shape here either way. A run started inside a running pipe keeps
-        # its parent, that pipe's span, which this stream receives: its first span carries no run-root mark.
-        is_run_root = attributes.get(PipelexSpanAttr.RUN_ROOT) is True
-        if span.parent and not is_run_root and span.parent.span_id != OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
+        # Add parent span ID for trace hierarchy. A run's root pipe span has a parent this stream never receives,
+        # the virtual root parent that sets a run's own trace id, or a host's span the run joined, so it names the
+        # trace's root `$ai_span` instead, which this exporter sends beside it (`_export_trace_root`): the run keeps
+        # one root here either way. A run started inside a running pipe keeps its parent, that pipe's span, which
+        # this stream receives: its first span carries no run-root mark.
+        if attributes.get(PipelexSpanAttr.RUN_ROOT) is True:
+            if span_context and span_context.is_valid:
+                properties[PostHogAttr.PARENT_ID] = self._get_trace_root_span_id(trace_id=span_context.trace_id, attributes=attributes)
+        elif span.parent and span.parent.span_id != OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
             properties[PostHogAttr.PARENT_ID] = f"{span.parent.span_id:016x}"
 
         return properties
+
+    @staticmethod
+    def _get_latency_seconds(*, span: ReadableSpan) -> float:
+        """The seconds the span took, never negative, and 0 for a span that names no start or no end, which an ended span always names."""
+        if span.start_time is None or span.end_time is None:
+            return 0.0
+        return max(0.0, (span.end_time - span.start_time) / 1e9)
+
+    @staticmethod
+    def _get_trace_root_span_id(*, trace_id: int, attributes: Mapping[str, OTelAttributeValue]) -> str:
+        """The span id of the trace root of the run this span belongs to (`make_trace_root_span_id`)."""
+        return make_trace_root_span_id(trace_id=trace_id, pipeline_run_id=str(attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID, "")))
+
+    @staticmethod
+    def _get_trace_name(*, attributes: Mapping[str, OTelAttributeValue], redaction: TelemetryRedactionConfig) -> OTelAttributeValue | None:
+        """The trace's name as this span may show it: the full name with the pipe code, or the redacted one without it."""
+        if redaction.redact_pipe_codes:
+            return attributes.get(PipelexSpanAttr.TRACE_NAME_REDACTED)
+        return attributes.get(PipelexSpanAttr.TRACE_NAME)
 
     def _export_generation_span(self, span: ReadableSpan, *, attributes: Mapping[str, OTelAttributeValue]) -> None:
         """Export a generation span, one inference call of any kind, as `$ai_generation`.
@@ -402,8 +453,6 @@ class PostHogSpanExporter(SpanExporter):
         pipe_type = cast("str | None", attributes.get(PipelexSpanAttr.PIPE_TYPE))
 
         # Build redacted span name
-        # The trace name is established by a "trace start" event emitted at pipeline setup,
-        # which ensures PostHog receives the correct trace name before any pipe spans arrive.
         redacted_span_name = self._build_redacted_pipe_span_name(
             original_span_name=span.name,
             pipe_type=pipe_type,
@@ -426,11 +475,55 @@ class PostHogSpanExporter(SpanExporter):
 
         # Deduplicated on `$ai_span_id`, as the tracking plan's rule 7 backstop.
         span_id = properties.get(PostHogAttr.SPAN_ID)
+        identity = self._resolve_identity(attributes=attributes)
+        if attributes.get(PipelexSpanAttr.RUN_ROOT) is True:
+            self._export_trace_root(span=span, attributes=attributes, redaction=redaction, identity=identity)
         self._capture_event(
             event=PostHogEvent.SPAN,
             properties=properties,
-            identity=self._resolve_identity(attributes=attributes),
+            identity=identity,
             event_uuid=make_span_event_uuid(span_id=span_id) if isinstance(span_id, str) else None,
+        )
+
+    def _export_trace_root(
+        self,
+        *,
+        span: ReadableSpan,
+        attributes: Mapping[str, OTelAttributeValue],
+        redaction: TelemetryRedactionConfig,
+        identity: TelemetryIdentity,
+    ) -> None:
+        """Send the trace's root `$ai_span`, the one span of the run's trace without a parent, beside the run's root pipe span.
+
+        It takes everything from that pipe span, which the run's every process marks the same way: the trace, the
+        trace's name as the run allows it to be shown, the run, its method, the person and groups, and the pipe's
+        latency, which is the run's. It is named after the trace, as PostHog names a trace after its earliest event, and
+        dated at the pipe's start, so it is that earliest event whenever it arrives. It carries no pipe property, since
+        it is the trace and no pipe, and it is deduplicated on its span id, derived from the trace and the run
+        (`make_trace_root_span_id`), as every `$ai_span` is.
+        """
+        span_context = span.get_span_context()
+        if not span_context or not span_context.is_valid:
+            return
+        trace_name = self._get_trace_name(attributes=attributes, redaction=redaction)
+        root_span_id = self._get_trace_root_span_id(trace_id=span_context.trace_id, attributes=attributes)
+        properties: dict[str, Any] = {
+            PostHogAttr.PIPELEX_VERSION: get_package_version(),
+            PostHogAttr.LATENCY: self._get_latency_seconds(span=span),
+            PostHogAttr.TRACE_ID: f"{span_context.trace_id:032x}",
+            PostHogAttr.SPAN_ID: root_span_id,
+            PostHogAttr.SPAN_NAME: trace_name,
+            PostHogAttr.TRACE_NAME: trace_name,
+            PostHogAttr.PIPELINE_RUN_ID: attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID),
+            "method_id": attributes.get(PipelexSpanAttr.RUN_METHOD_ID),
+        }
+        start_time = datetime.fromtimestamp(span.start_time / 1e9, tz=UTC) if span.start_time is not None else None
+        self._capture_event(
+            event=PostHogEvent.SPAN,
+            properties=properties,
+            identity=identity,
+            event_uuid=make_span_event_uuid(span_id=root_span_id),
+            timestamp=start_time,
         )
 
     @override

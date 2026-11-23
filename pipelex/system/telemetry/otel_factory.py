@@ -178,7 +178,7 @@ class OtelFactory:
         starts under the host's span, and the run follows the host's sampling decision and carries its W3C
         trace state. The span id stays the virtual root parent either way, which is what marks the context as
         the run's root. A host span that is the Pipelex span of a running pipe makes the run a subtree of that
-        pipe's run, which has already announced the trace and holds its root.
+        pipe's run, whose root pipe span is the one the trace's root hangs from.
 
         Args:
             pipeline_run_id: The run's id, from which its own trace id and trace names are derived.
