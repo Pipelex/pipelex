@@ -17,8 +17,7 @@ class OpenRouterCompletionsFactory(OpenAICompletionsFactory):
     def make_extras(
         self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
+        extra_headers, extra_body = super().make_extras(inference_model, inference_job=inference_job, output_desc=output_desc)
         if isinstance(inference_job, ImgGenJob):
-            extra_body = {"modalities": ["image"]}
-        else:
-            extra_body = {}
-        return inference_model.extra_headers or {}, extra_body
+            extra_body["modalities"] = ["image"]
+        return extra_headers, extra_body

@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
+from pipelex.providers.openai.openai_constants import OpenAIBodyKey
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
@@ -117,4 +118,7 @@ class OpenAICompletionsFactory(BackendExtrasFactory):
     def make_extras(
         self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
-        return inference_model.extra_headers or {}, {}
+        extra_body: dict[str, Any] = {}
+        if inference_model.service_tier is not None:
+            extra_body[OpenAIBodyKey.SERVICE_TIER] = str(inference_model.service_tier)
+        return inference_model.extra_headers or {}, extra_body

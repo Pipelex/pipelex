@@ -42,7 +42,13 @@ class TestSplitModelSpecKeys:
         assert split.rejected[0].reason == ModelSpecKeyRejection.NOT_HEADER_SHAPED
 
     @pytest.mark.parametrize(
-        ("near_miss", "known_field"), [("max-tokens", "max_tokens"), ("model-id", "model_id"), ("thinking-mode", "thinking_mode")]
+        ("near_miss", "known_field"),
+        [
+            ("max-tokens", "max_tokens"),
+            ("model-id", "model_id"),
+            ("thinking-mode", "thinking_mode"),
+            ("service-tier", "service_tier"),
+        ],
     )
     def test_a_hyphenated_spelling_of_a_known_field_is_rejected_despite_its_shape(self, near_miss: str, known_field: str) -> None:
         """The one hole the shape rule leaves: `max-tokens = 4096` is header-shaped and would go out

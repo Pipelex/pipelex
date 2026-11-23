@@ -46,6 +46,8 @@ class PortkeyFactory:
         # Model-level extras (unchanged)
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)
+        if inference_model.service_tier is not None:
+            extra_body[OpenAIBodyKey.SERVICE_TIER] = str(inference_model.service_tier)
         if isinstance(inference_job, LLMJob) and not inference_job.job_params.max_tokens and inference_model.max_tokens:
             extra_body[OpenAIBodyKey.MAX_TOKENS] = inference_model.max_tokens
 

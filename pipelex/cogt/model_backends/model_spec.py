@@ -8,6 +8,7 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.model_backends.service_tier import ServiceTier
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY
@@ -30,6 +31,7 @@ class InferenceModelSpec(ConfigModel):
     variant: str | None = None
     model_type: ModelType = Field(strict=False)
     model_id: str
+    service_tier: ServiceTier | None = Field(default=None, strict=False)
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
     costs: CostsByCategoryDict = Field(strict=False)
