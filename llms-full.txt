@@ -23104,7 +23104,7 @@ A worker implements the provider half of a call, `_gen_text` or `_extract_pages`
 
 | Symbol | Module | Role |
 |--------|--------|------|
-| `BackendExtrasFactory` | `pipelex.plugins.backend_extras_factory` | the per-request headers and body additions a worker asks its factory for |
+| `BackendExtrasFactory` | `pipelex.plugins.backend_extras_factory` | the per-request headers and body additions a worker asks its factory for, and its `is_storage_uri_enabled` flag, which keeps stored prompt files as references for a backend that reads Pipelex storage itself ([Storage Provider Plugins](storage-provider-plugins.md#a-backend-that-reads-the-storage-itself)) |
 | `OpenAICompletionsFactory` | `pipelex.providers.openai.openai_completions_factory` | extension base for a Chat Completions service: messages, client, extras |
 | `OpenAIResponsesFactory` | `pipelex.providers.openai.openai_responses_factory` | extension base for a Responses service |
 | `OpenAICompletionsLLMWorker` | `pipelex.providers.openai.openai_completions_llm_worker` | the Chat Completions LLM worker, built with a factory |
@@ -23119,7 +23119,7 @@ A worker implements the provider half of a call, `_gen_text` or `_extract_pages`
 | `prep_prompt_images` | `pipelex.cogt.image.prompt_image_utils` | prompt images, prepared for a request |
 | `PromptImageDetail` | `pipelex.cogt.image.prompt_image` | the detail level a prompt image asks for |
 | `prep_prompt_documents` | `pipelex.cogt.document.prompt_document_utils` | prompt documents, prepared for a request |
-| `PreparedFileBase64`, `PreparedFileHttpUrl`, `PreparedFileLocalPath` | `pipelex.tools.uri.prepared_file` | the forms a prepared file takes |
+| `PreparedFileBase64`, `PreparedFileHttpUrl`, `PreparedFileStorageUri`, `PreparedFileLocalPath` | `pipelex.tools.uri.prepared_file` | the forms a prepared file takes |
 | `make_base64_url_from_any_uri` | `pipelex.tools.uri.uri_base64` | a file reference, inlined as a data URL |
 
 **Errors: distilling, classifying and rendering a failure**
@@ -24088,6 +24088,37 @@ Besides files, a provider holds the large texts of a run: every `Text`, `Markdow
 ### A provider is not the tenant boundary
 
 A provider reads any key it is handed with the process's own credentials, and it should: it has no notion of whose run asked. On a host serving several tenants, what bounds a run's reads is the **read scope** the host passes with the run, which the content-generation leaves and the input seam check before they call a provider. A key outside that prefix, and any local path, is refused there, so a provider never sees it. A self-hosted deployment serving one tenant passes no read scope and reads as before. See [Distributed Content Generation](distributed-content-generation.md#what-a-leaf-may-read-the-read-scope) for the rule and where it runs.
+
+---
+
+## A backend that reads the storage itself
+
+When a prompt carries an image or a document stored as a `pipelex-storage://` URI, the runtime normally reads the object through the storage provider and hands the model's SDK its bytes, as base64. That is the only shape the providers Pipelex ships can take, since none of them can read Pipelex storage. A backend whose service *can* read that storage, because it runs beside the bucket with credentials of its own, gains nothing from the download: the bytes cross the runtime's memory and the request body for no reason, and a large file can exceed the request's size limit long before it exceeds the model's. Such a backend can ask for stored files to be kept as references.
+
+The opt-in is the `is_storage_uri_enabled` flag of `BackendExtrasFactory` (`pipelex/plugins/backend_extras_factory.py`), the per-backend factory a worker already consults for each request's extras. It is a keyword argument of the factory's constructor, off by default, and no backend Pipelex ships turns it on, so their requests are unchanged. A plugin backend turns it on when it builds its factory, typically from a setting of its own in the backend's `extra_config`:
+
+```python
+OpenAIResponsesLLMWorker(
+    openai_responses_factory=MyResponsesFactory(is_http_url_enabled=False, is_storage_uri_enabled=True),
+    ...
+)
+AnthropicLLMWorker(
+    ...,
+    extras_factory=MyAnthropicExtrasFactory(is_storage_uri_enabled=True),
+)
+```
+
+With the flag on, `prep_prompt_images` and `prep_prompt_documents` (and their single-file forms `prepare_prompt_image` and `prepare_prompt_document`) return a `PreparedFileStorageUri` for each stored file, carrying the URI unchanged, and make no storage read at all. Each factory then sends that URI where it would send a URL:
+
+| Factory | Images | Documents |
+|---------|--------|-----------|
+| `OpenAIResponsesFactory` | `input_image` with `image_url` set to the URI | `input_file` with `file_url` set to the URI, and no filename |
+| `AnthropicFactory`, through `AnthropicLLMWorker` | an `image` block whose `source` is `{"type": "url", "url": <the URI>}` | a `document` block whose `source` is `{"type": "url", "url": <the URI>}` |
+| `OpenAICompletionsFactory` | `image_url` with `url` set to the URI | still inlined: the Chat Completions file part has no URL form, so a backend that needs documents as references overrides `make_simple_messages` with a part that can carry the URI |
+
+Only stored files change. An `https://` URL keeps following `is_http_url_enabled`, a local path is still read, and an inline or `data:` file is still sent as base64. The Anthropic worker reads the flag from its `extras_factory`, so a worker built without one, as every Anthropic and Bedrock backend Pipelex ships is, keeps inlining.
+
+Turn it on only for a backend that really reads the storage the runtime writes to: the same bucket, under the same keys, with credentials that can read them. A model provider receiving a `pipelex-storage://` URI it cannot resolve refuses the request. Keeping a reference does not widen what a run may read: the content-generation leaf checks every prompt file against the run's read scope before it calls the worker, whether or not the bytes are then loaded (see [A provider is not the tenant boundary](#a-provider-is-not-the-tenant-boundary)).
 
 ---
 
@@ -25680,7 +25711,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.114.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.115.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
