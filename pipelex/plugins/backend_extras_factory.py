@@ -14,6 +14,9 @@ class BackendExtrasFactory(ABC):
     as base64; a plugin backend turns it on when it builds its factory.
     """
 
+    # Declared on the class too, so a subclass whose own `__init__` does not call this one still reads it as off.
+    is_storage_uri_enabled: bool = False
+
     def __init__(self, *, is_storage_uri_enabled: bool = False):
         self.is_storage_uri_enabled = is_storage_uri_enabled
 

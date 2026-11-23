@@ -39,6 +39,19 @@ class _ExtrasFactory(BackendExtrasFactory):
         return {}, {}
 
 
+class _OwnInitExtrasFactory(BackendExtrasFactory):
+    """A plugin's factory whose own `__init__` never calls the base one."""
+
+    def __init__(self, *, tag: str):
+        self.tag = tag
+
+    @override
+    def make_extras(
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
+        return {}, {}
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestAnthropicStorageUri:
     async def test_opted_in_the_user_message_carries_url_sources(self, mocker: MockerFixture) -> None:
@@ -84,6 +97,7 @@ class TestAnthropicStorageUri:
             (None, False),
             (_ExtrasFactory(), False),
             (_ExtrasFactory(is_storage_uri_enabled=True), True),
+            (_OwnInitExtrasFactory(tag="plugin"), False),
         ],
     )
     async def test_the_worker_takes_the_flag_from_its_extras_factory(self, extras_factory: BackendExtrasFactory | None, expected: bool) -> None:
