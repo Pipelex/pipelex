@@ -15,7 +15,7 @@ from pipelex.providers.openai.openai_completions_factory import OpenAICompletion
 from pipelex.providers.portkey.portkey_constants import PortkeyOpenAISdkVariant
 from pipelex.providers.portkey.portkey_exceptions import PortkeyFactoryError
 from pipelex.providers.portkey.portkey_factory import PortkeyFactory
-from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath, PreparedFileStorageUri
 
 if TYPE_CHECKING:
     # Deferred imports: avoid pulling heavy SDK at module-load time
@@ -56,12 +56,19 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
             user_contents.append(user_part_text)
         if llm_prompt.user_images:
             detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
-            prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
+            prepped_images = await prep_prompt_images(
+                prompt_images=llm_prompt.user_images,
+                is_http_url_enabled=self.is_http_url_enabled,
+                is_storage_uri_enabled=self.is_storage_uri_enabled,
+            )
             for prepped_image in prepped_images:
                 url: str
                 match prepped_image:
                     case PreparedFileHttpUrl():
                         url = prepped_image.url
+                    case PreparedFileStorageUri():
+                        # The backend reads the storage itself, so the URI travels as the image's URL.
+                        url = prepped_image.storage_uri
                     case PreparedFileBase64():
                         url = prepped_image.as_data_url()
                     case PreparedFileLocalPath():
@@ -84,7 +91,7 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
                         image_url_obj = OpenAIImageURL(url=doc_url, detail="auto")
                         doc_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                         user_contents.append(doc_param)
-                    case PreparedFileHttpUrl() | PreparedFileLocalPath():
+                    case PreparedFileHttpUrl() | PreparedFileStorageUri() | PreparedFileLocalPath():
                         msg = f"{type(prepped_document).__name__} is not supported for documents - should be converted to base64"
                         raise TypeError(msg)
 

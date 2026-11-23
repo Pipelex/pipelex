@@ -20,7 +20,7 @@ from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx, fetching_for_input
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes
-from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl
+from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileStorageUri
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -37,15 +37,18 @@ async def prepare_prompt_document(
     prompt_document: PromptDocument,
     *,
     is_http_url_enabled: bool,
+    is_storage_uri_enabled: bool = False,
 ) -> PreparedFile:
     """Prepare a single prompt document for LLM API consumption.
 
     Args:
         prompt_document: The input prompt document (URI, base64, or binary)
         is_http_url_enabled: Whether to pass HTTP URLs directly to the LLM
+        is_storage_uri_enabled: Whether to keep a `pipelex-storage://` URI as it is, without reading the
+            object, for a backend that reads the storage itself. Off, the object is loaded and sent as base64.
 
     Returns:
-        A PreparedFile (HttpUrl or Base64) ready for the LLM API
+        A PreparedFile (HttpUrl, StorageUri or Base64) ready for the LLM API
     """
     prepared: PreparedFile
     match prompt_document:
@@ -83,12 +86,15 @@ async def prepare_prompt_document(
                     )
 
                 case ResolvedPipelexStorage() as resolved_uri:
-                    storage = get_storage_provider()
-                    raw_bytes = await storage.load(uri=resolved_uri.storage_uri)
-                    prepared = PreparedFileBase64(
-                        base64_data=base64.b64encode(raw_bytes).decode("ascii"),
-                        file_type=detect_file_type_from_bytes(raw_bytes),
-                    )
+                    if is_storage_uri_enabled:
+                        prepared = PreparedFileStorageUri(storage_uri=resolved_uri.storage_uri)
+                    else:
+                        storage = get_storage_provider()
+                        raw_bytes = await storage.load(uri=resolved_uri.storage_uri)
+                        prepared = PreparedFileBase64(
+                            base64_data=base64.b64encode(raw_bytes).decode("ascii"),
+                            file_type=detect_file_type_from_bytes(raw_bytes),
+                        )
 
                 case ResolvedBase64DataUrl() as resolved_uri:
                     base64_data = resolved_uri.base64_data
@@ -104,19 +110,26 @@ async def prep_prompt_documents(
     prompt_documents: list[PromptDocument],
     *,
     is_http_url_enabled: bool,
+    is_storage_uri_enabled: bool = False,
 ) -> list[PreparedFile]:
     """Prepare multiple prompt documents in parallel.
 
     Args:
         prompt_documents: List of input prompt documents
         is_http_url_enabled: Whether to pass HTTP URLs directly to the LLM
+        is_storage_uri_enabled: Whether to keep `pipelex-storage://` URIs as they are, for a backend that reads the storage itself
 
     Returns:
         List of PreparedFile instances ready for the LLM API
     """
     # A bounded number at a time, so a prompt holding many documents does not open as many reads at once.
     prepare_factories: list[Callable[[], Awaitable[PreparedFile]]] = [
-        partial(prepare_prompt_document, prompt_document=prompt_document, is_http_url_enabled=is_http_url_enabled)
+        partial(
+            prepare_prompt_document,
+            prompt_document=prompt_document,
+            is_http_url_enabled=is_http_url_enabled,
+            is_storage_uri_enabled=is_storage_uri_enabled,
+        )
         for prompt_document in prompt_documents
     ]
     return await gather_bounded(prepare_factories, max_concurrency=MAX_CONCURRENT_URI_READS)

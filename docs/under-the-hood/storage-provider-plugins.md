@@ -209,6 +209,37 @@ A provider reads any key it is handed with the process's own credentials, and it
 
 ---
 
+## A backend that reads the storage itself
+
+When a prompt carries an image or a document stored as a `pipelex-storage://` URI, the runtime normally reads the object through the storage provider and hands the model's SDK its bytes, as base64. That is the only shape the providers Pipelex ships can take, since none of them can read Pipelex storage. A backend whose service *can* read that storage, because it runs beside the bucket with credentials of its own, gains nothing from the download: the bytes cross the runtime's memory and the request body for no reason, and a large file can exceed the request's size limit long before it exceeds the model's. Such a backend can ask for stored files to be kept as references.
+
+The opt-in is the `is_storage_uri_enabled` flag of `BackendExtrasFactory` (`pipelex/plugins/backend_extras_factory.py`), the per-backend factory a worker already consults for each request's extras. It is a keyword argument of the factory's constructor, off by default, and no backend Pipelex ships turns it on, so their requests are unchanged. A plugin backend turns it on when it builds its factory, typically from a setting of its own in the backend's `extra_config`:
+
+```python
+OpenAIResponsesLLMWorker(
+    openai_responses_factory=MyResponsesFactory(is_http_url_enabled=False, is_storage_uri_enabled=True),
+    ...
+)
+AnthropicLLMWorker(
+    ...,
+    extras_factory=MyAnthropicExtrasFactory(is_storage_uri_enabled=True),
+)
+```
+
+With the flag on, `prep_prompt_images` and `prep_prompt_documents` (and their single-file forms `prepare_prompt_image` and `prepare_prompt_document`) return a `PreparedFileStorageUri` for each stored file, carrying the URI unchanged, and make no storage read at all. Each factory then sends that URI where it would send a URL:
+
+| Factory | Images | Documents |
+|---------|--------|-----------|
+| `OpenAIResponsesFactory` | `input_image` with `image_url` set to the URI | `input_file` with `file_url` set to the URI, and no filename |
+| `AnthropicFactory`, through `AnthropicLLMWorker` | an `image` block whose `source` is `{"type": "url", "url": <the URI>}` | a `document` block whose `source` is `{"type": "url", "url": <the URI>}` |
+| `OpenAICompletionsFactory` | `image_url` with `url` set to the URI | still inlined: the Chat Completions file part has no URL form, so a backend that needs documents as references overrides `make_simple_messages` with a part that can carry the URI |
+
+Only stored files change. An `https://` URL keeps following `is_http_url_enabled`, a local path is still read, and an inline or `data:` file is still sent as base64. The Anthropic worker reads the flag from its `extras_factory`, so a worker built without one, as every Anthropic and Bedrock backend Pipelex ships is, keeps inlining.
+
+Turn it on only for a backend that really reads the storage the runtime writes to: the same bucket, under the same keys, with credentials that can read them. A model provider receiving a `pipelex-storage://` URI it cannot resolve refuses the request. Keeping a reference does not widen what a run may read: the content-generation leaf checks every prompt file against the run's read scope before it calls the worker, whether or not the bytes are then loaded (see [A provider is not the tenant boundary](#a-provider-is-not-the-tenant-boundary)).
+
+---
+
 ## Related
 
 - [Secrets Provider Plugins](secrets-provider-plugins.md) — the sibling config-selected-singleton seam riding the same mechanism; the `gcp` factory above reads its provider
