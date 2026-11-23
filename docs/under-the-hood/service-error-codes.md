@@ -60,6 +60,26 @@ Each entry says, about one code:
 | `user_action_kind` | the kind of the error's advice |
 | `detail` | the advice itself: what the caller, or whoever operates the service, should do. The local CLIs print it as a tip beside the error; a problem never carries it, since its step is the code's. The service's message already names the specifics, so the advice need not repeat them |
 | `is_model_not_found` | set for a code that means the service does not know the model at all: it selects the family's `*ModelNotFoundError` class, which the pipe layer re-raises as a model-availability error carrying the model handle, and its `error_code` is then `model.unavailable` |
+| `body_params` | the parameters of `error_code` the service states in its error body, each mapped to the field holding it; empty by default. See [The facts of a refusal](#the-facts-of-a-refusal) |
+
+## The facts of a refusal
+
+A problem's sentences are rendered from its code's templates and its parameters, never from the service's message, which rides the operator's diagnostics alone. So a code whose sentence names facts, such as `input.too_large` ("The input '{input}' reaches {size}, past the limit of {limit}."), renders them for the caller only when the error is given them; without them the caller reads the code's title, "An input exceeds a size limit", and the problem builder logs that a required parameter is missing.
+
+A service that knows the facts states them as fields of its error body, in its own vocabulary, and the entry maps them to the registry's names:
+
+```python
+ServiceErrorCode(
+    code="acme_files_too_large",
+    category=InferenceErrorCategory.CONTENT,
+    error_code=CoreCode.INPUT_TOO_LARGE,
+    user_action_kind=UserActionKind.CHANGE_INPUT,
+    detail="The files are over the provider's limit — use smaller files.",
+    body_params={"input": "reference", "size": "size_bytes", "limit": "limit_bytes"},
+)
+```
+
+When a refusal matches the entry, `render_inference_error` reads each field from the body the worker's Extract step kept (`ProviderErrorMetadata.body`), in its `error` section first and then at its top level, where the OpenAI client leaves the section's fields (`error_body_sections` in `pipelex.cogt.inference.error_classification`), and gives the values it finds to the error with `with_params`. A field the body does not hold, or holds as `null`, is left out, and the problem renders the sentences its code has for the parameters it was given; a value of the wrong type is dropped and logged by the problem builder, as for any raise site. An entry naming a parameter its `error_code` does not declare is refused when it is built.
 
 ## How the runtime reads them
 
@@ -75,6 +95,7 @@ At boot, every plugin's contributions are frozen into one `ServiceErrorVocabular
 |-----------|-------|
 | an entry whose `error_code` no family's failure class declares, a model-not-found entry whose `error_code` is not `model.unavailable`, or a `TRANSIENT` entry whose `error_code` does not invite a retry | a validation error when the plugin builds the entry, at import |
 | two plugins contribute the same code | `DuplicateServiceErrorCodeError`, naming both plugins |
+| an entry whose `body_params` names a parameter its `error_code` does not declare | a validation error when the plugin builds the entry, at import |
 | a plugin contributes a code the runtime classifies itself (`model_not_allowed_error`, see the [Error Model](error-model.md#a-model-the-integration-does-not-allow)) | `ReservedServiceErrorCodeError` |
 
 The vocabulary is a kernel-layer contribution: a plugin published under `pipelex.plugins.kernel` may contribute it, since inference errors are classified in a kernel-only boot too.

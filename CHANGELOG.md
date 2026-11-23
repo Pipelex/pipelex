@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A service error code can fill its registry code's parameters from the error body**: `ServiceErrorCode` takes `body_params`, mapping each parameter of its `error_code` to the field of the service's error body that states it, read in the body's `error` section first and then at its top level; a matched refusal's error is given the values the body holds, so its problem's sentence names them (an `input.too_large` names the input, its size and the limit) instead of falling back to the code's title. An entry naming a parameter its code does not declare is refused when it is built. `error_body_sections` in `pipelex.cogt.inference.error_classification` is public.
+
 ## [v0.115.0] - 2026-11-23
 
 ### Added
