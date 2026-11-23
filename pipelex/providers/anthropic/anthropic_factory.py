@@ -22,7 +22,7 @@ from pipelex.providers.anthropic.anthropic_exceptions import AnthropicFactoryErr
 from pipelex.system.environment import get_optional_env
 from pipelex.tools.aws.aws_config import BEDROCK_TOKEN_VAR_NAME, AwsKeyMethod, BedrockAccessVariant
 from pipelex.tools.aws.exceptions import AwsCredentialsError
-from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
+from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath, PreparedFileStorageUri
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -160,6 +160,15 @@ class AnthropicFactory:
                         "url": prepped_image.url,
                     },
                 }
+            case PreparedFileStorageUri():
+                # The backend reads the storage itself, so the URI travels as the source's URL.
+                image_block_param = {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": prepped_image.storage_uri,
+                    },
+                }
             case PreparedFileLocalPath():
                 msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
                 raise TypeError(msg)
@@ -192,6 +201,17 @@ class AnthropicFactory:
                 }  # pyright: ignore[reportAssignmentType]
                 if title:
                     document_block_param["title"] = title
+            case PreparedFileStorageUri():
+                # The backend reads the storage itself, so the URI travels as the source's URL.
+                document_block_param = {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": prepped_document.storage_uri,
+                    },
+                }  # pyright: ignore[reportAssignmentType]
+                if title:
+                    document_block_param["title"] = title
             case PreparedFileLocalPath():
                 msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
                 raise TypeError(msg)
@@ -201,7 +221,14 @@ class AnthropicFactory:
     async def make_user_message(
         cls,
         llm_job: LLMJob,
+        *,
+        is_storage_uri_enabled: bool,
     ) -> MessageParam:
+        """The user message of a text generation.
+
+        `is_storage_uri_enabled` keeps a `pipelex-storage://` image or document as a `url` source, for a
+        backend that reads the storage itself; off, the object is loaded and sent as base64.
+        """
         message: MessageParam
         content: list[TextBlockParam | ImageBlockParam | DocumentBlockParam] = []
         llm_prompt = llm_job.llm_prompt
@@ -213,11 +240,19 @@ class AnthropicFactory:
             }
             content.append(text_block_param)
         if llm_prompt.user_images:
-            prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
+            prepped_user_images = await prep_prompt_images(
+                prompt_images=llm_prompt.user_images,
+                is_http_url_enabled=False,
+                is_storage_uri_enabled=is_storage_uri_enabled,
+            )
             for prepped_image in prepped_user_images:
                 content.append(cls._make_image_block_param(prepped_image))
         if llm_prompt.user_documents:
-            prepped_user_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
+            prepped_user_documents = await prep_prompt_documents(
+                prompt_documents=llm_prompt.user_documents,
+                is_http_url_enabled=False,
+                is_storage_uri_enabled=is_storage_uri_enabled,
+            )
             for prepped_document in prepped_user_documents:
                 content.append(cls._make_document_block_param(prepped_document))
 
@@ -263,8 +298,14 @@ class AnthropicFactory:
     async def make_simple_messages(
         cls,
         llm_job: LLMJob,
+        *,
+        is_storage_uri_enabled: bool,
     ) -> 'list["ChatCompletionMessageParam"]':
-        """Makes a list of messages with a system message (if provided) and followed by a user message."""
+        """Makes a list of messages with a system message (if provided) and followed by a user message.
+
+        `is_storage_uri_enabled` keeps a `pipelex-storage://` image or document as a `url` source, for a
+        backend that reads the storage itself; off, the object is loaded and sent as base64.
+        """
         # Deferred import: avoid pulling heavy SDK at module-load time
         from openai.types.chat import ChatCompletionSystemMessageParam  # ruff: ignore[import-outside-top-level]
 
@@ -275,13 +316,21 @@ class AnthropicFactory:
 
         prepped_user_images: list[PreparedFile] | None
         if llm_prompt.user_images:
-            prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
+            prepped_user_images = await prep_prompt_images(
+                prompt_images=llm_prompt.user_images,
+                is_http_url_enabled=False,
+                is_storage_uri_enabled=is_storage_uri_enabled,
+            )
         else:
             prepped_user_images = None
 
         prepped_user_documents: list[tuple[PreparedFile, str | None]] | None
         if llm_prompt.user_documents:
-            prepped_docs = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
+            prepped_docs = await prep_prompt_documents(
+                prompt_documents=llm_prompt.user_documents,
+                is_http_url_enabled=False,
+                is_storage_uri_enabled=is_storage_uri_enabled,
+            )
             prepped_user_documents = [(prepped_doc, None) for prepped_doc in prepped_docs]
         else:
             prepped_user_documents = None

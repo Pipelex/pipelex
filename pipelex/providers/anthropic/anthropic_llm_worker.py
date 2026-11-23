@@ -129,6 +129,15 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
     # Instance methods
     #########################################################
 
+    @property
+    def _is_storage_uri_enabled(self) -> bool:
+        """Whether stored prompt files travel as their `pipelex-storage://` URI, which the backend's extras factory decides.
+
+        A backend that reads the storage itself turns it on in the factory it builds this worker with; without a
+        factory, as on every Anthropic backend Pipelex ships, stored files are loaded and sent as base64.
+        """
+        return self.extras_factory is not None and self.extras_factory.is_storage_uri_enabled
+
     @classmethod
     @override
     def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
@@ -355,7 +364,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        message = await AnthropicFactory.make_user_message(llm_job=llm_job)
+        message = await AnthropicFactory.make_user_message(llm_job=llm_job, is_storage_uri_enabled=self._is_storage_uri_enabled)
         max_tokens = self._sent_max_tokens(requested_max_tokens=job_params.max_tokens or self.default_max_tokens, is_structured=False)
 
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=max_tokens)
@@ -485,7 +494,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
+        messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job, is_storage_uri_enabled=self._is_storage_uri_enabled)
 
         # The structured call sets an explicit timeout, and its max_tokens is held to what that timeout allows
         timeout_seconds = get_config().inference.llm.anthropic.structured_output_timeout_seconds

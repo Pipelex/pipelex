@@ -2,7 +2,7 @@
 
 This module defines the output of file preparation - files in a format
 that can be directly consumed by different APIs (either as HTTP URLs,
-local paths, or as base64-encoded data with mime type).
+storage URIs kept as references, local paths, or as base64-encoded data with mime type).
 """
 
 from typing import Annotated, Literal, Union
@@ -18,6 +18,18 @@ class PreparedFileHttpUrl(BaseModel):
 
     kind: Literal["http_url"] = "http_url"
     url: str
+
+
+class PreparedFileStorageUri(BaseModel):
+    """A `pipelex-storage://` URI kept as it is, for a backend that reads the storage itself.
+
+    Preparation returns this kind only when its caller opts in with `is_storage_uri_enabled`: the
+    object is not read, and the backend receiving the URI is the one that fetches it. Every other
+    caller gets the bytes, as base64.
+    """
+
+    kind: Literal["storage_uri"] = "storage_uri"
+    storage_uri: str
 
 
 class PreparedFileLocalPath(BaseModel):
@@ -45,6 +57,6 @@ class PreparedFileBase64(BaseModel):
 
 
 PreparedFile = Annotated[
-    Union[PreparedFileHttpUrl, PreparedFileLocalPath, PreparedFileBase64],
+    Union[PreparedFileHttpUrl, PreparedFileStorageUri, PreparedFileLocalPath, PreparedFileBase64],
     Field(discriminator="kind"),
 ]

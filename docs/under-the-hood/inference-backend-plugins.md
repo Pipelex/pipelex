@@ -309,7 +309,7 @@ A worker implements the provider half of a call, `_gen_text` or `_extract_pages`
 
 | Symbol | Module | Role |
 |--------|--------|------|
-| `BackendExtrasFactory` | `pipelex.plugins.backend_extras_factory` | the per-request headers and body additions a worker asks its factory for |
+| `BackendExtrasFactory` | `pipelex.plugins.backend_extras_factory` | the per-request headers and body additions a worker asks its factory for, and its `is_storage_uri_enabled` flag, which keeps stored prompt files as references for a backend that reads Pipelex storage itself ([Storage Provider Plugins](storage-provider-plugins.md#a-backend-that-reads-the-storage-itself)) |
 | `OpenAICompletionsFactory` | `pipelex.providers.openai.openai_completions_factory` | extension base for a Chat Completions service: messages, client, extras |
 | `OpenAIResponsesFactory` | `pipelex.providers.openai.openai_responses_factory` | extension base for a Responses service |
 | `OpenAICompletionsLLMWorker` | `pipelex.providers.openai.openai_completions_llm_worker` | the Chat Completions LLM worker, built with a factory |
@@ -324,7 +324,7 @@ A worker implements the provider half of a call, `_gen_text` or `_extract_pages`
 | `prep_prompt_images` | `pipelex.cogt.image.prompt_image_utils` | prompt images, prepared for a request |
 | `PromptImageDetail` | `pipelex.cogt.image.prompt_image` | the detail level a prompt image asks for |
 | `prep_prompt_documents` | `pipelex.cogt.document.prompt_document_utils` | prompt documents, prepared for a request |
-| `PreparedFileBase64`, `PreparedFileHttpUrl`, `PreparedFileLocalPath` | `pipelex.tools.uri.prepared_file` | the forms a prepared file takes |
+| `PreparedFileBase64`, `PreparedFileHttpUrl`, `PreparedFileStorageUri`, `PreparedFileLocalPath` | `pipelex.tools.uri.prepared_file` | the forms a prepared file takes |
 | `make_base64_url_from_any_uri` | `pipelex.tools.uri.uri_base64` | a file reference, inlined as a data URL |
 
 **Errors: distilling, classifying and rendering a failure**

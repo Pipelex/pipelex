@@ -40,7 +40,7 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.config import get_config
 from pipelex.providers.mistral.mistral_exceptions import MistralExtractResponseError
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath, PreparedFileStorageUri
 
 
 class MistralFactory:
@@ -107,8 +107,8 @@ class MistralFactory:
                 image_url = prepared.as_data_url()
             case PreparedFileHttpUrl():
                 image_url = prepared.url
-            case PreparedFileLocalPath():
-                msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+            case PreparedFileStorageUri() | PreparedFileLocalPath():
+                msg = f"{type(prepared).__name__} is not supported for images - should be converted to base64"
                 raise TypeError(msg)
 
         return ImageURLChunk(image_url=image_url)
@@ -129,8 +129,8 @@ class MistralFactory:
                 document_url = prepped.as_data_url()
             case PreparedFileHttpUrl():
                 document_url = prepped.url
-            case PreparedFileLocalPath():
-                msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+            case PreparedFileStorageUri() | PreparedFileLocalPath():
+                msg = f"{type(prepped).__name__} is not supported for documents - should be converted to base64"
                 raise TypeError(msg)
 
         return DocumentURLChunk(document_url=document_url)
@@ -177,8 +177,8 @@ class MistralFactory:
                         url = prepared.as_data_url()
                     case PreparedFileHttpUrl():
                         url = prepared.url
-                    case PreparedFileLocalPath():
-                        msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+                    case PreparedFileStorageUri() | PreparedFileLocalPath():
+                        msg = f"{type(prepared).__name__} is not supported for images - should be converted to base64"
                         raise TypeError(msg)
 
                 image_url_obj = OpenAIImageURL(url=url, detail=detail.as_openai_detail)
@@ -342,9 +342,9 @@ class MistralFactory:
                 image_url = prepared.url
             case PreparedFileBase64():
                 image_url = prepared.as_data_url()
-            case PreparedFileLocalPath():
-                # This shouldn't happen since we use keep_local_path=False
-                msg = f"Unexpected PreparedFileLocalPath for URI: {uri}"
+            case PreparedFileStorageUri() | PreparedFileLocalPath():
+                # This shouldn't happen: keep_local_path=False, and a storage URI is always loaded here
+                msg = f"Unexpected {type(prepared).__name__} for URI: {uri}"
                 raise TypeError(msg)
 
         return ImageURLChunkTypedDict(
@@ -393,6 +393,10 @@ class MistralFactory:
                 )
                 signed_url_response = await mistral_client.files.get_signed_url_async(file_id=uploaded_file_id)
                 document_url = signed_url_response.url
+            case PreparedFileStorageUri():
+                # This shouldn't happen: a storage URI is always loaded here
+                msg = f"Unexpected PreparedFileStorageUri for URI: {uri}"
+                raise TypeError(msg)
             case PreparedFileBase64():
                 # For base64 or other types, we'd need to handle differently
                 # For now, convert to base64 data URL

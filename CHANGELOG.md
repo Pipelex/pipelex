@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Stored prompt files can stay storage references, for a backend that reads the storage itself (Breaking)**: `BackendExtrasFactory` takes `is_storage_uri_enabled`, off by default and off for every backend Pipelex ships, and a plugin backend whose service reads Pipelex storage turns it on so a prompt image or document stored as a `pipelex-storage://` URI is sent as that URI, never read by the runtime: `prepare_prompt_image`, `prepare_prompt_document`, `prep_prompt_images` and `prep_prompt_documents` then return the new `PreparedFileStorageUri`, the OpenAI Responses factory sends it as `input_image.image_url` and `input_file.file_url`, the Anthropic worker as a `url` source, and the Chat Completions factory as an image's `image_url` while still inlining documents. A `match` over `PreparedFile` gains that case, and `AnthropicFactory.make_user_message` and `make_simple_messages` take `is_storage_uri_enabled` as a required keyword.
+
 ## [v0.114.0] - 2026-11-23
 
 ### Changed

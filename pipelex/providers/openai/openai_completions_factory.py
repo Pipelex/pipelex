@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
-from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath, PreparedFileStorageUri
 
 if TYPE_CHECKING:
     # Deferred imports: avoid pulling heavy SDK at module-load time
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
 
 class OpenAICompletionsFactory(BackendExtrasFactory):
-    def __init__(self, is_http_url_enabled: bool):
-        super().__init__()
+    def __init__(self, is_http_url_enabled: bool, *, is_storage_uri_enabled: bool = False):
+        super().__init__(is_storage_uri_enabled=is_storage_uri_enabled)
         self.is_http_url_enabled = is_http_url_enabled
 
     async def make_simple_messages(
@@ -55,12 +55,19 @@ class OpenAICompletionsFactory(BackendExtrasFactory):
             user_contents.append(user_part_text)
         if llm_prompt.user_images:
             detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
-            prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
+            prepped_images = await prep_prompt_images(
+                prompt_images=llm_prompt.user_images,
+                is_http_url_enabled=self.is_http_url_enabled,
+                is_storage_uri_enabled=self.is_storage_uri_enabled,
+            )
             for prepped_image in prepped_images:
                 url: str
                 match prepped_image:
                     case PreparedFileHttpUrl():
                         url = prepped_image.url
+                    case PreparedFileStorageUri():
+                        # The backend reads the storage itself, so the URI travels as the image's URL.
+                        url = prepped_image.storage_uri
                     case PreparedFileBase64():
                         url = prepped_image.as_data_url()
                     case PreparedFileLocalPath():
@@ -72,7 +79,9 @@ class OpenAICompletionsFactory(BackendExtrasFactory):
                 user_contents.append(image_param)
 
         # Handle documents (PDF support via Chat Completions API)
-        # Documents must always be base64 encoded since Chat Completions API doesn't support file_url directly
+        # Documents must always be base64 encoded since Chat Completions API doesn't support file_url directly:
+        # its file part has no URL form, so even a backend that reads the storage itself receives a stored
+        # document's bytes here, unless it overrides this method with a part that can carry the URI.
         if llm_prompt.user_documents:
             prepped_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
             for doc_index, prepped_document in enumerate(prepped_documents):
@@ -85,7 +94,7 @@ class OpenAICompletionsFactory(BackendExtrasFactory):
                             file={"file_data": file_data, "filename": filename},
                         )
                         user_contents.append(file_param)
-                    case PreparedFileHttpUrl() | PreparedFileLocalPath():
+                    case PreparedFileHttpUrl() | PreparedFileStorageUri() | PreparedFileLocalPath():
                         msg = f"{type(prepped_document).__name__} is not supported for documents - should be converted to base64"
                         raise TypeError(msg)
 

@@ -11,7 +11,7 @@ from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
-from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath, PreparedFileStorageUri
 
 if TYPE_CHECKING:
     from openai.types.responses import (
@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 
 
 class OpenAIResponsesFactory(BackendExtrasFactory):
-    def __init__(self, is_http_url_enabled: bool):
-        super().__init__()
+    def __init__(self, is_http_url_enabled: bool, *, is_storage_uri_enabled: bool = False):
+        super().__init__(is_storage_uri_enabled=is_storage_uri_enabled)
         self.is_http_url_enabled = is_http_url_enabled
 
     async def make_input_items(self, llm_job: LLMJob) -> list[ResponseInputItemParam]:
@@ -43,12 +43,19 @@ class OpenAIResponsesFactory(BackendExtrasFactory):
             user_contents.append(text_content)
 
         detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
-        prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
+        prepped_images = await prep_prompt_images(
+            prompt_images=llm_prompt.user_images,
+            is_http_url_enabled=self.is_http_url_enabled,
+            is_storage_uri_enabled=self.is_storage_uri_enabled,
+        )
         for prepped_image in prepped_images:
             url: str
             match prepped_image:
                 case PreparedFileHttpUrl():
                     url = prepped_image.url
+                case PreparedFileStorageUri():
+                    # The backend reads the storage itself, so the URI travels as the image's URL.
+                    url = prepped_image.storage_uri
                 case PreparedFileBase64():
                     url = prepped_image.as_data_url()
                 case PreparedFileLocalPath():
@@ -60,13 +67,20 @@ class OpenAIResponsesFactory(BackendExtrasFactory):
 
         # Handle documents (PDF support via Responses API)
         if llm_prompt.user_documents:
-            prepped_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=self.is_http_url_enabled)
+            prepped_documents = await prep_prompt_documents(
+                prompt_documents=llm_prompt.user_documents,
+                is_http_url_enabled=self.is_http_url_enabled,
+                is_storage_uri_enabled=self.is_storage_uri_enabled,
+            )
             for doc_index, prepped_document in enumerate(prepped_documents):
                 file_param: ResponseInputFileParam
                 match prepped_document:
                     case PreparedFileHttpUrl():
                         # Note: filename is not allowed when using file_url (mutually exclusive)
                         file_param = ResponseInputFileParam(type="input_file", file_url=prepped_document.url)
+                    case PreparedFileStorageUri():
+                        # The backend reads the storage itself, so the URI travels as the file's URL.
+                        file_param = ResponseInputFileParam(type="input_file", file_url=prepped_document.storage_uri)
                     case PreparedFileBase64():
                         filename = self._get_document_filename(llm_prompt.user_documents[doc_index])
                         file_data = f"data:{prepped_document.mime_type};base64,{prepped_document.base64_data}"
