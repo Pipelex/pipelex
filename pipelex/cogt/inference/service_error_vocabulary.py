@@ -15,17 +15,37 @@ status ladder and whose matched entry `render_inference_error` renders.
 **Matched on the code alone, with no check on the provider.** A request reaches a service through
 whichever SDK its protocol calls for, so the reporting provider does not identify the service; the
 code does, and a service that contributes codes vouches that no vendor emits into them.
+
+**The facts of a refusal ride the service's error body.** A registry code's sentences are rendered
+from its parameters, never from the service's message, so a code such as `input.too_large` names the
+input, its size and the limit only when the error is given them. An entry names, in `body_params`,
+the field of the service's error section that holds each parameter, and the rendered error is given
+the values the body holds.
 """
 
 from collections.abc import Mapping
-from typing import Self
+from typing import Any, Self
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.exceptions import INFERENCE_FAILURE_CODES, InferenceErrorCategory
-from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.cogt.inference.error_classification import UserActionKind, error_body_sections
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+
+# The parameters the runtime states from what it knows rather than from a service's body: the model handle the
+# method named, never a service's own id for it, and the bound the renderer names for a context overflow.
+_PARAMS_THE_RUNTIME_STATES = frozenset({"model", "model_type", "reason", "provider", "pipe"})
+
+
+def _runtime_owned_params(*, error_code: ErrorCode) -> frozenset[str]:
+    """The parameters of `error_code` a body may not fill, because the runtime fills them and would overwrite it."""
+    match error_code:
+        case CoreCode.MODEL_CONTEXT_EXCEEDED:
+            return _PARAMS_THE_RUNTIME_STATES | {"limit"}
+        case CoreCode() | PipelexErrorCode():
+            return _PARAMS_THE_RUNTIME_STATES
 
 
 class ServiceErrorCode(BaseModel):
@@ -37,6 +57,10 @@ class ServiceErrorCode(BaseModel):
     retry can succeed: one of the codes an inference failure class declares, and `model.unavailable`
     for an entry flagged `is_model_not_found`, which selects the family's `*ModelNotFoundError` class,
     for a code that means the service does not know the model at all.
+    `body_params` maps each parameter of `error_code` the service states in its error body to the
+    field holding it, read in the body's `error` section first, then at its top level, where the
+    OpenAI client leaves the section's fields; an entry naming a parameter its code does not declare
+    is refused when it is built.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -47,6 +71,7 @@ class ServiceErrorCode(BaseModel):
     error_code: ErrorCode
     detail: str
     is_model_not_found: bool = False
+    body_params: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_error_code(self) -> Self:
@@ -59,7 +84,43 @@ class ServiceErrorCode(BaseModel):
         if self.category.is_retryable and not error_code_spec(self.error_code).invites_retry:
             msg = f"Service error code '{self.code}' is {self.category}, so it reports a code that invites a retry, not '{self.error_code}'"
             raise ValueError(msg)
+        undeclared = sorted(set(self.body_params) - error_code_spec(self.error_code).param_names)
+        if undeclared:
+            msg = f"Service error code '{self.code}' reads {', '.join(undeclared)} from the error body, which '{self.error_code}' does not declare"
+            raise ValueError(msg)
+        if self.body_params and self.is_model_not_found:
+            msg = (
+                f"Service error code '{self.code}' means the model is not found, whose parameters the runtime states, so it reads none from the body"
+            )
+            raise ValueError(msg)
+        runtime_owned = sorted(set(self.body_params) & _runtime_owned_params(error_code=self.error_code))
+        if runtime_owned:
+            msg = f"Service error code '{self.code}' reads {', '.join(runtime_owned)} from the error body, which the runtime states itself"
+            raise ValueError(msg)
         return self
+
+    def params_from_body(self, *, body: Any) -> dict[str, Any]:
+        """The parameters of `error_code` the service's error body states, by their registry names.
+
+        A field the body does not hold, or holds as `null` or an empty string, is left out, so the problem renders the sentences
+        its code has for the parameters it was given. A value of the wrong type is passed on as it is, and the
+        problem builder drops it and logs it, as it does for any raise site.
+
+        Args:
+            body: The error body, as the worker's Extract step kept it on `ProviderErrorMetadata.body`.
+
+        Returns:
+            The parameters found, by name; empty when the entry reads none or the body is not an object.
+        """
+        params: dict[str, Any] = {}
+        sections = error_body_sections(body)
+        for param_name, field_name in self.body_params.items():
+            for section in sections:
+                value = section.get(field_name)
+                if value is not None and value != "":
+                    params[param_name] = value
+                    break
+        return params
 
 
 class ServiceErrorVocabulary:

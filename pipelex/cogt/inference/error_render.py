@@ -202,13 +202,20 @@ def render_inference_error(
         user_action=user_action,
         provider_metadata=metadata,
     ).with_error_code(classification.error_code)
+    if classification.service_error_code is not None:
+        # The facts the service stated in its error body, which the code's sentences name: its message rides the
+        # diagnostics alone, so without them a caller reads the code's title.
+        body_params = classification.service_error_code.params_from_body(body=metadata.body)
+        if body_params:
+            failure.with_params(**body_params)
     if classification.is_model_not_allowed:
         # The provider serves the model but does not allow it for this caller.
         failure.with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.NOT_ALLOWED)
     match classification.error_code:
         case CoreCode.MODEL_CONTEXT_EXCEEDED:
             # The provider's refusal says the inputs are over the model's context window, the bound it names, and
-            # never as numbers the runtime can read, so the prompt's size and the window's are not given.
+            # never as numbers the runtime can read, so the prompt's size and the window's are given only when a
+            # service's body states them; a service entry may not read `model` or `limit`, which these values set.
             failure.with_params(model=model_handle, limit=ModelContextExceededLimit.CONTEXT_WINDOW)
         case CoreCode() | PipelexErrorCode():
             pass

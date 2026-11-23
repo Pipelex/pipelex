@@ -449,7 +449,7 @@ _GOOGLE_ERROR_INFO_TYPE = "type.googleapis.com/google.rpc.ErrorInfo"
 _GOOGLE_QUOTA_FAILURE_TYPE = "type.googleapis.com/google.rpc.QuotaFailure"
 
 
-def _error_sections(body: Any) -> list[dict[str, Any]]:
+def error_body_sections(body: Any) -> list[dict[str, Any]]:
     """The places an error body may hold its fields: its nested ``error`` section first, then its top level.
 
     Most providers nest their error under ``error``, and the OpenAI client pre-unwraps that section onto the body it
@@ -488,7 +488,7 @@ def _is_in_flight_budget_throttle_openrouter(*, status_code: int | None, body: A
     """
     if status_code != 402:
         return False
-    for section in _error_sections(body):
+    for section in error_body_sections(body):
         error_metadata = section.get("metadata")
         if not isinstance(error_metadata, dict):
             continue
@@ -509,7 +509,7 @@ def _is_quota_exhaustion_anthropic(*, status_code: int, error_type: str | None, 
     """
     if status_code == 402 or error_type == _ANTHROPIC_BILLING_ERROR_TYPE:
         return True
-    error_sections = _error_sections(body)
+    error_sections = error_body_sections(body)
     if not error_sections:
         return False
     error_section = error_sections[0]
@@ -525,7 +525,7 @@ def _is_quota_exhaustion_anthropic(*, status_code: int, error_type: str | None, 
 def _google_detail_entries(body: Any, *, detail_type: str) -> list[dict[str, Any]]:
     """The entries of a Google error's ``details`` whose ``@type`` is ``detail_type``, the nested ``error`` first."""
     entries: list[dict[str, Any]] = []
-    for section in _error_sections(body):
+    for section in error_body_sections(body):
         details = section.get("details")
         if not isinstance(details, list):
             continue
@@ -886,7 +886,10 @@ def _provider_error_code_from_flat_body(body: Any) -> str | None:
 def _error_codes_in_body(body: Any) -> tuple[str, ...]:
     """Every ``code`` and ``type`` an error body carries, in its nested ``error`` section and at its top level."""
     return tuple(
-        error_code for section in _error_sections(body) for error_code in (section.get("code"), section.get("type")) if isinstance(error_code, str)
+        error_code
+        for section in error_body_sections(body)
+        for error_code in (section.get("code"), section.get("type"))
+        if isinstance(error_code, str)
     )
 
 
@@ -908,7 +911,7 @@ def error_code_from_body_code_first(body: Any) -> str | None:
     never reaches the classifier. A body carrying only ``code`` reads identically
     through either precedence.
     """
-    for section in _error_sections(body):
+    for section in error_body_sections(body):
         code = section.get("code") or section.get("type")
         if isinstance(code, str):
             return code

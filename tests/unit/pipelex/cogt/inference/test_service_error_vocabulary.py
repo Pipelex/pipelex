@@ -19,6 +19,7 @@ from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorCode, ServiceErrorVocabulary
+from pipelex.errors.problem import ProblemView
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -166,3 +167,112 @@ class TestRendering:
         assert isinstance(error, ExtractJobFailureError)
         assert not isinstance(error, ExtractModelNotFoundError)
         assert error.resolve_error_code() == CoreCode.RUNTIME_MISCONFIGURED
+
+
+_TOO_LARGE_WITH_FACTS = ServiceErrorCode(
+    code="svc-files-too-large",
+    category=InferenceErrorCategory.CONTENT,
+    user_action_kind=UserActionKind.CHANGE_INPUT,
+    error_code=CoreCode.INPUT_TOO_LARGE,
+    detail="The files were over the provider's limit — use smaller files.",
+    body_params={"input": "reference", "size": "size_bytes", "limit": "limit_bytes"},
+)
+
+
+def _render_with_body(mocker: MockerFixture, *, body: object) -> LLMCompletionError:
+    mocker.patch(_ACCESSOR, return_value=ServiceErrorVocabulary({_TOO_LARGE_WITH_FACTS.code: _TOO_LARGE_WITH_FACTS}))
+    metadata = ProviderErrorMetadata(
+        provider=ProviderName.ANTHROPIC,
+        sdk_exception_type="APIStatusError",
+        message="the files add up to 26168984 bytes",
+        status_code=413,
+        provider_error_code=_TOO_LARGE_WITH_FACTS.code,
+        body=body,
+    )
+    error = render_inference_error(
+        metadata=metadata,
+        classification=classify_inference_error(metadata, family=InferenceErrorFamily.LLM),
+        family=InferenceErrorFamily.LLM,
+        model_desc="some-model",
+        model_handle="some-model",
+    )
+    assert isinstance(error, LLMCompletionError)
+    return error
+
+
+class TestParamsFromBody:
+    def test_the_body_s_facts_render_the_code_s_sentence(self, mocker: MockerFixture) -> None:
+        """A nested `error` section, as the Anthropic client keeps the body, gives the parameters the code's sentence names."""
+        body = {
+            "error": {"message": "too large", "code": "svc-files-too-large", "reference": "doc.pdf", "size_bytes": 26168984, "limit_bytes": 14999985}
+        }
+
+        problem = _render_with_body(mocker, body=body).to_problem(view=ProblemView.CALLER)
+
+        assert problem.detail == "The input 'doc.pdf' reaches 26168984, past the limit of 14999985."
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"input": "doc.pdf", "size": 26168984, "limit": 14999985}
+
+    def test_a_top_level_field_is_read_where_the_openai_client_leaves_it(self, mocker: MockerFixture) -> None:
+        body = {"message": "too large", "code": "svc-files-too-large", "reference": "doc.pdf", "size_bytes": 10, "limit_bytes": 5}
+
+        error = _render_with_body(mocker, body=body)
+
+        assert error.given_params == {"input": "doc.pdf", "size": 10, "limit": 5}
+
+    @pytest.mark.parametrize(
+        "body",
+        [None, "not json", {"error": {"code": "svc-files-too-large"}}, {"error": {"reference": None, "size_bytes": None}}],
+        ids=["no-body", "text-body", "no-facts", "null-facts"],
+    )
+    def test_a_body_without_the_facts_gives_no_parameters(self, mocker: MockerFixture, body: object) -> None:
+        error = _render_with_body(mocker, body=body)
+
+        assert error.given_params == {}
+
+    def test_an_entry_reading_none_gives_none(self) -> None:
+        assert _TOO_LARGE.params_from_body(body={"error": {"reference": "doc.pdf"}}) == {}
+
+    def test_an_empty_string_is_left_out_like_null(self) -> None:
+        assert _TOO_LARGE_WITH_FACTS.params_from_body(body={"error": {"reference": "", "size_bytes": 10}}) == {"size": 10}
+
+    def test_a_model_not_found_entry_reads_nothing_from_the_body(self) -> None:
+        with pytest.raises(ValueError, match="whose parameters the runtime states"):
+            ServiceErrorCode(
+                code="svc-nf",
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CHANGE_MODEL,
+                error_code=CoreCode.MODEL_UNAVAILABLE,
+                detail="advice",
+                is_model_not_found=True,
+                body_params={"model": "model_id"},
+            )
+
+    @pytest.mark.parametrize(
+        ("error_code", "body_params", "named"),
+        [
+            (CoreCode.MODEL_CONTEXT_EXCEEDED, {"limit": "lim", "count": "n"}, "limit"),
+            (CoreCode.MODEL_CONTEXT_EXCEEDED, {"model": "model_id"}, "model"),
+        ],
+    )
+    def test_a_parameter_the_runtime_states_is_refused(self, error_code: CoreCode, body_params: dict[str, str], named: str) -> None:
+        with pytest.raises(ValueError, match=f"reads {named} from the error body, which the runtime states itself"):
+            ServiceErrorCode(
+                code="svc-owned",
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                error_code=error_code,
+                detail="advice",
+                body_params=body_params,
+            )
+
+    def test_an_entry_naming_a_parameter_its_code_does_not_declare_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="does not declare"):
+            ServiceErrorCode(
+                code="svc-bad",
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                error_code=CoreCode.INPUT_TOO_LARGE,
+                detail="advice",
+                body_params={"host": "host"},
+            )
