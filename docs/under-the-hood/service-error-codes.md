@@ -79,7 +79,7 @@ ServiceErrorCode(
 )
 ```
 
-When a refusal matches the entry, `render_inference_error` reads each field from the body the worker's Extract step kept (`ProviderErrorMetadata.body`), in its `error` section first and then at its top level, where the OpenAI client leaves the section's fields (`error_body_sections` in `pipelex.cogt.inference.error_classification`), and gives the values it finds to the error with `with_params`. A field the body does not hold, or holds as `null`, is left out, and the problem renders the sentences its code has for the parameters it was given; a value of the wrong type is dropped and logged by the problem builder, as for any raise site. An entry naming a parameter its `error_code` does not declare is refused when it is built.
+When a refusal matches the entry, `render_inference_error` reads each field from the body the worker's Extract step kept (`ProviderErrorMetadata.body`), in its `error` section first and then at its top level, where the OpenAI client leaves the section's fields (`error_body_sections` in `pipelex.cogt.inference.error_classification`), and gives the values it finds to the error with `with_params`. A field the body does not hold, or holds as `null` or an empty string, is left out, and the problem renders the sentences its code has for the parameters it was given; a value of the wrong type is dropped and logged by the problem builder, as for any raise site. An entry naming a parameter its `error_code` does not declare is refused when it is built. So is an entry that reads a parameter the runtime states itself: `model`, `model_type`, `reason`, `provider` and `pipe` everywhere, since the caller knows a model by the handle the method named rather than by a service's own id for it, `limit` on `model.context_exceeded`, whose bound the renderer names, and any parameter at all on an entry that means the model is not found. A service rarely knows which method input a file came from, so its `input` is whatever names the file to the caller, such as the reference the method's input held.
 
 ## How the runtime reads them
 
@@ -96,6 +96,7 @@ At boot, every plugin's contributions are frozen into one `ServiceErrorVocabular
 | an entry whose `error_code` no family's failure class declares, a model-not-found entry whose `error_code` is not `model.unavailable`, or a `TRANSIENT` entry whose `error_code` does not invite a retry | a validation error when the plugin builds the entry, at import |
 | two plugins contribute the same code | `DuplicateServiceErrorCodeError`, naming both plugins |
 | an entry whose `body_params` names a parameter its `error_code` does not declare | a validation error when the plugin builds the entry, at import |
+| an entry whose `body_params` names a parameter the runtime states itself, or any parameter on a model-not-found entry | a validation error when the plugin builds the entry, at import |
 | a plugin contributes a code the runtime classifies itself (`model_not_allowed_error`, see the [Error Model](error-model.md#a-model-the-integration-does-not-allow)) | `ReservedServiceErrorCodeError` |
 
 The vocabulary is a kernel-layer contribution: a plugin published under `pipelex.plugins.kernel` may contribute it, since inference errors are classified in a kernel-only boot too.

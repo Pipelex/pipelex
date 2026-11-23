@@ -233,6 +233,39 @@ class TestParamsFromBody:
     def test_an_entry_reading_none_gives_none(self) -> None:
         assert _TOO_LARGE.params_from_body(body={"error": {"reference": "doc.pdf"}}) == {}
 
+    def test_an_empty_string_is_left_out_like_null(self) -> None:
+        assert _TOO_LARGE_WITH_FACTS.params_from_body(body={"error": {"reference": "", "size_bytes": 10}}) == {"size": 10}
+
+    def test_a_model_not_found_entry_reads_nothing_from_the_body(self) -> None:
+        with pytest.raises(ValueError, match="whose parameters the runtime states"):
+            ServiceErrorCode(
+                code="svc-nf",
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CHANGE_MODEL,
+                error_code=CoreCode.MODEL_UNAVAILABLE,
+                detail="advice",
+                is_model_not_found=True,
+                body_params={"model": "model_id"},
+            )
+
+    @pytest.mark.parametrize(
+        ("error_code", "body_params", "named"),
+        [
+            (CoreCode.MODEL_CONTEXT_EXCEEDED, {"limit": "lim", "count": "n"}, "limit"),
+            (CoreCode.MODEL_CONTEXT_EXCEEDED, {"model": "model_id"}, "model"),
+        ],
+    )
+    def test_a_parameter_the_runtime_states_is_refused(self, error_code: CoreCode, body_params: dict[str, str], named: str) -> None:
+        with pytest.raises(ValueError, match=f"reads {named} from the error body, which the runtime states itself"):
+            ServiceErrorCode(
+                code="svc-owned",
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                error_code=error_code,
+                detail="advice",
+                body_params=body_params,
+            )
+
     def test_an_entry_naming_a_parameter_its_code_does_not_declare_is_refused(self) -> None:
         with pytest.raises(ValueError, match="does not declare"):
             ServiceErrorCode(

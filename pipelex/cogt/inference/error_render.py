@@ -214,7 +214,8 @@ def render_inference_error(
     match classification.error_code:
         case CoreCode.MODEL_CONTEXT_EXCEEDED:
             # The provider's refusal says the inputs are over the model's context window, the bound it names, and
-            # never as numbers the runtime can read, so the prompt's size and the window's are not given.
+            # never as numbers the runtime can read, so the prompt's size and the window's are given only when a
+            # service's body states them; a service entry may not read `model` or `limit`, which these values set.
             failure.with_params(model=model_handle, limit=ModelContextExceededLimit.CONTEXT_WINDOW)
         case CoreCode() | PipelexErrorCode():
             pass
