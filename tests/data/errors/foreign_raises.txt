@@ -163,6 +163,7 @@ pipelex/providers/azure_rest/azure_img_gen_worker.py | AzureImgGenWorker.__init_
 pipelex/providers/linkup/linkup_extract_worker.py | LinkupExtractWorker._extract_pages | ValueError | invariant
 pipelex/providers/mistral/mistral_factory.py | MistralFactory.make_mistral_document_url | TypeError | invariant
 pipelex/providers/mistral/mistral_factory.py | MistralFactory.make_mistral_document_url_chunk_from_uri | TypeError | invariant
+pipelex/providers/mistral/mistral_factory.py | MistralFactory.make_mistral_document_url_chunk_from_uri | TypeError | invariant
 pipelex/providers/mistral/mistral_factory.py | MistralFactory.make_mistral_image_url | TypeError | invariant
 pipelex/providers/mistral/mistral_factory.py | MistralFactory.make_mistral_image_url_chunk_from_uri | TypeError | invariant
 pipelex/providers/mistral/mistral_factory.py | MistralFactory.make_simple_messages_openai_typed | TypeError | invariant
