@@ -23581,6 +23581,26 @@ Each entry says, about one code:
 | `user_action_kind` | the kind of the error's advice |
 | `detail` | the advice itself: what the caller, or whoever operates the service, should do. The local CLIs print it as a tip beside the error; a problem never carries it, since its step is the code's. The service's message already names the specifics, so the advice need not repeat them |
 | `is_model_not_found` | set for a code that means the service does not know the model at all: it selects the family's `*ModelNotFoundError` class, which the pipe layer re-raises as a model-availability error carrying the model handle, and its `error_code` is then `model.unavailable` |
+| `body_params` | the parameters of `error_code` the service states in its error body, each mapped to the field holding it; empty by default. See [The facts of a refusal](#the-facts-of-a-refusal) |
+
+## The facts of a refusal
+
+A problem's sentences are rendered from its code's templates and its parameters, never from the service's message, which rides the operator's diagnostics alone. So a code whose sentence names facts, such as `input.too_large` ("The input '{input}' reaches {size}, past the limit of {limit}."), renders them for the caller only when the error is given them; without them the caller reads the code's title, "An input exceeds a size limit", and the problem builder logs that a required parameter is missing.
+
+A service that knows the facts states them as fields of its error body, in its own vocabulary, and the entry maps them to the registry's names:
+
+```python
+ServiceErrorCode(
+    code="acme_files_too_large",
+    category=InferenceErrorCategory.CONTENT,
+    error_code=CoreCode.INPUT_TOO_LARGE,
+    user_action_kind=UserActionKind.CHANGE_INPUT,
+    detail="The files are over the provider's limit — use smaller files.",
+    body_params={"input": "reference", "size": "size_bytes", "limit": "limit_bytes"},
+)
+```
+
+When a refusal matches the entry, `render_inference_error` reads each field from the body the worker's Extract step kept (`ProviderErrorMetadata.body`), in its `error` section first and then at its top level, where the OpenAI client leaves the section's fields (`error_body_sections` in `pipelex.cogt.inference.error_classification`), and gives the values it finds to the error with `with_params`. A field the body does not hold, or holds as `null` or an empty string, is left out, and the problem renders the sentences its code has for the parameters it was given; a value of the wrong type is dropped and logged by the problem builder, as for any raise site. An entry naming a parameter its `error_code` does not declare is refused when it is built. So is an entry that reads a parameter the runtime states itself: `model`, `model_type`, `reason`, `provider` and `pipe` everywhere, since the caller knows a model by the handle the method named rather than by a service's own id for it, `limit` on `model.context_exceeded`, whose bound the renderer names, and any parameter at all on an entry that means the model is not found. A service rarely knows which method input a file came from, so its `input` is whatever names the file to the caller, such as the reference the method's input held.
 
 ## How the runtime reads them
 
@@ -23596,6 +23616,8 @@ At boot, every plugin's contributions are frozen into one `ServiceErrorVocabular
 |-----------|-------|
 | an entry whose `error_code` no family's failure class declares, a model-not-found entry whose `error_code` is not `model.unavailable`, or a `TRANSIENT` entry whose `error_code` does not invite a retry | a validation error when the plugin builds the entry, at import |
 | two plugins contribute the same code | `DuplicateServiceErrorCodeError`, naming both plugins |
+| an entry whose `body_params` names a parameter its `error_code` does not declare | a validation error when the plugin builds the entry, at import |
+| an entry whose `body_params` names a parameter the runtime states itself, or any parameter on a model-not-found entry | a validation error when the plugin builds the entry, at import |
 | a plugin contributes a code the runtime classifies itself (`model_not_allowed_error`, see the [Error Model](error-model.md#a-model-the-integration-does-not-allow)) | `ReservedServiceErrorCodeError` |
 
 The vocabulary is a kernel-layer contribution: a plugin published under `pipelex.plugins.kernel` may contribute it, since inference errors are classified in a kernel-only boot too.
@@ -25711,7 +25733,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.115.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.116.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
