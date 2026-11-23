@@ -1584,10 +1584,6 @@ rationale = "Extracts/derives from the response; single operand."
 param = "body"
 rationale = "Lists the codes and types of one error body, the operand the OpenAI and gateway spent-quota rule reads; single operand."
 
-["pipelex/cogt/inference/error_classification.py::_error_sections"]
-param = "body"
-rationale = "Lists the sections of one error body, the operand its readers error_code_from_body_code_first and _google_detail_entries pass straight through; single operand."
-
 ["pipelex/cogt/inference/error_classification.py::_google_detail_entries"]
 param = "body"
 rationale = "Lists the entries of one Google error body's details of one type, the operand its readers _google_retry_delay_seconds and _is_quota_exhaustion_google pass straight through; single operand."
@@ -1627,6 +1623,10 @@ rationale = "Extracts from the exc; single operand."
 ["pipelex/cogt/inference/error_classification.py::_stringify_for_scan"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
+
+["pipelex/cogt/inference/error_classification.py::error_body_sections"]
+param = "body"
+rationale = "Lists the sections of one error body, the operand its readers error_code_from_body_code_first, _google_detail_entries and ServiceErrorCode.params_from_body pass straight through; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::error_code_from_body_code_first"]
 param = "body"
