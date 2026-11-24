@@ -110,8 +110,25 @@ def _render_context_exceeded_detail(*, family: InferenceErrorFamily) -> str:
             return "The material to judge exceeds what the judgment model can read — shorten it."
 
 
+def _render_too_large_detail(*, metadata: SDKErrorEnvelope) -> str:
+    """The advice of an ``input.too_large`` refusal, which names no file.
+
+    A page fetch refusing the page at the caller's URL points at a smaller page. Every other size refusal, a
+    provider's worded refusal or a bare 413, speaks of the request built from the inputs: a refusal of a request's
+    bytes or payload names no file, and a payload limit may be reached by the runtime's own choice to inline files.
+    """
+    if metadata.is_fetched_page_too_large:
+        return "The page at the URL is too large for the provider to fetch whole — point at a smaller page."
+    return "The request built from the inputs exceeds the provider's size limit — make the inputs smaller, or split them."
+
+
 def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, family: InferenceErrorFamily, model_handle: str) -> str:
-    """Produce the free-form user-facing advice text for the classified error."""
+    """Produce the free-form user-facing advice text for the classified error.
+
+    A ``CHANGE_INPUT`` advice is worded from the code the classification picked where the code has a sentence of its
+    own: ``model.context_exceeded``, per family, and ``input.too_large``, the request built from the inputs over the
+    provider's size limit, or a page too large to fetch.
+    """
     if classification.service_error_code is not None:
         # Branches ahead of the action kind rather than inside it: the service's own code names the
         # remedy more precisely than the kind does, and the kind's generic advice is often simply
@@ -141,10 +158,12 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
             return "The provider rejected the credentials — check that the API key is valid and correctly configured."
         case UserActionKind.CHANGE_INPUT:
             # Worded from the code the classification picked, not from the metadata's wording, so a 5xx, or a parse
-            # failure quoting the model's own text, never reads as the context window
+            # failure quoting the model's own text, never reads as the context window or a file over its size
             match classification.error_code:
                 case CoreCode.MODEL_CONTEXT_EXCEEDED:
                     return _render_context_exceeded_detail(family=family)
+                case CoreCode.INPUT_TOO_LARGE:
+                    return _render_too_large_detail(metadata=metadata)
                 case CoreCode() | PipelexErrorCode():
                     pass
             if metadata.is_content_policy_violation:
@@ -202,13 +221,20 @@ def render_inference_error(
         user_action=user_action,
         provider_metadata=metadata,
     ).with_error_code(classification.error_code)
+    if classification.service_error_code is not None:
+        # The facts the service stated in its error body, which the code's sentences name: its message rides the
+        # diagnostics alone, so without them a caller reads the code's title.
+        body_params = classification.service_error_code.params_from_body(body=metadata.body)
+        if body_params:
+            failure.with_params(**body_params)
     if classification.is_model_not_allowed:
         # The provider serves the model but does not allow it for this caller.
         failure.with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.NOT_ALLOWED)
     match classification.error_code:
         case CoreCode.MODEL_CONTEXT_EXCEEDED:
             # The provider's refusal says the inputs are over the model's context window, the bound it names, and
-            # never as numbers the runtime can read, so the prompt's size and the window's are not given.
+            # never as numbers the runtime can read, so the prompt's size and the window's are given only when a
+            # service's body states them; a service entry may not read `model` or `limit`, which these values set.
             failure.with_params(model=model_handle, limit=ModelContextExceededLimit.CONTEXT_WINDOW)
         case CoreCode() | PipelexErrorCode():
             pass

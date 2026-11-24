@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A provider refusing a file as over its size limit is the caller's `input.too_large`**: a provider's 400, or another 4xx a gateway relays, refusing a file, an image or a request payload as too large in its own words (Anthropic's "The file exceeds the maximum allowed size.", its per-image "image exceeds 5 MB maximum" and its `request_too_large`, Gemini's "Request payload size exceeds the limit") read as `runtime.unexpected`, our defect, and told the caller to contact support; it now reads `input.too_large`, answered 422, with advice that the request built from the inputs exceeds the provider's size limit and that the inputs should be made smaller or split. A bare 413, which already read `input.too_large`, gives the same advice, and a web page too large to fetch points at a smaller page.
+
+## [v0.116.0] - 2026-11-23
+
+### Added
+
+- **A service error code can fill its registry code's parameters from the error body**: `ServiceErrorCode` takes `body_params`, mapping each parameter of its `error_code` to the field of the service's error body that states it, read in the body's `error` section first and then at its top level; a matched refusal's error is given the values the body holds, so its problem's sentence names them (an `input.too_large` names the input, its size and the limit) instead of falling back to the code's title. An entry naming a parameter its code does not declare is refused when it is built. `error_body_sections` in `pipelex.cogt.inference.error_classification` is public.
+
+## [v0.115.0] - 2026-11-23
+
+### Added
+
+- **Stored prompt files can stay storage references, for a backend that reads the storage itself (Breaking)**: `BackendExtrasFactory` takes `is_storage_uri_enabled`, off by default and off for every backend Pipelex ships, and a plugin backend whose service reads Pipelex storage turns it on so a prompt image or document stored as a `pipelex-storage://` URI is sent as that URI, never read by the runtime: `prepare_prompt_image`, `prepare_prompt_document`, `prep_prompt_images` and `prep_prompt_documents` then return the new `PreparedFileStorageUri`, the OpenAI Responses factory sends it as `input_image.image_url` and `input_file.file_url`, the Anthropic worker as a `url` source, and the Chat Completions factory as an image's `image_url` while still inlining documents. A `match` over `PreparedFile` gains that case, and `AnthropicFactory.make_user_message` and `make_simple_messages` take `is_storage_uri_enabled` as a required keyword.
+
 ## [v0.114.0] - 2026-11-23
 
 ### Changed

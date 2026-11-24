@@ -273,6 +273,36 @@ class ProviderErrorMetadata(BaseModel):
         )
 
     @property
+    def is_input_over_size_limit(self) -> bool:
+        """Whether the provider refused the request because a file, an image or the payload it sent is over its size limit.
+
+        Reads the structured error code first, ``provider_error_code`` and the code an error body carries (Anthropic's
+        ``request_too_large``), then the wording each provider gives such a refusal, in its rendered message or in the
+        in-process ``body``, as the context-window check reads them. Each phrase names the size of what was sent, so a
+        ``max_tokens`` over its bound, which Anthropic and OpenAI also word as a maximum exceeded, matches none of them.
+        The classifier reads it on a 400 and on any other 4xx, after the context-window signal, and the Render step
+        words its next step from the code the classifier picks, so a phrase in a 5xx, or quoted in a failure that
+        reached no status, says nothing.
+        """
+        if self.provider_error_code in _INPUT_SIZE_ERROR_CODES:
+            return True
+        if error_code_from_body_code_first(self.body) in _INPUT_SIZE_ERROR_CODES:
+            return True
+        if _names_an_input_over_its_size(text=self.message):
+            return True
+        return self.body is not None and _names_an_input_over_its_size(text=_stringify_for_scan(self.body))
+
+    @property
+    def is_fetched_page_too_large(self) -> bool:
+        """Whether a page fetch refused the page at the caller's URL as too large to return whole.
+
+        Linkup's ``LinkupFetchResponseTooLargeError``, which reaches no HTTP status, is the one such refusal: the
+        classifier reads it as ``input.too_large`` by its type name, and the Render step words a next step about the
+        page rather than about the request built from the inputs.
+        """
+        return self.status_code is None and self.sdk_exception_type == _FETCHED_PAGE_TOO_LARGE_TYPE_NAME
+
+    @property
     def is_network_error(self) -> bool:
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
@@ -375,6 +405,39 @@ _BEDROCK_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
 # "max_tokens (200000) exceed model maximum (8192)", which is the request's fault, not the input's length.
 _PROMPT_TOKENS_OVER_MODEL_MAXIMUM = re.compile(r"prompt tokens \(\d+\) exceed model maximum")
 
+# The SDK exception a page fetch raises when the page at the caller's URL is too large to return whole, Linkup's, which
+# carries no HTTP status and is recognised by its type name as the classifier's status-less table recognises it.
+_FETCHED_PAGE_TOO_LARGE_TYPE_NAME = "LinkupFetchResponseTooLargeError"
+
+# The error code a provider gives a refusal of a request over its size: Anthropic's `request_too_large`, the type its
+# error reference documents for a request over the maximum allowed number of bytes
+# (https://platform.claude.com/docs/en/api/errors), which it sends on a 413 and a gateway may relay on another status.
+_INPUT_SIZE_ERROR_CODES: frozenset[str] = frozenset({"request_too_large"})
+
+# How each provider words a refusal of a file, an image or a request payload over its size limit. Each phrase names
+# the size of what was sent, never a bare "too large" or "exceeds the maximum", which Anthropic and OpenAI also use for
+# a `max_tokens` over its bound, our request's fault rather than the input's. Gemini's "The document has no pages." is
+# left out on purpose: Gemini gives it to a file over its size and to a file it could not read alike. OpenAI, Bedrock
+# and Mistral document their limits but no wording for the refusal, so none of theirs is read.
+_INPUT_SIZE_PATTERNS: tuple[str, ...] = (
+    # Anthropic's refusal of a file over its size, observed on a 400 `invalid_request_error` relayed by the Manifold
+    # gateway on 2026-11-24
+    "file exceeds the maximum allowed size",
+    # Anthropic's `request_too_large` message, as its error reference documents it
+    "exceeds the maximum allowed number of bytes",
+    # Gemini's INVALID_ARGUMENT for a request whose inline data passes its limit, "Request payload size exceeds the
+    # limit: 20971520 bytes.", as developers report it on the Gemini API forum
+    "request payload size exceeds the limit",
+)
+# The phrases above, each read from a word boundary so that a longer word ending in one, such as "profile exceeds the
+# maximum allowed size" for "file exceeds the maximum allowed size", is not read as the provider's size refusal
+_INPUT_SIZE_PHRASES = re.compile("|".join(rf"\b{re.escape(phrase)}" for phrase in _INPUT_SIZE_PATTERNS))
+
+# Anthropic's refusal of one image over its per-image limit, "image exceeds 5 MB maximum: 5607404 bytes > 5242880
+# bytes", as its users report it (github.com/anthropics/claude-code/issues/2104), read with any limit so that a changed
+# limit still matches. Its refusal of an image's dimensions in pixels is not a size in bytes and is left out.
+_IMAGE_OVER_SIZE_LIMIT = re.compile(r"\bimage exceeds \d+(?:\.\d+)? ?mb maximum")
+
 # The error codes that make a 429 a spent quota rather than a rate limit, on the OpenAI dialect and through a gateway
 # alike, each one OpenAI's error-code guide documents for a billing refusal
 # (https://developers.openai.com/api/docs/guides/error-codes), which Azure OpenAI and the OpenAI-compatible providers
@@ -449,7 +512,7 @@ _GOOGLE_ERROR_INFO_TYPE = "type.googleapis.com/google.rpc.ErrorInfo"
 _GOOGLE_QUOTA_FAILURE_TYPE = "type.googleapis.com/google.rpc.QuotaFailure"
 
 
-def _error_sections(body: Any) -> list[dict[str, Any]]:
+def error_body_sections(body: Any) -> list[dict[str, Any]]:
     """The places an error body may hold its fields: its nested ``error`` section first, then its top level.
 
     Most providers nest their error under ``error``, and the OpenAI client pre-unwraps that section onto the body it
@@ -488,7 +551,7 @@ def _is_in_flight_budget_throttle_openrouter(*, status_code: int | None, body: A
     """
     if status_code != 402:
         return False
-    for section in _error_sections(body):
+    for section in error_body_sections(body):
         error_metadata = section.get("metadata")
         if not isinstance(error_metadata, dict):
             continue
@@ -509,7 +572,7 @@ def _is_quota_exhaustion_anthropic(*, status_code: int, error_type: str | None, 
     """
     if status_code == 402 or error_type == _ANTHROPIC_BILLING_ERROR_TYPE:
         return True
-    error_sections = _error_sections(body)
+    error_sections = error_body_sections(body)
     if not error_sections:
         return False
     error_section = error_sections[0]
@@ -525,7 +588,7 @@ def _is_quota_exhaustion_anthropic(*, status_code: int, error_type: str | None, 
 def _google_detail_entries(body: Any, *, detail_type: str) -> list[dict[str, Any]]:
     """The entries of a Google error's ``details`` whose ``@type`` is ``detail_type``, the nested ``error`` first."""
     entries: list[dict[str, Any]] = []
-    for section in _error_sections(body):
+    for section in error_body_sections(body):
         details = section.get("details")
         if not isinstance(details, list):
             continue
@@ -586,6 +649,14 @@ def _names_the_context_window(*, text: str, is_aws_validation_error: bool) -> bo
     if is_aws_validation_error and any(pattern in lower_text for pattern in _BEDROCK_CONTEXT_WINDOW_PATTERNS):
         return True
     return _PROMPT_TOKENS_OVER_MODEL_MAXIMUM.search(lower_text) is not None
+
+
+def _names_an_input_over_its_size(*, text: str) -> bool:
+    """Check if an error's text words a refusal of a file, an image or a payload over the provider's size limit."""
+    lower_text = text.lower()
+    if _INPUT_SIZE_PHRASES.search(lower_text) is not None:
+        return True
+    return _IMAGE_OVER_SIZE_LIMIT.search(lower_text) is not None
 
 
 def _stringify_for_scan(body: Any) -> str:
@@ -886,7 +957,10 @@ def _provider_error_code_from_flat_body(body: Any) -> str | None:
 def _error_codes_in_body(body: Any) -> tuple[str, ...]:
     """Every ``code`` and ``type`` an error body carries, in its nested ``error`` section and at its top level."""
     return tuple(
-        error_code for section in _error_sections(body) for error_code in (section.get("code"), section.get("type")) if isinstance(error_code, str)
+        error_code
+        for section in error_body_sections(body)
+        for error_code in (section.get("code"), section.get("type"))
+        if isinstance(error_code, str)
     )
 
 
@@ -908,7 +982,7 @@ def error_code_from_body_code_first(body: Any) -> str | None:
     never reaches the classifier. A body carrying only ``code`` reads identically
     through either precedence.
     """
-    for section in _error_sections(body):
+    for section in error_body_sections(body):
         code = section.get("code") or section.get("type")
         if isinstance(code, str):
             return code
