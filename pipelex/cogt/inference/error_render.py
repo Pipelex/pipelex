@@ -110,12 +110,25 @@ def _render_context_exceeded_detail(*, family: InferenceErrorFamily) -> str:
             return "The material to judge exceeds what the judgment model can read — shorten it."
 
 
+def _render_too_large_detail(*, metadata: SDKErrorEnvelope) -> str:
+    """The advice of an ``input.too_large`` refusal, which names a file only where the provider's refusal does.
+
+    A page fetch refusing the page at the caller's URL points at a smaller page, a provider's refusal naming a file,
+    an image or a payload over its size limit asks for the file to be made smaller or split, and a refusal that names
+    neither, such as a bare 413, asks for a smaller input.
+    """
+    if metadata.is_fetched_page_too_large:
+        return "The page at the URL is too large for the provider to fetch whole — point at a smaller page."
+    if metadata.is_input_over_size_limit:
+        return "A file in the inputs exceeds the provider's size limit — make it smaller, or split it."
+    return "An input exceeds the provider's size limit — make it smaller."
+
+
 def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, family: InferenceErrorFamily, model_handle: str) -> str:
     """Produce the free-form user-facing advice text for the classified error.
 
     A ``CHANGE_INPUT`` advice is worded from the code the classification picked where the code has a sentence of its
-    own: ``model.context_exceeded``, per family, and ``input.too_large``, a file in the inputs over the provider's size
-    limit, whichever 4xx it arrived on.
+    own: ``model.context_exceeded``, per family, and ``input.too_large``, worded from what the refusal names.
     """
     if classification.service_error_code is not None:
         # Branches ahead of the action kind rather than inside it: the service's own code names the
@@ -151,7 +164,7 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
                 case CoreCode.MODEL_CONTEXT_EXCEEDED:
                     return _render_context_exceeded_detail(family=family)
                 case CoreCode.INPUT_TOO_LARGE:
-                    return "A file in the inputs exceeds the provider's size limit — make it smaller, or split it."
+                    return _render_too_large_detail(metadata=metadata)
                 case CoreCode() | PipelexErrorCode():
                     pass
             if metadata.is_content_policy_violation:

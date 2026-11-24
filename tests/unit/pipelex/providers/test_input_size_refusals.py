@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import openai
 import pytest
+from linkup import LinkupFetchResponseTooLargeError
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict
 
 from pipelex.cogt.exceptions import (
@@ -21,6 +22,7 @@ from pipelex.cogt.inference.error_classification import (
     UserActionKind,
     extract_anthropic_metadata,
     extract_google_metadata,
+    extract_linkup_metadata,
     extract_openai_metadata,
 )
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
@@ -47,8 +49,12 @@ if TYPE_CHECKING:
 
     from pipelex.errors.error_codes import ErrorCode
 
-# The advice every family gives a file over the provider's size limit
+# The advice every family gives a file over the provider's size limit, where the provider's refusal names one
 _SIZE_ADVICE = "A file in the inputs exceeds the provider's size limit — make it smaller, or split it."
+# The advice of a size refusal that names no file, such as a bare 413
+_UNNAMED_INPUT_SIZE_ADVICE = "An input exceeds the provider's size limit — make it smaller."
+# The advice of a page fetch refusing the page at the caller's URL as too large
+_FETCHED_PAGE_SIZE_ADVICE = "The page at the URL is too large for the provider to fetch whole — point at a smaller page."
 
 # Each provider's refusal of a file, an image or a payload over its size limit, worded as the provider words it.
 # Anthropic's, observed on dev on 2026-11-24, called directly
@@ -191,24 +197,27 @@ class TestInputSizeRefusals:
         assert rendered.user_action.detail != _SIZE_ADVICE
 
     @pytest.mark.parametrize(
-        ("raise_refusal", "extract_metadata", "expected_category"),
+        ("raise_refusal", "extract_metadata", "expected_category", "expected_advice"),
         [
             pytest.param(
                 lambda: openai_compatible_refusal(body=_MANIFOLD_RELAYED_FILE_OVER_SIZE, status_code=422),
                 extract_openai_metadata,
                 InferenceErrorCategory.CONTENT,
+                _SIZE_ADVICE,
                 id="gateway-422-file-over-size",
             ),
             pytest.param(
                 lambda: anthropic_status_refusal(body=_ANTHROPIC_REQUEST_TOO_LARGE, status_code=413),
                 extract_anthropic_metadata,
                 InferenceErrorCategory.CONTENT,
+                _SIZE_ADVICE,
                 id="anthropic-413-request-too-large",
             ),
             pytest.param(
                 lambda: openai_compatible_refusal(body={"error": {"message": "Payload Too Large", "type": "invalid_request_error"}}, status_code=413),
                 extract_openai_metadata,
                 InferenceErrorCategory.CONFIGURATION,
+                _UNNAMED_INPUT_SIZE_ADVICE,
                 id="gateway-bare-413",
             ),
         ],
@@ -218,8 +227,12 @@ class TestInputSizeRefusals:
         raise_refusal: Callable[[], BaseException],
         extract_metadata: Callable[[BaseException], ProviderErrorMetadata],
         expected_category: InferenceErrorCategory,
+        expected_advice: str,
     ) -> None:
-        """A gateway may answer the size refusal with a 422 or a 413; a bare 413 keeps its configuration reading."""
+        """A gateway may answer the size refusal with a 422 or a 413; a bare 413 keeps its configuration reading.
+
+        The advice names a file only where the provider's refusal does, so a bare 413 asks for a smaller input.
+        """
         metadata = extract_metadata(raise_refusal())
         assert metadata.status_code != 400
 
@@ -229,7 +242,32 @@ class TestInputSizeRefusals:
         assert category is expected_category
         assert user_action_kind is UserActionKind.CHANGE_INPUT
         assert rendered.user_action is not None
-        assert rendered.user_action.detail == _SIZE_ADVICE
+        assert rendered.user_action.detail == expected_advice
+
+    def test_a_page_too_large_to_fetch_points_at_a_smaller_page(self) -> None:
+        """Linkup refusing the page at the caller's URL as too large reads `input.too_large`, with advice about the page, not a file."""
+        metadata = extract_linkup_metadata(LinkupFetchResponseTooLargeError("The fetch response is too large to return"))
+
+        error_code, category, user_action_kind, rendered = _classify_and_render(metadata, family=InferenceErrorFamily.EXTRACT)
+
+        assert metadata.is_fetched_page_too_large
+        assert error_code == CoreCode.INPUT_TOO_LARGE
+        assert category is InferenceErrorCategory.CONTENT
+        assert user_action_kind is UserActionKind.CHANGE_INPUT
+        assert isinstance(rendered, ExtractJobFailureError)
+        assert rendered.user_action is not None
+        assert rendered.user_action.detail == _FETCHED_PAGE_SIZE_ADVICE
+
+    def test_only_a_status_less_page_fetch_reads_as_a_page_too_large(self) -> None:
+        """The same type name on an answer that reached a status is not the page fetch's refusal."""
+        metadata = ProviderErrorMetadata(
+            provider=ProviderName.LINKUP,
+            sdk_exception_type="LinkupFetchResponseTooLargeError",
+            message="The fetch response is too large to return",
+            status_code=413,
+        )
+
+        assert not metadata.is_fetched_page_too_large
 
     @pytest.mark.parametrize(
         ("family", "expected_class"),

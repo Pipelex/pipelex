@@ -293,6 +293,16 @@ class ProviderErrorMetadata(BaseModel):
         return self.body is not None and _names_an_input_over_its_size(text=_stringify_for_scan(self.body))
 
     @property
+    def is_fetched_page_too_large(self) -> bool:
+        """Whether a page fetch refused the page at the caller's URL as too large to return whole.
+
+        Linkup's ``LinkupFetchResponseTooLargeError``, which reaches no HTTP status, is the one such refusal: the
+        classifier reads it as ``input.too_large`` by its type name, and the Render step words a next step about the
+        page rather than about a file the caller sent.
+        """
+        return self.status_code is None and self.sdk_exception_type == _FETCHED_PAGE_TOO_LARGE_TYPE_NAME
+
+    @property
     def is_network_error(self) -> bool:
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
@@ -394,6 +404,10 @@ _BEDROCK_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
 # with its subject: "exceed model maximum" alone is also how a parameter over its bound is refused, as in
 # "max_tokens (200000) exceed model maximum (8192)", which is the request's fault, not the input's length.
 _PROMPT_TOKENS_OVER_MODEL_MAXIMUM = re.compile(r"prompt tokens \(\d+\) exceed model maximum")
+
+# The SDK exception a page fetch raises when the page at the caller's URL is too large to return whole, Linkup's, which
+# carries no HTTP status and is recognised by its type name as the classifier's status-less table recognises it.
+_FETCHED_PAGE_TOO_LARGE_TYPE_NAME = "LinkupFetchResponseTooLargeError"
 
 # The error code a provider gives a refusal of a request over its size: Anthropic's `request_too_large`, the type its
 # error reference documents for a request over the maximum allowed number of bytes
