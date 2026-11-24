@@ -429,11 +429,14 @@ _INPUT_SIZE_PATTERNS: tuple[str, ...] = (
     # limit: 20971520 bytes.", as developers report it on the Gemini API forum
     "request payload size exceeds the limit",
 )
+# The phrases above, each read from a word boundary so that a longer word ending in one, such as "profile exceeds the
+# maximum allowed size" for "file exceeds the maximum allowed size", is not read as the provider's size refusal
+_INPUT_SIZE_PHRASES = re.compile("|".join(rf"\b{re.escape(phrase)}" for phrase in _INPUT_SIZE_PATTERNS))
 
 # Anthropic's refusal of one image over its per-image limit, "image exceeds 5 MB maximum: 5607404 bytes > 5242880
 # bytes", as its users report it (github.com/anthropics/claude-code/issues/2104), read with any limit so that a changed
 # limit still matches. Its refusal of an image's dimensions in pixels is not a size in bytes and is left out.
-_IMAGE_OVER_SIZE_LIMIT = re.compile(r"image exceeds \d+(?:\.\d+)? ?mb maximum")
+_IMAGE_OVER_SIZE_LIMIT = re.compile(r"\bimage exceeds \d+(?:\.\d+)? ?mb maximum")
 
 # The error codes that make a 429 a spent quota rather than a rate limit, on the OpenAI dialect and through a gateway
 # alike, each one OpenAI's error-code guide documents for a billing refusal
@@ -651,7 +654,7 @@ def _names_the_context_window(*, text: str, is_aws_validation_error: bool) -> bo
 def _names_an_input_over_its_size(*, text: str) -> bool:
     """Check if an error's text words a refusal of a file, an image or a payload over the provider's size limit."""
     lower_text = text.lower()
-    if any(pattern in lower_text for pattern in _INPUT_SIZE_PATTERNS):
+    if _INPUT_SIZE_PHRASES.search(lower_text) is not None:
         return True
     return _IMAGE_OVER_SIZE_LIMIT.search(lower_text) is not None
 

@@ -111,6 +111,11 @@ _ANTHROPIC_PROMPT_TOO_LONG: Body = {
 }
 # Gemini's answer to a document it could not read, which may be over its size or of a type it cannot open
 _GEMINI_NO_PAGES: Body = {"error": {"code": 400, "message": "The document has no pages.", "status": "INVALID_ARGUMENT"}}
+# A refusal whose subject only ends in a size phrase's first word, "profile" for "file", which names no input's size
+_PROFILE_OVER_SIZE: Body = {
+    "type": "error",
+    "error": {"type": "invalid_request_error", "message": "Your profile exceeds the maximum allowed size."},
+}
 
 
 def _classify_and_render(
@@ -178,6 +183,7 @@ class TestInputSizeRefusals:
                 id="anthropic-prompt-too-long",
             ),
             pytest.param(gemini_refusal, _GEMINI_NO_PAGES, extract_google_metadata, CoreCode.RUNTIME_UNEXPECTED, id="gemini-no-pages"),
+            pytest.param(anthropic_refusal, _PROFILE_OVER_SIZE, extract_anthropic_metadata, CoreCode.RUNTIME_UNEXPECTED, id="profile-over-size"),
         ],
     )
     def test_a_400_naming_another_limit_keeps_its_own_reading(
@@ -187,9 +193,13 @@ class TestInputSizeRefusals:
         extract_metadata: Callable[[BaseException], ProviderErrorMetadata],
         expected_error_code: ErrorCode,
     ) -> None:
-        """A max_tokens over its bound is our request's, a prompt over the window is the window's, and Gemini's no-pages is ambiguous."""
+        """A max_tokens over its bound is our request's, a prompt over the window is the window's, and Gemini's no-pages is ambiguous.
+
+        A size phrase is read only from a word boundary, so a longer word ending in its first word, such as "profile", is not it.
+        """
         metadata = extract_metadata(raise_refusal(answer))
         assert metadata.status_code == 400
+        assert not metadata.is_input_over_size_limit
 
         error_code, _, _, rendered = _classify_and_render(metadata)
 
