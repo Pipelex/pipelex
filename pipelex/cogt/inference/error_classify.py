@@ -251,14 +251,20 @@ def _classify_server_error(*, status_code: int, family: InferenceErrorFamily) ->
 def _bad_request_error_code(*, metadata: SDKErrorEnvelope) -> ErrorCode:
     """The code of a provider 400, which says what the provider refused when it says it, and is ours otherwise.
 
-    Inputs over what the model can read are the caller's to shorten, and a content-policy signal is the caller's
-    material refused. A 400 nothing recognises is most likely a request of ours the provider could not take. Every
-    family reads the context-window signal: ``model.context_exceeded`` means the inputs exceed what the model can read,
-    whether the model writes text, generates images or reads documents, as an image model whose prompt images exceed
-    its limit already reports, so the code stays the same and the Render step words the advice for the family.
+    Inputs over what the model can read are the caller's to shorten, a file, an image or a payload over the provider's
+    size limit is the caller's to make smaller, and a content-policy signal is the caller's material refused. A 400
+    nothing recognises is most likely a request of ours the provider could not take. The signals are read in that
+    order: the context window first, the more precise reading when a refusal could match both, then the size, then the
+    content policy. Every family reads the context-window signal: ``model.context_exceeded`` means the inputs exceed
+    what the model can read, whether the model writes text, generates images or reads documents, as an image model
+    whose prompt images exceed its limit already reports, so the code stays the same and the Render step words the
+    advice for the family. The size signal reads ``input.too_large`` for every family too, without the input, the size
+    or the limit, which a refusal in words does not reliably give.
     """
     if metadata.is_context_window_exceeded:
         return CoreCode.MODEL_CONTEXT_EXCEEDED
+    if metadata.is_input_over_size_limit:
+        return CoreCode.INPUT_TOO_LARGE
     if metadata.is_content_policy_violation:
         return CoreCode.MODEL_CONTENT_REFUSED
     return CoreCode.RUNTIME_UNEXPECTED
@@ -381,16 +387,24 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
         # Unrecognized 4xx (e.g. 405, 409, 413, 422) — 5xx is handled above. A refusal of the
         # caller's material may arrive on another status than 400, and is read as the 400 arm
         # reads it: inputs over what the model can read, which a gateway may answer 422 or 413,
-        # and a safety/content policy rejection routed as 422 (FAL surfaces these here, signalled
-        # by ``provider_error_code = "ContentPolicyViolation"``). Each is rejected content, not a
-        # configuration issue — keep it CONTENT so downstream reporting and retry policy treat it
-        # as bad input. The context-window signal comes first, as on a 400, and a 413 that
-        # carries none keeps its payload-size reading below.
+        # a file, an image or a payload over the provider's size limit, which Anthropic answers
+        # 413 and a gateway may relay on any status, and a safety/content policy rejection routed
+        # as 422 (FAL surfaces these here, signalled by ``provider_error_code =
+        # "ContentPolicyViolation"``). Each is rejected content, not a configuration issue — keep
+        # it CONTENT so downstream reporting and retry policy treat it as bad input. The signals
+        # are read in the 400 arm's order, the context window, then the size, then the content
+        # policy, and a 413 that carries none keeps its payload-size reading below.
         if metadata.is_context_window_exceeded:
             return ClassificationResult(
                 category=InferenceErrorCategory.CONTENT,
                 user_action_kind=UserActionKind.CHANGE_INPUT,
                 error_code=CoreCode.MODEL_CONTEXT_EXCEEDED,
+            )
+        if metadata.is_input_over_size_limit:
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                error_code=CoreCode.INPUT_TOO_LARGE,
             )
         if metadata.is_content_policy_violation:
             return ClassificationResult(
@@ -401,7 +415,8 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
         error_code: ErrorCode
         match status_code:
             case 413:
-                # Anthropic's ``request_too_large``: the request the caller's material made is over the provider's limit.
+                # A 413 the size signal did not read, such as a proxy's bare answer: the request the caller's material
+                # made is over a limit on its way to the provider.
                 error_code = CoreCode.INPUT_TOO_LARGE
             case _:
                 error_code = CoreCode.RUNTIME_UNEXPECTED

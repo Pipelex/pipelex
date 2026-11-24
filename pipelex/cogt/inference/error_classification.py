@@ -273,6 +273,26 @@ class ProviderErrorMetadata(BaseModel):
         )
 
     @property
+    def is_input_over_size_limit(self) -> bool:
+        """Whether the provider refused the request because a file, an image or the payload it sent is over its size limit.
+
+        Reads the structured error code first, ``provider_error_code`` and the code an error body carries (Anthropic's
+        ``request_too_large``), then the wording each provider gives such a refusal, in its rendered message or in the
+        in-process ``body``, as the context-window check reads them. Each phrase names the size of what was sent, so a
+        ``max_tokens`` over its bound, which Anthropic and OpenAI also word as a maximum exceeded, matches none of them.
+        The classifier reads it on a 400 and on any other 4xx, after the context-window signal, and the Render step
+        words its next step from the code the classifier picks, so a phrase in a 5xx, or quoted in a failure that
+        reached no status, says nothing.
+        """
+        if self.provider_error_code in _INPUT_SIZE_ERROR_CODES:
+            return True
+        if error_code_from_body_code_first(self.body) in _INPUT_SIZE_ERROR_CODES:
+            return True
+        if _names_an_input_over_its_size(text=self.message):
+            return True
+        return self.body is not None and _names_an_input_over_its_size(text=_stringify_for_scan(self.body))
+
+    @property
     def is_network_error(self) -> bool:
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
@@ -374,6 +394,32 @@ _BEDROCK_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
 # with its subject: "exceed model maximum" alone is also how a parameter over its bound is refused, as in
 # "max_tokens (200000) exceed model maximum (8192)", which is the request's fault, not the input's length.
 _PROMPT_TOKENS_OVER_MODEL_MAXIMUM = re.compile(r"prompt tokens \(\d+\) exceed model maximum")
+
+# The error code a provider gives a refusal of a request over its size: Anthropic's `request_too_large`, the type its
+# error reference documents for a request over the maximum allowed number of bytes
+# (https://platform.claude.com/docs/en/api/errors), which it sends on a 413 and a gateway may relay on another status.
+_INPUT_SIZE_ERROR_CODES: frozenset[str] = frozenset({"request_too_large"})
+
+# How each provider words a refusal of a file, an image or a request payload over its size limit. Each phrase names
+# the size of what was sent, never a bare "too large" or "exceeds the maximum", which Anthropic and OpenAI also use for
+# a `max_tokens` over its bound, our request's fault rather than the input's. Gemini's "The document has no pages." is
+# left out on purpose: Gemini gives it to a file over its size and to a file it could not read alike. OpenAI, Bedrock
+# and Mistral document their limits but no wording for the refusal, so none of theirs is read.
+_INPUT_SIZE_PATTERNS: tuple[str, ...] = (
+    # Anthropic's refusal of a file over its size, observed on a 400 `invalid_request_error` relayed by the Manifold
+    # gateway on 2026-11-24
+    "file exceeds the maximum allowed size",
+    # Anthropic's `request_too_large` message, as its error reference documents it
+    "exceeds the maximum allowed number of bytes",
+    # Gemini's INVALID_ARGUMENT for a request whose inline data passes its limit, "Request payload size exceeds the
+    # limit: 20971520 bytes.", as developers report it on the Gemini API forum
+    "request payload size exceeds the limit",
+)
+
+# Anthropic's refusal of one image over its per-image limit, "image exceeds 5 MB maximum: 5607404 bytes > 5242880
+# bytes", as its users report it (github.com/anthropics/claude-code/issues/2104), read with any limit so that a changed
+# limit still matches. Its refusal of an image's dimensions in pixels is not a size in bytes and is left out.
+_IMAGE_OVER_SIZE_LIMIT = re.compile(r"image exceeds \d+(?:\.\d+)? ?mb maximum")
 
 # The error codes that make a 429 a spent quota rather than a rate limit, on the OpenAI dialect and through a gateway
 # alike, each one OpenAI's error-code guide documents for a billing refusal
@@ -586,6 +632,14 @@ def _names_the_context_window(*, text: str, is_aws_validation_error: bool) -> bo
     if is_aws_validation_error and any(pattern in lower_text for pattern in _BEDROCK_CONTEXT_WINDOW_PATTERNS):
         return True
     return _PROMPT_TOKENS_OVER_MODEL_MAXIMUM.search(lower_text) is not None
+
+
+def _names_an_input_over_its_size(*, text: str) -> bool:
+    """Check if an error's text words a refusal of a file, an image or a payload over the provider's size limit."""
+    lower_text = text.lower()
+    if any(pattern in lower_text for pattern in _INPUT_SIZE_PATTERNS):
+        return True
+    return _IMAGE_OVER_SIZE_LIMIT.search(lower_text) is not None
 
 
 def _stringify_for_scan(body: Any) -> str:
