@@ -274,12 +274,14 @@ class TestInputSizeRefusals:
         assert rendered.user_action is not None
         assert rendered.user_action.detail != _SIZE_ADVICE
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="a provider's size refusal in words names neither the input nor, reliably, its size and the limit, the parameters of input.too_large"
-    )
     @pytest.mark.asyncio
     async def test_the_worker_reports_the_file_over_size_as_the_callers_input(self, mocker: MockerFixture) -> None:
-        """End to end through a worker: the run report reads `input.too_large`, the caller's to fix, never our `runtime.unexpected`."""
+        """End to end through a worker: the run report reads `input.too_large`, the caller's to fix, never our `runtime.unexpected`.
+
+        A refusal in words names neither the input nor, reliably, its size and the limit, so the problem carries none of
+        the code's parameters, which it withholds by rule: its sentences name no input, and the sweep of required
+        parameters, which runs on every unit test, finds nothing to report.
+        """
         worker = object.__new__(OpenAICompletionsLLMWorker)
         inference_model = mocker.MagicMock()
         inference_model.name = "claude-4.5-haiku"
@@ -303,6 +305,9 @@ class TestInputSizeRefusals:
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.INPUT_TOO_LARGE
+        assert caller.params is None or caller.params.as_wire() == {}
+        assert caller.detail == "An input is too large for the step that reads it."
+        assert caller.next_step.detail == "Make the inputs smaller, then send the request again."
         assert caller.domain == ProblemDomain.INPUT
         assert caller.retry == RetryVerdict.NO
         assert isinstance(exc_info.value.__cause__, openai.BadRequestError)
