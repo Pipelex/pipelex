@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A provider refusing a file as over its size limit is the caller's `input.too_large`**: a provider's 400, or another 4xx a gateway relays, refusing a file, an image or a request payload as too large in its own words (Anthropic's "The file exceeds the maximum allowed size.", its per-image "image exceeds 5 MB maximum" and its `request_too_large`, Gemini's "Request payload size exceeds the limit") read as `runtime.unexpected`, our defect, and told the caller to contact support; it now reads `input.too_large`, answered 422, with advice that the request built from the inputs exceeds the provider's size limit and that the inputs should be made smaller or split. A bare 413, which already read `input.too_large`, gives the same advice, and a web page too large to fetch points at a smaller page.
+
 ## [v0.116.0] - 2026-11-23
 
 ### Added
