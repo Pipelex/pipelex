@@ -377,20 +377,12 @@ class _CodeSentences(NamedTuple):
 # raise site is at fault for a parameter withheld by rule, so its absence is not logged (`missing_required_params`); any
 # other parameter the code requires still is.
 #
-# `input.too_large` requires `input`, `limit` and `size`, the input's name and two integers its sentence reads as a size
-# and its bound. A raise site that knows no bound, such as a converter refusing a body under a limit it does not say,
-# withholds `limit`; one whose bound is not a size, such as a conversion that ran out of time, where both are seconds,
-# withholds both, and its sentences say the input was too large or too slow to process; one that knows none of the
-# three, such as a provider refusing a file as over its size limit in its own words, which name neither the input nor,
-# reliably, its size and the limit, withholds all three, and its sentences name no input. The entries are tried in
-# order and the first whose parameters are all absent wins, so the entry withholding all three comes first, then the
-# one withholding `limit` and `size`, since each later entry matches every problem an earlier one does.
+# `input.too_large` requires `limit` and `size`, two integers its sentence reads as a size and its bound. A raise site
+# that knows no bound, such as a converter refusing a body under a limit it does not say, withholds `limit`; one whose
+# bound is not a size, such as a conversion that ran out of time, where both are seconds, withholds both, and its
+# sentences say the input was too large or too slow to process. The entry withholding both comes first, since one
+# withholding `limit` alone matches it too.
 _WITHHELD_PARAM_SENTENCES: dict[tuple[str, frozenset[str]], _CodeSentences] = {
-    ("input.too_large", frozenset({"input", "limit", "size"})): _CodeSentences(
-        detail="An input is too large for the step that reads it.",
-        actor_step_detail="Make the inputs smaller, then send the request again.",
-        other_step_detail="Pass this to the caller, who must make the inputs smaller.",
-    ),
     ("input.too_large", frozenset({"limit", "size"})): _CodeSentences(
         detail="The input '{input}' is too large for the step that reads it, in size or in the time it takes to process.",
         actor_step_detail="Make the input '{input}' smaller or simpler, then send the request again.",
