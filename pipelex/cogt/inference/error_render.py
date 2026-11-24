@@ -111,24 +111,23 @@ def _render_context_exceeded_detail(*, family: InferenceErrorFamily) -> str:
 
 
 def _render_too_large_detail(*, metadata: SDKErrorEnvelope) -> str:
-    """The advice of an ``input.too_large`` refusal, which names a file only where the provider's refusal does.
+    """The advice of an ``input.too_large`` refusal, which names no file.
 
-    A page fetch refusing the page at the caller's URL points at a smaller page, a provider's refusal naming a file,
-    an image or a payload over its size limit asks for the file to be made smaller or split, and a refusal that names
-    neither, such as a bare 413, asks for a smaller input.
+    A page fetch refusing the page at the caller's URL points at a smaller page. Every other size refusal, a
+    provider's worded refusal or a bare 413, speaks of the request built from the inputs: a refusal of a request's
+    bytes or payload names no file, and a payload limit may be reached by the runtime's own choice to inline files.
     """
     if metadata.is_fetched_page_too_large:
         return "The page at the URL is too large for the provider to fetch whole — point at a smaller page."
-    if metadata.is_input_over_size_limit:
-        return "A file in the inputs exceeds the provider's size limit — make it smaller, or split it."
-    return "An input exceeds the provider's size limit — make it smaller."
+    return "The request built from the inputs exceeds the provider's size limit — make the inputs smaller, or split them."
 
 
 def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, family: InferenceErrorFamily, model_handle: str) -> str:
     """Produce the free-form user-facing advice text for the classified error.
 
     A ``CHANGE_INPUT`` advice is worded from the code the classification picked where the code has a sentence of its
-    own: ``model.context_exceeded``, per family, and ``input.too_large``, worded from what the refusal names.
+    own: ``model.context_exceeded``, per family, and ``input.too_large``, the request built from the inputs over the
+    provider's size limit, or a page too large to fetch.
     """
     if classification.service_error_code is not None:
         # Branches ahead of the action kind rather than inside it: the service's own code names the

@@ -298,7 +298,7 @@ class ProviderErrorMetadata(BaseModel):
 
         Linkup's ``LinkupFetchResponseTooLargeError``, which reaches no HTTP status, is the one such refusal: the
         classifier reads it as ``input.too_large`` by its type name, and the Render step words a next step about the
-        page rather than about a file the caller sent.
+        page rather than about the request built from the inputs.
         """
         return self.status_code is None and self.sdk_exception_type == _FETCHED_PAGE_TOO_LARGE_TYPE_NAME
 
