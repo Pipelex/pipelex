@@ -33,6 +33,7 @@ from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.method_trees.file_references import BundleFileOrigin
+from pipelex.core.pipes.declared_item_count import holding_host_libraries_to_deployment_maximum
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -275,7 +276,12 @@ def _load_acquired_library(
         library_dirs_translation: AbstractContextManager[None] = (
             translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_faults()
         )
-        with library_dirs_translation:
+        # A host's directories are not the caller's: they load under the deployment's maximum declared item count, not
+        # the one the request states, which bounds only the caller's own contents.
+        host_library_maximum: AbstractContextManager[None] = (
+            nullcontext() if library_dirs_are_callers else holding_host_libraries_to_deployment_maximum()
+        )
+        with library_dirs_translation, host_library_maximum:
             library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs, methods_dirs=methods_dirs, tree_listing=listing)
     else:
         log.verbose(f"No library directories to load ({source_label})")
