@@ -135,7 +135,7 @@ async def pipeline_run_setup(
         Name of the output slot to write to.
     output_multiplicity:
         Output multiplicity specification. A fixed count is held to the maximum declared item count in force, the
-        run's own ``max_declared_item_count`` else the deployment's, and one past it is refused with
+        deployment's raised by the run's own ``max_declared_item_count``, and one past it is refused with
         ``DeclaredItemCountLimitError`` before the run registers or a library opens, since a live run asks a model for
         that many items and a dry run builds that many mock items.
     dynamic_output_concept_ref:
@@ -192,14 +192,13 @@ async def pipeline_run_setup(
         names, as the host states it for this run; ``None`` falls back to the
         deployment's ``custom_posthog.tracing.capture.pipe_codes``.
     max_declared_item_count:
-        The most items the run's method may declare for one slot (``Concept[N]`` or a step's ``nb_output``), as the
-        host states it for this run, such as a hosted plane from the caller's plan. ``None`` falls back to the
-        deployment's ``[interpreter.method_limits] max_declared_item_count``. The library load refuses a method
-        declaring more, and the run carries it on its ``RunMetadata``, so every pipe run, in this process or a
-        worker's, bounds its dry-run mock builders by it. It may not pass the deployment's
-        ``max_declared_item_count_ceiling``: one past it is refused with ``RunParameterError``, as the host's bug. The
-        host's own library directories still load under the deployment's maximum. See
-        :mod:`pipelex.core.pipes.declared_item_count`.
+        The run's own maximum of items its method may declare for one slot (``Concept[N]`` or a step's
+        ``nb_output``), as the host states it for this run, such as a hosted plane from the caller's plan. It only
+        raises the deployment's ``[interpreter.method_limits] max_declared_item_count``: the larger of the two is in
+        force, and ``None`` keeps the deployment's. The library load refuses a method declaring more, and the run
+        carries it on its ``RunMetadata``, so every pipe run, in this process or a worker's, bounds its dry-run mock
+        builders by it. It may not pass the deployment's ``max_declared_item_count_ceiling``: one past it is refused
+        with ``RunParameterError``, as the host's bug. See :mod:`pipelex.core.pipes.declared_item_count`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created

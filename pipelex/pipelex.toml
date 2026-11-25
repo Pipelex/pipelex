@@ -543,9 +543,9 @@ max_total_bytes = 1073741824
 # The most items a method may declare for one slot: an input or an output written Concept[N], or a controller step's
 # nb_output = N. A validation's dry run builds one mock item per declared item, so this bounds what a few lines of a
 # method can make it build. A method declaring more is refused when it loads, before anything is built. It is this
-# runtime's limit, not a rule of the language: a request to the API server may carry its own maximum in its place, and
-# a project raises it in its .pipelex/pipelex.toml. It also bounds a run's output_multiplicity. At most
-# max_declared_item_count_ceiling.
+# runtime's limit, not a rule of the language: a request to the API server may carry its own maximum, which only
+# raises this one, and a project raises it in its .pipelex/pipelex.toml. It also bounds a run's output_multiplicity.
+# At most max_declared_item_count_ceiling.
 max_declared_item_count = 1000
 # The most a request's own max_declared_item_count may state, and the most max_declared_item_count above may be. A
 # request's maximum is read from its JSON body, so a caller could otherwise raise its own limit: keep this at the

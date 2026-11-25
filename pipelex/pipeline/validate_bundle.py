@@ -16,7 +16,6 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.method_trees.file_references import BundleFileOrigin
-from pipelex.core.pipes.declared_item_count import holding_host_libraries_to_deployment_maximum
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -278,12 +277,7 @@ async def validate_bundle(
         with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
-                # A host's directories load under the deployment's maximum declared item count, not the one the request
-                # states, which bounds only the caller's own contents. The worker thread reads it from its copy of the context.
-                host_library_maximum: AbstractContextManager[None] = (
-                    nullcontext() if library_dirs_are_callers else holding_host_libraries_to_deployment_maximum()
-                )
-                with host_library_tree_faults, host_library_maximum:
+                with host_library_tree_faults:
                     await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs, tree_listing=listing)
             else:
                 log.verbose(f"No library directories to load ({source_label})")

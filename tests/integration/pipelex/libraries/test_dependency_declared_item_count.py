@@ -4,7 +4,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count
+from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import DeclaredItemCountLimitError
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -44,14 +44,15 @@ def _load_consumer_with_the_package(*, tmp_path: Path, mocker: MockerFixture) ->
 
 class TestDependencyDeclaredItemCount:
     def test_a_dependency_pipe_within_the_maximum_loads(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        with scoped_max_declared_item_count(maximum=5):
-            _load_consumer_with_the_package(tmp_path=tmp_path, mocker=mocker)
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", 5)
+        _load_consumer_with_the_package(tmp_path=tmp_path, mocker=mocker)
 
     def test_a_dependency_pipe_past_the_maximum_is_refused_before_it_is_built(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A package's pipes the load builds are held to the maximum in force, as the main crate's are."""
         build_spy = mocker.spy(get_library_manager().__class__, "_ensure_declared_item_counts_allowed")
 
-        with scoped_max_declared_item_count(maximum=4), pytest.raises(PipelexError) as exc_info:
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", 4)
+        with pytest.raises(PipelexError) as exc_info:
             _load_consumer_with_the_package(tmp_path=tmp_path, mocker=mocker)
 
         refusal = exc_info.value if isinstance(exc_info.value, DeclaredItemCountLimitError) else exc_info.value.__cause__

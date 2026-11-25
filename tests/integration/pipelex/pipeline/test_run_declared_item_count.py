@@ -58,13 +58,18 @@ class TestRunDeclaredItemCount:
         pipe_job = prepare_spy.spy_return
         assert pipe_job.job_metadata.run_metadata.max_declared_item_count == 2000
 
-    async def test_a_lower_maximum_refuses_what_the_deployment_allows(self) -> None:
+    async def test_a_lower_maximum_lowers_nothing(self, mocker: MockerFixture) -> None:
+        """A run's maximum only raises the deployment's: a lower one leaves the deployment's in force."""
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", 5)
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, max_declared_item_count=4)
 
-        with pytest.raises(ValidateBundleError) as exc_info:
-            await runner.execute(pipe_code="make_ideas", mthds_contents=[_declaring(5)], inputs=_INPUTS)
+        response = await runner.execute(pipe_code="make_ideas", mthds_contents=[_declaring(5)], inputs=_INPUTS)
+        assert len(response.pipe_output.main_stuff.as_list_of_fixed_content_type(TextContent).items) == 5
 
-        assert _refusal_params(exc=exc_info.value) == [{"slot": "the output of the pipe 'make_ideas'", "count": 5, "limit": 4}]
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await runner.execute(pipe_code="make_ideas", mthds_contents=[_declaring(6)], inputs=_INPUTS)
+
+        assert _refusal_params(exc=exc_info.value) == [{"slot": "the output of the pipe 'make_ideas'", "count": 6, "limit": 5}]
 
     async def test_a_maximum_past_the_deployments_ceiling_is_refused_before_the_run_starts(self) -> None:
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, max_declared_item_count=1001)
@@ -76,7 +81,7 @@ class TestRunDeclaredItemCount:
         ("max_declared_item_count", "output_multiplicity", "limit"),
         [
             pytest.param(None, 1001, 1000, id="deployment-maximum"),
-            pytest.param(4, 5, 4, id="run-maximum"),
+            pytest.param(4, 1001, 1000, id="lower-run-maximum"),
         ],
     )
     async def test_an_output_multiplicity_past_the_maximum_is_refused_before_the_run_starts(

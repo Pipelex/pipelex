@@ -125,8 +125,9 @@ class MethodLimitsConfig(ConfigModel):
     `max_declared_item_count` is the most items a method may declare for one slot: an input or an output written
     `Concept[N]`, or a controller step's `nb_output = N`, and the most a run may ask for with `output_multiplicity`. A
     dry run builds one mock item per declared item, so the limit bounds what a few lines of a method can make a
-    validation build. It is a runtime limit, not a rule of the language: a request may carry its own maximum in place of
-    this one, which a hosted plane derives from the caller's plan (`pipelex.core.pipes.declared_item_count`).
+    validation build. It is a runtime limit, not a rule of the language: a request may carry its own maximum, which a
+    hosted plane derives from the caller's plan, and which only ever raises this one, the larger of the two being in
+    force (`pipelex.core.pipes.declared_item_count`).
 
     `max_declared_item_count_ceiling` is the most a request's own maximum may state. A request's maximum comes from
     public JSON, so without a ceiling any caller could raise its own limit; a deployment behind a trusted front that

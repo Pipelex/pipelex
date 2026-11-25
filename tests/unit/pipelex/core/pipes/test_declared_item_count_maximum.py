@@ -68,14 +68,16 @@ class TestDeclaredItemCountMaximum:
     def test_outside_every_scope_the_maximum_is_the_deployments(self) -> None:
         assert get_max_declared_item_count() == 1000
 
-    def test_a_scope_states_the_maximum_and_none_keeps_the_one_in_force(self) -> None:
+    def test_a_scope_raises_the_maximum_never_lowers_it_and_none_keeps_the_one_in_force(self) -> None:
         with scoped_max_declared_item_count(maximum=5000):
             assert get_max_declared_item_count() == 5000
             with scoped_max_declared_item_count(maximum=None):
                 assert get_max_declared_item_count() == 5000
             with scoped_max_declared_item_count(maximum=3):
-                assert get_max_declared_item_count() == 3
+                assert get_max_declared_item_count() == 1000
             assert get_max_declared_item_count() == 5000
+        with scoped_max_declared_item_count(maximum=3):
+            assert get_max_declared_item_count() == 1000
         assert get_max_declared_item_count() == 1000
 
     @pytest.mark.parametrize("maximum", [0, -5, 1_000_000_000, True])
@@ -86,7 +88,7 @@ class TestDeclaredItemCountMaximum:
             pass
 
     def test_a_requests_maximum_is_held_to_the_deployments_ceiling(self, mocker: MockerFixture) -> None:
-        """At or below the ceiling, a lower maximum included, a request's maximum stands; past it, it is refused naming the ceiling."""
+        """At or below the ceiling, a lower maximum included, a request's maximum is accepted; past it, it is refused naming the ceiling."""
         assert validate_requested_max_declared_item_count(value=1000) == 1000
         assert validate_requested_max_declared_item_count(value=3) == 3
         with pytest.raises(RunParameterError, match=r"at most 1000, this deployment's max_declared_item_count_ceiling, got 1001"):
@@ -123,35 +125,39 @@ class TestDeclaredItemCountMaximum:
 
     def test_the_mock_builders_and_the_run_refuse_a_fixed_count_past_the_maximum_and_never_shorten_it(self, mocker: MockerFixture) -> None:
         """The dry run's second line: a fixed count past the maximum in force is refused before anything is built."""
-        with scoped_max_declared_item_count(maximum=2):
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", 2)
+        ensure_mock_item_count_allowed(count=2, slot="a slot")
+        mock_stuff = WorkingMemoryFactory.make_mock_stuff(_text_list_spec(multiplicity=2))
+        assert len(mock_stuff.as_list_of_fixed_content_type(TextContent).items) == 2
+
+        with pytest.raises(DeclaredItemCountLimitError, match="A dry run would build 3 items for the mock input 'items'"):
+            WorkingMemoryFactory.make_mock_stuff(_text_list_spec(multiplicity=3))
+        with pytest.raises(DeclaredItemCountLimitError, match="mock images"):
+            dry_img_gen_image_contents(mocker.MagicMock(nb_images=3))
+        with pytest.raises(DeclaredItemCountLimitError, match="The run asks for 3 items"):
+            ensure_run_item_count_allowed(count=3, slot="the run's output")
+        # A request stating a lower maximum lowers nothing: the deployment's is in force.
+        with scoped_max_declared_item_count(maximum=1):
             ensure_mock_item_count_allowed(count=2, slot="a slot")
-            mock_stuff = WorkingMemoryFactory.make_mock_stuff(_text_list_spec(multiplicity=2))
-            assert len(mock_stuff.as_list_of_fixed_content_type(TextContent).items) == 2
 
-            with pytest.raises(DeclaredItemCountLimitError, match="A dry run would build 3 items for the mock input 'items'"):
-                WorkingMemoryFactory.make_mock_stuff(_text_list_spec(multiplicity=3))
-            with pytest.raises(DeclaredItemCountLimitError, match="mock images"):
-                dry_img_gen_image_contents(mocker.MagicMock(nb_images=3))
-            with pytest.raises(DeclaredItemCountLimitError, match="The run asks for 3 items"):
-                ensure_run_item_count_allowed(count=3, slot="the run's output")
-
-    def test_a_length_the_dry_run_chooses_is_shortened_to_the_maximum_never_refused(self) -> None:
+    @pytest.mark.parametrize("maximum", [1, 2])
+    def test_a_length_the_dry_run_chooses_is_shortened_to_the_maximum_never_refused(self, mocker: MockerFixture, maximum: int) -> None:
         """A variable list declares no count: under a maximum below the dry run's defaults, its mocks are shorter, not refused."""
         assert get_config().inference.dry_run.nb_list_items == 3
-        with scoped_max_declared_item_count(maximum=1):
-            mock_stuff = WorkingMemoryFactory.make_mock_stuff(_text_list_spec(multiplicity=True))
-            assert len(mock_stuff.as_list_of_fixed_content_type(TextContent).items) == 1
-            assert len(dry_search_gen_sourced_answer().sources) == 1
-        with scoped_max_declared_item_count(maximum=2):
-            assert len(dry_search_gen_sourced_answer().sources) == 2
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", maximum)
+        mock_stuff = WorkingMemoryFactory.make_mock_stuff(_text_list_spec(multiplicity=True))
+        assert len(mock_stuff.as_list_of_fixed_content_type(TextContent).items) == min(maximum, 2)
+        assert len(dry_search_gen_sourced_answer().sources) == maximum
 
     @pytest.mark.asyncio
-    async def test_a_dry_leaf_with_no_scope_open_reads_its_runs_maximum_from_its_job_metadata(self) -> None:
-        """A worker's activity opens no scope: the leaf holds a fixed count to the maximum its job carries, else the worker's."""
-        assert len(await llm_gen_object_list(_dry_text_list_assignment(nb_items=None, run_max_declared_item_count=2))) == 2
-        assert len(await llm_gen_object_list(_dry_text_list_assignment(nb_items=5, run_max_declared_item_count=None))) == 5
+    async def test_a_dry_leaf_with_no_scope_open_reads_its_runs_maximum_from_its_job_metadata(self, mocker: MockerFixture) -> None:
+        """A worker's activity opens no scope: the leaf holds a fixed count to the maximum its job carries, raising the worker's."""
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", 4)
+        assert len(await llm_gen_object_list(_dry_text_list_assignment(nb_items=None, run_max_declared_item_count=2))) == 3
+        assert len(await llm_gen_object_list(_dry_text_list_assignment(nb_items=4, run_max_declared_item_count=None))) == 4
+        assert len(await llm_gen_object_list(_dry_text_list_assignment(nb_items=5, run_max_declared_item_count=5))) == 5
         with pytest.raises(DeclaredItemCountLimitError) as exc_info:
-            await llm_gen_object_list(_dry_text_list_assignment(nb_items=5, run_max_declared_item_count=4))
+            await llm_gen_object_list(_dry_text_list_assignment(nb_items=5, run_max_declared_item_count=2))
         assert exc_info.value.limit == 4
 
     @pytest.mark.asyncio

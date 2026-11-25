@@ -40,26 +40,29 @@ class TestDeclaredItemCountLimit:
         ("topic", "mthds_for_count", "slot"),
         DeclaredItemCountCases.SPELLINGS,
     )
-    async def test_a_request_maximum_raises_and_lowers_the_deployments(
+    async def test_a_request_maximum_raises_the_deployments_and_never_lowers_it(
         self, mocker: MockerFixture, topic: str, mthds_for_count: Any, slot: str
     ) -> None:
-        """The request's own maximum replaces the deployment's, in both directions, raised only up to the deployment's ceiling."""
+        """The request's own maximum raises the deployment's, only up to the deployment's ceiling; a lower one changes nothing."""
         mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count_ceiling", 2000)
         report = await validate_bundles_in_process(mthds_contents=[mthds_for_count(1500)], max_declared_item_count=2000)
         assert report is not None, topic
 
-        with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundles_in_process(mthds_contents=[mthds_for_count(5)], max_declared_item_count=4)
+        report = await validate_bundles_in_process(mthds_contents=[mthds_for_count(5)], max_declared_item_count=4)
+        assert report is not None, topic
 
-        assert _refusal_params(exc=exc_info.value) == [{"slot": slot, "count": 5, "limit": 4}], topic
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundles_in_process(mthds_contents=[mthds_for_count(1500)], max_declared_item_count=1200)
+
+        assert _refusal_params(exc=exc_info.value) == [{"slot": slot, "count": 1500, "limit": 1200}], topic
 
     async def test_a_scope_the_caller_opened_is_the_maximum_when_the_request_states_none(self) -> None:
         """`None` keeps the maximum already in force, a scope the host opened around the validation."""
-        mthds = DeclaredItemCountCases.SPELLINGS[0][1](3)
-        with scoped_max_declared_item_count(maximum=2), pytest.raises(ValidateBundleError) as exc_info:
+        mthds = DeclaredItemCountCases.SPELLINGS[0][1](1500)
+        with scoped_max_declared_item_count(maximum=1200), pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundles_in_process(mthds_contents=[mthds])
 
-        assert [params["limit"] for params in _refusal_params(exc=exc_info.value)] == [2]
+        assert [params["limit"] for params in _refusal_params(exc=exc_info.value)] == [1200]
 
     @pytest.mark.parametrize("maximum", [0, -1, 1_000_000_000, 1001])
     async def test_a_maximum_no_runtime_may_set_is_the_hosts_bug(self, maximum: int) -> None:
@@ -79,9 +82,12 @@ class TestDeclaredItemCountLimit:
         assert exc_info.value.validation_error_items(), topic
 
     @pytest.mark.parametrize("maximum", [1, 2])
-    async def test_a_method_declaring_no_count_is_valid_under_a_maximum_below_the_dry_runs_default_lengths(self, maximum: int) -> None:
+    async def test_a_method_declaring_no_count_is_valid_under_a_maximum_below_the_dry_runs_default_lengths(
+        self, mocker: MockerFixture, maximum: int
+    ) -> None:
         """A variable list's dry-run length, three by default, is the dry run's own choice, shortened to the maximum."""
-        report = await validate_bundles_in_process(mthds_contents=[DeclaredItemCountCases.DECLARING_NO_COUNT], max_declared_item_count=maximum)
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", maximum)
+        report = await validate_bundles_in_process(mthds_contents=[DeclaredItemCountCases.DECLARING_NO_COUNT])
         assert report is not None
 
     async def test_a_dry_run_building_more_mock_items_in_all_than_the_budget_is_an_invalid_verdict(self, mocker: MockerFixture) -> None:

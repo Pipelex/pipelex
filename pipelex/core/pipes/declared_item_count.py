@@ -5,21 +5,21 @@ controller step, and a run may ask for one with `output_multiplicity`. A dry run
 without a bound a few lines of a method make a validation build millions of them. One maximum covers every spelling.
 
 **The maximum is the runtime's, not the language's.** A method declaring 5,000 items is valid MTHDS; a runtime, or a
-plan on the hosted plane, may refuse to load it. The maximum in force is, in order:
+plan on the hosted plane, may refuse to load it. The deployment's maximum is `[interpreter.method_limits]
+max_declared_item_count`, 1,000 by default.
 
-- the one a scope opened with `scoped_max_declared_item_count` (`pipelex.core.pipes.declared_item_count_scope`), which a
-  host opens from a request's own maximum: the validation (`validate_bundles_in_process`), the run setup
-  (`pipeline_run_setup`) and every pipe run, which reads it from its `RunMetadata`, so a worker in another process
-  applies the request's maximum too, and a dry leaf run in an activity with no scope reads it from its job's metadata
-  (:func:`dry_leaf_limits`);
-- otherwise `[interpreter.method_limits] max_declared_item_count`, 1,000 by default.
-
-A scope opened with ``None`` changes nothing, so a nested run whose metadata carries no maximum keeps the one around it.
+**A request may raise the maximum, never lower it.** A host states a request's own maximum, such as the hosted plane from
+the caller's plan, and a scope opened with `scoped_max_declared_item_count` (`pipelex.core.pipes.declared_item_count_scope`)
+carries it: the validation (`validate_bundles_in_process`), the run setup (`pipeline_run_setup`) and every pipe run,
+which reads it from its `RunMetadata`, so a worker in another process applies it too, and a dry leaf run in an activity
+with no scope reads it from its job's metadata (:func:`dry_leaf_limits`). The maximum in force is the larger of that
+maximum and the deployment's (:func:`get_max_declared_item_count`), so a request stating a lower one changes nothing: a
+host's own library pipes, which load beside the caller's method, are never refused for what the caller states. A scope
+opened with ``None`` changes nothing either, so a nested run whose metadata carries no maximum keeps the one around it.
 
 **A request's maximum is held to the deployment's ceiling.** It arrives in public JSON, so a caller could raise its own
 limit: :func:`validate_requested_max_declared_item_count` refuses one past `max_declared_item_count_ceiling`, which a
-deployment raises only behind a trusted front that sets each request's maximum itself. A host's own library directories
-load under the deployment's maximum, never a request's (:func:`holding_host_libraries_to_deployment_maximum`).
+deployment raises only behind a trusted front that sets each request's maximum itself.
 
 **Three lines of defence per slot.** The library load refuses a method declaring a count past the maximum before it
 builds anything (`pipelex.libraries.declared_item_counts`), a dry-run mock builder asked for a fixed count past it
@@ -74,11 +74,15 @@ def get_deployment_max_declared_item_count() -> int:
 
 
 def get_max_declared_item_count() -> int:
-    """The maximum number of items one slot may hold, in this context."""
+    """The maximum number of items one slot may hold, in this context: the deployment's, raised by a request's own.
+
+    A request's maximum, the one a scope opened, only ever raises the deployment's: the larger of the two is in force.
+    """
+    deployment_maximum = get_deployment_max_declared_item_count()
     scoped = get_scoped_max_declared_item_count()
-    if scoped is not None:
-        return scoped
-    return get_deployment_max_declared_item_count()
+    if scoped is None:
+        return deployment_maximum
+    return max(scoped, deployment_maximum)
 
 
 def validate_requested_max_declared_item_count(*, value: int) -> int:
@@ -86,7 +90,8 @@ def validate_requested_max_declared_item_count(*, value: int) -> int:
 
     A request's maximum is read from public JSON, so the deployment's ceiling,
     `[interpreter.method_limits] max_declared_item_count_ceiling`, bounds what a caller may raise its own limit to. A
-    maximum at or below it, one lowering the deployment's included, is accepted.
+    maximum at or below it is accepted; one below the deployment's own maximum is accepted too, and lowers nothing,
+    since the larger of the two is in force (:func:`get_max_declared_item_count`).
 
     Raises:
         RunParameterError: The value is not a whole number from one to the ceiling. It is a `ValueError`, so a pydantic
@@ -197,16 +202,4 @@ def dry_leaf_limits(*, run_max_declared_item_count: int | None) -> Generator[Non
     """
     maximum = run_max_declared_item_count if get_scoped_max_declared_item_count() is None else None
     with scoped_max_declared_item_count(maximum=maximum), scoped_dry_run_mock_budget():
-        yield
-
-
-@contextmanager
-def holding_host_libraries_to_deployment_maximum() -> Generator[None, None, None]:
-    """Load a host's own library directories under the deployment's maximum, whatever a request's maximum is in force.
-
-    A host's directories, such as a server's installed methods or `PIPELEXPATH`, load beside a request's method inside
-    the request's scope, but they are not the caller's: a caller lowering its own maximum must not turn a host pipe
-    declaring more into the host's fault, nor raise the bound on the host's pipes.
-    """
-    with scoped_max_declared_item_count(maximum=get_deployment_max_declared_item_count()):
         yield

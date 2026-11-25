@@ -67,6 +67,12 @@ def _build_run_client(mocker: MockerFixture) -> tuple[TestClient, _RecordingOrch
     return _build_client(), orchestrator
 
 
+def _lower_the_deployments_maximum(mocker: MockerFixture) -> None:
+    """A deployment allowing four items for one slot, whose ceiling lets a request raise that to five."""
+    mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count", 4)
+    mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count_ceiling", 5)
+
+
 def _over_limit_params(*, errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [error["params"] for error in errors if error["code"] == _OVER_LIMIT]
 
@@ -110,9 +116,10 @@ class TestMaxDeclaredItemCount:
 
     @pytest.mark.parametrize("route", _RUN_ROUTES)
     def test_an_output_multiplicity_past_the_maximum_is_refused_before_the_run_starts(self, mocker: MockerFixture, route: str) -> None:
-        """A run's own `output_multiplicity` is held to the maximum in force, the request's here, as a 422."""
+        """A run's own `output_multiplicity` is held to the maximum in force, the deployment's here, which a lower request maximum leaves alone."""
+        _lower_the_deployments_maximum(mocker)
         client, orchestrator = _build_run_client(mocker)
-        body = {"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 4}
+        body = {"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 2}
 
         accepted = client.post(route, json={**body, "output_multiplicity": 4})
         refused = client.post(route, json={**body, "output_multiplicity": 5})
@@ -125,9 +132,10 @@ class TestMaxDeclaredItemCount:
 
     @pytest.mark.parametrize("route", _RUN_ROUTES)
     def test_a_run_declaring_more_than_its_maximum_is_refused_before_it_starts(self, mocker: MockerFixture, route: str) -> None:
+        _lower_the_deployments_maximum(mocker)
         client, orchestrator = _build_run_client(mocker)
 
-        response = client.post(route, json={"mthds_contents": [FIVE_IDEAS_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 4})
+        response = client.post(route, json={"mthds_contents": [FIVE_IDEAS_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 2})
 
         assert response.status_code == 422, response.text
         assert _over_limit_params(errors=response.json()["errors"]) == [{"slot": _SLOT, "count": 5, "limit": 4}]
@@ -146,12 +154,13 @@ class TestMaxDeclaredItemCount:
     @pytest.mark.parametrize(
         ("maximum", "is_valid"),
         [
-            pytest.param(None, True, id="deployment-default"),
-            pytest.param(5, True, id="at-the-maximum"),
-            pytest.param(4, False, id="past-the-maximum"),
+            pytest.param(None, False, id="deployment-maximum"),
+            pytest.param(2, False, id="a-lower-maximum-lowers-nothing"),
+            pytest.param(5, True, id="a-higher-maximum-raises-it"),
         ],
     )
-    def test_a_validation_loads_the_method_under_the_requests_maximum(self, maximum: int | None, is_valid: bool) -> None:
+    def test_a_validation_loads_the_method_under_the_requests_maximum(self, mocker: MockerFixture, maximum: int | None, is_valid: bool) -> None:
+        _lower_the_deployments_maximum(mocker)
         response = _build_client().post("/v1/validate", json={"mthds_contents": [FIVE_IDEAS_MTHDS], "max_declared_item_count": maximum})
 
         assert response.status_code == 200, response.text
@@ -168,12 +177,15 @@ class TestMaxDeclaredItemCount:
             pytest.param("/v1/pipe-io", {}, id="pipe-io"),
         ],
     )
-    def test_a_method_route_loads_the_method_under_the_requests_maximum(self, route: str, route_fields: dict[str, str]) -> None:
+    def test_a_method_route_loads_the_method_under_the_requests_maximum(
+        self, mocker: MockerFixture, route: str, route_fields: dict[str, str]
+    ) -> None:
+        _lower_the_deployments_maximum(mocker)
         client = _build_client()
         body = {"files": {"main.mthds": FIVE_IDEAS_MTHDS}, **route_fields}
 
         accepted = client.post(route, json={**body, "max_declared_item_count": 5})
-        refused = client.post(route, json={**body, "max_declared_item_count": 4})
+        refused = client.post(route, json={**body, "max_declared_item_count": 2})
 
         assert accepted.status_code == 200, accepted.text
         assert accepted.json()["is_valid"] is True, accepted.text
