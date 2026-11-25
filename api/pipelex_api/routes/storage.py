@@ -170,7 +170,7 @@ async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResol
         # caller probing another scope's references would leave no trace in the logs.
         log.warning(
             "Storage references outside the caller's scope were refused",
-            fields={"storage.refused_count": refused_outside_scope, "storage.requested_count": len(request_data.uris)},
+            fields={"refused_reference_count": refused_outside_scope, "requested_reference_count": len(request_data.uris)},
         )
     response = BulkResolveStorageUrlResponse(items=items)
     return JSONResponse(content=response.model_dump(mode="json", serialize_as_any=True, by_alias=True))

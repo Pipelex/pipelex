@@ -573,6 +573,8 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `delivery_failure` | string | Why a caller webhook's delivery, or one attempt of it, failed: `http_status`, `timeout`, `unreachable`, `refused_address` or `secret_unavailable` |
 | `storage_scheme` | string or `null` | The kind of storage a deployment's storage provider is, as a `pipelex.storage.*` problem names it: `s3`, `local`; `null` for a storage plugin whose kind the registry does not list |
 | `blob_sha256` | string | The SHA-256 a blob is stored under in the API server's blob store, in lowercase hex: its content's hash, never its content |
+| `requested_reference_count` | integer | The number of `pipelex-storage://` references one request to the API server's bulk resolve route asked to resolve |
+| `refused_reference_count` | integer | The number of those references the route refused because they lie outside the caller's scope |
 | `blob_size_bytes`, `read_size_bytes` | integer | The size the API server's blob store holds a blob at, and the size of the bytes a read of it returned, in bytes |
 | `env_var` | string | The name of an environment variable, never its value |
 | `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
