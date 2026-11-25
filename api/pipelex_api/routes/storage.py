@@ -7,12 +7,12 @@ platform serves that route, since it alone knows the organization that owns an o
 platform in front of it, serves the same contract for its own storage, field for field, so neither SDK, nor any client
 built on them, has to know which kind of server it talks to.
 
-**A caller resolves only what lies under its own scope.** The scope is the one a run of the caller's writes under by
-default and its hash entries resolve in (`resolve_blob_scope`): `single-tenant` on a deployment that identifies no
-caller (`AUTH_MODE=none`, or the shared `api_key`), and the caller's own `user_id` under `AUTH_MODE=jwt`. A reference
-under another scope is refused on its item, as the platform refuses another organization's, and a reference that does
-not parse is refused on its item as `pipelex.storage.uri_invalid`; the request answers `200` whenever every reference
-got a verdict.
+**A caller resolves what its runs may read when they name no read scope** (`caller_read_scope`, the rule the run
+routes follow). Under `AUTH_MODE=jwt` that is its own `user_id`, and a reference under another scope is refused on its
+item, as the platform refuses another organization's. A deployment that identifies no caller (`AUTH_MODE=none`, or the
+shared `api_key`) has one tenant, whose runs may already write and read any key through `storage_scope` and
+`read_scope`, so it resolves any reference that parses. A reference that does not parse is refused on its item as
+`pipelex.storage.uri_invalid`; the request answers `200` whenever every reference got a verdict.
 
 **A resolved link is this runner's own signed download route** (`pipelex_api.storage_links`), mounted outside the
 authenticated router like `PUT /v1/blobs/{sha256}`: its signed query authorizes it, so a browser can display an image
@@ -43,7 +43,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex_api.exceptions import RunnerAuthError, StoredObjectMissingError
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import COMMON_PROBLEM_RESPONSES, PROBLEM_403_STORAGE_LINK, PROBLEM_404_STORAGE_OBJECT, PROBLEM_422, PROBLEM_500
-from pipelex_api.routes.pipelex.pipeline import READ_SCOPE_UNDER_CALLER_REQUIREMENT, resolve_blob_scope
+from pipelex_api.routes.pipelex.pipeline import READ_SCOPE_UNDER_CALLER_REQUIREMENT, caller_read_scope
 from pipelex_api.security import trusts_forwarded_identity
 from pipelex_api.storage_links import (
     DOWNLOAD_ROUTE_NAME,
@@ -129,17 +129,17 @@ def _refusal(*, code: ErrorCode, params: dict[str, Any] | None = None) -> Refusa
 async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResolveStorageUrlRequest) -> BulkResolveStorageUrlResponse:
     """Turn a list of `pipelex-storage://` URIs into short-lived download links, one verdict per reference (Pipelex API extension).
 
-    The hosted platform's contract, for this runner's own storage. A reference resolves only when its key lies under the
-    caller's scope: `single-tenant` on a deployment that identifies no caller, the caller's `user_id` under
-    `AUTH_MODE=jwt`. A reference that does not parse is refused on its item as `pipelex.storage.uri_invalid`, and one
-    under another scope as `auth.forbidden` whose `requirement` is `read_scope_under_caller`; the request is a `200`
+    The hosted platform's contract, for this runner's own storage. Under `AUTH_MODE=jwt` a reference resolves only when
+    its key lies under the caller's `user_id`, and one under another scope is refused on its item as `auth.forbidden`
+    whose `requirement` is `read_scope_under_caller`; a deployment that identifies no caller resolves any reference
+    that parses. A reference that does not parse is refused on its item as `pipelex.storage.uri_invalid`; the request is a `200`
     because a verdict was produced for every reference. Resolving checks no file is stored at the address, as a
     presigned URL does not. Each link is this runner's own `GET /v1/storage/{key}`, at `PUBLIC_BASE_URL` when the
     deployment sets it, signed for that key and valid for `STORAGE_LINK_TTL_SECONDS`. More than
     `MAX_BULK_RESOLVE_URIS` references, or a reference past `STORAGE_URI_MAX_CHARS`, is a `422 request.invalid`.
     Not served when the runner trusts forwarded identity, where the host's platform serves it.
     """
-    scope = resolve_blob_scope(request, read_scope=None)
+    scope = caller_read_scope(request)
     items: list[BulkResolveStorageUrlItem] = []
     refused_outside_scope = 0
     for uri in request_data.uris:
@@ -147,7 +147,7 @@ async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResol
         if key is None:
             items.append(BulkResolveStorageUrlItem(uri=uri, error=_refusal(code=PipelexErrorCode.STORAGE_URI_INVALID)))
             continue
-        if not is_key_within_read_scope(key=key, read_scope=scope):
+        if scope is not None and not is_key_within_read_scope(key=key, read_scope=scope):
             refused_outside_scope += 1
             refusal = _refusal(code=CoreCode.AUTH_FORBIDDEN, params={"requirement": READ_SCOPE_UNDER_CALLER_REQUIREMENT})
             items.append(BulkResolveStorageUrlItem(uri=uri, error=refusal))

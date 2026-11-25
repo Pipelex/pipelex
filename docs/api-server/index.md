@@ -203,7 +203,7 @@ List the models this runner can route to, and check one model reference against 
 ### Storage Transport
 Read back what a run stores: a long text, a generated image or a received file travels in a run's answer as a `pipelex-storage://` reference, which a client resolves to a short-lived link and fetches. Pipelex API extensions serving the hosted platform's bulk resolve contract for this server's own storage, not mounted when the server trusts forwarded identity.
 
-- `POST /v1/resolve-storage-url/bulk` — Resolve up to 100 references to signed download links, one verdict per reference in request order; a caller resolves only references under its own scope, and a refused reference is a value on its item, never a failed request
+- `POST /v1/resolve-storage-url/bulk` — Resolve up to 100 references to signed download links, one verdict per reference in request order; a caller resolves what its runs may read, only under its own `user_id` under `AUTH_MODE=jwt`, and a refused reference is a value on its item, never a failed request
 - `GET /v1/storage/{key}` — Download one stored object from its signed link (no bearer token: the signature authorizes it), under its stored content type
 
 `POST /v1/upload` and the single `POST /v1/resolve-storage-url` are not served. To give a run a file, pass any public HTTP(S) URL (or base64 data URL) directly as `Document.content.url`.

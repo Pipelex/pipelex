@@ -152,15 +152,16 @@ class TestStorageRoutes:
         assert not storage.root
 
     def test_each_reference_gets_its_verdict_in_request_order(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
-        client = _build_client(monkeypatch=monkeypatch)
+        client = _build_client(monkeypatch=monkeypatch, auth_mode=AuthMode.JWT)
+        own_key = f"{StorageRouteTestData.JWT_USER_ID}/generated/0123456789abcdef.png"
         uris = [
-            _uri(StorageRouteTestData.IMAGE_KEY),
+            _uri(own_key),
             _uri(f"{StorageRouteTestData.OTHER_USER_ID}/generated/0123456789abcdef.png"),
             *StorageRouteTestData.MALFORMED_URIS,
-            _uri(StorageRouteTestData.IMAGE_KEY),
+            _uri(own_key),
         ]
 
-        items = _resolve(client, *uris)
+        items = _resolve(client, *uris, headers=_headers(auth_mode=AuthMode.JWT))
 
         assert [item["uri"] for item in items] == uris
         assert items[0]["error"] is None
@@ -176,39 +177,48 @@ class TestStorageRoutes:
             assert item["error"]["detail"] == "A storage address in the request cannot be parsed.", item
         assert not storage.root
 
-    @pytest.mark.parametrize(
-        ("auth_mode", "readable_scope", "foreign_scope"),
-        [
-            (AuthMode.NONE, "single-tenant", StorageRouteTestData.JWT_USER_ID),
-            (AuthMode.API_KEY, "single-tenant", StorageRouteTestData.JWT_USER_ID),
-            (AuthMode.JWT, StorageRouteTestData.JWT_USER_ID, "single-tenant"),
-            (AuthMode.JWT, StorageRouteTestData.JWT_USER_ID, StorageRouteTestData.OTHER_USER_ID),
-        ],
-    )
-    def test_each_auth_mode_resolves_only_under_its_caller_s_scope(
-        self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider, auth_mode: AuthMode, readable_scope: str, foreign_scope: str
+    @pytest.mark.parametrize("foreign_scope", ["single-tenant", StorageRouteTestData.OTHER_USER_ID, f"{StorageRouteTestData.JWT_USER_ID}x"])
+    def test_a_jwt_caller_resolves_only_under_its_own_id(
+        self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider, foreign_scope: str
     ) -> None:
-        storage.root[f"{readable_scope}/generated/value.txt"] = b"mine"
-        client = _build_client(monkeypatch=monkeypatch, auth_mode=auth_mode)
-        own_reference = _uri(f"{readable_scope}/generated/value.txt")
-        foreign_reference = _uri(f"{foreign_scope}/generated/value.txt")
-        # A key equal to the scope names no object inside it, and a prefix of the scope's id is another scope.
-        scope_itself = _uri(f"{readable_scope}/value.txt").rsplit("/", 1)[0]
-        prefixed_scope = _uri(f"{readable_scope}x/generated/value.txt")
+        """The reserved single-tenant scope, another caller's, and an id the caller's is a prefix of are all another scope."""
+        own_key = f"{StorageRouteTestData.JWT_USER_ID}/generated/value.txt"
+        storage.root[own_key] = b"mine"
+        storage.root[f"{foreign_scope}/generated/value.txt"] = b"theirs"
+        client = _build_client(monkeypatch=monkeypatch, auth_mode=AuthMode.JWT)
+        headers = _headers(auth_mode=AuthMode.JWT)
 
-        own, foreign, prefixed = _resolve(client, own_reference, foreign_reference, prefixed_scope, headers=_headers(auth_mode=auth_mode))
+        own, foreign = _resolve(client, _uri(own_key), _uri(f"{foreign_scope}/generated/value.txt"), headers=headers)
 
         assert own["error"] is None, own
         assert _download(client, own["url"]).content == b"mine"
-        for refused in (foreign, prefixed):
-            assert refused["url"] is None, refused
-            assert refused["error"] == {
-                "code": "auth.forbidden",
-                "detail": "The request's identity lacks 'read_scope_under_caller', which this operation needs.",
-                "params": {"requirement": "read_scope_under_caller"},
-            }
-        (bare_scope,) = _resolve(client, scope_itself, headers=_headers(auth_mode=auth_mode))
+        assert foreign["url"] is None, foreign
+        assert foreign["error"] == {
+            "code": "auth.forbidden",
+            "detail": "The request's identity lacks 'read_scope_under_caller', which this operation needs.",
+            "params": {"requirement": "read_scope_under_caller"},
+        }
+        (bare_scope,) = _resolve(client, _uri(StorageRouteTestData.JWT_USER_ID), headers=headers)
         assert bare_scope["error"]["code"] == "pipelex.storage.uri_invalid"
+
+    @pytest.mark.parametrize("auth_mode", [AuthMode.NONE, AuthMode.API_KEY])
+    def test_a_deployment_that_identifies_no_caller_resolves_any_reference_that_parses(
+        self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider, auth_mode: AuthMode
+    ) -> None:
+        """Its one tenant's runs may write under any `storage_scope` and read under any `read_scope`, so it reads them all back."""
+        keys = [
+            "single-tenant/generated/value.txt",
+            "a-run-s-own-storage-scope/generated/value.txt",
+            f"{StorageRouteTestData.OTHER_USER_ID}/assets/value.txt",
+        ]
+        for key in keys:
+            storage.root[key] = key.encode()
+        client = _build_client(monkeypatch=monkeypatch, auth_mode=auth_mode)
+
+        items = _resolve(client, *[_uri(key) for key in keys], headers=_headers(auth_mode=auth_mode))
+
+        assert [item["error"] for item in items] == [None, None, None]
+        assert [_download(client, item["url"]).content for item in items] == [key.encode() for key in keys]
 
     @pytest.mark.parametrize("auth_mode", [AuthMode.API_KEY, AuthMode.JWT])
     def test_resolving_needs_the_deployment_s_credential(self, monkeypatch: pytest.MonkeyPatch, auth_mode: AuthMode) -> None:
