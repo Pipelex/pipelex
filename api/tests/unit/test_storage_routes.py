@@ -35,7 +35,8 @@ from tests.unit._problems import ClientResponse, assert_problem
 from tests.unit.test_data import StorageRouteTestData
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-# What the local provider stores in its test: the key, the bytes and the content type stored with them.
+# What the local provider stores in its test: the key, the bytes and the content type stored with them. Every answer but
+# the PDF's is sandboxed, an HTML page's and an SVG image's above all, since either could run a script.
 _STORED_FILES = {
     "text": (StorageRouteTestData.TEXT_KEY, StorageRouteTestData.LONG_TEXT.encode(), "text/plain"),
     "image": (StorageRouteTestData.IMAGE_KEY, (_REPO_ROOT / "tests" / "data" / "images" / "logo-tiny.png").read_bytes(), "image/png"),
@@ -44,6 +45,8 @@ _STORED_FILES = {
         (_REPO_ROOT / "tests" / "data" / "documents" / "solar_system.pdf").read_bytes(),
         "application/pdf",
     ),
+    "html": ("single-tenant/generated/0123456789abcdef/value.html", b"<html><script>alert(1)</script></html>", "text/html"),
+    "svg": ("single-tenant/generated/0123456789abcdef.svg", b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', "image/svg+xml"),
 }
 _RESOLVE_PATH = "/v1/resolve-storage-url/bulk"
 
@@ -354,7 +357,7 @@ class TestStorageRoutes:
 
     @pytest.mark.parametrize("stored_file", list(_STORED_FILES))
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_the_local_provider_serves_a_stored_text_an_image_and_a_document(
+    async def test_the_local_provider_serves_each_stored_file_sandboxed_unless_a_pdf(
         self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path, stored_file: str
     ) -> None:
         key, data, media_type = _STORED_FILES[stored_file]
@@ -370,6 +373,12 @@ class TestStorageRoutes:
         assert downloaded.status_code == 200, downloaded.text
         assert downloaded.content == data
         assert downloaded.headers["content-type"].split(";")[0] == media_type
+        assert downloaded.headers["x-content-type-options"] == "nosniff"
+        if stored_file == "document":
+            # A sandbox keeps Chromium's PDF viewer from displaying the document (crbug 413851).
+            assert "content-security-policy" not in downloaded.headers
+        else:
+            assert downloaded.headers["content-security-policy"] == "sandbox"
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_the_python_sdk_loads_a_stored_text_through_the_runner(

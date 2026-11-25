@@ -64,6 +64,7 @@ MAX_BULK_RESOLVE_URIS = 100
 
 # What a download refused for its link lacks, as the `requirement` of its `auth.forbidden`.
 SIGNED_STORAGE_LINK_REQUIREMENT = "signed_storage_link"
+_PDF_MEDIA_TYPE = "application/pdf"
 _OCTET_STREAM = "application/octet-stream"
 
 
@@ -192,7 +193,8 @@ async def get_stored_object(
     hold, or that has expired, is a 403 `auth.forbidden` whose `requirement` is `signed_storage_link`, as is a query
     that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
     bytes come from the runner's configured storage provider, under the content type stored with them, else the one
-    their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner's origin.
+    their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner's origin,
+    except a PDF, which a sandbox keeps a browser's own viewer from displaying.
     """
     if storage_key_of(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") is None or not is_download_authorized(key=key, expires=expires, signature=signature):
         msg = (
@@ -205,8 +207,20 @@ async def get_stored_object(
         msg = "The link's signature holds, but the runner's storage holds no file at the address it names."
         raise StoredObjectMissingError(msg) from exc
     media_type = stored.mime_type or mime_type_of_file_name(file_name=key) or _OCTET_STREAM
-    headers = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "private"}
-    return Response(content=stored.data, media_type=media_type, headers=headers)
+    return Response(content=stored.data, media_type=media_type, headers=_download_headers(media_type=media_type))
+
+
+def _download_headers(*, media_type: str) -> dict[str, str]:
+    """The headers of a download: never sniffed, kept private, and sandboxed unless the object is a PDF.
+
+    A sandboxed answer runs no script on the runner's origin, which a stored HTML page or SVG image would otherwise run.
+    A PDF is the exception, since Chromium's viewer refuses to display a document served under a sandbox (crbug 413851),
+    and a PDF runs no script on the origin that serves it.
+    """
+    headers = {"X-Content-Type-Options": "nosniff", "Cache-Control": "private"}
+    if media_type.split(";", 1)[0].strip().lower() != _PDF_MEDIA_TYPE:
+        headers["Content-Security-Policy"] = "sandbox"
+    return headers
 
 
 def mount_storage_routes(*, app: FastAPI, auth_dependency: Any) -> None:
