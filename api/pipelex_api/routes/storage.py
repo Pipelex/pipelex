@@ -28,6 +28,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, Path, Query, Request, Response
+from fastapi.responses import JSONResponse
 from mthds.protocol.problem.registry import CoreCode
 from pipelex import log
 from pipelex.errors.error_codes import ErrorCode
@@ -127,7 +128,7 @@ def _refusal(*, code: ErrorCode, params: dict[str, Any] | None = None) -> Refusa
     response_model=BulkResolveStorageUrlResponse,
     summary="Resolve pipelex-storage:// references to short-lived download links, one verdict per reference.",
 )
-async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResolveStorageUrlRequest) -> BulkResolveStorageUrlResponse:
+async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResolveStorageUrlRequest) -> JSONResponse:
     """Turn a list of `pipelex-storage://` URIs into short-lived download links, one verdict per reference (Pipelex API extension).
 
     The hosted platform's contract, for this runner's own storage. Under `AUTH_MODE=jwt` a reference resolves only when
@@ -162,7 +163,8 @@ async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResol
             "Storage references outside the caller's scope were refused",
             fields={"storage.refused_count": refused_outside_scope, "storage.requested_count": len(request_data.uris)},
         )
-    return BulkResolveStorageUrlResponse(items=items)
+    response = BulkResolveStorageUrlResponse(items=items)
+    return JSONResponse(content=response.model_dump(mode="json", serialize_as_any=True, by_alias=True))
 
 
 @download_router.get(
