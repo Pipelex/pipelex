@@ -4,7 +4,7 @@ Runs the ``native_judge`` pipe through the local (non-Temporal) ``PipeRouter`` w
 mocked to fail, and asserts the resulting problem carries the full classification —
 its code, domain, verdict and step, and the model and the provider in the operator's diagnostics.
 
-This is the baseline a distributed arm must match, asserting the same ``JudgeProblemParityTestData``
+This is the baseline a distributed arm must match, asserting the same ``JudgeProblemParityCases``
 constants so local / distributed parity holds by construction. The judgment operator does not wrap the
 leaf error (unlike PipeLLM), so the ``PipeRouter`` locates the raw ``JudgmentJobFailureError`` (a
 ``CogtError``) itself, and the problem's diagnostics carry its identity.
@@ -22,7 +22,7 @@ from pipelex.interpreter_hub import get_pipe_router
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.error_handling.cases import JudgeProblemParityTestData
+from tests.integration.pipelex.error_handling.cases import JudgeProblemParityCases
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 
 
@@ -34,8 +34,8 @@ class TestJudgeProblemLocalFullChain:
     def failing_judge_pipe_job_local(self) -> Generator[PipeJob, None, None]:
         """A PipeJob for the judgment pipe, in LIVE mode so the judgment call actually fires."""
         yield from pipe_job_from_bundle(
-            bundle_file=JudgeProblemParityTestData.BUNDLE_FILE,
-            pipe_code=JudgeProblemParityTestData.PIPE_CODE,
+            bundle_file=JudgeProblemParityCases.BUNDLE_FILE,
+            pipe_code=JudgeProblemParityCases.PIPE_CODE,
             pipe_run_mode=PipeRunMode.LIVE,
         )
 
@@ -48,7 +48,7 @@ class TestJudgeProblemLocalFullChain:
         mocker.patch.object(
             ContentGenerator,
             "make_judgment_answers",
-            side_effect=JudgeProblemParityTestData.make_failing_judgment_error(),
+            side_effect=JudgeProblemParityCases.make_failing_judgment_error(),
         )
 
         with pytest.raises(PipeRouterError) as exc_info:
@@ -58,18 +58,18 @@ class TestJudgeProblemLocalFullChain:
         # The classification the problem carries — the parity target.
         error = exc_info.value
         problem = error.to_problem(view=ProblemView.OPERATOR)
-        assert problem.code == JudgeProblemParityTestData.EXPECTED_CODE
-        assert problem.domain == JudgeProblemParityTestData.EXPECTED_DOMAIN
-        assert problem.is_retryable is JudgeProblemParityTestData.EXPECTED_RETRYABLE
-        assert problem.next_step.kind == JudgeProblemParityTestData.EXPECTED_OPERATOR_STEP_KIND
+        assert problem.code == JudgeProblemParityCases.EXPECTED_CODE
+        assert problem.domain == JudgeProblemParityCases.EXPECTED_DOMAIN
+        assert problem.is_retryable is JudgeProblemParityCases.EXPECTED_RETRYABLE
+        assert problem.next_step.kind == JudgeProblemParityCases.EXPECTED_OPERATOR_STEP_KIND
         assert problem.diagnostics is not None
         assert problem.diagnostics.error_class == "JudgmentJobFailureError"
-        assert problem.diagnostics.model == JudgeProblemParityTestData.FAILURE_MODEL
+        assert problem.diagnostics.model == JudgeProblemParityCases.FAILURE_MODEL
         assert problem.diagnostics.provider is not None
-        assert problem.diagnostics.provider.name == JudgeProblemParityTestData.FAILURE_PROVIDER
-        assert find_inference_error_category_in_chain(error) == JudgeProblemParityTestData.FAILURE_CATEGORY
+        assert problem.diagnostics.provider.name == JudgeProblemParityCases.FAILURE_PROVIDER
+        assert find_inference_error_category_in_chain(error) == JudgeProblemParityCases.FAILURE_CATEGORY
         # The advice stays the local CLI's tip: the caller's view carries the code's step, never the advice.
         advice = error.advised_action()
         assert advice is not None
-        assert advice.kind == JudgeProblemParityTestData.FAILURE_USER_ACTION_KIND
-        assert JudgeProblemParityTestData.FAILURE_USER_ACTION_DETAIL not in str(error.to_problem(view=ProblemView.CALLER).to_wire())
+        assert advice.kind == JudgeProblemParityCases.FAILURE_USER_ACTION_KIND
+        assert JudgeProblemParityCases.FAILURE_USER_ACTION_DETAIL not in str(error.to_problem(view=ProblemView.CALLER).to_wire())

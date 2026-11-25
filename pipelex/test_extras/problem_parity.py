@@ -22,7 +22,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, JudgmentJobFailureEr
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 
 
-class ProblemParityTestData:
+class ProblemParityCases:
     """Constants + factory driving both arms of the local / Temporal problem parity test.
 
     A single deliberately-failing ``PipeLLM`` call is the source of truth for both arms: each runs
@@ -70,10 +70,10 @@ class ProblemParityTestData:
         return error
 
 
-class SearchProblemParityTestData:
+class SearchProblemParityCases:
     """Constants + factory driving both arms of the local / Temporal problem parity test for web search.
 
-    The search counterpart of :class:`ProblemParityTestData`. A single deliberately-failing
+    The search counterpart of :class:`ProblemParityCases`. A single deliberately-failing
     ``PipeSearch`` leaf is the source of truth for both arms: the local arm runs the ``native_search``
     pipe through the direct ``ContentGenerator`` with ``make_search_sourced_answer`` mocked to fail; the
     Temporal arm runs the same pipe through ``WfPipeRouter`` with the activity-side ``search_gen_sourced_answer``
@@ -118,10 +118,10 @@ class SearchProblemParityTestData:
         return error
 
 
-class JudgeProblemParityTestData:
+class JudgeProblemParityCases:
     """Constants + factory driving both arms of the local / Temporal problem parity test for judgment.
 
-    The judgment counterpart of :class:`SearchProblemParityTestData`. A single deliberately-failing
+    The judgment counterpart of :class:`SearchProblemParityCases`. A single deliberately-failing
     ``PipeJudge`` leaf is the source of truth for both arms: the local arm runs the ``native_judge`` pipe
     through the direct ``ContentGenerator`` with ``make_judgment_answers`` mocked to fail; a distributed
     arm runs the same pipe with its activity-side leaf mocked to fail. Both assert the same ``EXPECTED_*``

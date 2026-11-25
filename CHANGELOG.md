@@ -4,7 +4,8 @@
 
 ### Changed
 
-- **The pytest agent rule puts test data in `cases.py`**: the kit's pytest standards told agents to keep test data in `test_data.py`, a name pytest collects as a test module, inside classes such as `TestData`, which it collects as test classes. The rule now names `cases.py` and data classes ending in `Cases`, and this repository's own test data follows it, apart from the parity classes `pipelex.test_extras.problem_parity` ships to distributed plugins, whose public names are unchanged.
+- **The pytest agent rule puts test data in `cases.py`**: the kit's pytest standards told agents to keep test data in `test_data.py`, a name pytest collects as a test module, inside classes such as `TestData`, which it collects as test classes. The rule now names `cases.py` and data classes ending in `Cases`, and this repository's own test data follows it.
+- **The parity fixtures in `pipelex.test_extras.problem_parity` end in `Cases` (Breaking)**: `ProblemParityTestData`, `SearchProblemParityTestData` and `JudgeProblemParityTestData` are now `ProblemParityCases`, `SearchProblemParityCases` and `JudgeProblemParityCases`, so a distributed executor's tests import them under the new names.
 
 ### Fixed
 

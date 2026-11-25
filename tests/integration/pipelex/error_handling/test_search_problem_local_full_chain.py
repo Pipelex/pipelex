@@ -6,7 +6,7 @@ its code, domain, verdict and step, and the model and the provider in the operat
 
 This is the baseline the Temporal full-chain test
 (``tests/integration/pipelex/temporal/test_workflow_search_problem_full_chain.py``) must match.
-Both arms assert the same ``SearchProblemParityTestData`` constants, so local / Temporal parity holds
+Both arms assert the same ``SearchProblemParityCases`` constants, so local / Temporal parity holds
 by construction. The search operator does not wrap the leaf error (unlike PipeLLM), so the
 ``PipeRouter`` locates the raw ``SearchJobFailureError`` (a ``CogtError``) itself, and the problem's
 diagnostics carry its identity.
@@ -24,7 +24,7 @@ from pipelex.interpreter_hub import get_pipe_router
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.error_handling.cases import SearchProblemParityTestData
+from tests.integration.pipelex.error_handling.cases import SearchProblemParityCases
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 
 
@@ -36,8 +36,8 @@ class TestSearchProblemLocalFullChain:
     def failing_search_pipe_job_local(self) -> Generator[PipeJob, None, None]:
         """A PipeJob for the search pipe, in LIVE mode so the search call actually fires."""
         yield from pipe_job_from_bundle(
-            bundle_file=SearchProblemParityTestData.BUNDLE_FILE,
-            pipe_code=SearchProblemParityTestData.PIPE_CODE,
+            bundle_file=SearchProblemParityCases.BUNDLE_FILE,
+            pipe_code=SearchProblemParityCases.PIPE_CODE,
             pipe_run_mode=PipeRunMode.LIVE,
         )
 
@@ -50,7 +50,7 @@ class TestSearchProblemLocalFullChain:
         mocker.patch.object(
             ContentGenerator,
             "make_search_sourced_answer",
-            side_effect=SearchProblemParityTestData.make_failing_search_error(),
+            side_effect=SearchProblemParityCases.make_failing_search_error(),
         )
 
         with pytest.raises(PipeRouterError) as exc_info:
@@ -60,18 +60,18 @@ class TestSearchProblemLocalFullChain:
         # The classification the problem carries — the parity target.
         error = exc_info.value
         problem = error.to_problem(view=ProblemView.OPERATOR)
-        assert problem.code == SearchProblemParityTestData.EXPECTED_CODE
-        assert problem.domain == SearchProblemParityTestData.EXPECTED_DOMAIN
-        assert problem.is_retryable is SearchProblemParityTestData.EXPECTED_RETRYABLE
-        assert problem.next_step.kind == SearchProblemParityTestData.EXPECTED_OPERATOR_STEP_KIND
+        assert problem.code == SearchProblemParityCases.EXPECTED_CODE
+        assert problem.domain == SearchProblemParityCases.EXPECTED_DOMAIN
+        assert problem.is_retryable is SearchProblemParityCases.EXPECTED_RETRYABLE
+        assert problem.next_step.kind == SearchProblemParityCases.EXPECTED_OPERATOR_STEP_KIND
         assert problem.diagnostics is not None
         assert problem.diagnostics.error_class == "SearchJobFailureError"
-        assert problem.diagnostics.model == SearchProblemParityTestData.FAILURE_MODEL
+        assert problem.diagnostics.model == SearchProblemParityCases.FAILURE_MODEL
         assert problem.diagnostics.provider is not None
-        assert problem.diagnostics.provider.name == SearchProblemParityTestData.FAILURE_PROVIDER
-        assert find_inference_error_category_in_chain(error) == SearchProblemParityTestData.FAILURE_CATEGORY
+        assert problem.diagnostics.provider.name == SearchProblemParityCases.FAILURE_PROVIDER
+        assert find_inference_error_category_in_chain(error) == SearchProblemParityCases.FAILURE_CATEGORY
         # The advice stays the local CLI's tip: the caller's view carries the code's step, never the advice.
         advice = error.advised_action()
         assert advice is not None
-        assert advice.kind == SearchProblemParityTestData.FAILURE_USER_ACTION_KIND
-        assert SearchProblemParityTestData.FAILURE_USER_ACTION_DETAIL not in str(error.to_problem(view=ProblemView.CALLER).to_wire())
+        assert advice.kind == SearchProblemParityCases.FAILURE_USER_ACTION_KIND
+        assert SearchProblemParityCases.FAILURE_USER_ACTION_DETAIL not in str(error.to_problem(view=ProblemView.CALLER).to_wire())
