@@ -1,7 +1,9 @@
 from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
+from pipelex.config import get_config
 from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -38,8 +40,11 @@ class TestDeclaredItemCountLimit:
         ("topic", "mthds_for_count", "slot"),
         DeclaredItemCountCases.SPELLINGS,
     )
-    async def test_a_request_maximum_raises_and_lowers_the_deployments(self, topic: str, mthds_for_count: Any, slot: str) -> None:
-        """The request's own maximum replaces the deployment's, in both directions."""
+    async def test_a_request_maximum_raises_and_lowers_the_deployments(
+        self, mocker: MockerFixture, topic: str, mthds_for_count: Any, slot: str
+    ) -> None:
+        """The request's own maximum replaces the deployment's, in both directions, raised only up to the deployment's ceiling."""
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count_ceiling", 2000)
         report = await validate_bundles_in_process(mthds_contents=[mthds_for_count(1500)], max_declared_item_count=2000)
         assert report is not None, topic
 
@@ -56,10 +61,10 @@ class TestDeclaredItemCountLimit:
 
         assert [params["limit"] for params in _refusal_params(exc=exc_info.value)] == [2]
 
-    @pytest.mark.parametrize("maximum", [0, -1, 1_000_000_000])
+    @pytest.mark.parametrize("maximum", [0, -1, 1_000_000_000, 1001])
     async def test_a_maximum_no_runtime_may_set_is_the_hosts_bug(self, maximum: int) -> None:
-        """A maximum outside 1..999,999,999 is refused before any work, never read as a verdict."""
-        with pytest.raises(RunParameterError, match="maximum declared item count"):
+        """A maximum outside 1..999,999,999, or past the deployment's ceiling, is refused before any work, never read as a verdict."""
+        with pytest.raises(RunParameterError, match=r"max_declared_item_count|maximum declared item count"):
             await validate_bundles_in_process(mthds_contents=[DeclaredItemCountCases.SPELLINGS[0][1](3)], max_declared_item_count=maximum)
 
     @pytest.mark.parametrize(
@@ -69,6 +74,27 @@ class TestDeclaredItemCountLimit:
     async def test_a_count_past_every_runtimes_bound_is_an_invalid_verdict(self, topic: str, mthds_for_count: Any, message: str) -> None:
         """A count no maximum could allow is refused by the parser, whatever the request's maximum."""
         with pytest.raises(ValidateBundleError, match=message) as exc_info:
-            await validate_bundles_in_process(mthds_contents=[mthds_for_count(10**12)], max_declared_item_count=999_999_999)
+            await validate_bundles_in_process(mthds_contents=[mthds_for_count(10**12)])
 
         assert exc_info.value.validation_error_items(), topic
+
+    @pytest.mark.parametrize("maximum", [1, 2])
+    async def test_a_method_declaring_no_count_is_valid_under_a_maximum_below_the_dry_runs_default_lengths(self, maximum: int) -> None:
+        """A variable list's dry-run length, three by default, is the dry run's own choice, shortened to the maximum."""
+        report = await validate_bundles_in_process(mthds_contents=[DeclaredItemCountCases.DECLARING_NO_COUNT], max_declared_item_count=maximum)
+        assert report is not None
+
+    async def test_a_dry_run_building_more_mock_items_in_all_than_the_budget_is_an_invalid_verdict(self, mocker: MockerFixture) -> None:
+        """Each slot of a batch over `Text[10]` whose branches output `Text[5]` is small; the validation's one budget counts them all."""
+        mthds = DeclaredItemCountCases.BATCHING_LISTS(5)
+        mocker.patch.object(get_config().interpreter.method_limits, "max_dry_run_mock_items", 1000)
+        assert await validate_bundles_in_process(mthds_contents=[mthds]) is not None
+
+        mocker.patch.object(get_config().interpreter.method_limits, "max_dry_run_mock_items", 40)
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundles_in_process(mthds_contents=[mthds])
+
+        problem = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        budget_items = [item for item in problem.errors or [] if item.code == PipelexErrorCode.DEPLOYMENT_DRY_RUN_MOCK_BUDGET_EXCEEDED]
+        assert budget_items
+        assert all(item.params is not None and item.params.model_dump(exclude_none=True)["budget"] == 40 for item in budget_items)

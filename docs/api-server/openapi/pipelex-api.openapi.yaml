@@ -488,12 +488,16 @@ paths:
                   - type: 'null'
                   title: Max Declared Item Count
                   description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare
-                    for one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, for this
-                    request alone, in place of the deployment''s `[interpreter.method_limits] max_declared_item_count`. A
-                    validation''s dry run builds one mock item per declared item, so the method loads under this maximum:
-                    one declaring more is refused with `pipelex.deployment.declared_count_over_limit`, as an invalid verdict
-                    on `/validate` and a 422 on a run. A multi-tenant host sends the maximum of the caller''s plan. It travels
-                    with a run to every process that runs a part of it. Omit it to keep the deployment''s maximum.'
+                    for one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, and the
+                    most a run may ask for with `output_multiplicity`, for this request alone, in place of the deployment''s
+                    `[interpreter.method_limits] max_declared_item_count`. A validation''s dry run builds one mock item per
+                    declared item, so the method loads under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`,
+                    as an invalid verdict on `/validate` and a 422 on a run. It must be a JSON integer, never a boolean or
+                    a string, from 1 to the deployment''s `[interpreter.method_limits] max_declared_item_count_ceiling`, which
+                    is the deployment''s own maximum unless the deployment sits behind a trusted front that sets it, such
+                    as a multi-tenant host sending the maximum of the caller''s plan; any other value is a 422 `request.invalid`
+                    naming this field. It travels with a run to every process that runs a part of it. Omit it to keep the
+                    deployment''s maximum.'
               additionalProperties: true
               type: object
               title: PipelexApiExecuteRequest
@@ -919,12 +923,16 @@ paths:
                   - type: 'null'
                   title: Max Declared Item Count
                   description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare
-                    for one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, for this
-                    request alone, in place of the deployment''s `[interpreter.method_limits] max_declared_item_count`. A
-                    validation''s dry run builds one mock item per declared item, so the method loads under this maximum:
-                    one declaring more is refused with `pipelex.deployment.declared_count_over_limit`, as an invalid verdict
-                    on `/validate` and a 422 on a run. A multi-tenant host sends the maximum of the caller''s plan. It travels
-                    with a run to every process that runs a part of it. Omit it to keep the deployment''s maximum.'
+                    for one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, and the
+                    most a run may ask for with `output_multiplicity`, for this request alone, in place of the deployment''s
+                    `[interpreter.method_limits] max_declared_item_count`. A validation''s dry run builds one mock item per
+                    declared item, so the method loads under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`,
+                    as an invalid verdict on `/validate` and a 422 on a run. It must be a JSON integer, never a boolean or
+                    a string, from 1 to the deployment''s `[interpreter.method_limits] max_declared_item_count_ceiling`, which
+                    is the deployment''s own maximum unless the deployment sits behind a trusted front that sets it, such
+                    as a multi-tenant host sending the maximum of the caller''s plan; any other value is a 422 `request.invalid`
+                    naming this field. It travels with a run to every process that runs a part of it. Omit it to keep the
+                    deployment''s maximum.'
               additionalProperties: true
               type: object
               title: PipelexApiStartRequest
@@ -2322,11 +2330,15 @@ components:
           - type: 'null'
           title: Max Declared Item Count
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare for
-            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, for this request alone,
-            in place of the deployment''s `[interpreter.method_limits] max_declared_item_count`. A validation''s dry run builds
-            one mock item per declared item, so the method loads under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`,
-            as an invalid verdict on `/validate` and a 422 on a run. A multi-tenant host sends the maximum of the caller''s
-            plan. It travels with a run to every process that runs a part of it. Omit it to keep the deployment''s maximum.'
+            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, and the most a run may
+            ask for with `output_multiplicity`, for this request alone, in place of the deployment''s `[interpreter.method_limits]
+            max_declared_item_count`. A validation''s dry run builds one mock item per declared item, so the method loads
+            under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`, as an invalid
+            verdict on `/validate` and a 422 on a run. It must be a JSON integer, never a boolean or a string, from 1 to the
+            deployment''s `[interpreter.method_limits] max_declared_item_count_ceiling`, which is the deployment''s own maximum
+            unless the deployment sits behind a trusted front that sets it, such as a multi-tenant host sending the maximum
+            of the caller''s plan; any other value is a 422 `request.invalid` naming this field. It travels with a run to
+            every process that runs a part of it. Omit it to keep the deployment''s maximum.'
         read_scope:
           anyOf:
           - type: string
@@ -4532,11 +4544,15 @@ components:
           - type: 'null'
           title: Max Declared Item Count
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare for
-            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, for this request alone,
-            in place of the deployment''s `[interpreter.method_limits] max_declared_item_count`. A validation''s dry run builds
-            one mock item per declared item, so the method loads under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`,
-            as an invalid verdict on `/validate` and a 422 on a run. A multi-tenant host sends the maximum of the caller''s
-            plan. It travels with a run to every process that runs a part of it. Omit it to keep the deployment''s maximum.'
+            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, and the most a run may
+            ask for with `output_multiplicity`, for this request alone, in place of the deployment''s `[interpreter.method_limits]
+            max_declared_item_count`. A validation''s dry run builds one mock item per declared item, so the method loads
+            under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`, as an invalid
+            verdict on `/validate` and a 422 on a run. It must be a JSON integer, never a boolean or a string, from 1 to the
+            deployment''s `[interpreter.method_limits] max_declared_item_count_ceiling`, which is the deployment''s own maximum
+            unless the deployment sits behind a trusted front that sets it, such as a multi-tenant host sending the maximum
+            of the caller''s plan; any other value is a 422 `request.invalid` naming this field. It travels with a run to
+            every process that runs a part of it. Omit it to keep the deployment''s maximum.'
         read_scope:
           anyOf:
           - type: string
@@ -6205,11 +6221,15 @@ components:
           - type: 'null'
           title: Max Declared Item Count
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare for
-            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, for this request alone,
-            in place of the deployment''s `[interpreter.method_limits] max_declared_item_count`. A validation''s dry run builds
-            one mock item per declared item, so the method loads under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`,
-            as an invalid verdict on `/validate` and a 422 on a run. A multi-tenant host sends the maximum of the caller''s
-            plan. It travels with a run to every process that runs a part of it. Omit it to keep the deployment''s maximum.'
+            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, and the most a run may
+            ask for with `output_multiplicity`, for this request alone, in place of the deployment''s `[interpreter.method_limits]
+            max_declared_item_count`. A validation''s dry run builds one mock item per declared item, so the method loads
+            under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`, as an invalid
+            verdict on `/validate` and a 422 on a run. It must be a JSON integer, never a boolean or a string, from 1 to the
+            deployment''s `[interpreter.method_limits] max_declared_item_count_ceiling`, which is the deployment''s own maximum
+            unless the deployment sits behind a trusted front that sets it, such as a multi-tenant host sending the maximum
+            of the caller''s plan; any other value is a 422 `request.invalid` naming this field. It travels with a run to
+            every process that runs a part of it. Omit it to keep the deployment''s maximum.'
         read_scope:
           anyOf:
           - type: string
@@ -9509,11 +9529,15 @@ components:
           - type: 'null'
           title: Max Declared Item Count
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare for
-            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, for this request alone,
-            in place of the deployment''s `[interpreter.method_limits] max_declared_item_count`. A validation''s dry run builds
-            one mock item per declared item, so the method loads under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`,
-            as an invalid verdict on `/validate` and a 422 on a run. A multi-tenant host sends the maximum of the caller''s
-            plan. It travels with a run to every process that runs a part of it. Omit it to keep the deployment''s maximum.'
+            one slot, an input or an output written `Concept[N]` or a controller step''s `nb_output`, and the most a run may
+            ask for with `output_multiplicity`, for this request alone, in place of the deployment''s `[interpreter.method_limits]
+            max_declared_item_count`. A validation''s dry run builds one mock item per declared item, so the method loads
+            under this maximum: one declaring more is refused with `pipelex.deployment.declared_count_over_limit`, as an invalid
+            verdict on `/validate` and a 422 on a run. It must be a JSON integer, never a boolean or a string, from 1 to the
+            deployment''s `[interpreter.method_limits] max_declared_item_count_ceiling`, which is the deployment''s own maximum
+            unless the deployment sits behind a trusted front that sets it, such as a multi-tenant host sending the maximum
+            of the caller''s plan; any other value is a 422 `request.invalid` naming this field. It travels with a run to
+            every process that runs a part of it. Omit it to keep the deployment''s maximum.'
       type: object
       title: ValidateRequest
       description: 'The method to validate, in `files`, by `method_ref` or as `mthds_contents`, plus `allow_signatures` and

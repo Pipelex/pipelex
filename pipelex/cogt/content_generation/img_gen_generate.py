@@ -4,6 +4,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
+from pipelex.core.pipes.declared_item_count import dry_leaf_limits
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.runtime_hub import get_img_gen_worker
 
@@ -51,7 +52,8 @@ async def img_gen_single_image_and_store(
     if img_gen_assignment.cogt_run_params.run_mode.is_dry:
         # Exactly one mock, matching the live single path's one-provider-call semantics
         # regardless of the assignment's nb_images.
-        return dry_img_gen_image_contents(img_gen_assignment.model_copy(update={"nb_images": 1}))[0]
+        with dry_leaf_limits(run_max_declared_item_count=img_gen_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_img_gen_image_contents(img_gen_assignment.model_copy(update={"nb_images": 1}))[0]
     generated_image = await img_gen_single_image(img_gen_assignment)
     image_content = await generated_content_factory.make_image_content(
         storage_scope=img_gen_assignment.job_metadata.run_metadata.storage_scope,
@@ -74,7 +76,9 @@ async def img_gen_image_list_and_store(
     """
     authorize_assignment_reads(job_metadata=img_gen_assignment.job_metadata, uri_references=img_gen_assignment.referenced_uris())
     if img_gen_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_img_gen_image_contents(img_gen_assignment)
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=img_gen_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_img_gen_image_contents(img_gen_assignment)
     generated_image_list = await img_gen_image_list(img_gen_assignment)
     image_contents: list[ImageContent] = []
     for raw_details in generated_image_list:

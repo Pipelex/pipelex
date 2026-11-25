@@ -614,8 +614,47 @@ prompt = "Give ideas about $topic"
 """
 
 
+def _bundle_batching_lists(count: int) -> str:
+    return f"""domain = "declared_counts"
+description = "A batch over a fixed list, each branch building a fixed list of its own"
+main_pipe = "expand_all"
+
+[pipe.expand_item]
+type = "PipeLLM"
+description = "Expand one text"
+inputs = {{ item = "Text" }}
+output = "Text[{count}]"
+prompt = "Expand $item"
+
+[pipe.expand_all]
+type = "PipeBatch"
+description = "Expand each text"
+inputs = {{ items = "Text[{count * 2}]" }}
+output = "Text[]"
+branch_pipe_code = "expand_item"
+input_list_name = "items"
+input_item_name = "item"
+"""
+
+
 class DeclaredItemCountCases:
     """One bundle builder per spelling of a declared item count, with the slot its refusal names."""
+
+    #: A method on variable lists only, whose dry-run lengths are the dry run's own defaults.
+    DECLARING_NO_COUNT: ClassVar[str] = """domain = "declared_counts"
+description = "Pipes on variable lists, declaring no count"
+main_pipe = "summarize_list"
+
+[pipe.summarize_list]
+type = "PipeLLM"
+description = "Summarize the texts"
+inputs = { items = "Text[]" }
+output = "Text[]"
+prompt = "Summarize these texts: $items"
+"""
+
+    #: A batch over `Text[2N]` whose branch outputs `Text[N]`: each slot is small, their product is not.
+    BATCHING_LISTS: ClassVar[Callable[[int], str]] = _bundle_batching_lists
 
     SPELLINGS: ClassVar[list[tuple[str, Callable[[int], str], str]]] = [
         ("input Concept[N]", _bundle_with_input_count, "the input 'items' of the pipe 'summarize_items'"),

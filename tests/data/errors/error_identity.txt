@@ -87,6 +87,7 @@ DriftGitError | runtime.unexpected
 DriftManifestError | pipelex.config.invalid
 DryRunError | inherits cause, else runtime.unexpected
 DryRunGraphNotProducedError | runtime.unexpected
+DryRunMockBudgetError | pipelex.deployment.dry_run_mock_budget_exceeded
 DryRunMockBuildError | method.mock_unsatisfiable
 DryRunObjectFidelityError | method.mock_unsatisfiable
 DuplicateBundleValidatorError | pipelex.plugin.conflict

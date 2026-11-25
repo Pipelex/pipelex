@@ -289,9 +289,15 @@ max_total_bytes = 1073741824
 
 [interpreter.method_limits]
 # The most items a method may declare for one slot: an input or an output written Concept[N], or a controller step's
-# nb_output = N. A validation's dry run builds one mock item per declared item. Raise it here for a method that
-# declares more; a method past it is refused when it loads. At most 999999999.
+# nb_output = N, and the most a run may ask for with output_multiplicity. A validation's dry run builds one mock item
+# per declared item. Raise it here for a method that declares more, with the ceiling below; a method past it is refused
+# when it loads.
 max_declared_item_count = 1000
+# The most a request's own max_declared_item_count may state, and the most max_declared_item_count above may be. Raise
+# it only behind a trusted front that sets each request's maximum itself. At most 999999999.
+max_declared_item_count_ceiling = 1000
+# The most mock items one dry run or one validation builds in all, whatever the slots.
+max_dry_run_mock_items = 100000
 
 ####################################################################################################
 # Builder Config

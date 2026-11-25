@@ -7,7 +7,7 @@ than the maximum in force (`pipelex.core.pipes.declared_item_count`), so a valid
 starts it.
 """
 
-from pipelex.core.pipes.declared_item_count import ensure_declared_item_count_allowed
+from pipelex.core.pipes.declared_item_count import ItemCountSource, ensure_declared_item_count_allowed
 from pipelex.core.pipes.variable_multiplicity import fixed_item_count, parse_concept_with_multiplicity
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
@@ -38,14 +38,19 @@ def ensure_pipe_declared_item_counts_allowed(*, pipe_code: str, blueprint: PipeB
     for input_name, slot_value in (blueprint.inputs or {}).items():
         input_count = fixed_item_count(multiplicity=parse_concept_with_multiplicity(slot_concept_spec(slot_value)).multiplicity)
         if input_count is not None:
-            ensure_declared_item_count_allowed(count=input_count, slot=f"the input '{input_name}' of the pipe '{pipe_code}'", maximum=maximum)
+            ensure_declared_item_count_allowed(
+                count=input_count, slot=f"the input '{input_name}' of the pipe '{pipe_code}'", maximum=maximum, source=ItemCountSource.METHOD
+            )
     output_count = fixed_item_count(multiplicity=parse_concept_with_multiplicity(blueprint.output).multiplicity)
     if output_count is not None:
-        ensure_declared_item_count_allowed(count=output_count, slot=f"the output of the pipe '{pipe_code}'", maximum=maximum)
+        ensure_declared_item_count_allowed(
+            count=output_count, slot=f"the output of the pipe '{pipe_code}'", maximum=maximum, source=ItemCountSource.METHOD
+        )
     for step in _steps_of(blueprint=blueprint):
         if step.nb_output is not None:
             ensure_declared_item_count_allowed(
                 count=step.nb_output,
                 slot=f"the {step.step_label} in the pipe '{pipe_code}'",
                 maximum=maximum,
+                source=ItemCountSource.METHOD,
             )

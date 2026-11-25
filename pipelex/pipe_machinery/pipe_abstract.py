@@ -16,7 +16,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.method_trees.tree_file_reads import TreeFileRead
-from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count
+from pipelex.core.pipes.declared_item_count_scope import scoped_dry_run_mock_budget, scoped_max_declared_item_count
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError, PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec
@@ -794,6 +794,9 @@ class PipeAbstract(ABC, BaseModel):
                 # The run's maximum declared item count, when its host stated one, bounds the dry-run mock builders of
                 # this pipe and of every pipe below it, in this process or a worker's; None keeps the one in force.
                 scoped_max_declared_item_count(maximum=job_metadata.run_metadata.max_declared_item_count),
+                # One budget of mock items for the whole dry run: the outermost pipe run opens it, unless a validation
+                # or a run setup already did, and every pipe below it, a batch's concurrent branches included, adds to it.
+                scoped_dry_run_mock_budget(),
             ):
                 return await self._run_pipe_traced(
                     job_metadata=job_metadata,

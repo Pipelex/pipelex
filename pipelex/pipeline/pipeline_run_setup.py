@@ -8,7 +8,8 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count, validate_max_declared_item_count
+from pipelex.core.pipes.declared_item_count import ensure_run_item_count_allowed, validate_requested_max_declared_item_count
+from pipelex.core.pipes.declared_item_count_scope import scoped_dry_run_mock_budget, scoped_max_declared_item_count
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
@@ -133,7 +134,10 @@ async def pipeline_run_setup(
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
-        Output multiplicity specification.
+        Output multiplicity specification. A fixed count is held to the maximum declared item count in force, the
+        run's own ``max_declared_item_count`` else the deployment's, and one past it is refused with
+        ``DeclaredItemCountLimitError`` before the run registers or a library opens, since a live run asks a model for
+        that many items and a dry run builds that many mock items.
     dynamic_output_concept_ref:
         Override the dynamic output concept ref.
     pipe_run_mode:
@@ -192,7 +196,10 @@ async def pipeline_run_setup(
         host states it for this run, such as a hosted plane from the caller's plan. ``None`` falls back to the
         deployment's ``[interpreter.method_limits] max_declared_item_count``. The library load refuses a method
         declaring more, and the run carries it on its ``RunMetadata``, so every pipe run, in this process or a
-        worker's, bounds its dry-run mock builders by it. See :mod:`pipelex.core.pipes.declared_item_count`.
+        worker's, bounds its dry-run mock builders by it. It may not pass the deployment's
+        ``max_declared_item_count_ceiling``: one past it is refused with ``RunParameterError``, as the host's bug. The
+        host's own library directories still load under the deployment's maximum. See
+        :mod:`pipelex.core.pipes.declared_item_count`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -279,10 +286,16 @@ async def pipeline_run_setup(
     # And the method id beside them, which rides every span and event of the run as they do.
     if method_id is not None:
         method_id = validate_method_id(value=method_id)
-    # And the maximum declared item count, which the load below holds the method to: a value no runtime may set is the
-    # host's bug, refused before the run registers or a library opens.
+    # And the maximum declared item count, which the load below holds the method to: a value no runtime may set, or one
+    # past the deployment's ceiling on a request's maximum, is the host's bug, refused before the run registers or a
+    # library opens.
     if max_declared_item_count is not None:
-        max_declared_item_count = validate_max_declared_item_count(value=max_declared_item_count)
+        max_declared_item_count = validate_requested_max_declared_item_count(value=max_declared_item_count)
+    # And the number of outputs the run asks for itself, held to the same maximum as a count a method declares: a live
+    # run asks a model for that many items, and a dry run builds that many mock items.
+    if isinstance(output_multiplicity, int) and not isinstance(output_multiplicity, bool):
+        with scoped_max_declared_item_count(maximum=max_declared_item_count):
+            ensure_run_item_count_allowed(count=output_multiplicity, slot="the run's output, with `output_multiplicity`")
 
     # And the scope, for the same reason and with more at stake.
     #
@@ -485,8 +498,8 @@ async def pipeline_run_setup(
             )
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
-        # The mock inputs a run asks for are built under the run's maximum too.
-        with scoped_max_declared_item_count(maximum=max_declared_item_count):
+        # The mock inputs a run asks for are built under the run's maximum too, and within the dry run's budget of mock items.
+        with scoped_max_declared_item_count(maximum=max_declared_item_count), scoped_dry_run_mock_budget():
             pipe_job = await prepare_pipe_job(
                 pipe=pipe,
                 library_id=library_id,

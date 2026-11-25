@@ -120,7 +120,7 @@ class TestValidateDispatch:
         _register_stub_for_temporal(mocker, stub)
 
         client = _build_client()
-        response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS], "allow_signatures": True, "max_declared_item_count": 5000})
+        response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS], "allow_signatures": True, "max_declared_item_count": 500})
 
         assert response.status_code == 200, response.text
         body = response.json()
@@ -140,7 +140,7 @@ class TestValidateDispatch:
         assert stub.calls[0]["mthds_contents"] == [VALID_MTHDS]
         assert stub.calls[0]["allow_signatures"] is True
         # The request's maximum declared item count, which a dispatched validator carries to its worker.
-        assert stub.calls[0]["max_declared_item_count"] == 5000
+        assert stub.calls[0]["max_declared_item_count"] == 500
 
     def test_validator_fault_propagates_as_5xx(self, mocker: MockerFixture) -> None:
         """A validator that raises a genuine fault (no verdict produced) propagates to the global 5xx handler."""

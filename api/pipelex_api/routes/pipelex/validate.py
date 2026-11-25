@@ -27,7 +27,13 @@ from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_ME
 from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.method_selection import select_request_method
 from pipelex_api.routes.pipelex.pipeline import ApiRunner, bound_read_scope, get_request_user_id
-from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest, max_declared_item_count_field
+from pipelex_api.schemas.models import (
+    RESOURCES_FIELD_DESCRIPTION,
+    CallerAnalyticsGroupsMixin,
+    MthdsContentsRequest,
+    RequestMaxDeclaredItemCount,
+    max_declared_item_count_field,
+)
 
 router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
 
@@ -143,7 +149,7 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
             "no scope, so a dry run without one leaves nothing stored."
         ),
     )
-    max_declared_item_count: int | None = max_declared_item_count_field()
+    max_declared_item_count: RequestMaxDeclaredItemCount = max_declared_item_count_field()
 
     @field_validator("read_scope")
     @classmethod

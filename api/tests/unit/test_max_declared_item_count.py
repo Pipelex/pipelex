@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -76,12 +77,51 @@ class TestMaxDeclaredItemCount:
         client, orchestrator = _build_run_client(mocker)
 
         response = client.post(
-            route, json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 2000}
+            route, json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 500}
         )
 
         assert response.status_code == _SUCCESS_STATUS[route], response.text
         (run_metadata,) = orchestrator.run_metadatas
-        assert run_metadata.max_declared_item_count == 2000
+        assert run_metadata.max_declared_item_count == 500
+
+    @pytest.mark.parametrize("route", [*_RUN_ROUTES, "/v1/validate", "/v1/resolve"])
+    def test_a_maximum_past_the_deployments_ceiling_is_a_422_naming_the_field(self, mocker: MockerFixture, route: str) -> None:
+        """The field is public JSON: a caller cannot raise its own maximum past the ceiling, 1,000 by default."""
+        client, orchestrator = _build_run_client(mocker)
+        body: dict[str, Any] = {"files": {"main.mthds": VALID_MTHDS}} if route == "/v1/resolve" else {"mthds_contents": [VALID_MTHDS]}
+
+        response = client.post(route, json={**body, "inputs": {"text": "hi"}, "max_declared_item_count": 1001})
+
+        assert_problem(response, status=422, code="request.invalid", field="max_declared_item_count")
+        assert orchestrator.run_metadatas == []
+
+    @pytest.mark.parametrize("route", _RUN_ROUTES)
+    def test_a_deployment_raising_its_ceiling_lets_a_trusted_front_raise_a_runs_maximum(self, mocker: MockerFixture, route: str) -> None:
+        mocker.patch.object(get_config().interpreter.method_limits, "max_declared_item_count_ceiling", 5000)
+        client, orchestrator = _build_run_client(mocker)
+
+        response = client.post(
+            route, json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 5000}
+        )
+
+        assert response.status_code == _SUCCESS_STATUS[route], response.text
+        (run_metadata,) = orchestrator.run_metadatas
+        assert run_metadata.max_declared_item_count == 5000
+
+    @pytest.mark.parametrize("route", _RUN_ROUTES)
+    def test_an_output_multiplicity_past_the_maximum_is_refused_before_the_run_starts(self, mocker: MockerFixture, route: str) -> None:
+        """A run's own `output_multiplicity` is held to the maximum in force, the request's here, as a 422."""
+        client, orchestrator = _build_run_client(mocker)
+        body = {"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hi"}, "max_declared_item_count": 4}
+
+        accepted = client.post(route, json={**body, "output_multiplicity": 4})
+        refused = client.post(route, json={**body, "output_multiplicity": 5})
+
+        assert accepted.status_code == _SUCCESS_STATUS[route], accepted.text
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["code"] == _OVER_LIMIT
+        assert refused.json()["params"] == {"slot": "the run's output, with `output_multiplicity`", "count": 5, "limit": 4}
+        assert len(orchestrator.run_metadatas) == 1
 
     @pytest.mark.parametrize("route", _RUN_ROUTES)
     def test_a_run_declaring_more_than_its_maximum_is_refused_before_it_starts(self, mocker: MockerFixture, route: str) -> None:
@@ -94,7 +134,7 @@ class TestMaxDeclaredItemCount:
         assert orchestrator.run_metadatas == []
 
     @pytest.mark.parametrize("route", [*_RUN_ROUTES, "/v1/validate", "/v1/resolve"])
-    @pytest.mark.parametrize("bad_maximum", [0, -1, 1_000_000_000, "many"])
+    @pytest.mark.parametrize("bad_maximum", [0, -1, 1_000_000_000, "many", True, False, "5", 5.0])
     def test_a_maximum_no_runtime_may_set_is_a_422_naming_the_field(self, mocker: MockerFixture, route: str, bad_maximum: Any) -> None:
         client, _orchestrator = _build_run_client(mocker)
         body: dict[str, Any] = {"files": {"main.mthds": VALID_MTHDS}} if route == "/v1/resolve" else {"mthds_contents": [VALID_MTHDS]}

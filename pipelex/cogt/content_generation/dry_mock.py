@@ -71,7 +71,7 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
-from pipelex.core.pipes.declared_item_count import ensure_mock_item_count_allowed
+from pipelex.core.pipes.declared_item_count import capped_synthetic_mock_count, ensure_mock_item_count_allowed, spend_dry_run_mock_items
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -183,7 +183,11 @@ def build_mock_object(model_class: type[BaseModelTypeVar], **field_values: Any) 
     into the typed :class:`DryRunMockBuildError` naming the class and the remedy;
     the activity error boundary then makes it terminal (eng review D7, listed in
     ``non_retryable_error_types``).
+
+    The mock counts against the dry run's budget of mock items before it is built
+    (:func:`~pipelex.core.pipes.declared_item_count.spend_dry_run_mock_items`).
     """
+    spend_dry_run_mock_items(count=1, slot=f"a dry run's mock '{model_class.__name__}' object")
     try:
         return DryRunFactory.make_dry_run_factory(model_class).build(**field_values)
     except (ValidationError, FactoryException) as exc:
@@ -197,10 +201,11 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> li
     factory classes — building it once per list (not once per item) keeps list mocks linear in
     item construction only. Same :class:`DryRunMockBuildError` wrap as :func:`build_mock_object`.
 
-    A count past the maximum in force is refused before anything is built, never shortened
-    (:func:`~pipelex.core.pipes.declared_item_count.ensure_mock_item_count_allowed`).
+    The ``count`` items count against the dry run's budget of mock items before any is built
+    (:func:`~pipelex.core.pipes.declared_item_count.spend_dry_run_mock_items`). Whether ``count`` may pass the
+    maximum declared item count is the caller's to say, since only it knows whether the count was declared or chosen.
     """
-    ensure_mock_item_count_allowed(count=count, slot=f"a dry run's list of mock '{model_class.__name__}' objects")
+    spend_dry_run_mock_items(count=count, slot=f"a dry run's list of mock '{model_class.__name__}' objects")
     factory = DryRunFactory.make_dry_run_factory(model_class)
     try:
         return [factory.build() for _ in range(count)]
@@ -209,10 +214,18 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> li
 
 
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:
-    """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11), including 0."""
+    """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11), including 0.
+
+    A fixed ``nb_items`` is a count the method or the run declared, refused past the maximum in force rather than
+    shortened, since the run holds the list to that length. Without one, the length is the dry run's own default,
+    ``inference.dry_run.nb_list_items``, which no one declared: it is shortened to the maximum, never refused.
+    """
     if object_assignment.nb_items is not None:
+        ensure_mock_item_count_allowed(
+            count=object_assignment.nb_items, slot=f"a dry run's list of mock '{object_assignment.object_class_name}' objects"
+        )
         return object_assignment.nb_items
-    return get_config().inference.dry_run.nb_list_items
+    return capped_synthetic_mock_count(default=get_config().inference.dry_run.nb_list_items)
 
 
 class _ReportLLMJobFunc(Protocol):
@@ -335,7 +348,9 @@ def dry_img_gen_image_contents(img_gen_assignment: ImgGenAssignment) -> list[Ima
     Sits at the ``*_and_store`` layer — one step above the raw provider leaf — so a dry run never
     touches the storage provider (eng review D10).
     """
+    # The number of images is always fixed, by the output's `Image[N]`, a step's `nb_output` or one single image.
     ensure_mock_item_count_allowed(count=img_gen_assignment.nb_images, slot="a dry run's list of mock images")
+    spend_dry_run_mock_items(count=img_gen_assignment.nb_images, slot="a dry run's list of mock images")
     image_urls = get_config().inference.dry_run.image_urls
     return [
         _dry_image_content(image_url=image_urls[image_index % len(image_urls)], img_gen_assignment=img_gen_assignment)
@@ -353,7 +368,9 @@ def dry_extract_page_contents(extract_assignment: ExtractAssignment) -> list[Pag
     if extract_assignment.extract_input.image_uri:
         nb_pages = 1
     else:
-        nb_pages = get_config().inference.dry_run.nb_extract_pages
+        # The dry run's own page count, declared by no one: shortened to the maximum, never refused.
+        nb_pages = capped_synthetic_mock_count(default=get_config().inference.dry_run.nb_extract_pages)
+    spend_dry_run_mock_items(count=nb_pages, slot="a dry run's mock extracted pages")
     return [
         PageContent(
             text_and_images=TextAndImagesContent(
@@ -372,7 +389,8 @@ def dry_render_page_views() -> list[ImageContent]:
     Fake URLs come from ``inference.dry_run.image_urls`` (validated non-empty) — the single configured
     source of truth for dry fake images, same as the img-gen mock.
     """
-    nb_pages = get_config().inference.dry_run.nb_extract_pages
+    nb_pages = capped_synthetic_mock_count(default=get_config().inference.dry_run.nb_extract_pages)
+    spend_dry_run_mock_items(count=nb_pages, slot="a dry run's mock page views")
     image_urls = get_config().inference.dry_run.image_urls
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]
 
@@ -388,7 +406,8 @@ def dry_render_document(render_assignment: RenderDocumentAssignment) -> Document
 
 def dry_search_gen_sourced_answer() -> SearchResultContent:
     """Dry leaf for sourced-answer search: polyfactory-built result with mock sources, no provider."""
-    nb_sources = get_config().inference.dry_run.nb_list_items
+    # The dry run's own number of sources, declared by no one: shortened to the maximum, never refused.
+    nb_sources = capped_synthetic_mock_count(default=get_config().inference.dry_run.nb_list_items)
     mock_sources = build_mock_objects(DocumentContent, count=nb_sources)
     return build_mock_object(SearchResultContent, sources=mock_sources)
 

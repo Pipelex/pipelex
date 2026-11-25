@@ -1,13 +1,20 @@
-"""The scope a host opens to state the maximum declared item count for one request.
+"""The scopes a host opens to bound what one request's dry run may build.
 
-A host opens :func:`scoped_max_declared_item_count` from a request's own maximum, such as a hosted plane from the
-caller's plan, and everything run in that context, the library load and the dry run's mock builders included, reads it
-through `pipelex.core.pipes.declared_item_count`, which falls back to the deployment's configuration outside any scope.
+Two bounds share this context, both read through `pipelex.core.pipes.declared_item_count`, which falls back to the
+deployment's configuration outside any scope:
 
-This module reads no configuration, so the pipe machinery can open the scope without importing the configuration
-singleton.
+- **The maximum declared item count**, the most items one slot may hold. A host opens
+  :func:`scoped_max_declared_item_count` from a request's own maximum, such as a hosted plane from the caller's plan, and
+  everything run in that context, the library load and the dry run's mock builders included, reads it.
+- **The dry run's mock budget**, the most mock items one dry run or one validation builds in all, whatever the slots.
+  :func:`scoped_dry_run_mock_budget` opens one tally for the block, or joins the one already open, so a validation's
+  sweep, a run's pipes and the concurrent branches of a batch all add to the same tally.
+
+This module reads no configuration, so the pipe machinery can open the scopes without importing the configuration
+singleton: the budget's size is the configuration's, read when an item is added (`spend_dry_run_mock_items`).
 """
 
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -21,7 +28,9 @@ _scoped_max_declared_item_count: ContextVar[int | None] = ContextVar("scoped_max
 def validate_max_declared_item_count(*, value: int) -> int:
     """Refuse a maximum no runtime may set: below one, or past the parser's ceiling.
 
-    A host states the maximum, so a value refused here is the host's bug, refused before any work.
+    A host states the maximum, so a value refused here is the host's bug, refused before any work. The deployment's own
+    ceiling on a request's maximum is checked where a request's maximum enters
+    (`pipelex.core.pipes.declared_item_count.validate_requested_max_declared_item_count`), since it reads the configuration.
 
     Raises:
         RunParameterError: The value is not a count between one and `DECLARED_ITEM_COUNT_CEILING`.
@@ -52,3 +61,57 @@ def scoped_max_declared_item_count(*, maximum: int | None) -> Generator[None, No
 def get_scoped_max_declared_item_count() -> int | None:
     """The maximum a scope opened in this context states, or ``None`` outside every scope."""
     return _scoped_max_declared_item_count.get()
+
+
+class DryRunMockTally:
+    """The mock items one dry run has built so far, against the budget the configuration sets.
+
+    The scope holds this one mutable object rather than a number, so every context copied from the scope's shares it:
+    the concurrent branches of a batch, each run as a task in its own copy of the context, and a load's worker thread
+    all add to the same tally, where a copied integer would give each of them a budget of its own. Under asyncio an add
+    runs between two awaits, so no other coroutine interleaves with it; the lock makes it atomic across threads too.
+    """
+
+    def __init__(self) -> None:
+        self._built = 0
+        self._lock = threading.Lock()
+
+    @property
+    def built(self) -> int:
+        """How many mock items the dry run has built so far."""
+        return self._built
+
+    def add_within(self, *, count: int, budget: int) -> bool:
+        """Add `count` mock items when the tally stays within `budget`, and say whether it did; past it, add nothing."""
+        with self._lock:
+            if self._built + count > budget:
+                return False
+            self._built += count
+            return True
+
+
+_scoped_dry_run_mock_tally: ContextVar[DryRunMockTally | None] = ContextVar("scoped_dry_run_mock_tally", default=None)
+
+
+@contextmanager
+def scoped_dry_run_mock_budget() -> Generator[DryRunMockTally, None, None]:
+    """Count the mock items the block builds against one budget: a new tally, or the one a scope around it opened.
+
+    A nested scope joins the open tally rather than starting a fresh one, so a validation's sweep and every pipe run in
+    it, or a run's pipes and the branches of its batches, spend one budget between them.
+    """
+    open_tally = _scoped_dry_run_mock_tally.get()
+    if open_tally is not None:
+        yield open_tally
+        return
+    tally = DryRunMockTally()
+    token = _scoped_dry_run_mock_tally.set(tally)
+    try:
+        yield tally
+    finally:
+        _scoped_dry_run_mock_tally.reset(token)
+
+
+def get_scoped_dry_run_mock_tally() -> DryRunMockTally | None:
+    """The tally a budget scope opened in this context counts on, or ``None`` outside every one."""
+    return _scoped_dry_run_mock_tally.get()

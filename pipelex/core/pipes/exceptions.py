@@ -76,12 +76,13 @@ class DeclaredItemCountLimitError(PipelexError):
     runtime allows at most the maximum in force (`pipelex.core.pipes.declared_item_count`): a request's own, else
     `[interpreter.method_limits] max_declared_item_count`. The method is valid MTHDS: the limit is the runtime's, so the
     refusal carries `pipelex.deployment.declared_count_over_limit`, whose steps say a higher plan or configuration
-    raises it. It is raised when a method loads for a validation or a run, before anything is built, and again by a
-    dry-run mock builder asked for more items than the limit, so a path that skipped the load check cannot build them.
+    raises it. It is raised when a method loads for a validation or a run, before anything is built, again by a
+    dry-run mock builder asked for a fixed count past the limit, so a path that skipped the load check cannot build them,
+    and by a run's setup when the run's own `output_multiplicity` asks for more.
 
     Attributes:
         slot: Where the count is declared, as a caller reads it, such as "the input 'items' of the pipe 'summarize'".
-        count: The declared count.
+        count: The count asked for.
         limit: The maximum in force.
     """
 
@@ -96,6 +97,33 @@ class DeclaredItemCountLimitError(PipelexError):
     @override
     def problem_params(self) -> dict[str, Any]:
         return {"slot": self.slot, "count": self.count, "limit": self.limit}
+
+
+class DryRunMockBudgetError(PipelexError):
+    """A dry run of a method would build more mock items in all than the runtime's budget for one dry run.
+
+    The maximum declared item count bounds one slot; this budget bounds their sum and their products, such as many
+    inputs each declaring the maximum, or a batch over a list whose every branch builds another list. Every dry-run mock
+    builder adds what it builds to one tally per validation or per run (`pipelex.core.pipes.declared_item_count`), and
+    the one that would pass `[interpreter.method_limits] max_dry_run_mock_items` refuses before it builds anything. Like
+    the declared count, it is the runtime's limit, so the refusal carries
+    `pipelex.deployment.dry_run_mock_budget_exceeded`.
+
+    Attributes:
+        slot: What the builder was about to build, as a caller reads it, such as "the mock input 'items'".
+        budget: The most mock items this runtime builds for one dry run.
+    """
+
+    error_code = PipelexErrorCode.DEPLOYMENT_DRY_RUN_MOCK_BUDGET_EXCEEDED
+
+    def __init__(self, message: str, *, slot: str, budget: int):
+        self.slot = slot
+        self.budget = budget
+        super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"slot": self.slot, "budget": self.budget}
 
 
 class PipeRunError(PipelexError):

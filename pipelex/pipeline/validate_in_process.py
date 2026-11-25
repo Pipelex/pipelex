@@ -25,7 +25,8 @@ from typing import TYPE_CHECKING
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
-from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count, validate_max_declared_item_count
+from pipelex.core.pipes.declared_item_count import validate_requested_max_declared_item_count
+from pipelex.core.pipes.declared_item_count_scope import scoped_dry_run_mock_budget, scoped_max_declared_item_count
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_tree_listing import MethodTreeListing, get_scoped_tree_listing
@@ -139,14 +140,17 @@ async def validate_bundles_in_process(
             is the maximum in force for the whole pass, the load, the sweep's dry runs and the graph arm, so a method
             declaring more is the invalid verdict ``pipelex.deployment.declared_count_over_limit`` and no mock list past
             it is built. ``None`` keeps the one in force: a scope the caller opened, else the deployment's
-            ``[interpreter.method_limits] max_declared_item_count`` (`pipelex.core.pipes.declared_item_count`).
+            ``[interpreter.method_limits] max_declared_item_count`` (`pipelex.core.pipes.declared_item_count`). It may
+            not pass the deployment's ``max_declared_item_count_ceiling``. Whatever it is, the whole pass builds at most
+            ``max_dry_run_mock_items`` mock items, past which its dry run is the invalid verdict
+            ``pipelex.deployment.dry_run_mock_budget_exceeded``.
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
 
     Raises:
         RunParameterError: When `request_id` breaks the request id rule, or `max_declared_item_count` is not a count
-            any runtime may set: the host's bug, refused before any work.
+            from one to the deployment's `max_declared_item_count_ceiling`: the host's bug, refused before any work.
         PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
     """
     # Refused before any work, as a run refuses it before its setup: an id that breaks the rule is the host's bug, never
@@ -154,11 +158,13 @@ async def validate_bundles_in_process(
     if request_id is not None:
         validate_request_id(value=request_id)
     if max_declared_item_count is not None:
-        validate_max_declared_item_count(value=max_declared_item_count)
+        validate_requested_max_declared_item_count(value=max_declared_item_count)
     with (
         log.context(request_id=request_id),
         scoped_caller_identity(caller_identity=caller_identity),
         scoped_max_declared_item_count(maximum=max_declared_item_count),
+        # One budget of mock items for the whole validation: the sweep's dry runs and the graph arm spend it together.
+        scoped_dry_run_mock_budget(),
         MethodValidationReport() as validation_report,
     ):
         return await _validate_bundles_in_scope(
