@@ -5,10 +5,12 @@ info:
   summary: The source-available Pipelex runner — implements MTHDS Protocol v2.0.1.
   description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v2.0.1 (`POST /execute`, `POST /start`, `POST
     /validate`, `GET /models`, `GET /version` — marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve
-    and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), the model reference check (`/models/check`), and
-    editor tooling (`/lint`, `/format`). Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API.
-    All endpoints are served under the `/v1` base path; every error is an RFC 7807 `application/problem+json` problem document,
-    documented per operation as a `ProblemDocument`.'
+    and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), the model reference check (`/models/check`), editor
+    tooling (`/lint`, `/format`), and the storage transport that reads back what a run stores (`/resolve-storage-url/bulk`
+    and the signed download links of `/storage/{key}` it resolves to, not served when the server trusts forwarded identity).
+    Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. All endpoints are served under the
+    `/v1` base path; every error is an RFC 7807 `application/problem+json` problem document, documented per operation as a
+    `ProblemDocument`.'
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
