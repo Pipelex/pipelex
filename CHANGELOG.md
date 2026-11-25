@@ -12,7 +12,7 @@
 
 ### Fixed
 
-- **The local storage provider reads a key naming no regular file as a missing file**: a key naming a directory, a path through a file, or a segment longer than the filesystem holds raises `StorageFileNotFoundError` instead of `StorageLocalError` or a raw `OSError`.
+- **The local storage provider reads a key naming no regular file as a missing file**: in every read, `load_with_metadata`, `load_head`, `load_size` and `load_metadata`, a key naming a directory, a path through a file, or a segment longer than the filesystem holds raises `StorageFileNotFoundError` instead of `StorageLocalError` or a raw `OSError`. The check reads the path's status itself, so a permission the filesystem refuses raises `StorageLocalError` on every supported Python, where from Python 3.14 `Path.is_file()` would have read it as a missing file.
 
 ## [v0.117.0] - 2026-11-25
 

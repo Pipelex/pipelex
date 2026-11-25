@@ -2,6 +2,7 @@ import contextlib
 import errno
 import json
 import os
+import stat
 import threading
 from collections.abc import Mapping
 from pathlib import Path
@@ -16,9 +17,10 @@ from pipelex.tools.misc.filetype_utils import detect_file_type_from_path
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError, StorageLocalError
 from pipelex.tools.storage.storage_provider_abstract import StorageKind, StorageProviderAbstract, StoredData
 
-# The errors a read of a key raises when the key names no stored file: a path whose name, or one of whose segments, is
-# longer than the filesystem allows, and a path naming a directory, which a write never leaves under a key.
-_NAMES_NO_STORED_FILE_ERRNOS = frozenset({errno.ENAMETOOLONG, errno.EISDIR, errno.ENOTDIR})
+# The errors a read of a key raises when the key names no stored file: nothing at the path, a path whose name, or one of
+# whose segments, is longer than the filesystem allows, a path naming a directory, which a write never leaves under a
+# key, and a path through a file. Any other error, a permission refused above all, is a failure of the filesystem.
+_NAMES_NO_STORED_FILE_ERRNOS = frozenset({errno.ENOENT, errno.ENAMETOOLONG, errno.EISDIR, errno.ENOTDIR})
 
 # The name of the file holding a stored file's metadata, beside it: hidden, as the temporary files of a write are, and
 # never a key a caller can name, so no read or write reaches it as a stored file of its own.
@@ -115,6 +117,51 @@ class LocalStorageProvider(StorageProviderAbstract):
 
         return resolved_path
 
+    def _stored_file_status(self, *, file_path: Path, key: str) -> os.stat_result:
+        """The status of the regular file stored under the key, read without opening it.
+
+        The status itself is read, rather than `Path.is_file()`, which from Python 3.14 answers False where a permission
+        is refused, so a filesystem fault would read as a missing file.
+
+        Raises:
+            StorageFileNotFoundError: If no regular file is stored under the key: nothing is there, a directory is, the
+                path goes through a file, or the filesystem cannot hold a name the key holds.
+            StorageLocalError: If the filesystem cannot read the path's status (e.g. permission denied, I/O error).
+        """
+        try:
+            status = file_path.stat()
+        except OSError as exc:
+            if exc.errno not in _NAMES_NO_STORED_FILE_ERRNOS:
+                msg = f"Failed to read file '{key}': {exc}"
+                raise StorageLocalError(msg) from exc
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
+        if not stat.S_ISREG(status.st_mode):
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
+        return status
+
+    async def _read_stored_file(self, *, file_path: Path, key: str, nb_bytes: int | None) -> bytes:
+        """The bytes of the regular file stored under the key: all of them, or at most `nb_bytes` leading ones.
+
+        Raises:
+            StorageFileNotFoundError: If no regular file is stored under the key, as `_stored_file_status` reads it, or
+                the file is removed between that check and the open.
+            StorageLocalError: If the filesystem read fails (e.g. permission denied, I/O error).
+        """
+        self._stored_file_status(file_path=file_path, key=key)
+        try:
+            async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+                data: bytes = await file_handle.read() if nb_bytes is None else await file_handle.read(nb_bytes)
+        except OSError as exc:
+            # A file that passed the status check can still be gone by the open (TOCTOU), or be refused a name there.
+            if exc.errno in _NAMES_NO_STORED_FILE_ERRNOS:
+                msg = f"File not found: '{key}'"
+                raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
+            msg = f"Failed to read file '{key}': {exc}"
+            raise StorageLocalError(msg) from exc
+        return data
+
     @override
     async def _load_with_metadata(self, key: str) -> StoredData:
         """Load bytes from a file with MIME type metadata.
@@ -126,40 +173,13 @@ class LocalStorageProvider(StorageProviderAbstract):
             StoredData containing file contents and detected MIME type.
 
         Raises:
-            StorageFileNotFoundError: If no regular file is stored under the key: nothing is there, a directory is, or
-                the filesystem cannot hold a name the key holds.
+            StorageFileNotFoundError: If no regular file is stored under the key: nothing is there, a directory is, the
+                path goes through a file, or the filesystem cannot hold a name the key holds.
             StorageInvalidUriError: If the key is invalid.
             StorageLocalError: If the filesystem read fails (e.g. permission denied, I/O error).
         """
         file_path = self._validate_key(key)
-
-        # Only a regular file is a stored file: a key naming a directory, or a name the filesystem cannot hold, stores
-        # nothing, as a key no write was made to does not.
-        try:
-            is_stored_file = file_path.is_file()
-        except OSError as exc:
-            if exc.errno not in _NAMES_NO_STORED_FILE_ERRNOS:
-                msg = f"Failed to read file '{key}': {exc}"
-                raise StorageLocalError(msg) from exc
-            msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
-        if not is_stored_file:
-            msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
-
-        try:
-            async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
-                data = await file_handle.read()
-        except FileNotFoundError as exc:
-            # TOCTOU: the file passed is_file() above but was removed before the open.
-            msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
-        except OSError as exc:
-            if exc.errno in _NAMES_NO_STORED_FILE_ERRNOS:
-                msg = f"File not found: '{key}'"
-                raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
-            msg = f"Failed to read file '{key}': {exc}"
-            raise StorageLocalError(msg) from exc
+        data = await self._read_stored_file(file_path=file_path, key=key, nb_bytes=None)
 
         # Detect MIME type from file path
         mime_type: str | None = None
@@ -183,44 +203,26 @@ class LocalStorageProvider(StorageProviderAbstract):
             At most `nb_bytes` leading bytes of the file.
 
         Raises:
-            StorageFileNotFoundError: If the file does not exist.
+            StorageFileNotFoundError: If no regular file is stored under the key: nothing is there, a directory is, the
+                path goes through a file, or the filesystem cannot hold a name the key holds.
             StorageInvalidUriError: If the key is invalid.
             StorageLocalError: If the filesystem read fails (e.g. permission denied, I/O error).
         """
         file_path = self._validate_key(key)
-        try:
-            async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
-                data: bytes = await file_handle.read(nb_bytes)
-        except FileNotFoundError as exc:
-            msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
-        except OSError as exc:
-            msg = f"Failed to read file '{key}': {exc}"
-            raise StorageLocalError(msg) from exc
-        return data
+        return await self._read_stored_file(file_path=file_path, key=key, nb_bytes=nb_bytes)
 
     @override
     async def _load_size(self, key: str) -> int:
         """The size of a file, read from its metadata without opening it.
 
         Raises:
-            StorageFileNotFoundError: If the file does not exist.
+            StorageFileNotFoundError: If no regular file is stored under the key: nothing is there, a directory is, the
+                path goes through a file, or the filesystem cannot hold a name the key holds.
             StorageInvalidUriError: If the key is invalid.
-            StorageLocalError: If the key names something that is not a file, or the filesystem cannot stat it.
+            StorageLocalError: If the filesystem cannot read the file's status (e.g. permission denied, I/O error).
         """
         file_path = self._validate_key(key)
-        try:
-            stat_result = file_path.stat()
-        except FileNotFoundError as exc:
-            msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
-        except OSError as exc:
-            msg = f"Failed to read the size of file '{key}': {exc}"
-            raise StorageLocalError(msg) from exc
-        if not file_path.is_file():
-            msg = f"Failed to read the size of '{key}': it is not a file"
-            raise StorageLocalError(msg)
-        return stat_result.st_size
+        return self._stored_file_status(file_path=file_path, key=key).st_size
 
     @staticmethod
     def _temporary_path_beside(*, file_path: Path) -> Path:
@@ -430,9 +432,9 @@ class LocalStorageProvider(StorageProviderAbstract):
         """The metadata kept in the sidecar beside a file, empty when it was stored with none.
 
         Raises:
-            StorageFileNotFoundError: If the file does not exist.
+            StorageFileNotFoundError: If no regular file is stored under the key.
             StorageInvalidUriError: If the key is invalid.
-            StorageLocalError: If the key names something that is not a file, or the sidecar cannot be read.
+            StorageLocalError: If the filesystem cannot read the file's status, or the sidecar cannot be read.
         """
         await self._load_size(key)
         sidecar_path = _sidecar_path_of(file_path=self._validate_key(key))
