@@ -11,6 +11,7 @@ from pipelex.cogt.content_generation.dry_mock import dry_render_page_views
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.core.pipes.declared_item_count import dry_leaf_limits
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.tools.misc.file_fetch_utils import fetching_for_input
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -30,7 +31,9 @@ async def render_page_views_and_store(
     """
     authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_render_page_views()
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=render_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_render_page_views()
     # Deferred import: avoid pulling the pdf rendering SDK at module-load time
     from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # ruff: ignore[import-outside-top-level]
 

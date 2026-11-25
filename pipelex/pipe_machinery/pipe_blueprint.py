@@ -12,6 +12,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import (
     MULTIPLICITY_PATTERN,
     PipeVariableMultiplicityError,
+    fixed_count_from_digits,
     is_force_presence,
     is_multiple_multiplicity,
     multiplicity_from_bracket_content,
@@ -385,7 +386,9 @@ class PipeBlueprint(ABC, BaseModel):
                     raise ValueError(msg)
 
                 bracket_content = match.group(2)
-                if bracket_content and int(bracket_content) <= 0:
+                # A count written with more digits than any runtime allows is refused on the string, naming the input,
+                # before it is converted; whether it passes the maximum in force is the load's check.
+                if bracket_content and fixed_count_from_digits(digits=bracket_content, slot=f"the input '{input_name}'") <= 0:
                     msg = f"Invalid input '{input_name}': '{concept_spec}'. Multiplicity must be at least 1."
                     raise ValueError(msg)
 

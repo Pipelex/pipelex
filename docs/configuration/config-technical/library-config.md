@@ -291,6 +291,29 @@ A method of a server's own library directories that refuses to load for any othe
 
 A process that loads the same transported method again and again, such as a hosted worker running every branch of a batch, builds the method's concept classes once: `load_from_crate` keeps them per crate and hands the same classes to every later load of it. The `max_classes` key under `[interpreter.crate_class_cache]` in `pipelex.toml` bounds the classes kept over all methods, the least recently used method leaving first, and `0` turns the cache off. Loading library directories never uses it. [Runtime Bridge & Transport](../../under-the-hood/runtime-bridge-and-transport.md) says when a load may reuse the classes.
 
+## How Many Items a Method May Declare
+
+A method can declare a fixed number of items for one slot in three ways: an input or an output written `Concept[N]`, and a controller step's `nb_output = N`, which reaches a `PipeLLM` step as the number of objects it generates and a `PipeImgGen` step as the number of images. A run can ask for one too, with its `output_multiplicity`. A dry run, the one every validation runs, builds one mock item for each declared item, so a few characters of a method could otherwise make a validation build millions of objects.
+
+Every load therefore holds each declared count to a maximum, and every dry run to a budget, set under `[interpreter.method_limits]`:
+
+```toml
+[interpreter.method_limits]
+max_declared_item_count = 1000
+max_declared_item_count_ceiling = 1000
+max_dry_run_mock_items = 100000
+```
+
+A load for a validation or a run reads every count the method declares, in its own bundles and in the dependency packages it loads, before it builds anything, and refuses a method declaring more items for one slot than the maximum with [`pipelex.deployment.declared_count_over_limit`](../../errors/pipelex/deployment/declared_count_over_limit.md), naming the slot, the count and the maximum. A validation answers it as its invalid verdict, and a run refuses to start. A run whose own `output_multiplicity` passes the maximum is refused the same way before it starts. The dry run's mock builders hold the same maximum, so a path that skipped the load's check cannot build more mock items either: for a fixed count they refuse rather than build fewer, since a fixed slot's value must have its declared length. A variable list, `Concept[]`, declares no count: the dry run builds it at its own default length, `inference.dry_run.nb_list_items`, shortened to the maximum when the maximum is lower, so a method declaring no count is never refused by it.
+
+The maximum is this runtime's, not a rule of the MTHDS language: a method declaring 5,000 items is valid MTHDS that this runtime, at its default, refuses to load. To accept larger counts, raise `max_declared_item_count` in your project's `.pipelex/pipelex.toml`, and `max_declared_item_count_ceiling` with it: the configuration refuses a maximum above its own ceiling.
+
+A host serving several callers may raise the maximum per request: the Pipelex API takes a [`max_declared_item_count`](../../api-server/pipe-run.md#declared-item-count-max_declared_item_count) on its run, validation and method routes, and a run carries it to every process that runs a part of it, so a worker holds the run to the request's maximum rather than its own configuration. A request's maximum only raises the deployment's: the larger of the two is in force, so a maximum below the deployment's is accepted and changes nothing, and a method of the host's own library directories, its installed methods or `PIPELEXPATH`, loading beside the caller's, is never refused for what the caller states. That field arrives in a request's JSON body, so a caller could raise its own limit: a request's maximum may be at most `max_declared_item_count_ceiling`, and one above it is a `422` `request.invalid` naming the field. By default the ceiling equals the deployment's maximum, so no request can raise it. A deployment that sits behind a trusted front setting each request's maximum itself, as the hosted plane does from the caller's plan, raises `max_declared_item_count_ceiling` to the highest maximum that front sends, and that front strips the field from what its own callers send.
+
+The maximum bounds one slot at a time, which leaves their sum and their products open: twenty inputs each declaring the maximum, or a batch over a list whose every branch builds another list, make one dry run build far more than any slot declares. So every item a dry run builds, a mock input, a mock output or a text a dry `PipeCompose` renders, whatever the slot, counts against one budget, `max_dry_run_mock_items`, shared by the concurrent branches of a batch. The budget covers one in-process validation, the hosted validation sweep included since it runs in one activity, and one in-process dry run, its mock inputs and its pipes together. A dry run that would pass it is refused with [`pipelex.deployment.dry_run_mock_budget_exceeded`](../../errors/pipelex/deployment/dry_run_mock_budget_exceeded.md), naming the budget. A request cannot change the budget. A distributed dry run, whose pipes run in worker activities, counts each activity against a budget of its own, so there the bound holds per activity, not per run.
+
+Whatever the maximum, a count is written with at most nine significant digits, leading zeros aside: the parser refuses a longer one before it reads the number, and no configuration or request may set a maximum above 999,999,999.
+
 ## Project Organization
 
 **Golden rule:** Put `.mthds` files where they make sense in YOUR project. Pipelex finds them automatically.

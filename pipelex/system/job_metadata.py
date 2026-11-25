@@ -6,6 +6,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from pipelex.core.pipes.declared_count_bounds import DECLARED_ITEM_COUNT_CEILING
 from pipelex.system.exceptions import RunParameterError
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
@@ -248,6 +249,13 @@ class RunMetadata(BaseModel):
     # spans as `pipelex.run.capture_pipe_codes`, so the exporter that redacts reads it from the span itself, in
     # whichever process the span was made (`pipelex.system.telemetry.pipe_identity`).
     capture_pipe_codes: bool | None = None
+
+    # The most items the run's method may declare for one slot (`Concept[N]` or a step's `nb_output`), as the host stated
+    # it for this run, such as the hosted plane from the caller's plan; None falls back to the deployment's
+    # `[interpreter.method_limits] max_declared_item_count`. It rides here so it crosses a process boundary with the run:
+    # every pipe run makes it the maximum in force while it runs (`pipelex.core.pipes.declared_item_count`), so the dry-run
+    # mock builders of a worker bound themselves by the run's maximum, not by the worker's own configuration.
+    max_declared_item_count: int | None = Field(default=None, ge=1, le=DECLARED_ITEM_COUNT_CEILING)
 
     # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
     # HTTP request enters Pipelex). Rides here so it crosses the Temporal

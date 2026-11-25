@@ -97,6 +97,7 @@ class TestValidateInProcessRequestId:
                 methods_dirs=None,
                 read_scope=None,
                 request_id="not a request id",
+                max_declared_item_count=None,
             )
 
         sweep.assert_not_awaited()

@@ -15,6 +15,7 @@ from pipelex.config import get_config
 from pipelex.core.concepts.exceptions import ConceptStructureClassNotFoundError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.declared_item_count import capped_synthetic_mock_count
 from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
@@ -294,7 +295,8 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             )
         self._refuse_output_multiplicity_override(pipe_run_params=pipe_run_params)
         row_model = self.row_model()
-        nb_records = get_config().inference.dry_run.nb_list_items
+        # The dry run's own number of records, declared by no one: shortened to the maximum in force, never refused.
+        nb_records = capped_synthetic_mock_count(default=get_config().inference.dry_run.nb_list_items)
         mock_records: list[StuffContent] = []
         for position in range(1, nb_records + 1):
             pinned_values: dict[str, Any] = {self.row_field: position} if self.row_field is not None else {}

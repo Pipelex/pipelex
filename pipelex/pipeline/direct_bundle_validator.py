@@ -52,6 +52,7 @@ class DirectBundleValidator:
         # reads no blob store, so the scope a dispatched arm hands its worker the trees through has no use here.
         read_scope: str | None,  # ruff: ignore[unused-method-argument]
         request_id: str | None,
+        max_declared_item_count: int | None,
     ) -> PipelexValidationReport | BundleValidationFailure:
         try:
             return await validate_bundles_in_process(
@@ -67,6 +68,8 @@ class DirectBundleValidator:
                 methods_dirs=methods_dirs,
                 # Refused there before any work when it breaks the request id rule, then bound for the whole sweep.
                 request_id=request_id,
+                # The maximum in force for the whole sweep, the load, the dry runs and the graph arm.
+                max_declared_item_count=max_declared_item_count,
             )
         except ValidateBundleError as exc:
             # An invalid bundle is a produced verdict, not a fault: surface its problem and its items

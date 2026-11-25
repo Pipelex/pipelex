@@ -2,17 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import anthropic
-import botocore.session
 import httpx
 import openai
 import pytest
-from botocore.exceptions import ClientError
-from botocore.stub import Stubber
-from google.genai import errors as genai_errors
-from mistralai.client import Mistral
-from mistralai.client.errors import MistralError
-from mistralai.client.models import UserMessage
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict
 
 from pipelex.cogt.exceptions import (
@@ -40,6 +32,18 @@ from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from tests.helpers.completion_stop import make_text_llm_job
+from tests.unit.pipelex.providers.provider_refusals import (
+    ORIGIN,
+    Body,
+    answering,
+    anthropic_refusal,
+    anthropic_status_refusal,
+    bedrock_refusal,
+    gemini_refusal,
+    mistral_refusal,
+    openai_compatible_refusal,
+    openai_refusal,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -48,13 +52,8 @@ if TYPE_CHECKING:
 
     from pipelex.errors.error_codes import ErrorCode
 
-_ORIGIN = "https://provider.example.com"
-
-# The body of a provider's 400, as its API sends it.
-_Body = dict[str, Any]
-
 # Each provider's 400 for a prompt over the model's context window, worded as the provider words it.
-_OPENAI_CONTEXT_LENGTH: _Body = {
+_OPENAI_CONTEXT_LENGTH: Body = {
     "error": {
         "message": (
             "This model's maximum context length is 128000 tokens. However, your messages resulted in 130412 tokens. "
@@ -65,7 +64,7 @@ _OPENAI_CONTEXT_LENGTH: _Body = {
         "code": "context_length_exceeded",
     }
 }
-_OPENAI_CONTEXT_WINDOW: _Body = {
+_OPENAI_CONTEXT_WINDOW: Body = {
     "error": {
         "message": "Your input exceeds the context window of this model. Please adjust your input and try again.",
         "type": "invalid_request_error",
@@ -74,7 +73,7 @@ _OPENAI_CONTEXT_WINDOW: _Body = {
     }
 }
 # OpenAI's refusal when the messages and the completion the request reserves with max_tokens together pass the window
-_OPENAI_MESSAGES_AND_COMPLETION: _Body = {
+_OPENAI_MESSAGES_AND_COMPLETION: Body = {
     "error": {
         "message": (
             "This model's maximum context length is 128000 tokens. However, you requested 130000 tokens "
@@ -85,25 +84,25 @@ _OPENAI_MESSAGES_AND_COMPLETION: _Body = {
         "code": "context_length_exceeded",
     }
 }
-_ANTHROPIC_PROMPT_TOO_LONG: _Body = {
+_ANTHROPIC_PROMPT_TOO_LONG: Body = {
     "type": "error",
     "error": {"type": "invalid_request_error", "message": "prompt is too long: 208310 tokens > 200000 maximum"},
 }
-_ANTHROPIC_INPUT_AND_MAX_TOKENS: _Body = {
+_ANTHROPIC_INPUT_AND_MAX_TOKENS: Body = {
     "type": "error",
     "error": {
         "type": "invalid_request_error",
         "message": "input length and `max_tokens` exceed context limit: 197202 + 8192 > 200000, decrease input length or `max_tokens` and try again",
     },
 }
-_MISTRAL_PROMPT_TOO_LARGE: _Body = {
+_MISTRAL_PROMPT_TOO_LARGE: Body = {
     "object": "error",
     "message": "Prompt contains 140000 tokens and 0 draft tokens, too large for model with 131072 maximum context length",
     "type": "invalid_request_message_error",
     "param": None,
     "code": "3051",
 }
-_GEMINI_INPUT_TOKEN_COUNT: _Body = {
+_GEMINI_INPUT_TOKEN_COUNT: Body = {
     "error": {
         "code": 400,
         "message": "The input token count (1234567) exceeds the maximum number of tokens allowed (1048576).",
@@ -113,7 +112,7 @@ _GEMINI_INPUT_TOKEN_COUNT: _Body = {
 _BEDROCK_INPUT_TOO_LONG = "Input is too long for requested model."
 
 # The same providers' 400s for a request of ours they could not take, which say nothing about the context window.
-_OPENAI_INVALID_TYPE: _Body = {
+_OPENAI_INVALID_TYPE: Body = {
     "error": {
         "message": "Invalid type for 'messages[0].content': expected one of a string or array of objects, but got an integer instead.",
         "type": "invalid_request_error",
@@ -121,131 +120,61 @@ _OPENAI_INVALID_TYPE: _Body = {
         "code": "invalid_type",
     }
 }
-_ANTHROPIC_FIELD_REQUIRED: _Body = {"type": "error", "error": {"type": "invalid_request_error", "message": "max_tokens: Field required"}}
-_MISTRAL_INVALID_MESSAGE: _Body = {
+_ANTHROPIC_FIELD_REQUIRED: Body = {"type": "error", "error": {"type": "invalid_request_error", "message": "max_tokens: Field required"}}
+_MISTRAL_INVALID_MESSAGE: Body = {
     "object": "error",
     "message": "Assistant message must have either content or tool_calls, but not none.",
     "type": "invalid_request_message_error",
     "param": None,
     "code": "3230",
 }
-_GEMINI_INVALID_PAYLOAD: _Body = {
+_GEMINI_INVALID_PAYLOAD: Body = {
     "error": {"code": 400, "message": 'Invalid JSON payload received. Unknown name "foo": Cannot find field.', "status": "INVALID_ARGUMENT"}
 }
 _BEDROCK_INVALID_MODEL = "The provided model identifier is invalid."
 # Anthropic's 413 for a request over its payload size, which says nothing about the context window
-_ANTHROPIC_REQUEST_TOO_LARGE: _Body = {
+_ANTHROPIC_REQUEST_TOO_LARGE: Body = {
     "type": "error",
     "error": {"type": "request_too_large", "message": "Request exceeds the maximum allowed number of bytes."},
 }
-
-
-def _answering(*, body: _Body, status_code: int = 400) -> httpx.MockTransport:
-    """A transport whose every request the provider answers with the status, a 400 unless told, carrying the body."""
-
-    def handle(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code=status_code, json=body, request=request)
-
-    return httpx.MockTransport(handle)
-
-
-def _openai_refusal(body: _Body) -> BaseException:
-    with httpx.Client(transport=_answering(body=body)) as http_client:
-        client = openai.OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1", max_retries=0, http_client=http_client)
-        with pytest.raises(openai.BadRequestError) as exc_info:
-            client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": "Summarize the contract."}])
-    return exc_info.value
-
-
-def _anthropic_refusal(body: _Body) -> BaseException:
-    with httpx.Client(transport=_answering(body=body)) as http_client:
-        client = anthropic.Anthropic(api_key="unused-in-this-test", base_url=_ORIGIN, max_retries=0, http_client=http_client)
-        with pytest.raises(anthropic.BadRequestError) as exc_info:
-            client.messages.create(model="claude-sonnet-4-5", max_tokens=8192, messages=[{"role": "user", "content": "Summarize the contract."}])
-    return exc_info.value
-
-
-def _openai_compatible_refusal(*, body: _Body, status_code: int) -> BaseException:
-    """An OpenAI-compatible server, a gateway, answering with another 4xx than 400, raised by the OpenAI SDK."""
-    with httpx.Client(transport=_answering(body=body, status_code=status_code)) as http_client:
-        client = openai.OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1", max_retries=0, http_client=http_client)
-        with pytest.raises(openai.APIStatusError) as exc_info:
-            client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": "Summarize the contract."}])
-    return exc_info.value
-
-
-def _anthropic_status_refusal(*, body: _Body, status_code: int) -> BaseException:
-    with httpx.Client(transport=_answering(body=body, status_code=status_code)) as http_client:
-        client = anthropic.Anthropic(api_key="unused-in-this-test", base_url=_ORIGIN, max_retries=0, http_client=http_client)
-        with pytest.raises(anthropic.APIStatusError) as exc_info:
-            client.messages.create(model="claude-sonnet-4-5", max_tokens=8192, messages=[{"role": "user", "content": "Summarize the contract."}])
-    return exc_info.value
-
-
-def _mistral_refusal(body: _Body) -> BaseException:
-    with httpx.Client(transport=_answering(body=body)) as http_client:
-        client = Mistral(api_key="unused-in-this-test", server_url=_ORIGIN, client=http_client)
-        with pytest.raises(MistralError) as exc_info:
-            client.chat.complete(model="mistral-large-latest", messages=[UserMessage(content="Summarize the contract.")])
-    return exc_info.value
-
-
-def _gemini_refusal(body: _Body) -> BaseException:
-    request = httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent")
-    with pytest.raises(genai_errors.ClientError) as exc_info:
-        genai_errors.APIError.raise_for_response(httpx.Response(status_code=400, json=body, request=request))  # pyright: ignore[reportUnknownMemberType]
-    return exc_info.value
-
-
-def _bedrock_refusal(message: str) -> BaseException:
-    """Bedrock's Converse refusal with the message, raised by a real bedrock-runtime client from a stubbed answer."""
-    # The bedrock-runtime client botocore builds from its service model, whose operations it types as nothing
-    client: Any = botocore.session.get_session().create_client(
-        "bedrock-runtime", region_name="us-east-1", aws_access_key_id="unused-in-this-test", aws_secret_access_key="unused-in-this-test"
-    )
-    stubber = Stubber(client)
-    stubber.add_client_error("converse", service_error_code="ValidationException", service_message=message, http_status_code=400)
-    with stubber, pytest.raises(ClientError) as exc_info:
-        client.converse(modelId="anthropic.claude-sonnet-4-5", messages=[{"role": "user", "content": [{"text": "Summarize the contract."}]}])
-    return exc_info.value
 
 
 # Each case: the provider's SDK raising its 400 from the provider's answer, the Extract step reading it, and the code
 # the 400 must read.
 _REFUSALS = [
     pytest.param(
-        _openai_refusal, _OPENAI_CONTEXT_LENGTH, extract_openai_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="openai-maximum-context-length"
+        openai_refusal, _OPENAI_CONTEXT_LENGTH, extract_openai_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="openai-maximum-context-length"
     ),
-    pytest.param(_openai_refusal, _OPENAI_CONTEXT_WINDOW, extract_openai_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="openai-context-window"),
+    pytest.param(openai_refusal, _OPENAI_CONTEXT_WINDOW, extract_openai_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="openai-context-window"),
     pytest.param(
-        _openai_refusal,
+        openai_refusal,
         _OPENAI_MESSAGES_AND_COMPLETION,
         extract_openai_metadata,
         CoreCode.MODEL_CONTEXT_EXCEEDED,
         id="openai-messages-and-completion",
     ),
     pytest.param(
-        _anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="anthropic-prompt-too-long"
+        anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="anthropic-prompt-too-long"
     ),
     pytest.param(
-        _anthropic_refusal,
+        anthropic_refusal,
         _ANTHROPIC_INPUT_AND_MAX_TOKENS,
         extract_anthropic_metadata,
         CoreCode.MODEL_CONTEXT_EXCEEDED,
         id="anthropic-input-and-max-tokens",
     ),
     pytest.param(
-        _mistral_refusal, _MISTRAL_PROMPT_TOO_LARGE, extract_mistral_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="mistral-prompt-too-large"
+        mistral_refusal, _MISTRAL_PROMPT_TOO_LARGE, extract_mistral_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="mistral-prompt-too-large"
     ),
-    pytest.param(_gemini_refusal, _GEMINI_INPUT_TOKEN_COUNT, extract_google_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="gemini-input-token-count"),
-    pytest.param(_bedrock_refusal, _BEDROCK_INPUT_TOO_LONG, extract_bedrock_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="bedrock-input-too-long"),
-    pytest.param(_openai_refusal, _OPENAI_INVALID_TYPE, extract_openai_metadata, CoreCode.RUNTIME_UNEXPECTED, id="openai-invalid-type"),
+    pytest.param(gemini_refusal, _GEMINI_INPUT_TOKEN_COUNT, extract_google_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="gemini-input-token-count"),
+    pytest.param(bedrock_refusal, _BEDROCK_INPUT_TOO_LONG, extract_bedrock_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="bedrock-input-too-long"),
+    pytest.param(openai_refusal, _OPENAI_INVALID_TYPE, extract_openai_metadata, CoreCode.RUNTIME_UNEXPECTED, id="openai-invalid-type"),
     pytest.param(
-        _anthropic_refusal, _ANTHROPIC_FIELD_REQUIRED, extract_anthropic_metadata, CoreCode.RUNTIME_UNEXPECTED, id="anthropic-field-required"
+        anthropic_refusal, _ANTHROPIC_FIELD_REQUIRED, extract_anthropic_metadata, CoreCode.RUNTIME_UNEXPECTED, id="anthropic-field-required"
     ),
-    pytest.param(_mistral_refusal, _MISTRAL_INVALID_MESSAGE, extract_mistral_metadata, CoreCode.RUNTIME_UNEXPECTED, id="mistral-invalid-message"),
-    pytest.param(_gemini_refusal, _GEMINI_INVALID_PAYLOAD, extract_google_metadata, CoreCode.RUNTIME_UNEXPECTED, id="gemini-invalid-payload"),
-    pytest.param(_bedrock_refusal, _BEDROCK_INVALID_MODEL, extract_bedrock_metadata, CoreCode.RUNTIME_UNEXPECTED, id="bedrock-invalid-model"),
+    pytest.param(mistral_refusal, _MISTRAL_INVALID_MESSAGE, extract_mistral_metadata, CoreCode.RUNTIME_UNEXPECTED, id="mistral-invalid-message"),
+    pytest.param(gemini_refusal, _GEMINI_INVALID_PAYLOAD, extract_google_metadata, CoreCode.RUNTIME_UNEXPECTED, id="gemini-invalid-payload"),
+    pytest.param(bedrock_refusal, _BEDROCK_INVALID_MODEL, extract_bedrock_metadata, CoreCode.RUNTIME_UNEXPECTED, id="bedrock-invalid-model"),
 ]
 
 
@@ -283,9 +212,9 @@ class TestContextWindowRefusals:
     @pytest.mark.parametrize(
         ("raise_refusal", "answer", "extract_metadata"),
         [
-            pytest.param(_anthropic_refusal, _ANTHROPIC_INPUT_AND_MAX_TOKENS, extract_anthropic_metadata, id="anthropic-input-and-max-tokens"),
-            pytest.param(_openai_refusal, _OPENAI_MESSAGES_AND_COMPLETION, extract_openai_metadata, id="openai-messages-and-completion"),
-            pytest.param(_anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, id="anthropic-prompt-too-long"),
+            pytest.param(anthropic_refusal, _ANTHROPIC_INPUT_AND_MAX_TOKENS, extract_anthropic_metadata, id="anthropic-input-and-max-tokens"),
+            pytest.param(openai_refusal, _OPENAI_MESSAGES_AND_COMPLETION, extract_openai_metadata, id="openai-messages-and-completion"),
+            pytest.param(anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, id="anthropic-prompt-too-long"),
         ],
     )
     def test_a_language_models_window_advice_names_the_input_and_max_tokens(
@@ -340,9 +269,9 @@ class TestContextWindowRefusals:
     @pytest.mark.parametrize(
         ("raise_refusal", "answer", "extract_metadata"),
         [
-            pytest.param(_gemini_refusal, _GEMINI_INPUT_TOKEN_COUNT, extract_google_metadata, id="gemini-input-token-count"),
-            pytest.param(_anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, id="anthropic-prompt-too-long"),
-            pytest.param(_bedrock_refusal, _BEDROCK_INPUT_TOO_LONG, extract_bedrock_metadata, id="bedrock-input-too-long"),
+            pytest.param(gemini_refusal, _GEMINI_INPUT_TOKEN_COUNT, extract_google_metadata, id="gemini-input-token-count"),
+            pytest.param(anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, id="anthropic-prompt-too-long"),
+            pytest.param(bedrock_refusal, _BEDROCK_INPUT_TOO_LONG, extract_bedrock_metadata, id="bedrock-input-too-long"),
         ],
     )
     def test_another_familys_advice_fits_what_its_model_reads(
@@ -377,19 +306,19 @@ class TestContextWindowRefusals:
         ("raise_refusal", "extract_metadata", "expected_error_code"),
         [
             pytest.param(
-                lambda: _openai_compatible_refusal(body=_OPENAI_CONTEXT_LENGTH, status_code=422),
+                lambda: openai_compatible_refusal(body=_OPENAI_CONTEXT_LENGTH, status_code=422),
                 extract_openai_metadata,
                 CoreCode.MODEL_CONTEXT_EXCEEDED,
                 id="gateway-422-context-length",
             ),
             pytest.param(
-                lambda: _openai_compatible_refusal(body=_OPENAI_CONTEXT_LENGTH, status_code=413),
+                lambda: openai_compatible_refusal(body=_OPENAI_CONTEXT_LENGTH, status_code=413),
                 extract_openai_metadata,
                 CoreCode.MODEL_CONTEXT_EXCEEDED,
                 id="gateway-413-context-length",
             ),
             pytest.param(
-                lambda: _anthropic_status_refusal(body=_ANTHROPIC_REQUEST_TOO_LARGE, status_code=413),
+                lambda: anthropic_status_refusal(body=_ANTHROPIC_REQUEST_TOO_LARGE, status_code=413),
                 extract_anthropic_metadata,
                 CoreCode.INPUT_TOO_LARGE,
                 id="anthropic-413-payload-size",
@@ -470,9 +399,9 @@ class TestContextWindowRefusals:
         completions_factory.make_extras = mocker.MagicMock(return_value=({}, {}))
         worker.openai_completions_factory = completions_factory
 
-        async with httpx.AsyncClient(transport=_answering(body=_OPENAI_CONTEXT_LENGTH)) as http_client:
+        async with httpx.AsyncClient(transport=answering(body=_OPENAI_CONTEXT_LENGTH)) as http_client:
             worker.openai_client_for_text = openai.AsyncOpenAI(
-                api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1", max_retries=0, http_client=http_client
+                api_key="unused-in-this-test", base_url=f"{ORIGIN}/v1", max_retries=0, http_client=http_client
             )
             with pytest.raises(LLMCompletionError) as exc_info:
                 await worker._gen_text(llm_job=make_text_llm_job())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

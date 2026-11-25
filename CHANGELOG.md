@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.117.0] - 2026-11-25
+
+### Added
+
+- **`max_declared_item_count` on the API's run, validation and method routes**: `/v1/execute`, `/v1/start`, `/v1/validate`, `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io` take an optional maximum on the items a method may declare for one slot, which raises the deployment's for that request alone and never lowers it, the larger of the two being in force, and a run carries it to every process that runs a part of it; `PipelexMTHDSProtocol`, `pipeline_run_setup`, `validate_bundles_in_process` and `PipelexKernel.make` take it as `max_declared_item_count`, and `RunMetadata` carries it. The field is a strict integer, so `true` or `"5"` is a `422` rather than read as 1 or 5, and it may not pass the new `[interpreter.method_limits] max_declared_item_count_ceiling`, 1,000 by default: a request's maximum comes from public JSON, so by default no caller can raise its own limit, and a deployment behind a trusted front that sets each request's maximum raises the ceiling. A maximum above it is a `422` `request.invalid` naming the field on the API, and a `RunParameterError` at the library's entry points; the deployment's own maximum may not pass it either.
+- **A budget of mock items per dry run, `[interpreter.method_limits] max_dry_run_mock_items`**, 100,000 by default: every dry-run mock builder, and a dry `PipeCompose`'s rendered output, adds what it builds to one tally per in-process validation or per in-process dry run, its mock inputs and its pipes together, shared by a batch's concurrent branches; a distributed dry run counts each worker activity against a budget of its own. A dry run that would pass it is refused with the new `pipelex.deployment.dry_run_mock_budget_exceeded` (`DryRunMockBudgetError`), naming the budget. The per-slot maximum left the sum and the products of the slots unbounded, such as a batch over `Text[1000]` whose branch outputs `Text[1000]`.
+
+### Changed
+
+- **`BundleValidatorProtocol.validate_bundles` takes `max_declared_item_count` (Breaking)**: a bundle validator receives the request's maximum declared item count, `None` when the request states none, and a validator dispatching to a worker hands it to `validate_bundles_in_process` there, so the worker validates under the request's maximum rather than its own configuration.
+
+### Fixed
+
+- **A declared item count is bounded**: a method declaring more items for one slot than `[interpreter.method_limits] max_declared_item_count` allows, 1,000 by default, with `Concept[N]` on an input or an output or a controller step's `nb_output`, in its own bundles or in a dependency package it loads, is refused at load with `pipelex.deployment.declared_count_over_limit`, naming the slot, the count and the maximum, instead of making a validation's dry run build one mock item per declared item; the dry run's mock builders refuse a fixed count past the same maximum, also in a worker's activity, which reads the run's maximum from its job's metadata, and the parser refuses a count written with more than nine significant digits, leading zeros of any length aside. The length the dry run chooses itself for a variable list, `Concept[]`, is shortened to the maximum rather than refused, so a method declaring no count stays valid under a low maximum.
+- **A run's `output_multiplicity` is bounded**: a run asking for more outputs than the maximum declared item count in force is refused before it starts with `pipelex.deployment.declared_count_over_limit`, a `422` on the API, instead of asking a model for that many items.
+- **A provider refusing a file as over its size limit is the caller's `input.too_large`**: a provider's 400, or another 4xx a gateway relays, refusing a file, an image or a request payload as too large in its own words (Anthropic's "The file exceeds the maximum allowed size.", its per-image "image exceeds 5 MB maximum" and its `request_too_large`, Gemini's "Request payload size exceeds the limit") read as `runtime.unexpected`, our defect, and told the caller to contact support; it now reads `input.too_large`, answered 422, with advice that the request built from the inputs exceeds the provider's size limit and that the inputs should be made smaller or split. A bare 413, which already read `input.too_large`, gives the same advice, and a web page too large to fetch points at a smaller page.
+
 ## [v0.116.0] - 2026-11-23
 
 ### Added

@@ -541,6 +541,40 @@
         "ge": 0
       }
     },
+    "interpreter.method_limits": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.method_limits.max_declared_item_count": {
+      "value_type": "int",
+      "required": true,
+      "default": 1000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1,
+        "le": 999999999
+      }
+    },
+    "interpreter.method_limits.max_declared_item_count_ceiling": {
+      "value_type": "int",
+      "required": true,
+      "default": 1000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1,
+        "le": 999999999
+      }
+    },
+    "interpreter.method_limits.max_dry_run_mock_items": {
+      "value_type": "int",
+      "required": true,
+      "default": 100000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
     "interpreter.method_tree_limits": {
       "value_type": "table",
       "required": true,

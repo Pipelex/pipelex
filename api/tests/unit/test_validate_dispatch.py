@@ -61,6 +61,7 @@ class _StubBundleValidator:
         methods_dirs: Sequence[Path] | None,
         read_scope: str | None,
         request_id: str | None,
+        max_declared_item_count: int | None,
     ) -> BundleValidationFailure:
         self.calls.append(
             {
@@ -75,6 +76,7 @@ class _StubBundleValidator:
                 "methods_dirs": methods_dirs,
                 "read_scope": read_scope,
                 "request_id": request_id,
+                "max_declared_item_count": max_declared_item_count,
             }
         )
         if self._error is not None:
@@ -118,7 +120,7 @@ class TestValidateDispatch:
         _register_stub_for_temporal(mocker, stub)
 
         client = _build_client()
-        response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS], "allow_signatures": True})
+        response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS], "allow_signatures": True, "max_declared_item_count": 500})
 
         assert response.status_code == 200, response.text
         body = response.json()
@@ -137,6 +139,8 @@ class TestValidateDispatch:
         assert len(stub.calls) == 1
         assert stub.calls[0]["mthds_contents"] == [VALID_MTHDS]
         assert stub.calls[0]["allow_signatures"] is True
+        # The request's maximum declared item count, which a dispatched validator carries to its worker.
+        assert stub.calls[0]["max_declared_item_count"] == 500
 
     def test_validator_fault_propagates_as_5xx(self, mocker: MockerFixture) -> None:
         """A validator that raises a genuine fault (no verdict produced) propagates to the global 5xx handler."""

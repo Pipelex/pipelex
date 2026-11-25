@@ -4,6 +4,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.core.pipes.declared_item_count import dry_leaf_limits
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.runtime_hub import get_extract_worker
 
@@ -34,7 +35,9 @@ async def extract_gen_pages_and_store(
     """
     authorize_assignment_reads(job_metadata=extract_assignment.job_metadata, uri_references=extract_assignment.referenced_uris())
     if extract_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_extract_page_contents(extract_assignment)
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=extract_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_extract_page_contents(extract_assignment)
     extract_output = await extract_gen_pages(extract_assignment)
     return await generated_content_factory.make_page_contents(
         storage_scope=extract_assignment.job_metadata.run_metadata.storage_scope,

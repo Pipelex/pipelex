@@ -9,6 +9,7 @@ from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigil
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.declared_item_count import spend_dry_run_mock_items
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
@@ -371,6 +372,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeComposeOutput:
+        # A dry run's compose builds its output from mock inputs, a rendered text or a constructed object, or a mock of
+        # it when the construction fails: one item of the dry run's budget of mock items, spent before it is built.
+        spend_dry_run_mock_items(count=1, slot=f"the output of the pipe '{self.code}'")
         if self.is_construct_mode:
             try:
                 return await self._live_run_operator_pipe(
@@ -415,6 +419,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
+        # Its one item of the budget was spent when the dry run began (`_dry_run_operator_pipe`).
         factory = DryRunFactory.make_dry_run_factory(output_class)
         the_content = factory.build()
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)

@@ -2,6 +2,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from pipelex.core.pipes.declared_count_bounds import DECLARED_ITEM_COUNT_CEILING
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_controllers.binding.binding_step_blueprint import PATH_GRAMMAR_DESCRIPTION
 from pipelex.pipe_machinery.validation import check_name_is_not_reserved, check_stored_name
@@ -36,6 +37,21 @@ class SubPipeBlueprint(BaseModel):
     def validate_multiple_output(self) -> Self:
         if has_more_than_one_among_attributes_from_list(self, attributes_list=["nb_output", "multiple_output"]):
             msg = f"The {self.step_label} carries both `nb_output` and `multiple_output`: a step sets at most one of them."
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_nb_output_ceiling(self) -> Self:
+        """Refuse an `nb_output` past every runtime's ceiling, whatever maximum is in force.
+
+        The count a runtime accepts is its own limit, checked when the method loads (`pipelex.core.pipes.declared_item_count`).
+        This is the fixed bound above every such limit, the one the parser applies to a `[N]` suffix's digits.
+        """
+        if self.nb_output is not None and self.nb_output > DECLARED_ITEM_COUNT_CEILING:
+            msg = (
+                f"The {self.step_label} sets `nb_output` to {self.nb_output}, more than any runtime allows: "
+                f"a declared count is at most {DECLARED_ITEM_COUNT_CEILING}."
+            )
             raise ValueError(msg)
         return self
 

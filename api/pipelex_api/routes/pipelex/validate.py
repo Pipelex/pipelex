@@ -27,7 +27,13 @@ from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_ME
 from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.method_selection import select_request_method
 from pipelex_api.routes.pipelex.pipeline import ApiRunner, bound_read_scope, get_request_user_id
-from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest
+from pipelex_api.schemas.models import (
+    RESOURCES_FIELD_DESCRIPTION,
+    CallerAnalyticsGroupsMixin,
+    MthdsContentsRequest,
+    RequestMaxDeclaredItemCount,
+    max_declared_item_count_field,
+)
 
 router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
 
@@ -143,6 +149,7 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
             "no scope, so a dry run without one leaves nothing stored."
         ),
     )
+    max_declared_item_count: RequestMaxDeclaredItemCount = max_declared_item_count_field()
 
     @field_validator("read_scope")
     @classmethod
@@ -408,6 +415,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             extras=request_data.analytics_groups,
             read_scope=read_scope,
             submitted_files=submitted_files,
+            max_declared_item_count=request_data.max_declared_item_count,
         ).validate_verdict(
             mthds_contents=request_data.mthds_contents,
             mthds_sources=request_data.mthds_sources,
@@ -442,6 +450,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
                 user_id=user_id,
                 extras=request_data.analytics_groups,
                 read_scope=read_scope,
+                max_declared_item_count=request_data.max_declared_item_count,
             ).validate_verdict(
                 mthds_contents=None,
                 mthds_sources=None,

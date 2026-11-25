@@ -32,6 +32,7 @@ from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
+from pipelex.core.pipes.declared_item_count import dry_leaf_limits
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.stored_value_content import generation_schema
 from pipelex.runtime_hub import get_model_deck, get_report_delegate
@@ -62,7 +63,9 @@ def _make_search_job(search_assignment: SearchAssignment) -> SearchJob:
 async def search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
     authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_search_gen_sourced_answer()
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=search_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_search_gen_sourced_answer()
     worker = _make_search_worker(search_assignment)
     search_job = _make_search_job(search_assignment)
     return await worker.search_sourced_answer(search_job=search_job)
@@ -82,7 +85,9 @@ async def search_gen_structured(search_object_assignment: SearchObjectAssignment
     search_assignment = search_object_assignment.search_assignment
     authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_object_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_search_gen_structured(search_object_assignment)
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=search_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_search_gen_structured(search_object_assignment)
     boundary_class = SchemaToModelFactory.make_from_json_schema(
         schema=search_object_assignment.output_class_schema,
         class_name=search_object_assignment.output_class_name,
@@ -109,7 +114,8 @@ async def search_gen_structured_object(
     """
     authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_search_gen_structured_object(output_class=output_class)
+        with dry_leaf_limits(run_max_declared_item_count=search_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_search_gen_structured_object(output_class=output_class)
     result_dict = await _run_structured_search(search_assignment, schema=output_class)
     # ``is_mock_built=False`` is a statement, not a formality: this data came from the provider, so a
     # failure here is a malformed response and keeps its ``ValidationError`` — it is not the dry-run

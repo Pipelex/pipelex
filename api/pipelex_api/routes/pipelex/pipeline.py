@@ -539,6 +539,9 @@ class ApiRunner(PipelexMTHDSProtocol):
             method_id=self.method_id,
             method_address=self.method_address,
             capture_pipe_codes=self.capture_pipe_codes,
+            # The request's maximum declared item count, which the base `execute` threads too: left out of this call, the
+            # method would load under the deployment's maximum and its job would carry none to the worker.
+            max_declared_item_count=self.max_declared_item_count,
             # The packages the request ships, which the base `execute` threads too.
             methods_dirs=self.methods_dirs,
             # The files submitted with the contents, such as a template file, which the base `execute` threads too.
@@ -709,6 +712,8 @@ class ApiRunner(PipelexMTHDSProtocol):
                 read_scope=self.read_scope,
                 # The request's id, which a dispatched validator carries to its worker for the lines written there.
                 request_id=request_id,
+                # The request's maximum declared item count, which a dispatched validator carries to its worker.
+                max_declared_item_count=self.max_declared_item_count,
             )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
@@ -1040,6 +1045,7 @@ async def execute(request: Request) -> JSONResponse:
             method_id=extras.method_key,
             method_address=source.method_provenance.address if source.method_provenance is not None else None,
             capture_pipe_codes=extras.capture_pipe_codes,
+            max_declared_item_count=extras.max_declared_item_count,
             library_dirs=source.library_dirs,
             library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,
@@ -1152,6 +1158,7 @@ async def start(
             method_id=extras.method_key,
             method_address=source.method_provenance.address if source.method_provenance is not None else None,
             capture_pipe_codes=extras.capture_pipe_codes,
+            max_declared_item_count=extras.max_declared_item_count,
             library_dirs=source.library_dirs,
             library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,
