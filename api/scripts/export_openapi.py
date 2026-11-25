@@ -14,22 +14,47 @@ Usage:
 `--check` exits non-zero when the committed artifact drifts from the schema the
 app currently generates — `make openapi-check`, which the gate (`make agent-check`, here or at the
 repository root) runs.
+
+The artifact describes the server as it boots by default, so the export reads the app under the default
+`AUTH_MODE` and with `TRUST_FORWARDED_IDENTITY_HEADERS` off, whatever the environment or a `.env` says: both
+decide which routes are mounted, and `api/Makefile` exports `.env` into every target. Export and check are
+then the same on every machine.
 """
 
 import argparse
+import importlib
+import os
 import sys
 from pathlib import Path
+from typing import cast
 
 import yaml
+from fastapi import FastAPI
 
-from pipelex_api.main import fastapi_app
+# Imported first, for its side effect: pipelex loads the home and project `.env` files into the environment, overriding
+# it, the first time this module is imported. The defaults below are set after that load, so no `.env` undoes them.
+from pipelex.system import environment as _pipelex_environment  # noqa: F401  # pyright: ignore[reportUnusedImport]
+
+from pipelex_api.security import AUTH_MODE_ENV_VAR, TRUST_FORWARDED_IDENTITY_HEADERS_ENV, AuthMode
 
 _GENERATED_HEADER = "# GENERATED FILE — do not edit by hand. Regenerate with `make openapi-export`.\n"
 _EXPORT_HINT = "`make openapi-export` in api/ (`make -C api openapi-export` from the repository root)"
 
 
+def _documented_app() -> FastAPI:
+    """The app as it boots under the default authentication mode and without trusting forwarded identity.
+
+    `pipelex_api.main` selects its authentication and mounts its routes when it is imported, so it is imported here,
+    once both variables hold their defaults, rather than at the top of this module.
+    """
+    os.environ[AUTH_MODE_ENV_VAR] = AuthMode.NONE
+    os.environ[TRUST_FORWARDED_IDENTITY_HEADERS_ENV] = "false"
+    main_module = importlib.import_module("pipelex_api.main")
+    return cast("FastAPI", main_module.fastapi_app)
+
+
 def render_openapi_yaml() -> str:
-    schema = fastapi_app.openapi()
+    schema = _documented_app().openapi()
     body = yaml.safe_dump(schema, sort_keys=False, allow_unicode=True, width=120)
     return _GENERATED_HEADER + body
 
