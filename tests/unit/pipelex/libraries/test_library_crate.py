@@ -7,7 +7,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
+from tests.unit.pipelex.libraries.library_crate_cases import BlueprintSamples
 
 DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of a domain disagree on a field, and the first value is kept"
 
