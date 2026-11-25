@@ -46,7 +46,11 @@ _STORED_FILES = {
         "application/pdf",
     ),
     "html": ("single-tenant/generated/0123456789abcdef/value.html", b"<html><script>alert(1)</script></html>", "text/html"),
-    "svg": ("single-tenant/generated/0123456789abcdef.svg", b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', "image/svg+xml"),
+    "svg": (
+        "single-tenant/generated/0123456789abcdef.svg",
+        b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        "image/svg+xml",
+    ),
 }
 _RESOLVE_PATH = "/v1/resolve-storage-url/bulk"
 
@@ -318,16 +322,16 @@ class TestStorageRoutes:
         assert not storage.root
 
     @pytest.mark.parametrize(
-        ("key", "status", "code"),
+        ("key", "expected"),
         [
-            pytest.param("single-tenant/generated", 404, "pipelex.storage.object_missing", id="a_directory"),
-            pytest.param("single-tenant/generated/value.txt/inner.txt", 404, "pipelex.storage.object_missing", id="through_a_file"),
-            pytest.param("single-tenant/" + "a" * 300 + ".txt", 403, "auth.forbidden", id="a_segment_no_filesystem_holds"),
+            pytest.param("single-tenant/generated", (404, "pipelex.storage.object_missing"), id="a_directory"),
+            pytest.param("single-tenant/generated/value.txt/inner.txt", (404, "pipelex.storage.object_missing"), id="through_a_file"),
+            pytest.param("single-tenant/" + "a" * 300 + ".txt", (403, "auth.forbidden"), id="a_segment_no_filesystem_holds"),
         ],
     )
     @pytest.mark.asyncio(loop_scope="class")
     async def test_a_signed_link_naming_no_stored_file_is_never_a_server_error(
-        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path, key: str, status: int, code: str
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path, key: str, expected: tuple[int, str]
     ) -> None:
         """Whatever key a validly signed link names, the local provider answers a refusal of the caller's, never a 500."""
         local = LocalStorageProvider(root_path=tmp_path)
@@ -339,6 +343,7 @@ class TestStorageRoutes:
 
         response = client.get(f"/v1/storage/{quote(key, safe='/')}", params={"expires": expires, "signature": signature})
 
+        status, code = expected
         assert_problem(response, status=status, code=code)
 
     def test_links_start_with_the_configured_public_base_url(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
