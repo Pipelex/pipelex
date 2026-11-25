@@ -28,7 +28,8 @@ from pipelex_sdk.runs import RunResults
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
-from pipelex_api.limits import DEFAULT_STORAGE_LINK_TTL_SECONDS
+from pipelex_api.exceptions import ApiBootConfigError
+from pipelex_api.limits import DEFAULT_STORAGE_LINK_TTL_SECONDS, MAX_SIGNED_LINK_TTL_SECONDS, signed_link_ttl_seconds
 from pipelex_api.routes.storage import MAX_BULK_RESOLVE_URIS, STORAGE_URI_MAX_CHARS, mount_storage_routes
 from pipelex_api.security import AUTH_MODE_ENV_VAR, TRUST_FORWARDED_IDENTITY_HEADERS_ENV, AuthMode, get_auth_dependency
 from pipelex_api.signed_links import LinkPurpose, link_signature
@@ -388,6 +389,31 @@ class TestStorageRoutes:
 
         problem = assert_problem(_download(client, item["url"]), status=503, code="pipelex.storage.unavailable")
         assert problem["params"] == {"scheme": "s3"}
+
+    @pytest.mark.parametrize("env_var", ["STORAGE_LINK_TTL_SECONDS", "BLOB_UPLOAD_URL_TTL_SECONDS"])
+    def test_a_signed_link_lifetime_past_seven_days_refuses_to_boot(self, monkeypatch: pytest.MonkeyPatch, env_var: str) -> None:
+        monkeypatch.setenv(env_var, str(MAX_SIGNED_LINK_TTL_SECONDS))
+        assert signed_link_ttl_seconds(env_var=env_var, default=60) == MAX_SIGNED_LINK_TTL_SECONDS
+        assert MAX_SIGNED_LINK_TTL_SECONDS == 7 * 24 * 3600
+
+        monkeypatch.setenv(env_var, str(MAX_SIGNED_LINK_TTL_SECONDS + 1))
+        with pytest.raises(ApiBootConfigError, match=f"{env_var} is {MAX_SIGNED_LINK_TTL_SECONDS + 1} seconds"):
+            signed_link_ttl_seconds(env_var=env_var, default=60)
+
+        monkeypatch.setenv(env_var, "9" * 40)
+        with pytest.raises(ApiBootConfigError):
+            signed_link_ttl_seconds(env_var=env_var, default=60)
+
+    def test_a_link_at_the_longest_lifetime_still_downloads(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, storage: InMemoryStorageProvider
+    ) -> None:
+        storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"
+        mocker.patch("pipelex_api.storage_links.STORAGE_LINK_TTL_SECONDS", MAX_SIGNED_LINK_TTL_SECONDS)
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+
+        assert _download(client, item["url"]).content == b"a text"
 
     def test_links_start_with_the_configured_public_base_url(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"

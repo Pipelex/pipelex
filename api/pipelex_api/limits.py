@@ -7,6 +7,8 @@ requires a process restart.
 
 from pipelex.system.environment import get_positive_int_env
 
+from pipelex_api.exceptions import ApiBootConfigError
+
 DEFAULT_MAX_REQUEST_BODY_MIB = 100
 DEFAULT_MAX_MTHDS_FILE_KIB = 1024  # 1 MiB per .mthds file
 DEFAULT_MAX_MTHDS_FILES_PER_REQUEST = 16
@@ -38,6 +40,9 @@ DEFAULT_MAX_METHOD_DEPENDENCIES = 32  # dependency trees beside the method's own
 DEFAULT_MAX_METHOD_REQUEST_TOTAL_KIB = 128 * 1024  # 128 MiB across the method's tree and its dependency trees
 DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS = 3600  # how long an upload target `POST /v1/blobs/missing` names stays valid
 DEFAULT_STORAGE_LINK_TTL_SECONDS = 900  # how long a download link `POST /v1/resolve-storage-url/bulk` resolves to stays valid
+# The longest a signed link may stay valid, seven days, as for an S3 presigned URL. A fixed cap, not env-tunable: a link's
+# expiry must stay within the digits `pipelex_api.signed_links` accepts, and a longer-lived link is a standing credential.
+MAX_SIGNED_LINK_TTL_SECONDS = 7 * 24 * 3600
 DEFAULT_MAX_METHOD_CACHE_CLONES = 64  # cached method-package clones (one per resolved commit SHA)
 DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB = 512 * 1024  # 512 MiB across all cached clones
 DEFAULT_MAX_METHOD_CACHE_AGE_HOURS = 24  # a cached clone unused for this long is evicted
@@ -67,8 +72,27 @@ MAX_METHOD_TREE_FILE_BYTES = get_positive_int_env(env_var="MAX_METHOD_TREE_FILE_
 MAX_METHOD_DEPENDENCIES = get_positive_int_env(env_var="MAX_METHOD_DEPENDENCIES", default=DEFAULT_MAX_METHOD_DEPENDENCIES)
 MAX_METHOD_REQUEST_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_REQUEST_TOTAL_KIB", default=DEFAULT_MAX_METHOD_REQUEST_TOTAL_KIB) * 1024
 
-BLOB_UPLOAD_URL_TTL_SECONDS = get_positive_int_env(env_var="BLOB_UPLOAD_URL_TTL_SECONDS", default=DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS)
-STORAGE_LINK_TTL_SECONDS = get_positive_int_env(env_var="STORAGE_LINK_TTL_SECONDS", default=DEFAULT_STORAGE_LINK_TTL_SECONDS)
+
+def signed_link_ttl_seconds(*, env_var: str, default: int) -> int:
+    """How long a kind of signed link stays valid, read from `env_var`, refused at boot past `MAX_SIGNED_LINK_TTL_SECONDS`.
+
+    Raises:
+        ApiBootConfigError: If the variable holds more seconds than the cap, so the server refuses to start rather than
+            hand out links it cannot sign or that would outlive the cap.
+    """
+    ttl_seconds = get_positive_int_env(env_var=env_var, default=default)
+    if ttl_seconds > MAX_SIGNED_LINK_TTL_SECONDS:
+        msg = (
+            f"{env_var} is {ttl_seconds} seconds, over the {MAX_SIGNED_LINK_TTL_SECONDS}-second (seven-day) cap on how long "
+            f"a signed link stays valid: set it to {MAX_SIGNED_LINK_TTL_SECONDS} or less, or unset it for its default of {default}."
+        )
+        raise ApiBootConfigError(msg)
+    return ttl_seconds
+
+
+BLOB_UPLOAD_URL_TTL_SECONDS = signed_link_ttl_seconds(env_var="BLOB_UPLOAD_URL_TTL_SECONDS", default=DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS)
+STORAGE_LINK_TTL_SECONDS = signed_link_ttl_seconds(env_var="STORAGE_LINK_TTL_SECONDS", default=DEFAULT_STORAGE_LINK_TTL_SECONDS)
+
 
 MAX_METHOD_CACHE_CLONES = get_positive_int_env(env_var="MAX_METHOD_CACHE_CLONES", default=DEFAULT_MAX_METHOD_CACHE_CLONES)
 MAX_METHOD_CACHE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_CACHE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB) * 1024

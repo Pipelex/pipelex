@@ -71,7 +71,7 @@ PIPELEX_ENV=dev
 # A method and the dependency trees it sends beside it are also bounded together:
 # MAX_METHOD_DEPENDENCIES=32          # dependency trees in one request
 # MAX_METHOD_REQUEST_TOTAL_KIB=131072 # bytes across the method's trees (default 128 MiB)
-# BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid
+# BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid (at most 604800, seven days)
 # Blobs live in the configured storage under <scope>/blobs/.
 
 # ── Signed links: upload targets and stored-object downloads ──────────────
@@ -89,7 +89,9 @@ PIPELEX_ENV=dev
 # worker processes (`uvicorn --workers N`, or a host that sets WEB_CONCURRENCY)
 # sets it, the same on every instance and every worker.
 # LINK_SIGNING_KEY=<a-long-random-secret>
-# STORAGE_LINK_TTL_SECONDS=900        # how long a resolved download link stays valid
+# STORAGE_LINK_TTL_SECONDS=900        # how long a resolved download link stays valid (at most 604800, seven days)
+# A signed link stays valid for at most seven days, as an S3 presigned URL does:
+# the server refuses to start when either lifetime above is set past that cap.
 
 # ── Running a method by address (`method_ref`) ────────────────────────────
 # See pipe-run.md → "Running a method by address". All read at startup.

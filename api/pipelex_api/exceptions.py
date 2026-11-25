@@ -47,7 +47,7 @@ class RequestFieldConflictError(PipelexError, ValueError):
 
 
 class ApiBootConfigError(PipelexError):
-    """Raised at startup when the deployment's orchestration config cannot boot coherently."""
+    """Raised at startup when the deployment's config cannot boot coherently: its orchestration, or a signed link's lifetime past its cap."""
 
     error_code = PipelexErrorCode.CONFIG_INVALID
 
