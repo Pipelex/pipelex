@@ -1900,11 +1900,11 @@ paths:
 
         that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
 
-        bytes come from the runner''s configured storage provider, under the content type stored with them, else the one
+        bytes come from the runner''s configured storage provider, under the bare media type `served_media_type` derives;
 
-        their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner''s origin,
+        the answer is sandboxed, so a stored HTML page never runs a script on the runner''s origin, except a PDF, which a
 
-        except a PDF, which a sandbox keeps a browser''s own viewer from displaying.'
+        sandbox keeps a browser''s own viewer from displaying.'
       operationId: get_stored_object_v1_storage__key__get
       parameters:
       - name: key
@@ -1937,7 +1937,8 @@ paths:
         description: The link's signature.
       responses:
         '200':
-          description: The object's bytes, under its stored content type.
+          description: The object's bytes, under the bare media type the route derives from the stored type and the key's
+            name.
           content:
             application/octet-stream:
               schema:

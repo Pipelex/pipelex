@@ -20,7 +20,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
-from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StoredData
 from pipelex_sdk.artifact_models import BulkResolvedStorageUrls, LoadStoredTextsOptions
 from pipelex_sdk.artifacts import load_stored_texts
 from pipelex_sdk.runs import RunResults
@@ -394,6 +394,94 @@ class TestStorageRoutes:
             assert "content-security-policy" not in downloaded.headers
         else:
             assert downloaded.headers["content-security-policy"] == "sandbox"
+
+    @pytest.mark.parametrize(
+        ("key", "provider_type", "expected"),
+        [
+            pytest.param("single-tenant/assets/report.pdf", "application/pdf; charset=binary", ("application/pdf", False), id="parameters_dropped"),
+            pytest.param("single-tenant/assets/report.pdf", "Application/PDF", ("application/pdf", False), id="lowercased"),
+            pytest.param("single-tenant/assets/report.bin", "image/png", ("image/png", True), id="stored_type_kept"),
+            pytest.param("single-tenant/assets/report", "application/pdf;,text/html", ("application/octet-stream", True), id="comma_no_name_type"),
+            pytest.param("single-tenant/assets/report.png", "application/pdf;,text/html", ("image/png", True), id="comma_name_type"),
+            pytest.param("single-tenant/assets/report.pdf", "application/pdf;,text/html", ("application/pdf", False), id="comma_falls_back_to_name"),
+            pytest.param("single-tenant/assets/report", "application/pdf,text/html", ("application/octet-stream", True), id="comma_in_essence"),
+            pytest.param("single-tenant/assets/report", "application/pdf/html", ("application/octet-stream", True), id="two_slashes"),
+            pytest.param("single-tenant/assets/report", "application", ("application/octet-stream", True), id="no_subtype"),
+            pytest.param("single-tenant/assets/report", "/pdf", ("application/octet-stream", True), id="no_type"),
+            pytest.param("single-tenant/assets/report", "application/p df", ("application/octet-stream", True), id="space_in_subtype"),
+            pytest.param("single-tenant/assets/report", "applicatio\u212a/pdf", ("application/octet-stream", True), id="non_ascii"),
+            pytest.param("single-tenant/assets/report.txt", None, ("text/plain", True), id="no_stored_type"),
+        ],
+    )
+    def test_the_download_route_serves_a_validated_bare_media_type(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: MockerFixture,
+        key: str,
+        provider_type: str | None,
+        expected: tuple[str, bool],
+    ) -> None:
+        """Whatever type a provider that keeps stored types answers, the route serves a bare `type/subtype` it validated."""
+        provider = mocker.Mock(storage_kind="s3")
+        provider.load_with_metadata = mocker.AsyncMock(return_value=StoredData(data=b"stored bytes", mime_type=provider_type))
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(key))
+        downloaded = _download(client, item["url"])
+
+        served, sandboxed = expected
+        assert downloaded.status_code == 200, downloaded.text
+        # The framework names the charset of a text type; the type itself is the bare one, with nothing the provider sent.
+        assert downloaded.headers["content-type"].removesuffix("; charset=utf-8") == served
+        assert ("content-security-policy" in downloaded.headers) is sandboxed
+        if sandboxed:
+            assert downloaded.headers["content-security-policy"] == "sandbox"
+
+    @pytest.mark.parametrize("head", [b"BM", b"MZ", b"ID3", b"GIF89a", b"%PDF-1.4"])
+    @pytest.mark.parametrize("provider_kind", ["local", "memory"])
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_provider_keeping_no_stored_type_serves_the_type_the_name_implies(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path, provider_kind: str, head: bytes
+    ) -> None:
+        """A text whose first bytes look like another format is served as the text the resolve route reported."""
+        provider: LocalStorageProvider | InMemoryStorageProvider
+        match provider_kind:
+            case "local":
+                provider = LocalStorageProvider(root_path=tmp_path)
+            case "memory":
+                provider = InMemoryStorageProvider(root={})
+            case _:
+                pytest.fail(f"unknown provider kind {provider_kind}")
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
+        data = head + b" is how this stored text starts"
+        await provider.store(data, key=StorageRouteTestData.TEXT_KEY, content_type="text/plain")
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        downloaded = _download(client, item["url"])
+
+        assert item["content_type"] == "text/plain"
+        assert downloaded.status_code == 200, downloaded.text
+        assert downloaded.content == data
+        assert downloaded.headers["content-type"] == "text/plain; charset=utf-8"
+        assert downloaded.headers["content-security-policy"] == "sandbox"
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_provider_keeping_no_stored_type_sniffs_an_object_whose_name_implies_none(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        local = LocalStorageProvider(root_path=tmp_path)
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=local)
+        key = "single-tenant/assets/no-extension"
+        await local.store(_STORED_FILES["image"][1], key=key, content_type="image/png")
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(key))
+        downloaded = _download(client, item["url"])
+
+        assert item["content_type"] is None
+        assert downloaded.headers["content-type"] == "image/png"
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_the_python_sdk_loads_a_stored_text_through_the_runner(

@@ -38,7 +38,7 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.storage_scope import is_key_within_read_scope
 from pipelex.tools.misc.filetype_utils import mime_type_of_file_name
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
-from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageKind
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex_api.exceptions import RunnerAuthError, StoredObjectMissingError
@@ -67,6 +67,8 @@ MAX_BULK_RESOLVE_URIS = 100
 SIGNED_STORAGE_LINK_REQUIREMENT = "signed_storage_link"
 _PDF_MEDIA_TYPE = "application/pdf"
 _OCTET_STREAM = "application/octet-stream"
+# The characters of an HTTP token (RFC 7230 `tchar`), which the type and the subtype of a media type are each made of.
+_TOKEN_CHARS = frozenset("!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 
 class BulkResolveStorageUrlRequest(BaseModel):
@@ -176,7 +178,7 @@ async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResol
     # statuses it can produce itself, and never answers 401.
     responses={
         200: {
-            "description": "The object's bytes, under its stored content type.",
+            "description": "The object's bytes, under the bare media type the route derives from the stored type and the key's name.",
             "content": {_OCTET_STREAM: {"schema": {"type": "string", "format": "binary"}}},
         },
         403: PROBLEM_403_STORAGE_LINK,
@@ -195,33 +197,80 @@ async def get_stored_object(
     The link's signed query is its authorization, so the route needs no bearer token. A link whose signature does not
     hold, or that has expired, is a 403 `auth.forbidden` whose `requirement` is `signed_storage_link`, as is a query
     that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
-    bytes come from the runner's configured storage provider, under the content type stored with them, else the one
-    their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner's origin,
-    except a PDF, which a sandbox keeps a browser's own viewer from displaying.
+    bytes come from the runner's configured storage provider, under the bare media type `served_media_type` derives;
+    the answer is sandboxed, so a stored HTML page never runs a script on the runner's origin, except a PDF, which a
+    sandbox keeps a browser's own viewer from displaying.
     """
     if storage_key_of(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") is None or not is_download_authorized(key=key, expires=expires, signature=signature):
         msg = (
             "This download carries no valid link: resolve the reference with POST /v1/resolve-storage-url/bulk, and fetch the link before it expires."
         )
         raise RunnerAuthError(msg).with_error_code(CoreCode.AUTH_FORBIDDEN).with_params(requirement=SIGNED_STORAGE_LINK_REQUIREMENT)
+    provider = get_storage_provider()
     try:
-        stored = await get_storage_provider().load_with_metadata(f"{PIPELEX_STORAGE_SCHEME}{key}")
+        stored = await provider.load_with_metadata(f"{PIPELEX_STORAGE_SCHEME}{key}")
     except StorageFileNotFoundError as exc:
         msg = "The link's signature holds, but the runner's storage holds no file at the address it names."
         raise StoredObjectMissingError(msg) from exc
-    media_type = stored.mime_type or mime_type_of_file_name(file_name=key) or _OCTET_STREAM
+    media_type = served_media_type(key=key, provider_type=stored.mime_type, storage_kind=provider.storage_kind)
     return Response(content=stored.data, media_type=media_type, headers=_download_headers(media_type=media_type))
+
+
+def bare_media_type(*, content_type: str | None) -> str | None:
+    """The bare `type/subtype` a content type names, lowercase, or None when it names no well-formed one.
+
+    The parameters after a `;` are dropped. What is left must be one type and one subtype, each a non-empty HTTP token
+    (RFC 7230 `tchar`), joined by exactly one `/`; a content type holding a comma anywhere, or any other shape, names
+    none, so the route never serves a type it has not validated.
+    """
+    if content_type is None or "," in content_type:
+        return None
+    essence = content_type.split(";", 1)[0].strip()
+    media_type, slash, subtype = essence.partition("/")
+    if not slash or not media_type or not subtype:
+        return None
+    if any(char not in _TOKEN_CHARS for char in media_type) or any(char not in _TOKEN_CHARS for char in subtype):
+        return None
+    return essence.lower()
+
+
+def _keeps_stored_type(*, storage_kind: StorageKind) -> bool:
+    """Whether a provider of this kind answers the content type an object was stored with, rather than one it guessed.
+
+    S3 and GCS keep the type a write gave them, and a plugin is taken at its word. The local and in-memory providers keep
+    none: the type they answer is sniffed from the bytes, which the name the object was stored under says better.
+    """
+    match storage_kind:
+        case "s3" | "gcs" | "plugin":
+            return True
+        case "local" | "memory":
+            return False
+
+
+def served_media_type(*, key: str, provider_type: str | None, storage_kind: StorageKind) -> str:
+    """The bare media type the download route serves an object under, which agrees with what was stored.
+
+    Both candidates are reduced to a validated bare type first (`bare_media_type`): the type the provider answered and
+    the one the key's name implies, which is the type the resolve route reported. A provider that keeps the type an
+    object was stored with has its type served, else the name's; one that keeps none has the name's type served, else
+    the one it sniffed from the bytes. With neither, the object is served as `application/octet-stream`.
+    """
+    stored_type = bare_media_type(content_type=provider_type)
+    name_type = bare_media_type(content_type=mime_type_of_file_name(file_name=key))
+    if _keeps_stored_type(storage_kind=storage_kind):
+        return stored_type or name_type or _OCTET_STREAM
+    return name_type or stored_type or _OCTET_STREAM
 
 
 def _download_headers(*, media_type: str) -> dict[str, str]:
     """The headers of a download: never sniffed, kept private, and sandboxed unless the object is a PDF.
 
-    A sandboxed answer runs no script on the runner's origin, which a stored HTML page or SVG image would otherwise run.
-    A PDF is the exception, since Chromium's viewer refuses to display a document served under a sandbox (crbug 413851),
-    and a PDF runs no script on the origin that serves it.
+    `media_type` is the bare type `served_media_type` derived. A sandboxed answer runs no script on the runner's origin,
+    which a stored HTML page or SVG image would otherwise run. A PDF is the exception, since Chromium's viewer refuses to
+    display a document served under a sandbox (crbug 413851), and a PDF runs no script on the origin that serves it.
     """
     headers = {"X-Content-Type-Options": "nosniff", "Cache-Control": "private"}
-    if media_type.split(";", 1)[0].strip().lower() != _PDF_MEDIA_TYPE:
+    if media_type != _PDF_MEDIA_TYPE:
         headers["Content-Security-Policy"] = "sandbox"
     return headers
 
