@@ -48,6 +48,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.declared_item_count import validate_requested_max_declared_item_count
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel.exceptions import TraceContextRunModeError
@@ -101,6 +102,7 @@ class PipelexKernel:
         is_mock_usage: bool = False,
         trace_context: TraceContext | None = None,
         step_id_source: Callable[[], str] | None = None,
+        max_declared_item_count: int | None = None,
     ) -> Self:
         """Mint a kernel for one run: a run id, the execution-mode contract, and optional tracing.
 
@@ -162,6 +164,13 @@ class PipelexKernel:
         supported way to say otherwise. Omitting it leaves the telemetry group facet empty, which
         misattributes nothing. See :mod:`pipelex.system.run_extras`.
 
+        ``max_declared_item_count`` is the most items one slot of the run may hold, such as the list a dry
+        ``llm_object`` step builds, as the host states it for this run, the way ``pipeline_run_setup`` takes it. It is
+        validated as there: a whole number from one to the deployment's
+        ``[interpreter.method_limits] max_declared_item_count_ceiling``, else ``RunParameterError``. It rides the run
+        metadata, where every dry leaf a step reaches reads it, in this process or a worker's activity. ``None`` keeps
+        the deployment's ``max_declared_item_count``.
+
         ``step_id_source`` overrides where each step's ``pipe_run_id`` comes from; it defaults to a
         fresh ``uuid4``, which is what every in-process run wants. It exists for a kernel hosted
         inside a **replay-based** executor, where identifiers minted from a non-replay-safe source
@@ -178,6 +187,8 @@ class PipelexKernel:
                 "on this boot; a boot without inference runs every run dry."
             )
             raise TraceContextRunModeError(msg)
+        if max_declared_item_count is not None:
+            max_declared_item_count = validate_requested_max_declared_item_count(value=max_declared_item_count)
         return cls(
             job_metadata=JobMetadata(
                 run_metadata=RunMetadata(
@@ -187,6 +198,7 @@ class PipelexKernel:
                     pipeline_run_id=cls._resolve_pipeline_run_id(trace_context=trace_context, pipeline_run_id=pipeline_run_id),
                     request_id=request_id,
                     extras=extras or {},
+                    max_declared_item_count=max_declared_item_count,
                 ),
                 trace_context=trace_context,
             ),

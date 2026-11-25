@@ -1562,6 +1562,84 @@
       ]
     },
     {
+      "code": "pipelex.deployment.declared_count_over_limit",
+      "title": "More items are asked for one slot than this runtime allows",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "{count} items are asked for {slot}, more than the {limit} this runtime allows for one slot.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Ask for at most {limit} items for {slot}, in the method or in the request, or run it under a plan or a configuration that allows more, then run it again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to ask for at most {limit} items for {slot}, or the account's owner to move to a plan that allows more."
+        }
+      },
+      "params": {
+        "slot": {
+          "type": "caller_text",
+          "description": "Where the count is asked for, such as the input 'items' of the pipe 'summarize'."
+        },
+        "count": {
+          "type": "integer",
+          "description": "The number of items asked for there."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "The most items this runtime allows for one slot."
+        }
+      },
+      "meaning": "A method declares a fixed number of items with `Concept[N]` on an input or an output, or with `nb_output` on a controller step, and a run may ask for one with `output_multiplicity`. A dry run builds one mock item per item asked for, and a live run asks a model for each. Each runtime bounds that number: a local runtime by its configuration, the hosted plane by the caller's plan. The method is valid, but this runtime refuses to load it for a validation or a run while one of its counts passes that bound, and refuses a run whose `output_multiplicity` passes it.",
+      "what_to_do": "Ask for fewer items for the slot `params.slot` names, such as a variable list `Concept[]` in place of a fixed count, or a smaller `output_multiplicity`, or raise the limit: on the hosted plane by moving to a plan that allows more, on your own runtime with `max_declared_item_count` under `[interpreter.method_limits]` in `.pipelex/pipelex.toml`.",
+      "see": [
+        {
+          "title": "Library Configuration",
+          "href": "configuration/config-technical/library-config.md"
+        }
+      ]
+    },
+    {
+      "code": "pipelex.deployment.dry_run_mock_budget_exceeded",
+      "title": "A dry run of the method would build more mock items than this runtime allows",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A dry run of the method would build more than {budget} mock items in all, the most this runtime builds for one dry run, when it reached {slot}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare fewer items across the method, such as smaller fixed counts or fewer lists nested in batches, so that a dry run builds at most {budget} mock items, then run it again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare fewer items across the method, so that a dry run builds at most {budget} mock items."
+        }
+      },
+      "params": {
+        "slot": {
+          "type": "caller_text",
+          "description": "What the dry run was about to build when it passed the budget, such as the mock input 'items'."
+        },
+        "budget": {
+          "type": "integer",
+          "description": "The most mock items this runtime builds for one dry run."
+        }
+      },
+      "meaning": "A validation dry-runs the method, building one mock item for every item a slot holds. Each slot is bounded by the maximum declared item count, and their sum by a budget: many inputs each declaring the maximum, or a batch over a list whose every branch builds another list, multiply what one dry run builds. The method is valid, but this runtime refuses to finish its dry run once the mock items it built would pass the budget. The budget covers one in-process validation or dry run, its mock inputs and its pipes together; a distributed dry run counts each of its worker activities against a budget of its own.",
+      "what_to_do": "Declare fewer items across the method: smaller fixed counts, variable lists `Concept[]` in place of fixed counts, or fewer lists nested in batches. On your own runtime, the budget is `max_dry_run_mock_items` under `[interpreter.method_limits]` in `.pipelex/pipelex.toml`.",
+      "see": [
+        {
+          "title": "Library Configuration",
+          "href": "configuration/config-technical/library-config.md"
+        }
+      ]
+    },
+    {
       "code": "pipelex.deployment.token_claims_invalid",
       "title": "The token's claims cannot be used",
       "domain": "operator",

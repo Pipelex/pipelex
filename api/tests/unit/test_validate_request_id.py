@@ -56,6 +56,7 @@ class _RecordingBundleValidator:
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,  # noqa: ARG002
         request_id: str | None,
+        max_declared_item_count: int | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
         self.request_ids.append(request_id)
         return BundleValidationFailure(

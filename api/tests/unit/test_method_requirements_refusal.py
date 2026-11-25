@@ -124,6 +124,7 @@ class _UnreachableValidator:
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,  # noqa: ARG002
         request_id: str | None,  # noqa: ARG002
+        max_declared_item_count: int | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
         self.calls += 1
         msg = "A method refused for its requirements must not reach the validator."

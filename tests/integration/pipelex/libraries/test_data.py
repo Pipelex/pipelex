@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import ClassVar
 
 
@@ -559,3 +560,110 @@ steps       = [{{ pipe = "{pipe_ref}", result = "score" }}]
     def legacy_lock_naming(cls, *, address: str) -> str:
         """A `methods.lock` written before tree digests, its entry recording a `hash`."""
         return f'["{address}"]\nversion = "0.1.0"\nhash    = "sha256:{"c" * 64}"\nsource  = "https://github.com/pipelex-tests/fom-lock-methods.git"\n'
+
+
+def _bundle_with_input_count(count: int) -> str:
+    return f"""domain = "declared_counts"
+description = "A pipe taking a fixed number of texts"
+main_pipe = "summarize_items"
+
+[pipe.summarize_items]
+type = "PipeLLM"
+description = "Summarize the texts"
+inputs = {{ items = "Text[{count}]" }}
+output = "Text"
+prompt = '''Summarize these texts:
+
+@items
+'''
+"""
+
+
+def _bundle_with_output_count(count: int) -> str:
+    return f"""domain = "declared_counts"
+description = "A pipe producing a fixed number of texts"
+main_pipe = "make_ideas"
+
+[pipe.make_ideas]
+type = "PipeLLM"
+description = "Make ideas"
+inputs = {{ topic = "Text" }}
+output = "Text[{count}]"
+prompt = "Give ideas about $topic"
+"""
+
+
+def _bundle_with_step_count(count: int) -> str:
+    return f"""domain = "declared_counts"
+description = "A sequence asking a step for a fixed number of texts"
+main_pipe = "brainstorm"
+
+[pipe.brainstorm]
+type = "PipeSequence"
+description = "Brainstorm"
+inputs = {{ topic = "Text" }}
+output = "Text[]"
+steps = [{{ pipe = "make_ideas", result = "ideas", nb_output = {count} }}]
+
+[pipe.make_ideas]
+type = "PipeLLM"
+description = "Make ideas"
+inputs = {{ topic = "Text" }}
+output = "Text[]"
+prompt = "Give ideas about $topic"
+"""
+
+
+def _bundle_batching_lists(count: int) -> str:
+    return f"""domain = "declared_counts"
+description = "A batch over a fixed list, each branch building a fixed list of its own"
+main_pipe = "expand_all"
+
+[pipe.expand_item]
+type = "PipeLLM"
+description = "Expand one text"
+inputs = {{ item = "Text" }}
+output = "Text[{count}]"
+prompt = "Expand $item"
+
+[pipe.expand_all]
+type = "PipeBatch"
+description = "Expand each text"
+inputs = {{ items = "Text[{count * 2}]" }}
+output = "Text[]"
+branch_pipe_code = "expand_item"
+input_list_name = "items"
+input_item_name = "item"
+"""
+
+
+class DeclaredItemCountCases:
+    """One bundle builder per spelling of a declared item count, with the slot its refusal names."""
+
+    #: A method on variable lists only, whose dry-run lengths are the dry run's own defaults.
+    DECLARING_NO_COUNT: ClassVar[str] = """domain = "declared_counts"
+description = "Pipes on variable lists, declaring no count"
+main_pipe = "summarize_list"
+
+[pipe.summarize_list]
+type = "PipeLLM"
+description = "Summarize the texts"
+inputs = { items = "Text[]" }
+output = "Text[]"
+prompt = "Summarize these texts: $items"
+"""
+
+    #: A batch over `Text[2N]` whose branch outputs `Text[N]`: each slot is small, their product is not.
+    BATCHING_LISTS: ClassVar[Callable[[int], str]] = _bundle_batching_lists
+
+    SPELLINGS: ClassVar[list[tuple[str, Callable[[int], str], str]]] = [
+        ("input Concept[N]", _bundle_with_input_count, "the input 'items' of the pipe 'summarize_items'"),
+        ("output Concept[N]", _bundle_with_output_count, "the output of the pipe 'make_ideas'"),
+        ("step nb_output", _bundle_with_step_count, "the step running pipe 'make_ideas' in the pipe 'brainstorm'"),
+    ]
+
+    PAST_ANY_RUNTIME: ClassVar[list[tuple[str, Callable[[int], str], str]]] = [
+        ("input Concept[N]", _bundle_with_input_count, "more than any runtime allows"),
+        ("output Concept[N]", _bundle_with_output_count, "more than any runtime allows"),
+        ("step nb_output", _bundle_with_step_count, "more than any runtime allows"),
+    ]
