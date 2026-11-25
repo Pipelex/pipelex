@@ -255,7 +255,9 @@ class TestStorageRoutes:
 
         assert_problem(response, status=422, code="request.invalid")
 
-    @pytest.mark.parametrize("tampering", ["no_query", "forged_signature", "another_key", "not_a_number", "expired", "upload_signature"])
+    @pytest.mark.parametrize(
+        "tampering", ["no_query", "forged_signature", "another_key", "not_a_number", "too_many_digits", "expired", "upload_signature"]
+    )
     def test_a_download_without_a_valid_link_is_refused(
         self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider, mocker: MockerFixture, tampering: str
     ) -> None:
@@ -278,6 +280,9 @@ class TestStorageRoutes:
                 path = f"/v1/storage/{StorageRouteTestData.MISSING_KEY}"
             case "not_a_number":
                 query["expires"] = "１２３４５６７８９０"
+            case "too_many_digits":
+                # Past the digits Python's `int()` reads by default: a refused link, never a server error.
+                query["expires"] = "9" * 5000
             case "expired":
                 pass
             case "upload_signature":

@@ -63,9 +63,15 @@ def is_signature_valid(*, purpose: LinkPurpose, message: str, signature: str) ->
     return hmac.compare_digest(expected, signature.encode("utf-8", "surrogatepass"))
 
 
+# The most digits an expiry this runner signs has: seconds since the epoch stay under twelve digits for tens of
+# thousands of years. A longer text is no link of this runner's, and is refused before `int()` reads it, which refuses
+# a text past Python's own digit limit with a `ValueError`.
+_MAX_EXPIRY_DIGITS = 12
+
+
 def is_expiry_valid(*, expires: str, now: int) -> bool:
     """Whether `expires`, the caller's text, is a decimal number of seconds since the epoch not yet past."""
-    if not expires.isascii() or not expires.isdecimal():
+    if len(expires) > _MAX_EXPIRY_DIGITS or not expires.isascii() or not expires.isdecimal():
         return False
     return int(expires) >= now
 

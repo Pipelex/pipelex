@@ -244,6 +244,7 @@ class TestBlobRoutes:
             pytest.param("expires", "soon", id="expires_not_a_number"),
             pytest.param("expires", "١٢٣", id="expires_in_other_digits"),
             pytest.param("expires", "-5", id="expires_signed"),
+            pytest.param("expires", "9" * 5000, id="expires_past_the_int_digit_limit"),
         ],
     )
     def test_a_malformed_target_is_refused_as_no_valid_target(self, name: str, value: str) -> None:
