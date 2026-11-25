@@ -7,7 +7,7 @@ description: "Every Pipelex error code, with its title, domain, retry verdict an
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.117.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.118.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -75,6 +75,7 @@ Pipelex's storage addresses and uploads.
 |---|---|---|---|---|
 | [`pipelex.storage.uri_invalid`](pipelex/storage/uri_invalid.md) | The storage address is malformed | `input` | `no` | `422` |
 | [`pipelex.storage.not_found`](pipelex/storage/not_found.md) | A stored file is gone | `runtime` | `no` | `500` |
+| [`pipelex.storage.object_missing`](pipelex/storage/object_missing.md) | No file is stored at this link | `input` | `no` | `404` |
 | [`pipelex.storage.damaged`](pipelex/storage/damaged.md) | A stored file is damaged | `runtime` | `no` | `500` |
 | [`pipelex.storage.unavailable`](pipelex/storage/unavailable.md) | Storage is unavailable | `runtime` | `yes` | `503` |
 | [`pipelex.storage.not_configured`](pipelex/storage/not_configured.md) | This deployment serves no storage for that address | `operator` | `no` | `500` |

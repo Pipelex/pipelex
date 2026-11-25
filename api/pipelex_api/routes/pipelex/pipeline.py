@@ -190,6 +190,17 @@ def _resolve_read_scope(request: Request, *, requested: str | None) -> str | Non
     """
     if requested is not None:
         return bound_read_scope(request, requested=requested)
+    return caller_read_scope(request)
+
+
+def caller_read_scope(request: Request) -> str | None:
+    """What a request that names no read scope may read: the caller's own id, or everything when no caller is known.
+
+    A deployment that identifies its callers (`AUTH_MODE=jwt`, or a trusted proxy's forwarded id) scopes the caller to
+    its own id, where its writes land by default. A single-tenant deployment (`AUTH_MODE=none` without forwarded
+    identity, or the shared `api_key`) has one tenant, whose runs may already write and read any key through
+    `storage_scope` and `read_scope`, so it reads unscoped.
+    """
     user: RequestUser | None = getattr(request.state, "user", None)
     return user.user_id if user else None
 

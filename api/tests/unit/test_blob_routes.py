@@ -244,6 +244,7 @@ class TestBlobRoutes:
             pytest.param("expires", "soon", id="expires_not_a_number"),
             pytest.param("expires", "١٢٣", id="expires_in_other_digits"),
             pytest.param("expires", "-5", id="expires_signed"),
+            pytest.param("expires", "9" * 5000, id="expires_past_the_int_digit_limit"),
         ],
     )
     def test_a_malformed_target_is_refused_as_no_valid_target(self, name: str, value: str) -> None:
@@ -260,7 +261,7 @@ class TestBlobRoutes:
 
     def test_upload_targets_start_with_the_configured_public_base_url(self, mocker: MockerFixture) -> None:
         """Behind a proxy terminating TLS, the URL a request arrived at is not the one a sender reaches."""
-        mocker.patch("pipelex_api.blob_upload.get_optional_env", return_value="https://runner.example.com/api/")
+        mocker.patch("pipelex_api.signed_links.get_optional_env", return_value="https://runner.example.com/api/")
         client = _build_client()
 
         (target,) = _missing(client, _TEMPLATE)
@@ -278,7 +279,7 @@ class TestBlobRoutes:
         assert str(target["upload"]["url"]).startswith(f"http://testserver/v1/blobs/{sha256_hex(_TEMPLATE)}?")
 
     def test_a_public_base_url_that_is_not_an_http_url_is_a_configuration_error(self, mocker: MockerFixture) -> None:
-        mocker.patch("pipelex_api.blob_upload.get_optional_env", return_value="runner.example.com")
+        mocker.patch("pipelex_api.signed_links.get_optional_env", return_value="runner.example.com")
 
         response = _build_client().post("/v1/blobs/missing", json={"blobs": [_blob_ref(_TEMPLATE)]})
 
