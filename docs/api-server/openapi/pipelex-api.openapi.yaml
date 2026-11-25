@@ -1902,7 +1902,9 @@ paths:
 
         bytes come from the runner''s configured storage provider, under the content type stored with them, else the one
 
-        their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner''s origin.'
+        their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner''s origin,
+
+        except a PDF, which a sandbox keeps a browser''s own viewer from displaying.'
       operationId: get_stored_object_v1_storage__key__get
       parameters:
       - name: key
@@ -1984,14 +1986,14 @@ paths:
         API extension).
 
 
-        The hosted platform''s contract, for this runner''s own storage. A reference resolves only when its key lies under
-        the
+        The hosted platform''s contract, for this runner''s own storage. Under `AUTH_MODE=jwt` a reference resolves only when
 
-        caller''s scope: `single-tenant` on a deployment that identifies no caller, the caller''s `user_id` under
+        its key lies under the caller''s `user_id`, and one under another scope is refused on its item as `auth.forbidden`
 
-        `AUTH_MODE=jwt`. A reference that does not parse is refused on its item as `pipelex.storage.uri_invalid`, and one
+        whose `requirement` is `read_scope_under_caller`; a deployment that identifies no caller resolves any reference
 
-        under another scope as `auth.forbidden` whose `requirement` is `read_scope_under_caller`; the request is a `200`
+        that parses. A reference that does not parse is refused on its item as `pipelex.storage.uri_invalid`; the request
+        is a `200`
 
         because a verdict was produced for every reference. Resolving checks no file is stored at the address, as a
 

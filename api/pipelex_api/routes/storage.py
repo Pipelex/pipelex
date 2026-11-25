@@ -124,6 +124,7 @@ def _refusal(*, code: ErrorCode, params: dict[str, Any] | None = None) -> Refusa
 
 @resolve_router.post(
     "/resolve-storage-url/bulk",
+    response_model=BulkResolveStorageUrlResponse,
     summary="Resolve pipelex-storage:// references to short-lived download links, one verdict per reference.",
 )
 async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResolveStorageUrlRequest) -> BulkResolveStorageUrlResponse:
