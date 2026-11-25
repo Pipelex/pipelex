@@ -37,6 +37,7 @@ DEFAULT_MAX_METHOD_TREE_FILE_KIB = 32 * 1024  # 32 MiB for one file of a tree, a
 DEFAULT_MAX_METHOD_DEPENDENCIES = 32  # dependency trees beside the method's own
 DEFAULT_MAX_METHOD_REQUEST_TOTAL_KIB = 128 * 1024  # 128 MiB across the method's tree and its dependency trees
 DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS = 3600  # how long an upload target `POST /v1/blobs/missing` names stays valid
+DEFAULT_STORAGE_LINK_TTL_SECONDS = 900  # how long a download link `POST /v1/resolve-storage-url/bulk` resolves to stays valid
 DEFAULT_MAX_METHOD_CACHE_CLONES = 64  # cached method-package clones (one per resolved commit SHA)
 DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB = 512 * 1024  # 512 MiB across all cached clones
 DEFAULT_MAX_METHOD_CACHE_AGE_HOURS = 24  # a cached clone unused for this long is evicted
@@ -67,6 +68,7 @@ MAX_METHOD_DEPENDENCIES = get_positive_int_env(env_var="MAX_METHOD_DEPENDENCIES"
 MAX_METHOD_REQUEST_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_REQUEST_TOTAL_KIB", default=DEFAULT_MAX_METHOD_REQUEST_TOTAL_KIB) * 1024
 
 BLOB_UPLOAD_URL_TTL_SECONDS = get_positive_int_env(env_var="BLOB_UPLOAD_URL_TTL_SECONDS", default=DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS)
+STORAGE_LINK_TTL_SECONDS = get_positive_int_env(env_var="STORAGE_LINK_TTL_SECONDS", default=DEFAULT_STORAGE_LINK_TTL_SECONDS)
 
 MAX_METHOD_CACHE_CLONES = get_positive_int_env(env_var="MAX_METHOD_CACHE_CLONES", default=DEFAULT_MAX_METHOD_CACHE_CLONES)
 MAX_METHOD_CACHE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_CACHE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB) * 1024

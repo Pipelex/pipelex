@@ -72,15 +72,23 @@ PIPELEX_ENV=dev
 # MAX_METHOD_DEPENDENCIES=32          # dependency trees in one request
 # MAX_METHOD_REQUEST_TOTAL_KIB=131072 # bytes across the method's trees (default 128 MiB)
 # BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid
-# The address clients reach this API at, which upload targets start with. Set it
-# behind a proxy that terminates TLS or serves the API under a path prefix, since
-# the URL a request arrives at is then not the one a client can upload to. Unset,
-# a target starts with the URL of the request that asked for it.
+# Blobs live in the configured storage under <scope>/blobs/.
+
+# ── Signed links: upload targets and stored-object downloads ──────────────
+# See pipe-run.md → "Sending files by hash" and storage-transport.md.
+# The address clients reach this API at, which every signed link starts with:
+# the upload targets of /v1/blobs/missing and the download links of
+# /v1/resolve-storage-url/bulk. Set it behind a proxy that terminates TLS or
+# serves the API under a path prefix, since the URL a request arrives at is then
+# not the one a client can reach. Unset, a link starts with the URL of the
+# request that asked for it.
 # PUBLIC_BASE_URL=https://runner.example.com
-# The key the upload targets are signed with. Unset, each process draws its own,
-# so a deployment serving one API through several instances sets it, the same on
-# every instance. Blobs live in the configured storage under <scope>/blobs/.
-# BLOB_UPLOAD_SIGNING_KEY=<a-long-random-secret>
+# The key every signed link is signed with, each kind of link under a purpose of
+# its own. Unset, each process draws its own, so its links stop holding when it
+# restarts, and a deployment serving one API through several instances sets it,
+# the same on every instance.
+# LINK_SIGNING_KEY=<a-long-random-secret>
+# STORAGE_LINK_TTL_SECONDS=900        # how long a resolved download link stays valid
 
 # ── Running a method by address (`method_ref`) ────────────────────────────
 # See pipe-run.md → "Running a method by address". All read at startup.

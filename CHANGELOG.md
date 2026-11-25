@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A self-hosted API server hands back what it stores, `POST /v1/resolve-storage-url/bulk` and `GET /v1/storage/{key}`**: the server serves the hosted platform's bulk resolve contract for its own storage, field for field, so the long texts, generated images and received files a run hands back as `pipelex-storage://` references load and download through both SDKs and every client built on them, where a bare server answered a 404. A caller resolves only references under its own scope (`single-tenant` without per-caller identity, the caller's `user_id` under `AUTH_MODE=jwt`), a reference that does not parse is refused on its item as `pipelex.storage.uri_invalid` and one under another scope as `auth.forbidden` with the requirement `read_scope_under_caller`, and each resolved link is the server's own signed download route, which needs no bearer token, starts with `PUBLIC_BASE_URL` when it is set, expires after `STORAGE_LINK_TTL_SECONDS` (fifteen minutes by default), and answers a bad or expired signature with a 403 `auth.forbidden` whose requirement is `signed_storage_link` and an address holding no file with a 404 under the new code `pipelex.storage.object_missing`. Neither route is mounted when the server trusts forwarded identity (`TRUST_FORWARDED_IDENTITY_HEADERS=true`), where the host's platform serves it.
+
+### Changed
+
+- **`LINK_SIGNING_KEY` replaces `BLOB_UPLOAD_SIGNING_KEY` (Breaking)**: the API server signs its upload targets and its download links with one key, each kind of link under a purpose of its own, so a deployment of several instances that set `BLOB_UPLOAD_SIGNING_KEY` sets `LINK_SIGNING_KEY` instead; unset, each process still draws its own key.
+
 ## [v0.117.0] - 2026-11-25
 
 ### Added

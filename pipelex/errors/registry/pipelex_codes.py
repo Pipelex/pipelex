@@ -39,6 +39,7 @@ class PipelexErrorCode(StrEnum):
     REQUEST_DEPENDENCY_KEY_MISMATCH = "pipelex.request.dependency_key_mismatch"
     STORAGE_URI_INVALID = "pipelex.storage.uri_invalid"
     STORAGE_NOT_FOUND = "pipelex.storage.not_found"
+    STORAGE_OBJECT_MISSING = "pipelex.storage.object_missing"
     STORAGE_DAMAGED = "pipelex.storage.damaged"
     STORAGE_UNAVAILABLE = "pipelex.storage.unavailable"
     STORAGE_NOT_CONFIGURED = "pipelex.storage.not_configured"
@@ -426,6 +427,15 @@ class StorageNotFoundParams(PipelexErrorParams):
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_NOT_FOUND
 
     scheme: Literal["local", "s3", "gcs", "memory", "plugin"]
+
+
+class StorageObjectMissingParams(PipelexErrorParams):
+    """The parameters of `pipelex.storage.object_missing`.
+
+    No file is stored at this link.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_OBJECT_MISSING
 
 
 class StorageDamagedParams(PipelexErrorParams):
@@ -1110,6 +1120,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH: RequestDependencyKeyMismatchParams,
     PipelexErrorCode.STORAGE_URI_INVALID: StorageUriInvalidParams,
     PipelexErrorCode.STORAGE_NOT_FOUND: StorageNotFoundParams,
+    PipelexErrorCode.STORAGE_OBJECT_MISSING: StorageObjectMissingParams,
     PipelexErrorCode.STORAGE_DAMAGED: StorageDamagedParams,
     PipelexErrorCode.STORAGE_UNAVAILABLE: StorageUnavailableParams,
     PipelexErrorCode.STORAGE_NOT_CONFIGURED: StorageNotConfiguredParams,
@@ -1443,6 +1454,17 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         actor_step_detail="Report this to whoever runs the runtime.",
         other_step="report",
         other_step_detail="Report this to whoever runs the runtime.",
+    ),
+    PipelexErrorCode.STORAGE_OBJECT_MISSING: PipelexErrorEntry(
+        title="No file is stored at this link",
+        domain="input",
+        retry="no",
+        status=404,
+        detail="No file is stored at the storage address this link names.",
+        actor_step="change_input",
+        actor_step_detail="Resolve a storage address that a run or an upload returned, then fetch the link the answer gives.",
+        other_step="change_input",
+        other_step_detail="Pass this to the caller, whose link names a storage address where no file is stored.",
     ),
     PipelexErrorCode.STORAGE_DAMAGED: PipelexErrorEntry(
         title="A stored file is damaged",

@@ -1885,6 +1885,177 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
       x-mthds-protocol: true
+  /v1/storage/{key}:
+    get:
+      tags:
+      - storage
+      summary: Download one stored object from the signed link POST /resolve-storage-url/bulk resolved it to.
+      description: 'Answer one stored object''s bytes, as the link `POST /v1/resolve-storage-url/bulk` resolved it to (Pipelex
+        API extension).
+
+
+        The link''s signed query is its authorization, so the route needs no bearer token. A link whose signature does not
+
+        hold, or that has expired, is a 403 `auth.forbidden` whose `requirement` is `signed_storage_link`, as is a query
+
+        that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
+
+        bytes come from the runner''s configured storage provider, under the content type stored with them, else the one
+
+        their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner''s origin.'
+      operationId: get_stored_object_v1_storage__key__get
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          description: 'The object''s storage key: its pipelex-storage:// reference without the scheme.'
+          title: Key
+        description: 'The object''s storage key: its pipelex-storage:// reference without the scheme.'
+      - name: expires
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: When the link expires, in seconds since the epoch.
+          title: Expires
+        description: When the link expires, in seconds since the epoch.
+      - name: signature
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The link's signature.
+          title: Signature
+        description: The link's signature.
+      responses:
+        '200':
+          description: The object's bytes, under its stored content type.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: '`auth.forbidden`, whose `params.requirement` is `signed_storage_link` — the download does not carry
+            the signed query a link of `POST /v1/resolve-storage-url/bulk` names, its signature does not hold for this key,
+            or it has expired. Resolve the reference again for a fresh link.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '404':
+          description: '`pipelex.storage.object_missing` — the link''s signature holds, but the runner''s storage holds no
+            file at the address it names: resolving a reference checks only that the caller may read it, not that a file is
+            stored there.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '422':
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '500':
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+  /v1/resolve-storage-url/bulk:
+    post:
+      tags:
+      - storage
+      summary: Resolve pipelex-storage:// references to short-lived download links, one verdict per reference.
+      description: 'Turn a list of `pipelex-storage://` URIs into short-lived download links, one verdict per reference (Pipelex
+        API extension).
+
+
+        The hosted platform''s contract, for this runner''s own storage. A reference resolves only when its key lies under
+        the
+
+        caller''s scope: `single-tenant` on a deployment that identifies no caller, the caller''s `user_id` under
+
+        `AUTH_MODE=jwt`. A reference that does not parse is refused on its item as `pipelex.storage.uri_invalid`, and one
+
+        under another scope as `auth.forbidden` whose `requirement` is `read_scope_under_caller`; the request is a `200`
+
+        because a verdict was produced for every reference. Resolving checks no file is stored at the address, as a
+
+        presigned URL does not. Each link is this runner''s own `GET /v1/storage/{key}`, at `PUBLIC_BASE_URL` when the
+
+        deployment sets it, signed for that key and valid for `STORAGE_LINK_TTL_SECONDS`. More than
+
+        `MAX_BULK_RESOLVE_URIS` references, or a reference past `STORAGE_URI_MAX_CHARS`, is a `422 request.invalid`.
+
+        Not served when the runner trusts forwarded identity, where the host''s platform serves it.'
+      operationId: resolve_storage_urls_in_bulk_v1_resolve_storage_url_bulk_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkResolveStorageUrlRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkResolveStorageUrlResponse'
+        '401':
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none.'
+          headers:
+            WWW-Authenticate:
+              description: Authentication challenge, `Bearer`, where the deployment reads a bearer token (`AUTH_MODE=api_key`
+                or `AUTH_MODE=jwt`). Absent behind a trusted proxy, which reads no credential of the request.
+              schema:
+                type: string
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '413':
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '422':
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '500':
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
   /:
     get:
       tags:
@@ -2247,6 +2418,74 @@ components:
       - required
       title: BooleanItem
       description: '`boolean` — true or false.'
+    BulkResolveStorageUrlItem:
+      properties:
+        uri:
+          type: string
+          title: Uri
+          description: The reference exactly as sent
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+          description: Short-lived signed download URL on this runner; null when the reference was refused
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+          description: UTC expiry of the signed URL; null when refused
+        content_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Content Type
+          description: Content type guessed from the URI extension; null when unknown or refused
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/RefusalItem'
+          - type: 'null'
+          description: 'Why the reference was refused: `pipelex.storage.uri_invalid` for a reference that does not parse,
+            or `auth.forbidden` whose `requirement` is `read_scope_under_caller` for one outside the caller''s scope; null
+            when resolved'
+      type: object
+      required:
+      - uri
+      title: BulkResolveStorageUrlItem
+      description: 'One verdict per reference. A client branches on `error`, never on the HTTP status.
+
+
+        Either `url` and `expires_at` are set and `error` is null, or `error` is set and the three link fields are null.'
+    BulkResolveStorageUrlRequest:
+      properties:
+        uris:
+          items:
+            type: string
+            maxLength: 512
+          type: array
+          maxItems: 100
+          title: Uris
+          description: pipelex-storage:// URIs to resolve, at most 100 per request
+      additionalProperties: false
+      type: object
+      required:
+      - uris
+      title: BulkResolveStorageUrlRequest
+      description: The references to resolve, the platform's request field for field.
+    BulkResolveStorageUrlResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/BulkResolveStorageUrlItem'
+          type: array
+          title: Items
+          description: One item per requested reference, in the request's order
+      type: object
+      required:
+      - items
+      title: BulkResolveStorageUrlResponse
     CellPolicy:
       type: string
       enum:
@@ -8372,6 +8611,35 @@ components:
       - xhigh
       - max
       title: ReasoningEffort
+    RefusalItem:
+      properties:
+        code:
+          type: string
+          title: Code
+          description: The registry code the refusal of this reference carries
+        detail:
+          type: string
+          title: Detail
+          description: The code's sentence for this reference
+        params:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Params
+          description: The parameters the code declares; null when it declares none
+      type: object
+      required:
+      - code
+      - detail
+      title: RefusalItem
+      description: 'Why one reference was refused, as a value inside a `200`: the problem item of the refusal, the platform''s
+        field for field.
+
+
+        `code` is the registry code the refusal carries, so a client that maps those codes applies the same mapping per
+
+        reference, `detail` the code''s sentence, and `params` the parameters the code declares.'
     RemapValueOp:
       properties:
         table_path:

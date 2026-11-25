@@ -218,3 +218,35 @@ inputs = {{ text = "Text" }}
 output = "Text"
 steps = [{{ pipe = "{DEPENDENCY_ADDRESS}->probe_dep.entry", result = "out" }}]
 """
+
+
+class StorageRouteTestData:
+    """The values the storage routes' tests use: synthetic credentials, references and the platform's wire fields."""
+
+    SYNTHETIC_API_KEY = "test-api-key-storage-routes-only"
+    SYNTHETIC_JWT_SECRET = "test-jwt-secret-storage-routes-only"
+    JWT_USER_ID = "44444444-4444-4444-4444-444444444444"
+    OTHER_USER_ID = "55555555-5555-4555-5555-555555555555"
+    PUBLIC_BASE_URL = "https://runner.example.com/api/"
+    LONG_TEXT = "The tide clock follows the moon. " * 200
+    TEXT_KEY = "single-tenant/generated/0123456789abcdef/value.txt"
+    IMAGE_KEY = "single-tenant/generated/0123456789abcdef.png"
+    DOCUMENT_KEY = "single-tenant/assets/Gbd437jMzYXoTEgUSi27mi.pdf"
+    MISSING_KEY = "single-tenant/generated/fedcba9876543210/value.txt"
+    MALFORMED_URIS = (
+        "s3://single-tenant/generated/value.txt",
+        "pipelex-storage://",
+        "pipelex-storage://value.txt",
+        "pipelex-storage://single-tenant//value.txt",
+        "pipelex-storage://single-tenant/../other/value.txt",
+        "pipelex-storage://single-tenant/./value.txt",
+        "pipelex-storage://single-tenant\\other/value.txt",
+        "pipelex-storage://single-tenant/value\n.txt",
+    )
+    # The platform's wire, field for field (`pipelex-server/platform/src/pipelex_platform/routers/v1/storage.py`):
+    # `BulkResolveStorageUrlResponse`, `BulkResolveStorageUrlItem` and `RefusalItem`, and its two bounds.
+    PLATFORM_RESPONSE_FIELDS = frozenset({"items"})
+    PLATFORM_ITEM_FIELDS = frozenset({"uri", "url", "expires_at", "content_type", "error"})
+    PLATFORM_REFUSAL_FIELDS = frozenset({"code", "detail", "params"})
+    PLATFORM_MAX_BULK_RESOLVE_URIS = 100
+    PLATFORM_STORAGE_URI_MAX_CHARS = 512

@@ -213,6 +213,17 @@ PROBLEM_403_BLOB_UPLOAD: dict[str, Any] = _problem(
 )
 
 
+PROBLEM_403_STORAGE_LINK: dict[str, Any] = _problem(
+    "`auth.forbidden`, whose `params.requirement` is `signed_storage_link` — the download does not carry the signed query "
+    "a link of `POST /v1/resolve-storage-url/bulk` names, its signature does not hold for this key, or it has expired. "
+    "Resolve the reference again for a fresh link.",
+)
+
+PROBLEM_404_STORAGE_OBJECT: dict[str, Any] = _problem(
+    "`pipelex.storage.object_missing` — the link's signature holds, but the runner's storage holds no file at the "
+    "address it names: resolving a reference checks only that the caller may read it, not that a file is stored there.",
+)
+
 # Attached to the composite `/v1` router (`pipelex_api.routes`), so every auth-wrapped operation documents
 # the failures any of them can produce: the router-level auth check (401), the body-size middleware
 # (413), request-shape and input-domain rejections (422), and the server-fault floor (500). Declaring

@@ -1,0 +1,219 @@
+"""`POST /v1/resolve-storage-url/bulk` and `GET /v1/storage/{key}`: a self-hosted runner hands back what it stores.
+
+A run's long texts, the images it generates and the files it receives travel as `pipelex-storage://` references into
+this runner's storage. Every client reads one back the same way: it sends the references to the bulk resolve route,
+receives one short-lived link per reference, and fetches each link without its credential. On the hosted plane the
+platform serves that route, since it alone knows the organization that owns an object; a self-hosted runner, with no
+platform in front of it, serves the same contract for its own storage, field for field, so neither SDK, nor any client
+built on them, has to know which kind of server it talks to.
+
+**A caller resolves only what lies under its own scope.** The scope is the one a run of the caller's writes under by
+default and its hash entries resolve in (`resolve_blob_scope`): `single-tenant` on a deployment that identifies no
+caller (`AUTH_MODE=none`, or the shared `api_key`), and the caller's own `user_id` under `AUTH_MODE=jwt`. A reference
+under another scope is refused on its item, as the platform refuses another organization's, and a reference that does
+not parse is refused on its item as `pipelex.storage.uri_invalid`; the request answers `200` whenever every reference
+got a verdict.
+
+**A resolved link is this runner's own signed download route** (`pipelex_api.storage_links`), mounted outside the
+authenticated router like `PUT /v1/blobs/{sha256}`: its signed query authorizes it, so a browser can display an image
+from it directly.
+
+**Neither route is mounted when the runner trusts forwarded identity** (`trusts_forwarded_identity`). Such a runner
+sits behind a host that owns tenancy, the hosted plane, whose edge sends `/v1/resolve-storage-url*` to its platform:
+the forwarded id is a user, not the organization that owns the object, which is why the route left the runner there.
+Not mounting it keeps a misrouted request from reaching a reader that cannot check organizations.
+"""
+
+from datetime import datetime
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, FastAPI, Path, Query, Request, Response
+from mthds.protocol.problem.registry import CoreCode
+from pipelex import log
+from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import make_problem_item
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.runtime_hub import get_storage_provider
+from pipelex.system.storage_scope import is_key_within_read_scope
+from pipelex.tools.misc.filetype_utils import mime_type_of_file_name
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pydantic import BaseModel, ConfigDict, Field
+
+from pipelex_api.exceptions import RunnerAuthError, StoredObjectMissingError
+from pipelex_api.json_body import JsonBodyRoute
+from pipelex_api.openapi_responses import COMMON_PROBLEM_RESPONSES, PROBLEM_403_STORAGE_LINK, PROBLEM_404_STORAGE_OBJECT, PROBLEM_422, PROBLEM_500
+from pipelex_api.routes.pipelex.pipeline import READ_SCOPE_UNDER_CALLER_REQUIREMENT, resolve_blob_scope
+from pipelex_api.security import trusts_forwarded_identity
+from pipelex_api.storage_links import (
+    DOWNLOAD_ROUTE_NAME,
+    EXPIRES_PARAM,
+    SIGNATURE_PARAM,
+    download_link,
+    is_download_authorized,
+    storage_key_of,
+)
+
+resolve_router = APIRouter(tags=["storage"], route_class=JsonBodyRoute)
+download_router = APIRouter(tags=["storage"])
+
+# The bounds of the platform's bulk resolve route, which a client chunks its references by: one reference, as a request
+# field, and how many references one request holds. Contract numbers, the same on every server serving the route.
+STORAGE_URI_MAX_CHARS = 512
+MAX_BULK_RESOLVE_URIS = 100
+
+# What a download refused for its link lacks, as the `requirement` of its `auth.forbidden`.
+SIGNED_STORAGE_LINK_REQUIREMENT = "signed_storage_link"
+_OCTET_STREAM = "application/octet-stream"
+
+
+class BulkResolveStorageUrlRequest(BaseModel):
+    """The references to resolve, the platform's request field for field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    uris: list[Annotated[str, Field(max_length=STORAGE_URI_MAX_CHARS)]] = Field(
+        ...,
+        max_length=MAX_BULK_RESOLVE_URIS,
+        description=f"pipelex-storage:// URIs to resolve, at most {MAX_BULK_RESOLVE_URIS} per request",
+    )
+
+
+class RefusalItem(BaseModel):
+    """Why one reference was refused, as a value inside a `200`: the problem item of the refusal, the platform's field for field.
+
+    `code` is the registry code the refusal carries, so a client that maps those codes applies the same mapping per
+    reference, `detail` the code's sentence, and `params` the parameters the code declares.
+    """
+
+    code: str = Field(description="The registry code the refusal of this reference carries")
+    detail: str = Field(description="The code's sentence for this reference")
+    params: dict[str, Any] | None = Field(default=None, description="The parameters the code declares; null when it declares none")
+
+
+class BulkResolveStorageUrlItem(BaseModel):
+    """One verdict per reference. A client branches on `error`, never on the HTTP status.
+
+    Either `url` and `expires_at` are set and `error` is null, or `error` is set and the three link fields are null.
+    """
+
+    uri: str = Field(..., description="The reference exactly as sent")
+    url: str | None = Field(default=None, description="Short-lived signed download URL on this runner; null when the reference was refused")
+    expires_at: datetime | None = Field(default=None, description="UTC expiry of the signed URL; null when refused")
+    content_type: str | None = Field(default=None, description="Content type guessed from the URI extension; null when unknown or refused")
+    error: RefusalItem | None = Field(
+        default=None,
+        description=(
+            "Why the reference was refused: `pipelex.storage.uri_invalid` for a reference that does not parse, or "
+            "`auth.forbidden` whose `requirement` is `read_scope_under_caller` for one outside the caller's scope; null when resolved"
+        ),
+    )
+
+
+class BulkResolveStorageUrlResponse(BaseModel):
+    items: list[BulkResolveStorageUrlItem] = Field(..., description="One item per requested reference, in the request's order")
+
+
+def _refusal(*, code: ErrorCode, params: dict[str, Any] | None = None) -> RefusalItem:
+    item = make_problem_item(code=code, params=params)
+    return RefusalItem(
+        code=item.code, detail=item.detail, params=item.params.model_dump(mode="json", exclude_none=True) if item.params is not None else None
+    )
+
+
+@resolve_router.post(
+    "/resolve-storage-url/bulk",
+    summary="Resolve pipelex-storage:// references to short-lived download links, one verdict per reference.",
+)
+async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResolveStorageUrlRequest) -> BulkResolveStorageUrlResponse:
+    """Turn a list of `pipelex-storage://` URIs into short-lived download links, one verdict per reference (Pipelex API extension).
+
+    The hosted platform's contract, for this runner's own storage. A reference resolves only when its key lies under the
+    caller's scope: `single-tenant` on a deployment that identifies no caller, the caller's `user_id` under
+    `AUTH_MODE=jwt`. A reference that does not parse is refused on its item as `pipelex.storage.uri_invalid`, and one
+    under another scope as `auth.forbidden` whose `requirement` is `read_scope_under_caller`; the request is a `200`
+    because a verdict was produced for every reference. Resolving checks no file is stored at the address, as a
+    presigned URL does not. Each link is this runner's own `GET /v1/storage/{key}`, at `PUBLIC_BASE_URL` when the
+    deployment sets it, signed for that key and valid for `STORAGE_LINK_TTL_SECONDS`. More than
+    `MAX_BULK_RESOLVE_URIS` references, or a reference past `STORAGE_URI_MAX_CHARS`, is a `422 request.invalid`.
+    Not served when the runner trusts forwarded identity, where the host's platform serves it.
+    """
+    scope = resolve_blob_scope(request, read_scope=None)
+    items: list[BulkResolveStorageUrlItem] = []
+    refused_outside_scope = 0
+    for uri in request_data.uris:
+        key = storage_key_of(uri=uri)
+        if key is None:
+            items.append(BulkResolveStorageUrlItem(uri=uri, error=_refusal(code=PipelexErrorCode.STORAGE_URI_INVALID)))
+            continue
+        if not is_key_within_read_scope(key=key, read_scope=scope):
+            refused_outside_scope += 1
+            refusal = _refusal(code=CoreCode.AUTH_FORBIDDEN, params={"requirement": READ_SCOPE_UNDER_CALLER_REQUIREMENT})
+            items.append(BulkResolveStorageUrlItem(uri=uri, error=refusal))
+            continue
+        url, expires_at = download_link(request=request, key=key)
+        items.append(BulkResolveStorageUrlItem(uri=uri, url=url, expires_at=expires_at, content_type=mime_type_of_file_name(file_name=key)))
+    if refused_outside_scope:
+        # On the single route of old such a refusal was a logged 403; here it is a value on a 200, so without this line a
+        # caller probing another scope's references would leave no trace in the logs.
+        log.warning(
+            "Storage references outside the caller's scope were refused",
+            fields={"storage.refused_count": refused_outside_scope, "storage.requested_count": len(request_data.uris)},
+        )
+    return BulkResolveStorageUrlResponse(items=items)
+
+
+@download_router.get(
+    "/storage/{key:path}",
+    name=DOWNLOAD_ROUTE_NAME,
+    response_class=Response,
+    summary="Download one stored object from the signed link POST /resolve-storage-url/bulk resolved it to.",
+    # Mounted outside the composite `/v1` router, so it inherits none of its shared problem responses: it declares the
+    # statuses it can produce itself, and never answers 401.
+    responses={
+        200: {
+            "description": "The object's bytes, under its stored content type.",
+            "content": {_OCTET_STREAM: {"schema": {"type": "string", "format": "binary"}}},
+        },
+        403: PROBLEM_403_STORAGE_LINK,
+        404: PROBLEM_404_STORAGE_OBJECT,
+        422: PROBLEM_422,
+        500: PROBLEM_500,
+    },
+)
+async def get_stored_object(
+    key: Annotated[str, Path(description="The object's storage key: its pipelex-storage:// reference without the scheme.")],
+    expires: Annotated[str | None, Query(alias=EXPIRES_PARAM, description="When the link expires, in seconds since the epoch.")] = None,
+    signature: Annotated[str | None, Query(alias=SIGNATURE_PARAM, description="The link's signature.")] = None,
+) -> Response:
+    """Answer one stored object's bytes, as the link `POST /v1/resolve-storage-url/bulk` resolved it to (Pipelex API extension).
+
+    The link's signed query is its authorization, so the route needs no bearer token. A link whose signature does not
+    hold, or that has expired, is a 403 `auth.forbidden` whose `requirement` is `signed_storage_link`, as is a query
+    that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
+    bytes come from the runner's configured storage provider, under the content type stored with them, else the one
+    their name implies; the answer is sandboxed, so a stored HTML page never runs a script on the runner's origin.
+    """
+    if storage_key_of(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") is None or not is_download_authorized(key=key, expires=expires, signature=signature):
+        msg = (
+            "This download carries no valid link: resolve the reference with POST /v1/resolve-storage-url/bulk, and fetch the link before it expires."
+        )
+        raise RunnerAuthError(msg).with_error_code(CoreCode.AUTH_FORBIDDEN).with_params(requirement=SIGNED_STORAGE_LINK_REQUIREMENT)
+    try:
+        stored = await get_storage_provider().load_with_metadata(f"{PIPELEX_STORAGE_SCHEME}{key}")
+    except StorageFileNotFoundError as exc:
+        msg = "The link's signature holds, but the runner's storage holds no file at the address it names."
+        raise StoredObjectMissingError(msg) from exc
+    media_type = stored.mime_type or mime_type_of_file_name(file_name=key) or _OCTET_STREAM
+    headers = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "private"}
+    return Response(content=stored.data, media_type=media_type, headers=headers)
+
+
+def mount_storage_routes(*, app: FastAPI, auth_dependency: Any) -> None:
+    """Mount the resolve route behind the deployment's authentication and the download route without it, unless the
+    runner trusts forwarded identity, where neither is mounted.
+    """
+    if trusts_forwarded_identity():
+        return
+    app.include_router(download_router, prefix="/v1")
+    app.include_router(resolve_router, prefix="/v1", dependencies=[Depends(auth_dependency)], responses=COMMON_PROBLEM_RESPONSES)

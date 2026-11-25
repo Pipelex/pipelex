@@ -207,6 +207,10 @@ Besides files, a provider holds the large texts of a run: every `Text`, `Markdow
 
 A provider reads any key it is handed with the process's own credentials, and it should: it has no notion of whose run asked. On a host serving several tenants, what bounds a run's reads is the **read scope** the host passes with the run, which the content-generation leaves and the input seam check before they call a provider. A key outside that prefix, and any local path, is refused there, so a provider never sees it. A self-hosted deployment serving one tenant passes no read scope and reads as before. See [Distributed Content Generation](distributed-content-generation.md#what-a-leaf-may-read-the-read-scope) for the rule and where it runs.
 
+### How a stored object reaches a client
+
+A run hands its large texts, the images it generates and the files it receives back as `pipelex-storage://` references, and a client reads one through a server, never through the provider. On the hosted platform, the platform resolves a reference to a presigned link on its bucket. A self-hosted API server resolves it to a signed link on its own download route, `GET /v1/storage/{key}`, which reads the object with `load_with_metadata` and answers its bytes under the content type the provider returns, else the one the key's extension implies. So a provider serves those downloads through the same hook a run's reads use, and a missing object must raise `StorageFileNotFoundError`, which the route answers as a `404`. The server resolves only references under the caller's own scope, as the provider itself checks nothing. See [Storage Transport](../api-server/storage-transport.md).
+
 ---
 
 ## A backend that reads the storage itself

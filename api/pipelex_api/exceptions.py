@@ -246,6 +246,16 @@ class BlobStoreDamagedError(PipelexError):
         return {"scheme": self.scheme}
 
 
+class StoredObjectMissingError(PipelexError):
+    """A signed download link whose storage address holds no file: ``pipelex.storage.object_missing``, a 404.
+
+    Resolving a storage address checks only that the caller may read under it, never that a file is stored there, as
+    a presigned URL on an object store does, so a link to an address nothing was stored at is the caller's to correct.
+    """
+
+    error_code = PipelexErrorCode.STORAGE_OBJECT_MISSING
+
+
 class OrchestrationOverrideForbiddenError(PipelexError):
     """A request choosing an orchestration mode on a deployment that fixes its own."""
 

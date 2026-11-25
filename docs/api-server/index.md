@@ -20,7 +20,7 @@ MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
 ```
 
 - **MTHDS Protocol** — the routes `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`, and the blob routes `POST /blobs/missing` and `PUT /blobs/{sha256}`, which the protocol makes optional and this server serves, declaring `blob_store: true` on `/version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those — the flag is how a conformance suite or a third-party runner extracts the portable subset.
-- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
+- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), editor tooling (`/lint`, `/format`), and the storage transport that reads back what a run stores (`/resolve-storage-url/bulk` and the signed download links it resolves to, `/storage/{key}`), which serves the hosted platform's bulk resolve contract for this server's own storage. `/upload` and the single `/resolve-storage-url` were removed, as [Storage Transport](storage-transport.md) explains.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
 All routes are served under the `/v1` base path (clients compose `{base}/v1/{endpoint}`).
@@ -200,8 +200,12 @@ List the models this runner can route to, and check one model reference against 
 
 [Learn more →](models.md)
 
-### Uploader (removed)
+### Storage Transport
+Read back what a run stores: a long text, a generated image or a received file travels in a run's answer as a `pipelex-storage://` reference, which a client resolves to a short-lived link and fetches. Pipelex API extensions serving the hosted platform's bulk resolve contract for this server's own storage, not mounted when the server trusts forwarded identity.
 
-`POST /v1/upload` and `POST /v1/resolve-storage-url` have been **removed** ([Storage Transport](storage-transport.md)). The storage provider itself is untouched — only the two HTTP routes are gone.
+- `POST /v1/resolve-storage-url/bulk` — Resolve up to 100 references to signed download links, one verdict per reference in request order; a caller resolves only references under its own scope, and a refused reference is a value on its item, never a failed request
+- `GET /v1/storage/{key}` — Download one stored object from its signed link (no bearer token: the signature authorizes it), under its stored content type
 
-For most use cases you don't need either: pass any public HTTP(S) URL (or base64 data URL) directly as `Document.content.url` and skip the upload step entirely.
+`POST /v1/upload` and the single `POST /v1/resolve-storage-url` are not served. To give a run a file, pass any public HTTP(S) URL (or base64 data URL) directly as `Document.content.url`.
+
+[Learn more →](storage-transport.md)
