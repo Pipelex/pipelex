@@ -72,14 +72,17 @@ def fixed_count_from_digits(*, digits: str, slot: str) -> int:
     Raises:
         PipeVariableMultiplicityError: The count is written with more than `DECLARED_ITEM_COUNT_MAX_DIGITS` digits.
     """
-    significant_digits = len(digits.lstrip("0"))
+    significant = digits.lstrip("0")
+    significant_digits = len(significant)
     if significant_digits > DECLARED_ITEM_COUNT_MAX_DIGITS:
         msg = (
             f"The count declared for {slot} is written with {significant_digits} digits, more than any runtime allows: "
             f"a declared count has at most {DECLARED_ITEM_COUNT_MAX_DIGITS} digits."
         )
         raise PipeVariableMultiplicityError(msg)
-    return int(digits)
+    # Converted without its leading zeros, which may be thousands long: Python refuses to convert a string of more than
+    # 4,300 digits, zeros included, and the bound above counts only the significant ones.
+    return int(significant or "0")
 
 
 def multiplicity_from_bracket_content(*, bracket_content: str | None) -> VariableMultiplicity | None:

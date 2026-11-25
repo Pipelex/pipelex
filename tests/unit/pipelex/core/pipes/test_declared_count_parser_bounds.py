@@ -24,6 +24,18 @@ class TestDeclaredCountParserBounds:
         """Leading zeros are not counted, so a padded count parses to its value."""
         assert parse_concept_with_multiplicity(spec).multiplicity == expected
 
+    @pytest.mark.parametrize(
+        ("spec", "expected"),
+        [
+            pytest.param(f"Text[{'0' * 5000}7]", 7, id="past-python-int-string-limit"),
+            pytest.param(f"domain.Concept[{'0' * 4301}999999999]", 999_999_999, id="nine-significant-digits"),
+        ],
+    )
+    def test_leading_zeros_past_pythons_conversion_limit_parse_to_their_value(self, spec: str, expected: int) -> None:
+        """Thousands of leading zeros are not significant digits: they parse, never reaching Python's 4,300-digit guard."""
+        assert parse_concept_with_multiplicity(spec).multiplicity == expected
+        assert fixed_count_from_digits(digits=f"{'0' * 5000}7", slot="the input 'items'") == 7
+
     @pytest.mark.parametrize("spec", ["Text[1000000000]", f"Text[{'9' * 5000}]", "domain.Concept[1234567890]?"])
     def test_a_count_of_more_digits_is_refused_before_it_is_converted(self, spec: str) -> None:
         """A count of thousands of digits is our typed refusal, never Python's guard on long integer strings."""
