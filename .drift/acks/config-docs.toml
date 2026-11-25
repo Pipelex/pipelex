@@ -1,7 +1,7 @@
 contract = "config-docs"
-digest = "sha256:b265399caaadb0301bc4c4dcb580361e89cd60c72dc76dbf07eb0455a4c14978"
+digest = "sha256:8c802dca3bd8a64a90733e5333a9b43d43a670ae4dc6dd6dd0bf8c28b6e3300f"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-25T18:18:56Z"
+reviewed_at = "2026-11-25T18:27:46Z"
 rationale = "real-catch: the configs.py docstring and the pipelex.toml comments now say a request's maximum only raises max_declared_item_count and that max_dry_run_mock_items bounds one in-process dry run or validation, each worker activity of a distributed dry run counting on its own; library-config.md 'How Many Items a Method May Declare' was updated to the raise-only semantics and the budget's scope; no key, default or validator changed, so no migration ledger entry"
 
 [trigger_files]
@@ -10,7 +10,7 @@ rationale = "real-catch: the configs.py docstring and the pipelex.toml comments 
 "pipelex/graph/graph_config.py" = "blob:dc0939a6d2730c0a10b88aa1a6e0b2dd583462a6"
 "pipelex/language/mthds_config.py" = "blob:353009ad8c59dc5266bdd9dfa42b1ad18b67dca7"
 "pipelex/methods/methods_config.py" = "blob:76ca9a0e64f8c10ef6a355aafd0d79d36b09f06a"
-"pipelex/pipelex.toml" = "blob:2c97f0faa816fb2f32c51ffe8a8c00822ab69245"
+"pipelex/pipelex.toml" = "blob:4a694220dab06501327bccc640abb21e12280ee6"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
 "pipelex/system/configuration/config_loader.py" = "blob:2ddb6aa2f696b520685919ca4a5b5b1e09f6266a"
