@@ -284,6 +284,16 @@ max_files = 10000
 max_total_bytes = 1073741824
 
 ####################################################################################################
+# Method Limits Config
+####################################################################################################
+
+[interpreter.method_limits]
+# The most items a method may declare for one slot: an input or an output written Concept[N], or a controller step's
+# nb_output = N. A validation's dry run builds one mock item per declared item. Raise it here for a method that
+# declares more; a method past it is refused when it loads. At most 999999999.
+max_declared_item_count = 1000
+
+####################################################################################################
 # Builder Config
 ####################################################################################################
 

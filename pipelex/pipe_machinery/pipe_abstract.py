@@ -16,6 +16,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.method_trees.tree_file_reads import TreeFileRead
+from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError, PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec
@@ -788,7 +789,12 @@ class PipeAbstract(ABC, BaseModel):
         # Temporal activity runs a sub-pipe with no outer scope to inherit.
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         try:
-            with scoped_caller_identity(caller_identity=CallerIdentity.make_from_run_metadata(run_metadata=job_metadata.run_metadata)):
+            with (
+                scoped_caller_identity(caller_identity=CallerIdentity.make_from_run_metadata(run_metadata=job_metadata.run_metadata)),
+                # The run's maximum declared item count, when its host stated one, bounds the dry-run mock builders of
+                # this pipe and of every pipe below it, in this process or a worker's; None keeps the one in force.
+                scoped_max_declared_item_count(maximum=job_metadata.run_metadata.max_declared_item_count),
+            ):
                 return await self._run_pipe_traced(
                     job_metadata=job_metadata,
                     working_memory=working_memory,

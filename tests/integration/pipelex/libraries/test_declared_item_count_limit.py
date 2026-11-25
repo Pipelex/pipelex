@@ -1,0 +1,74 @@
+from typing import Any
+
+import pytest
+
+from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_in_process import validate_bundles_in_process
+from pipelex.system.exceptions import RunParameterError
+from tests.integration.pipelex.libraries.test_data import DeclaredItemCountCases
+
+
+def _refusal_params(*, exc: ValidateBundleError) -> list[dict[str, Any]]:
+    """The parameters set on every item the verdict carries under the declared-count code."""
+    problem = exc.to_problem(view=ProblemView.OPERATOR)
+    refusals = [item for item in problem.errors or [] if item.code == PipelexErrorCode.DEPLOYMENT_DECLARED_COUNT_OVER_LIMIT]
+    return [item.params.model_dump(exclude_none=True) if item.params is not None else {} for item in refusals]
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestDeclaredItemCountLimit:
+    @pytest.mark.parametrize(
+        ("topic", "mthds_for_count", "slot"),
+        DeclaredItemCountCases.SPELLINGS,
+    )
+    async def test_the_default_maximum_accepts_1000_and_refuses_1001(self, topic: str, mthds_for_count: Any, slot: str) -> None:
+        """Each spelling of a declared count is held to the deployment's maximum of 1,000 at load."""
+        report = await validate_bundles_in_process(mthds_contents=[mthds_for_count(1000)])
+        assert report is not None, topic
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundles_in_process(mthds_contents=[mthds_for_count(1001)])
+
+        assert _refusal_params(exc=exc_info.value) == [{"slot": slot, "count": 1001, "limit": 1000}], topic
+
+    @pytest.mark.parametrize(
+        ("topic", "mthds_for_count", "slot"),
+        DeclaredItemCountCases.SPELLINGS,
+    )
+    async def test_a_request_maximum_raises_and_lowers_the_deployments(self, topic: str, mthds_for_count: Any, slot: str) -> None:
+        """The request's own maximum replaces the deployment's, in both directions."""
+        report = await validate_bundles_in_process(mthds_contents=[mthds_for_count(1500)], max_declared_item_count=2000)
+        assert report is not None, topic
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundles_in_process(mthds_contents=[mthds_for_count(5)], max_declared_item_count=4)
+
+        assert _refusal_params(exc=exc_info.value) == [{"slot": slot, "count": 5, "limit": 4}], topic
+
+    async def test_a_scope_the_caller_opened_is_the_maximum_when_the_request_states_none(self) -> None:
+        """`None` keeps the maximum already in force, a scope the host opened around the validation."""
+        mthds = DeclaredItemCountCases.SPELLINGS[0][1](3)
+        with scoped_max_declared_item_count(maximum=2), pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundles_in_process(mthds_contents=[mthds])
+
+        assert [params["limit"] for params in _refusal_params(exc=exc_info.value)] == [2]
+
+    @pytest.mark.parametrize("maximum", [0, -1, 1_000_000_000])
+    async def test_a_maximum_no_runtime_may_set_is_the_hosts_bug(self, maximum: int) -> None:
+        """A maximum outside 1..999,999,999 is refused before any work, never read as a verdict."""
+        with pytest.raises(RunParameterError, match="maximum declared item count"):
+            await validate_bundles_in_process(mthds_contents=[DeclaredItemCountCases.SPELLINGS[0][1](3)], max_declared_item_count=maximum)
+
+    @pytest.mark.parametrize(
+        ("topic", "mthds_for_count", "message"),
+        DeclaredItemCountCases.PAST_ANY_RUNTIME,
+    )
+    async def test_a_count_past_every_runtimes_bound_is_an_invalid_verdict(self, topic: str, mthds_for_count: Any, message: str) -> None:
+        """A count no maximum could allow is refused by the parser, whatever the request's maximum."""
+        with pytest.raises(ValidateBundleError, match=message) as exc_info:
+            await validate_bundles_in_process(mthds_contents=[mthds_for_count(10**12)], max_declared_item_count=999_999_999)
+
+        assert exc_info.value.validation_error_items(), topic

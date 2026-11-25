@@ -464,3 +464,16 @@ description = "Signature placeholder for the summary step."
 inputs = { doc = "ApiDoc" }
 output = "ApiSummary"
 """
+
+# A pipe declaring a fixed count of five outputs, held to the maximum declared item count a request states.
+FIVE_IDEAS_MTHDS = """\
+domain = "smoke"
+main_pipe = "five_ideas"
+
+[pipe.five_ideas]
+type = "PipeLLM"
+description = "Five ideas"
+inputs = { text = "Text" }
+output = "Text[5]"
+prompt = "Ideas about $text"
+"""

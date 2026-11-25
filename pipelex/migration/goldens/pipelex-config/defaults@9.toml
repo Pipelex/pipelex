@@ -535,6 +535,18 @@ excluded_dirs = [
 max_files = 10000
 max_total_bytes = 1073741824
 
+####################################################################################################
+# Method limits — what this runtime accepts of a method it loads for a validation or a run
+####################################################################################################
+
+[interpreter.method_limits]
+# The most items a method may declare for one slot: an input or an output written Concept[N], or a controller step's
+# nb_output = N. A validation's dry run builds one mock item per declared item, so this bounds what a few lines of a
+# method can make it build. A method declaring more is refused when it loads, before anything is built. It is this
+# runtime's limit, not a rule of the language: a request to the API server may carry its own maximum in its place, and
+# a project raises it in its .pipelex/pipelex.toml. At most 999999999.
+max_declared_item_count = 1000
+
 [interpreter.builder]
 fix_loop_max_attempts = 10
 default_output_dir = "."

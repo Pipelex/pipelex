@@ -125,6 +125,7 @@ The policies of a runner deployment.
 | [`pipelex.deployment.orchestration_override_forbidden`](pipelex/deployment/orchestration_override_forbidden.md) | This deployment does not allow choosing the orchestration mode | `input` | `no` | `422` |
 | [`pipelex.deployment.custom_code_requires_sandbox`](pipelex/deployment/custom_code_requires_sandbox.md) | Custom code needs a sandbox-hosted deployment | `operator` | `no` | `501` |
 | [`pipelex.deployment.python_structures_refused`](pipelex/deployment/python_structures_refused.md) | Python structure classes are not allowed here | `method` | `no` | `422` |
+| [`pipelex.deployment.declared_count_over_limit`](pipelex/deployment/declared_count_over_limit.md) | The method declares more items than this runtime allows | `method` | `no` | `422` |
 | [`pipelex.deployment.token_claims_invalid`](pipelex/deployment/token_claims_invalid.md) | The token's claims cannot be used | `operator` | `no` | `500` |
 
 ## pipelex.docgen { #pipelex-docgen }

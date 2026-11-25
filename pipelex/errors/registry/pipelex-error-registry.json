@@ -1562,6 +1562,47 @@
       ]
     },
     {
+      "code": "pipelex.deployment.declared_count_over_limit",
+      "title": "The method declares more items than this runtime allows",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method declares {count} items for {slot}, and this runtime allows at most {limit} items for one slot.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare at most {limit} items for {slot}, or run the method under a plan or a configuration that allows more, then run it again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare at most {limit} items for {slot}, or the account's owner to move to a plan that allows more."
+        }
+      },
+      "params": {
+        "slot": {
+          "type": "caller_text",
+          "description": "Where the method declares the count, such as the input 'items' of the pipe 'summarize'."
+        },
+        "count": {
+          "type": "integer",
+          "description": "The number of items the method declares there."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "The most items this runtime allows for one slot."
+        }
+      },
+      "meaning": "A method declares a fixed number of items with `Concept[N]` on an input or an output, or with `nb_output` on a controller step, and a dry run builds one mock item per declared item. Each runtime bounds that number: a local runtime by its configuration, the hosted plane by the caller's plan. The method is valid, but this runtime refuses to load it for a validation or a run while one of its counts passes that bound.",
+      "what_to_do": "Declare fewer items for the slot `params.slot` names, such as a variable list `Concept[]` in place of a fixed count, or raise the limit: on the hosted plane by moving to a plan that allows more, on your own runtime with `max_declared_item_count` under `[interpreter.method_limits]` in `.pipelex/pipelex.toml`.",
+      "see": [
+        {
+          "title": "Library Configuration",
+          "href": "configuration/config-technical/library-config.md"
+        }
+      ]
+    },
+    {
       "code": "pipelex.deployment.token_claims_invalid",
       "title": "The token's claims cannot be used",
       "domain": "operator",

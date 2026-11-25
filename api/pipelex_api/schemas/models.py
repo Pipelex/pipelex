@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from mthds.protocol.pipe_output import VariableMultiplicity
 from mthds.protocol.pipeline_inputs import PipelineInputs
+from pipelex.core.pipes.declared_count_bounds import DECLARED_ITEM_COUNT_CEILING
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.methods.fetching import MethodProvenance
@@ -440,6 +441,22 @@ _CAPTURE_PIPE_CODES_DESCRIPTION = (
     "part of it. Omit it to keep the deployment's setting."
 )
 
+MAX_DECLARED_ITEM_COUNT_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the most items the method may declare for one slot, an "
+    "input or an output written `Concept[N]` or a controller step's `nb_output`, for this request alone, in place of the "
+    "deployment's `[interpreter.method_limits] max_declared_item_count`. A validation's dry run builds one mock item per "
+    "declared item, so the method loads under this maximum: one declaring more is refused with "
+    "`pipelex.deployment.declared_count_over_limit`, as an invalid verdict on `/validate` and a 422 on a run. A "
+    "multi-tenant host sends the maximum of the caller's plan. It travels with a run to every process that runs a part "
+    "of it. Omit it to keep the deployment's maximum."
+)
+
+
+def max_declared_item_count_field() -> Any:
+    """The optional `max_declared_item_count` field every route loading a method takes, with its one description and bounds."""
+    return Field(default=None, ge=1, le=DECLARED_ITEM_COUNT_CEILING, description=MAX_DECLARED_ITEM_COUNT_DESCRIPTION)
+
+
 _CALLER_ANALYTICS_GROUPS_DESCRIPTION = (
     "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host-supplied groups the caller of this request "
     'belongs to, as a mapping of group type to group key (e.g. `{"organization": "org_acme"}`), exactly as a run '
@@ -514,8 +531,8 @@ class PipelineApiExtras(BaseModel):
     are defined and handled by the implementation that owns them). The upstream
     protocol models don't know about `callback_urls`.
 
-    `storage_scope`, `read_scope`, `analytics_groups`, `method_key` and `capture_pipe_codes` are the host-computed run
-    context: data a multi-tenant host knows about its own tenancy and sends in the
+    `storage_scope`, `read_scope`, `analytics_groups`, `method_key`, `capture_pipe_codes` and `max_declared_item_count`
+    are the host-computed run context: data a multi-tenant host knows about its own tenancy and sends in the
     body, as opposed to the caller's identity, which arrives on a trusted header. The
     runtime carries them opaquely and validates them again at its own seam.
     """
@@ -530,6 +547,7 @@ class PipelineApiExtras(BaseModel):
     analytics_groups: dict[str, str] | None = Field(default=None, description=_ANALYTICS_GROUPS_DESCRIPTION)
     method_key: str | None = Field(default=None, description=_METHOD_KEY_DESCRIPTION)
     capture_pipe_codes: bool | None = Field(default=None, description=_CAPTURE_PIPE_CODES_DESCRIPTION)
+    max_declared_item_count: int | None = max_declared_item_count_field()
 
     @field_validator("method_key")
     @classmethod
@@ -656,6 +674,7 @@ class PipelexApiStartRequest(StartRequest):
     analytics_groups: dict[str, str] | None = Field(default=None, description=_ANALYTICS_GROUPS_DESCRIPTION)
     method_key: str | None = Field(default=None, description=_METHOD_KEY_DESCRIPTION)
     capture_pipe_codes: bool | None = Field(default=None, description=_CAPTURE_PIPE_CODES_DESCRIPTION)
+    max_declared_item_count: int | None = max_declared_item_count_field()
 
 
 class PipelexApiExecuteRequest(RunRequest):
@@ -664,7 +683,8 @@ class PipelexApiExecuteRequest(RunRequest):
     Used only to publish the OpenAPI request schema: `/execute` reads the body through the raw
     `Request` (plain JSON, parsed by the route), so FastAPI cannot infer the body type; this model documents the
     extensions the route actually honors (`pipeline_run_id`, `callback_urls`, `orchestration_mode`, `storage_scope`,
-    `read_scope`, `analytics_groups`, `method_key`, `capture_pipe_codes`, all parsed by `PipelineApiExtras`).
+    `read_scope`, `analytics_groups`, `method_key`, `capture_pipe_codes`, `max_declared_item_count`, all parsed by
+    `PipelineApiExtras`).
     """
 
     pipeline_run_id: str | None = Field(
@@ -681,6 +701,7 @@ class PipelexApiExecuteRequest(RunRequest):
     analytics_groups: dict[str, str] | None = Field(default=None, description=_ANALYTICS_GROUPS_DESCRIPTION)
     method_key: str | None = Field(default=None, description=_METHOD_KEY_DESCRIPTION)
     capture_pipe_codes: bool | None = Field(default=None, description=_CAPTURE_PIPE_CODES_DESCRIPTION)
+    max_declared_item_count: int | None = max_declared_item_count_field()
 
 
 class PipeOutputWire(PipeOutput):
@@ -770,6 +791,7 @@ class MethodTreeRequest(BaseModel):
         ),
     )
     resources: dict[str, str] | None = Field(default=None, description=TREE_ROUTE_RESOURCES_FIELD_DESCRIPTION)
+    max_declared_item_count: int | None = max_declared_item_count_field()
     read_scope: str | None = Field(default=None, description=_TREE_READ_SCOPE_DESCRIPTION)
 
     @field_validator("read_scope")

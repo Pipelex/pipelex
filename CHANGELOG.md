@@ -2,8 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`max_declared_item_count` on the API's run, validation and method routes**: `/v1/execute`, `/v1/start`, `/v1/validate`, `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io` take an optional maximum on the items a method may declare for one slot, in place of the deployment's for that request alone, and a run carries it to every process that runs a part of it; `PipelexMTHDSProtocol`, `pipeline_run_setup` and `validate_bundles_in_process` take it as `max_declared_item_count`, and `RunMetadata` carries it.
+
+### Changed
+
+- **`BundleValidatorProtocol.validate_bundles` takes `max_declared_item_count` (Breaking)**: a bundle validator receives the request's maximum declared item count, `None` when the request states none, and a validator dispatching to a worker hands it to `validate_bundles_in_process` there, so the worker validates under the request's maximum rather than its own configuration.
+
 ### Fixed
 
+- **A declared item count is bounded**: a method declaring more items for one slot than `[interpreter.method_limits] max_declared_item_count` allows, 1,000 by default, with `Concept[N]` on an input or an output or a controller step's `nb_output`, is refused at load with `pipelex.deployment.declared_count_over_limit`, naming the slot, the count and the maximum, instead of making a validation's dry run build one mock item per declared item; the dry run's mock builders refuse past the same maximum, and the parser refuses a count written with more than nine digits.
 - **A provider refusing a file as over its size limit is the caller's `input.too_large`**: a provider's 400, or another 4xx a gateway relays, refusing a file, an image or a request payload as too large in its own words (Anthropic's "The file exceeds the maximum allowed size.", its per-image "image exceeds 5 MB maximum" and its `request_too_large`, Gemini's "Request payload size exceeds the limit") read as `runtime.unexpected`, our defect, and told the caller to contact support; it now reads `input.too_large`, answered 422, with advice that the request built from the inputs exceeds the provider's size limit and that the inputs should be made smaller or split. A bare 413, which already read `input.too_large`, gives the same advice, and a web page too large to fetch points at a smaller page.
 
 ## [v0.116.0] - 2026-11-23

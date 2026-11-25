@@ -37,6 +37,7 @@ from pipelex.core.method_trees.building_bundle import BuildingBundle, building_p
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, HeldFile
 from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD, sharing_module_name_checks
+from pipelex.core.pipes.declared_item_count import get_max_declared_item_count
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError, PipeValidationError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -47,6 +48,7 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.libraries.crate_class_cache import CRATE_CLASS_CACHE, CrateClasses
 from pipelex.libraries.crate_qualification import qualify_crate
+from pipelex.libraries.declared_item_counts import ensure_pipe_declared_item_counts_allowed
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -976,6 +978,14 @@ class LibraryManager(LibraryManagerAbstract):
             if fingerprint in loaded_set:
                 log.verbose("Skipped a crate already loaded into the library", fields={"library_id": library_id, "crate_fingerprint": fingerprint})
                 return []
+
+            # Before anything is built, every item count a pipe declares is held to the maximum in force: a dry run builds
+            # one mock item per declared item, so a count past it is refused here, located on its pipe. A prevalidated
+            # crate passed this check where its library was loaded, under the run's own maximum, which a worker loading
+            # it may not hold in scope, so it is not checked again; its pipe runs still bound their mock builders by the
+            # maximum their run metadata carries.
+            if not is_crate_prevalidated:
+                self._ensure_declared_item_counts_allowed(crate=crate)
             library = self.get_library(library_id=library_id)
 
             # Load domains from crate metadata
@@ -1102,6 +1112,24 @@ class LibraryManager(LibraryManagerAbstract):
                     fingerprint=fingerprint, seed=class_cache_seed, built=built_classes, max_classes=crate_class_cache_max_classes()
                 )
             return all_pipes
+
+    @staticmethod
+    def _ensure_declared_item_counts_allowed(*, crate: LibraryCrate) -> None:
+        """Refuse a crate whose pipe declares more items for one slot than the maximum in force, located on that pipe.
+
+        Raises:
+            PipeLoadRefusalError: A pipe declares a count past the maximum, raised from its `DeclaredItemCountLimitError`.
+        """
+        maximum = get_max_declared_item_count()
+        for pipe_ref, pipe_blueprint in crate.pipes.items():
+            parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
+            elaboration = crate.elaboration_metadata.get(pipe_ref)
+            # A helper pipe the bundle elaborator generated is named by the authored pipe it came from.
+            authored_pipe_code = elaboration.parent_pipe_code if elaboration is not None else parsed.local_code
+            with _locating_pipe_build_refusals(
+                pipe_code=parsed.local_code, domain_code=parsed.domain_path or "", source=crate.source_map.get(pipe_ref), elaboration=elaboration
+            ):
+                ensure_pipe_declared_item_counts_allowed(pipe_code=authored_pipe_code, blueprint=pipe_blueprint, maximum=maximum)
 
     @override
     def load_from_blueprints(

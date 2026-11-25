@@ -10,6 +10,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
 from pipelex.errors.error_codes import ErrorCode
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -66,6 +67,35 @@ class PipeVariableMultiplicityError(PipelexError, ValueError):
     """
 
     error_code = CoreCode.METHOD_SCHEMA_VIOLATION
+
+
+class DeclaredItemCountLimitError(PipelexError):
+    """A method declares more items for one slot than the runtime allows.
+
+    A count is declared by `Concept[N]` on an input or an output, or by a controller step's `nb_output = N`, and the
+    runtime allows at most the maximum in force (`pipelex.core.pipes.declared_item_count`): a request's own, else
+    `[interpreter.method_limits] max_declared_item_count`. The method is valid MTHDS: the limit is the runtime's, so the
+    refusal carries `pipelex.deployment.declared_count_over_limit`, whose steps say a higher plan or configuration
+    raises it. It is raised when a method loads for a validation or a run, before anything is built, and again by a
+    dry-run mock builder asked for more items than the limit, so a path that skipped the load check cannot build them.
+
+    Attributes:
+        slot: Where the count is declared, as a caller reads it, such as "the input 'items' of the pipe 'summarize'".
+        count: The declared count.
+        limit: The maximum in force.
+    """
+
+    error_code = PipelexErrorCode.DEPLOYMENT_DECLARED_COUNT_OVER_LIMIT
+
+    def __init__(self, message: str, *, slot: str, count: int, limit: int):
+        self.slot = slot
+        self.count = count
+        self.limit = limit
+        super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"slot": self.slot, "count": self.count, "limit": self.limit}
 
 
 class PipeRunError(PipelexError):

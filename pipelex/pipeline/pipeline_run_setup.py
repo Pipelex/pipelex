@@ -8,6 +8,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count, validate_max_declared_item_count
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
@@ -81,6 +82,7 @@ async def pipeline_run_setup(
     method_id: str | None = None,
     method_address: str | None = None,
     capture_pipe_codes: bool | None = None,
+    max_declared_item_count: int | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
@@ -185,6 +187,12 @@ async def pipeline_run_setup(
         Whether this run's telemetry may carry its pipe codes and output class
         names, as the host states it for this run; ``None`` falls back to the
         deployment's ``custom_posthog.tracing.capture.pipe_codes``.
+    max_declared_item_count:
+        The most items the run's method may declare for one slot (``Concept[N]`` or a step's ``nb_output``), as the
+        host states it for this run, such as a hosted plane from the caller's plan. ``None`` falls back to the
+        deployment's ``[interpreter.method_limits] max_declared_item_count``. The library load refuses a method
+        declaring more, and the run carries it on its ``RunMetadata``, so every pipe run, in this process or a
+        worker's, bounds its dry-run mock builders by it. See :mod:`pipelex.core.pipes.declared_item_count`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -271,6 +279,10 @@ async def pipeline_run_setup(
     # And the method id beside them, which rides every span and event of the run as they do.
     if method_id is not None:
         method_id = validate_method_id(value=method_id)
+    # And the maximum declared item count, which the load below holds the method to: a value no runtime may set is the
+    # host's bug, refused before the run registers or a library opens.
+    if max_declared_item_count is not None:
+        max_declared_item_count = validate_max_declared_item_count(value=max_declared_item_count)
 
     # And the scope, for the same reason and with more at stake.
     #
@@ -360,17 +372,19 @@ async def pipeline_run_setup(
     success = False
     try:
         # Seam 1: open the library and load dirs + blueprints, in a worker thread, off the event loop. Owns its own
-        # load-failure teardown, and leaves the library current in this context.
-        library_id, qualified_main_pipe = await acquire_library_async(
-            library_id=library_id,
-            library_dirs=library_dirs,
-            mthds_contents=mthds_contents,
-            bundle_uris=bundle_uris,
-            library_dirs_are_callers=library_dirs_are_callers,
-            methods_dirs=methods_dirs,
-            submitted_files=submitted_files,
-            tree_listing=tree_listing,
-        )
+        # load-failure teardown, and leaves the library current in this context. The load holds every count the method
+        # declares to the run's maximum, the worker thread reading it from its copy of this context.
+        with scoped_max_declared_item_count(maximum=max_declared_item_count):
+            library_id, qualified_main_pipe = await acquire_library_async(
+                library_id=library_id,
+                library_dirs=library_dirs,
+                mthds_contents=mthds_contents,
+                bundle_uris=bundle_uris,
+                library_dirs_are_callers=library_dirs_are_callers,
+                methods_dirs=methods_dirs,
+                submitted_files=submitted_files,
+                tree_listing=tree_listing,
+            )
         library_acquired = True
 
         # Resolve the pipe to execute against the now-open library. A caller-supplied `pipe_code` is
@@ -471,30 +485,33 @@ async def pipeline_run_setup(
             )
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
-        pipe_job = await prepare_pipe_job(
-            pipe=pipe,
-            library_id=library_id,
-            execution_config=execution_config,
-            pipe_run_mode=pipe_run_mode,
-            is_mock_usage=is_mock_usage,
-            pipeline_run_id=pipeline_run_id,
-            user_id=user_id,
-            storage_scope=storage_scope,
-            read_scope=read_scope,
-            extras=extras,
-            method_id=method_id,
-            method_address=method_address,
-            capture_pipe_codes=capture_pipe_codes,
-            inputs=inputs,
-            search_scope=search_scope,
-            trace_context=trace_context,
-            otel_context=otel_context,
-            output_name=output_name,
-            output_multiplicity=output_multiplicity,
-            dynamic_output_concept_ref=dynamic_output_concept_ref,
-            request_id=request_id,
-            inputs_base_dir=inputs_base_dir,
-        )
+        # The mock inputs a run asks for are built under the run's maximum too.
+        with scoped_max_declared_item_count(maximum=max_declared_item_count):
+            pipe_job = await prepare_pipe_job(
+                pipe=pipe,
+                library_id=library_id,
+                execution_config=execution_config,
+                pipe_run_mode=pipe_run_mode,
+                is_mock_usage=is_mock_usage,
+                pipeline_run_id=pipeline_run_id,
+                user_id=user_id,
+                storage_scope=storage_scope,
+                read_scope=read_scope,
+                extras=extras,
+                method_id=method_id,
+                method_address=method_address,
+                capture_pipe_codes=capture_pipe_codes,
+                max_declared_item_count=max_declared_item_count,
+                inputs=inputs,
+                search_scope=search_scope,
+                trace_context=trace_context,
+                otel_context=otel_context,
+                output_name=output_name,
+                output_multiplicity=output_multiplicity,
+                dynamic_output_concept_ref=dynamic_output_concept_ref,
+                request_id=request_id,
+                inputs_base_dir=inputs_base_dir,
+            )
 
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,

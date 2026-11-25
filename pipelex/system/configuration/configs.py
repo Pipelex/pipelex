@@ -4,6 +4,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, field_validator, model_validator
 
 from pipelex.cogt.config_cogt import InferenceConfig
+from pipelex.core.pipes.declared_count_bounds import DECLARED_ITEM_COUNT_CEILING
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.hosted.run_config import RunConfig
 from pipelex.language.mthds_config import MthdsConfig
@@ -116,6 +117,20 @@ class MethodTreeLimitsConfig(ConfigModel):
     max_files: int | None = Field(default=None, ge=1)
     max_total_bytes: int | None = Field(default=None, ge=0)
     max_file_bytes: int | None = Field(default=None, ge=0)
+
+
+class MethodLimitsConfig(ConfigModel):
+    """`[interpreter.method_limits]`: what this runtime accepts of a method it loads for a validation or a run.
+
+    `max_declared_item_count` is the most items a method may declare for one slot: an input or an output written
+    `Concept[N]`, or a controller step's `nb_output = N`. A dry run builds one mock item per declared item, so the
+    limit bounds what a few lines of a method can make a validation build. It is a runtime limit, not a rule of the
+    language: a request may carry its own maximum in place of this one, which a hosted plane derives from the caller's
+    plan (`pipelex.core.pipes.declared_item_count`). It can never pass `DECLARED_ITEM_COUNT_CEILING`, the most digits
+    the parser reads in a count.
+    """
+
+    max_declared_item_count: int = Field(ge=1, le=DECLARED_ITEM_COUNT_CEILING)
 
 
 class CrateClassCacheConfig(ConfigModel):
@@ -236,6 +251,7 @@ class InterpreterConfig(ConfigModel):
     pipeline_execution: PipelineExecutionConfig
     scan: ScanConfig
     method_tree_limits: MethodTreeLimitsConfig
+    method_limits: MethodLimitsConfig
     crate_class_cache: CrateClassCacheConfig
     builder: BuilderConfig
 

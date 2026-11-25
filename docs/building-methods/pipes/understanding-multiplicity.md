@@ -360,6 +360,8 @@ Use fixed output multiplicity when:
 - External requirements dictate a fixed count
 - You want consistent batch sizes for processing
 
+The language sets no upper bound on `N`, but a runtime may: validating a method dry-runs it with one mock item per declared item, so a runtime can refuse to load a method declaring more items for one slot than it allows. Pipelex's maximum, and how to raise it, is described in [Library Configuration](../../configuration/config-technical/library-config.md#how-many-items-a-method-may-declare). It covers `Concept[N]` on inputs and outputs and a controller step's `nb_output` alike.
+
 ### When to Use Variable Input (Empty Brackets `[]`)
 
 Use variable input multiplicity when:

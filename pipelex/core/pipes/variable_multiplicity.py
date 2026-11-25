@@ -6,6 +6,7 @@ from mthds.protocol.pipe_io_contracts import PresenceMarker
 from mthds.protocol.problem.registry import MethodOutputMultiplicityMismatchExpected
 from pydantic import BaseModel, Field
 
+from pipelex.core.pipes.declared_count_bounds import DECLARED_ITEM_COUNT_MAX_DIGITS
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "PresenceMarker",
     "VariableMultiplicity",
     "VariableMultiplicityResolution",
+    "fixed_count_from_digits",
     "fixed_item_count",
     "format_concept_with_multiplicity",
     "is_force_presence",
@@ -55,6 +57,31 @@ def normalize_variable_multiplicity(*, multiplicity: VariableMultiplicity | None
     return None if multiplicity == 1 else multiplicity
 
 
+def fixed_count_from_digits(*, digits: str, slot: str) -> int:
+    """The count a run of digits from a `[N]` suffix writes, refused when it has more digits than any runtime allows.
+
+    The digits are counted on the string, leading zeros aside, before they are converted, so a count of thousands of
+    digits is refused by this typed error naming its slot rather than by Python's limit on converting long integer
+    strings. Every runtime's maximum lies below the bound (`pipelex.core.pipes.declared_count_bounds`); whether the
+    count passes the maximum in force is the load's check, not the parser's.
+
+    Args:
+        digits: The digits between the brackets, as `MULTIPLICITY_PATTERN` matched them.
+        slot: Where the count is written, for the message, such as "'Text[...]'" or "the input 'items'".
+
+    Raises:
+        PipeVariableMultiplicityError: The count is written with more than `DECLARED_ITEM_COUNT_MAX_DIGITS` digits.
+    """
+    significant_digits = len(digits.lstrip("0"))
+    if significant_digits > DECLARED_ITEM_COUNT_MAX_DIGITS:
+        msg = (
+            f"The count declared for {slot} is written with {significant_digits} digits, more than any runtime allows: "
+            f"a declared count has at most {DECLARED_ITEM_COUNT_MAX_DIGITS} digits."
+        )
+        raise PipeVariableMultiplicityError(msg)
+    return int(digits)
+
+
 def multiplicity_from_bracket_content(*, bracket_content: str | None) -> VariableMultiplicity | None:
     """The multiplicity an io-ref's bracket suffix denotes, already normalized.
 
@@ -68,7 +95,7 @@ def multiplicity_from_bracket_content(*, bracket_content: str | None) -> Variabl
         return None
     if bracket_content == "":
         return True
-    return normalize_variable_multiplicity(multiplicity=int(bracket_content))
+    return normalize_variable_multiplicity(multiplicity=fixed_count_from_digits(digits=bracket_content, slot="a slot"))
 
 
 def presence_from_symbol(*, symbol: str | None) -> PresenceMarker:
@@ -242,8 +269,9 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     marker_symbol = match.group(3)
 
     # Group 2 is `\d*`: None (no brackets), "" (`[]`), or digits (`[N]`). Only the digit arm can be out
-    # of range, and it is refused before the suffix is projected onto a multiplicity.
-    if bracket_content and int(bracket_content) <= 0:
+    # of range, and it is refused before the suffix is projected onto a multiplicity: first a count written with more
+    # digits than any runtime allows, on the string, then a count below one.
+    if bracket_content and fixed_count_from_digits(digits=bracket_content, slot=f"'{extracted_concept}'") <= 0:
         msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
         raise PipeVariableMultiplicityError(msg)
     multiplicity = multiplicity_from_bracket_content(bracket_content=bracket_content)

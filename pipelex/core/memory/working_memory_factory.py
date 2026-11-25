@@ -11,6 +11,7 @@ from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstr
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
+from pipelex.core.pipes.declared_item_count import ensure_mock_item_count_allowed
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec, TypedNamedStuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.list_content import ListContent
@@ -237,7 +238,8 @@ class WorkingMemoryFactory(BaseModel):
         """Create a single mock `Stuff` from a `TypedNamedStuffSpec`.
 
         Honors multiplicity: a non-multiple spec yields a `Stuff` of mock content;
-        a multiple spec yields a `Stuff` whose content is a `ListContent` of mock items.
+        a multiple spec yields a `Stuff` whose content is a `ListContent` of mock items, and a fixed count past the
+        maximum in force raises `DeclaredItemCountLimitError` before any item is built.
         Errors from `make_mock_content` are allowed to propagate — the legacy
         `make_mock_inputs` loop is the one place that swallows them with a fallback.
         """
@@ -254,6 +256,9 @@ class WorkingMemoryFactory(BaseModel):
             nb_stuffs = 2
         else:
             nb_stuffs = typed_named_stuff_spec.multiplicity
+        # A fixed count past the maximum in force is refused before any item is built, never shortened: the load refuses
+        # such a count first, so reaching it here means a path skipped that check.
+        ensure_mock_item_count_allowed(count=nb_stuffs, slot=f"the mock input '{typed_named_stuff_spec.variable_name}'")
 
         items: list[StuffContent] = [cls.make_mock_content(typed_named_stuff_spec) for _ in range(nb_stuffs)]
 

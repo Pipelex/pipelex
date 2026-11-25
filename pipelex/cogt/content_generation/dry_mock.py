@@ -71,6 +71,7 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.core.pipes.declared_item_count import ensure_mock_item_count_allowed
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -195,7 +196,11 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> li
     ``DryRunFactory.make_dry_run_factory`` recursively scans the model tree and mints dynamic
     factory classes — building it once per list (not once per item) keeps list mocks linear in
     item construction only. Same :class:`DryRunMockBuildError` wrap as :func:`build_mock_object`.
+
+    A count past the maximum in force is refused before anything is built, never shortened
+    (:func:`~pipelex.core.pipes.declared_item_count.ensure_mock_item_count_allowed`).
     """
+    ensure_mock_item_count_allowed(count=count, slot=f"a dry run's list of mock '{model_class.__name__}' objects")
     factory = DryRunFactory.make_dry_run_factory(model_class)
     try:
         return [factory.build() for _ in range(count)]
@@ -330,6 +335,7 @@ def dry_img_gen_image_contents(img_gen_assignment: ImgGenAssignment) -> list[Ima
     Sits at the ``*_and_store`` layer — one step above the raw provider leaf — so a dry run never
     touches the storage provider (eng review D10).
     """
+    ensure_mock_item_count_allowed(count=img_gen_assignment.nb_images, slot="a dry run's list of mock images")
     image_urls = get_config().inference.dry_run.image_urls
     return [
         _dry_image_content(image_url=image_urls[image_index % len(image_urls)], img_gen_assignment=img_gen_assignment)

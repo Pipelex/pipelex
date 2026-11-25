@@ -17,6 +17,7 @@ from typing_extensions import override
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
+from pipelex.core.pipes.declared_item_count_scope import validate_max_declared_item_count
 from pipelex.errors.security_event import emit_security_event, emit_security_event_for_run
 from pipelex.errors.unsupported_reasons import METHOD_FILES_UNSUPPORTED_REASON
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -239,6 +240,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # PipeDocGen step's `template_file`, keyed by canonical bundle-relative path (`canonical_submitted_files`).
         # A bundle loaded from a directory reads the files of its method tree instead.
         submitted_files: Mapping[str, bytes] | None = None,
+        # The most items a method this protocol runs or validates may declare for one slot (`Concept[N]` or a step's
+        # `nb_output`), as the host states it, such as a hosted plane from the caller's plan; None keeps the
+        # deployment's `[interpreter.method_limits] max_declared_item_count`. Refused here when no runtime may set it.
+        max_declared_item_count: int | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
@@ -255,6 +260,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.method_id = validate_method_id(value=method_id) if method_id is not None else None
         self.method_address = method_address
         self.capture_pipe_codes = capture_pipe_codes
+        self.max_declared_item_count = (
+            validate_max_declared_item_count(value=max_declared_item_count) if max_declared_item_count is not None else None
+        )
         self.execution_config = execution_config
         self._pipe_run = pipe_run
         # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
@@ -427,6 +435,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 method_id=self.method_id,
                 method_address=self.method_address,
                 capture_pipe_codes=self.capture_pipe_codes,
+                max_declared_item_count=self.max_declared_item_count,
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,
                 methods_dirs=self.methods_dirs,
@@ -652,6 +661,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # The same ownership a run of this runtime reads: the caller's own directories keep their paths.
             library_dirs_are_callers=self.library_dirs_are_callers,
             submitted_files=self.submitted_files,
+            max_declared_item_count=self.max_declared_item_count,
         )
 
     @override

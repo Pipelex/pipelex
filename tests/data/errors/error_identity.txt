@@ -62,6 +62,7 @@ CsvError | one of input.invalid, request.invalid, runtime.unexpected, input.file
 CsvFlatnessError | input.invalid
 CsvReadError | input.file_unreadable
 DateContentError | pipe.function_raised
+DeclaredItemCountLimitError | pipelex.deployment.declared_count_over_limit
 DeliveryError | abstract
 DocGenChoiceKeyError | pipelex.config.invalid
 DocGenEngineMissingError | pipelex.docgen.engine_unavailable

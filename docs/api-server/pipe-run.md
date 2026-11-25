@@ -49,6 +49,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
 - `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
+- `max_declared_item_count` (integer, optional): **Pipelex-API extension.** The most items the method may declare for one slot, for this run alone, overriding the deployment's maximum — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one. It must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved: any other value is a `422` `request.invalid` naming `pipeline_run_id`, before the run is registered.
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends, before the response is sent; their delivery never changes the response, but a receiver that never answers delays it by about 51 seconds at most, the delivery's three attempts of 15 seconds and its waits between them. See [Webhooks](webhooks.md).
 
@@ -169,6 +170,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
 - `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
+- `max_declared_item_count` (integer, optional): **Pipelex-API extension.** The most items the method may declare for one slot, for this run alone, overriding the deployment's maximum — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
@@ -420,6 +422,19 @@ Both `/execute` and `/start` also accept optional **Pipelex-API extensions** tha
 **`capture_pipe_codes`** says whether this run's telemetry may carry its pipe codes and output class names, overriding the deployment's `custom_posthog.tracing.capture.pipe_codes` for this run alone. `true` sends the real values in the span and trace names and in the `pipe_code` and `output_class_name` properties; `false` sends the redaction marker. The value travels with the run to every process that runs a part of it, so a worker's activities honour it too. Omit it, or send `null`, to keep the deployment's setting.
 
 ---
+
+## Declared item count: `max_declared_item_count`
+
+A method declares a fixed number of items for one slot with `Concept[N]` on an input or an output, or with a controller step's `nb_output = N`. The server holds each of those counts to a maximum when it loads the method, because a dry run builds one mock item per declared item. Without the field, the maximum is the deployment's `[interpreter.method_limits] max_declared_item_count`, 1,000 by default (see [Library Configuration](../configuration/config-technical/library-config.md#how-many-items-a-method-may-declare)). With it, the request states its own:
+
+```json
+{
+  "pipe_code": "summarize_reviews",
+  "max_declared_item_count": 5000
+}
+```
+
+A method declaring more items for one slot than the maximum in force is refused with a `422` [`pipelex.deployment.declared_count_over_limit`](../errors/pipelex/deployment/declared_count_over_limit.md), whose parameters name the `slot`, the `count` and the `limit`, before the run starts. The maximum travels with the run to every process that runs a part of it, so a worker's dry-run mock builders hold the request's maximum rather than their own deployment's. The value is a whole number from 1 to 999,999,999; any other is a `422` `request.invalid` naming the field. A multi-tenant host sends the maximum of the caller's plan; omit it, or send `null`, to keep the deployment's maximum. The same field is taken by [`/v1/validate`](pipe-validate.md) and by the method routes `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io`.
 
 ## Input Format: PipelineInputs
 
