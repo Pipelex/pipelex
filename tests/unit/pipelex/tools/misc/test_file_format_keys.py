@@ -102,6 +102,11 @@ class TestFileFormatKeys:
     def test_the_declared_type_stands_when_the_sniff_fails(self):
         assert identify_mime_type(head=b"plain words", declared_mime_type="text/markdown", file_name=None) == "text/markdown"
 
+    @pytest.mark.parametrize("head", [b"plain words", None])
+    def test_the_declared_type_stands_as_its_base_type(self, head: bytes | None):
+        """A declared type with parameters stands without them, whether the bytes were read or not."""
+        assert identify_mime_type(head=head, declared_mime_type="Text/Plain; charset=utf-8", file_name=None) == "text/plain"
+
     def test_no_head_keeps_the_declared_type(self):
         assert identify_mime_type(head=None, declared_mime_type="application/pdf", file_name=None) == "application/pdf"
 

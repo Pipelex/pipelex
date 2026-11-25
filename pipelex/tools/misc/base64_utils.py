@@ -3,6 +3,7 @@ from pathlib import Path
 
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_bytes
+from pipelex.tools.uri.data_url import is_data_url, parse_data_url
 
 
 async def load_binary_as_base64(path: Path) -> str:
@@ -36,22 +37,25 @@ def make_base64_url(
 
 
 def is_prefixed_base64_url(possibly_base64_url: str) -> bool:
-    return possibly_base64_url.startswith("data:") and ";base64," in possibly_base64_url
+    """Whether the value is a base64 `data:` URL, its header read up to its first comma (`parse_data_url`)."""
+    if not is_data_url(uri=possibly_base64_url) or "," not in possibly_base64_url:
+        return False
+    return parse_data_url(uri=possibly_base64_url).is_base64
 
 
 def strip_base64_str_if_needed(base64_str: str) -> str:
-    if "," in base64_str:
-        return base64_str.split(",", 1)[1]
-    if "data:" in base64_str and ";base64," in base64_str:
-        return base64_str.split(";base64,", 1)[1]
-    return base64_str
+    """The base64 text of a value that may carry a data URL's header: everything after its first comma, else the value."""
+    if "," not in base64_str:
+        return base64_str
+    if is_data_url(uri=base64_str):
+        return parse_data_url(uri=base64_str).payload
+    # A header without its scheme, such as `image/png;base64,…`, ends at its first comma too.
+    return base64_str.split(",", 1)[1]
 
 
 def extract_base64_str_from_base64_url_if_possible(possibly_base64_url: str) -> tuple[str, str] | None:
-    if not possibly_base64_url.startswith("data:"):
+    """The payload and the declared media type of a base64 `data:` URL, or `None` for any other value."""
+    if not is_prefixed_base64_url(possibly_base64_url):
         return None
-    if ";base64," not in possibly_base64_url:
-        return None
-    mime_type = possibly_base64_url[5:].split(";base64,", 1)[0]
-    base64_str = possibly_base64_url.split(";base64,", 1)[1]
-    return base64_str, mime_type
+    parsed = parse_data_url(uri=possibly_base64_url)
+    return parsed.payload, parsed.media_type

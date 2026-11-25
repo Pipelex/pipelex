@@ -5,6 +5,7 @@ from typing import ClassVar, Literal, NamedTuple
 
 from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.tools.misc.filetype_utils import is_single_media_type
 from pipelex.tools.storage.exceptions import (
     StorageChecksumMismatchError,
     StorageFileNotFoundError,
@@ -44,6 +45,12 @@ class StorageProviderAbstract(ABC):
     unchanged: what it is handed is not stored, and `load_metadata` answers None for an object it holds. Keys are read
     back lowercase, as S3 returns them, so a caller writes them lowercase; keys are non-empty and keys and values are
     ASCII, as S3 requires, which `store` and `store_if_absent` check for every provider before anything is stored.
+
+    **Content type.** The `content_type` of `store` and `store_if_absent` is one media type, a bare `type/subtype`
+    optionally followed by `; name=value` parameters, with no comma and no control character, so a reader that serves
+    the stored type, a browser among them, can read no second type out of it. Both check it for every provider before
+    anything is stored, and refuse another as a fault of their caller: the runtime reduces every type a caller declares
+    before it stores a file (`pipelex.tools.misc.filetype_utils.declared_media_type`).
 
     A subclass holding a client open between operations overrides ``teardown`` to close it.
 
@@ -211,8 +218,10 @@ class StorageProviderAbstract(ABC):
 
         Raises:
             StorageInvalidMetadataError: If a metadata key is empty, or a key or value is not ASCII.
+            ValueError: If `content_type` is not one media type.
         """
         uri = self._add_scheme(key)
+        _check_content_type(content_type=content_type, key=key)
         _check_metadata(metadata=metadata, key=key)
         await self._store_with_metadata(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex, metadata=metadata)
         return uri
@@ -285,8 +294,10 @@ class StorageProviderAbstract(ABC):
             StorageInvalidKeyError: If the key includes the scheme prefix.
             StorageChecksumMismatchError: If `data` does not hash to `checksum_sha256_hex`.
             StorageInvalidMetadataError: If a metadata key is empty, or a key or value is not ASCII.
+            ValueError: If `content_type` is not one media type.
         """
         self._add_scheme(key)
+        _check_content_type(content_type=content_type, key=key)
         _check_metadata(metadata=metadata, key=key)
         if checksum_sha256_hex is not None and hashlib.sha256(data).hexdigest() != checksum_sha256_hex:
             msg = f"The bytes to store under '{key}' do not hash to the checksum {checksum_sha256_hex!r} given with them: nothing was stored."
@@ -401,6 +412,21 @@ class StorageProviderAbstract(ABC):
         Returns:
             Human-readable link for debugging/display.
         """
+
+
+def _check_content_type(*, content_type: str | None, key: str) -> None:
+    """Refuse a content type that is not one media type, before any provider stores it.
+
+    A caller in the runtime never passes one, so the refusal is a programming error, raised as a `ValueError`. The
+    message names the key and not the type, which can hold a caller's content.
+
+    Raises:
+        ValueError: If `content_type` is not one media type.
+    """
+    if content_type is None or is_single_media_type(media_type=content_type):
+        return
+    msg = f"The content type to store under '{key}' is not one media type: it must be <type>/<subtype>, optionally followed by ; parameters."
+    raise ValueError(msg)
 
 
 def _check_metadata(*, metadata: Mapping[str, str] | None, key: str) -> None:

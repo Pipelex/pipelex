@@ -6716,10 +6716,6 @@ rationale = "Loads the bytes and media type one URI names."
 param = "uri"
 rationale = "Loads the bytes one URI names."
 
-["pipelex/tools/uri/uri_resolver.py::_resolve_base64_data_url"]
-param = "uri"
-rationale = "Parses/reads the uri; single operand."
-
 ["pipelex/tools/uri/uri_resolver.py::_resolve_file_uri"]
 param = "uri"
 rationale = "Parses/reads the uri; single operand."

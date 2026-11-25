@@ -13,14 +13,14 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.runtime_hub import get_storage_provider
+from pipelex.tools.uri.data_url import is_data_url
 from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
-from pipelex.tools.uri.uri_resolver import BASE64_DATA_URL_PREFIX
 
 _FALLBACK_STEM = "main_stuff_file"
 
 
 def _filename_from_url(url: str) -> str | None:
-    if url.startswith(BASE64_DATA_URL_PREFIX):
+    if is_data_url(uri=url):
         return None
     name = PurePosixPath(urllib.parse.urlparse(url).path).name
     return name or None

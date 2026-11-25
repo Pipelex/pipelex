@@ -41,7 +41,7 @@ class InputRefusalNamingTestData:
             ),
         ),
         (
-            "a_data_url_that_is_not_base64",
+            "a_data_url_whose_payload_is_not_base64",
             FileInputRefusalCase(
                 native_concept_code=NativeConceptCode.DOCUMENT,
                 input_name="documents",
@@ -84,3 +84,69 @@ class InputRefusalNamingTestData:
         expected_code="input.file_type_unsupported",
         expected_params={"input": "photos", "format": "pdf"},
     )
+
+
+class DeclaredTypeRefusalCase(NamedTuple):
+    """A file input whose declaration is refused, and the field and reason the refusal names."""
+
+    url: str
+    mime_type: str | None
+    expected_field_suffix: str
+    expected_reason: str
+
+
+class DeclaredMediaTypeTestData:
+    """File inputs whose declared media type is read as its bare type, or refused when it is not one media type."""
+
+    HELLO_BASE64 = base64.b64encode(b"hello").decode("ascii")
+
+    # A data URL whose header declares a type with parameters, stored under its bare type with the matching key extension.
+    STORED_UNDER_BARE_TYPE: ClassVar[list[tuple[str, str, str | None, str, str]]] = [
+        ("header_with_a_charset", f"data:text/plain;charset=utf-8;base64,{HELLO_BASE64}", None, "text/plain", "txt"),
+        ("header_in_upper_case", f"DATA:Text/Plain;BASE64,{HELLO_BASE64}", None, "text/plain", "txt"),
+        ("field_with_parameters", f"data:;base64,{HELLO_BASE64}", "text/plain; charset=utf-8", "text/plain", "txt"),
+        ("header_wins_over_the_field", f"data:text/markdown;base64,{HELLO_BASE64}", "text/plain", "text/markdown", "md"),
+    ]
+
+    REFUSED: ClassVar[list[tuple[str, DeclaredTypeRefusalCase]]] = [
+        (
+            "a_data_url_that_is_not_base64",
+            DeclaredTypeRefusalCase(url="data:text/plain,hello", mime_type=None, expected_field_suffix="url", expected_reason="invalid_data_url"),
+        ),
+        (
+            "a_header_holding_a_comma",
+            DeclaredTypeRefusalCase(
+                url=f"data:application/pdf;,text/plain;base64,{HELLO_BASE64}",
+                mime_type=None,
+                expected_field_suffix="url",
+                expected_reason="invalid_data_url",
+            ),
+        ),
+        (
+            "a_header_with_no_comma",
+            DeclaredTypeRefusalCase(
+                url=f"data:text/plain;base64{HELLO_BASE64}", mime_type=None, expected_field_suffix="url", expected_reason="invalid_data_url"
+            ),
+        ),
+        (
+            "a_header_declaring_no_subtype",
+            DeclaredTypeRefusalCase(
+                url=f"data:text;base64,{HELLO_BASE64}", mime_type=None, expected_field_suffix="url", expected_reason="invalid_data_url"
+            ),
+        ),
+        (
+            "a_mime_type_field_holding_a_comma",
+            DeclaredTypeRefusalCase(
+                url=f"data:;base64,{HELLO_BASE64}",
+                mime_type="application/pdf,text/plain",
+                expected_field_suffix="mime_type",
+                expected_reason="invalid_media_type",
+            ),
+        ),
+        (
+            "a_mime_type_field_of_a_web_link_declaring_no_subtype",
+            DeclaredTypeRefusalCase(
+                url="https://example.com/notes.txt", mime_type="text", expected_field_suffix="mime_type", expected_reason="invalid_media_type"
+            ),
+        ),
+    ]

@@ -8,8 +8,9 @@ things to each:
   is stamped with the type that describes its bytes, so every later check and operator reads the
   format instead of guessing it again. The bytes are the truth: a sniffed type replaces a declared
   one. A stored file is identified by a head read of its first bytes, a data URL and a local file by
-  the bytes already in hand. An http(s) input is never fetched, and keeps whatever type the caller
-  declared. An Image input whose bytes identify something other than an image is refused here,
+  the bytes already in hand. An http(s) input is never fetched, and keeps the type the caller
+  declared. A declared type is read as its bare `type/subtype`, its parameters dropped, and one that
+  is not a single media type is refused, naming the input. An Image input whose bytes identify something other than an image is refused here,
   before it is relocated, whatever will consume it.
 - **Relocation**, when the run is configured for it: a data URL, or a local file when local uploads
   are enabled, is stored and its url becomes a `pipelex-storage://` reference, and every input gets
@@ -53,11 +54,13 @@ from pipelex.pipeline.exceptions import (
 )
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.storage_scope import INPUT_ASSETS_LEAF
+from pipelex.tools.misc.exceptions import DeclaredMediaTypeError
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import (
     FILE_HEAD_NB_BYTES,
     IMAGE_FORMAT_KEY,
     UNKNOWN_FILE_TYPE,
+    declared_media_type,
     describe_file_format,
     format_key_from_mime_type,
     guess_file_type_from_bytes,
@@ -68,6 +71,8 @@ from pipelex.tools.misc.http_utils import validate_http_url_syntax
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
 from pipelex.tools.storage.storage_file_name import path_safe_extension
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.uri.data_url import ACCEPTED_DATA_URL_FORM, is_data_url, parse_base64_data_url
+from pipelex.tools.uri.data_url_exceptions import DataUrlError
 from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath, ResolvedPipelexStorage, UriKind
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -130,6 +135,9 @@ class _PreparationContext(NamedTuple):
 # The field of a file input that holds its reference, named by an `input.invalid` refusal of a blank or malformed one.
 _URL_FIELD = "url"
 
+# The field of a file input that declares its media type, named by the refusal of a declaration that is not one media type.
+_MIME_TYPE_FIELD = "mime_type"
+
 
 def _refused_file_input(*, path: FileInputPath, field_suffix: str | None = None) -> dict[str, str]:
     """How a refusal of a file input names it, by `InputShapingError`'s convention, as the error's keyword arguments.
@@ -149,6 +157,10 @@ class FileInputUnreadableReason(StrEnum):
 
     # A data URL whose payload does not decode as base64.
     INVALID_BASE64 = "invalid_base64"
+    # A `data:` URL that is not a base64 data URL, or whose header declares a type that is not one media type.
+    INVALID_DATA_URL = "invalid_data_url"
+    # A file input whose `mime_type` field is not one media type.
+    INVALID_MEDIA_TYPE = "invalid_media_type"
     # A local path the runner cannot open: it does not exist, is a directory, or is not readable.
     PATH_UNREADABLE = "path_unreadable"
 
@@ -213,8 +225,10 @@ async def prepare_file_inputs(
         PipelineInputUrlMissingError: An input's url is blank, a text input's included.
         PipelineInputNotAnImageError: An Image input's bytes identify something other than an image.
         PipelineInputUrlInvalidError: An http(s) url does not parse as one (when relocating).
-        PipelineInputContentError: A data URL is not valid base64, a local path cannot be read
-            for an upload, or a storage reference names no stored file or is refused as a key.
+        PipelineInputContentError: A data URL is not a base64 one, declares a type that is not one
+            media type, or is not valid base64, a file input's `mime_type` is not one media type, a
+            local path cannot be read for an upload, or a storage reference names no stored file or
+            is refused as a key.
         UriReadRefusedError: An input's url is a local path, or a storage reference outside the
             read scope, on a run with a read scope.
     """
@@ -395,8 +409,13 @@ async def _prepare_url_content(
     Every form comes out with its `mime_type` established, and, when relocating, with a
     `public_url` a template can render:
 
-    - A `data:` URL is decoded and identified from its bytes. When relocating, it is stored, its
+    - A `data:` URL is decoded and identified from its bytes. Only a base64 one is read, its header
+      ending at its first comma (`pipelex.tools.uri.data_url`). When relocating, it is stored, its
       url becomes the storage reference, signed as its `public_url`.
+
+    Every type a caller declares, the data URL's header and the content's `mime_type` field, is
+    reduced to its bare `type/subtype` before anything identifies, stores or links the file
+    (`declared_media_type`), and a declaration that is not one media type is refused.
     - A local path is identified from its bytes. When relocating with local uploads enabled, it is
       stored the same way; otherwise it is kept, and identified from a head read of the file.
     - A `pipelex-storage://` reference is identified from a head read of the stored object. When
@@ -410,9 +429,10 @@ async def _prepare_url_content(
         PipelineInputNotAnImageError: If the content is an ImageContent and its bytes identify
             something other than an image. It is raised before anything is relocated.
         PipelineInputUrlInvalidError: If an http(s) url does not parse as one (when relocating).
-        PipelineInputContentError: If a data URL is not valid base64, a local path cannot be read
-            for an upload, or a pipelex-storage:// reference names no stored file or is refused
-            by the storage provider as a key.
+        PipelineInputContentError: If a data URL is not a base64 one, declares a type that is not
+            one media type, or is not valid base64, the content's `mime_type` is not one media
+            type, a local path cannot be read for an upload, or a pipelex-storage:// reference
+            names no stored file or is refused by the storage provider as a key.
         UriReadRefusedError: If the url is a local path, or a storage reference outside the
             read scope, on a run with a read scope.
     """
@@ -420,6 +440,13 @@ async def _prepare_url_content(
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
         raise PipelineInputUrlMissingError(msg, **_refused_file_input(path=path, field_suffix=_URL_FIELD))
+
+    # Both declared sources are reduced before anything reads, stores or links the file, a data URL's
+    # form included: such a URL is refused as what it is, whatever the run's read scope.
+    content = _with_declared_mime_type(content=content, path=path)
+    data_url_media_type: str | None = None
+    if is_data_url(uri=content.url):
+        data_url_media_type = _declared_data_url_media_type(content=content, path=path)
 
     # Before anything reads or links the url. A signed link is a read by whoever holds it, so a
     # foreign storage reference is refused here rather than read or signed; a local path is refused
@@ -436,7 +463,9 @@ async def _prepare_url_content(
             case ResolvedPipelexStorage():
                 return await _prepare_storage_reference(content=content, resolved_uri=resolved_uri, path=path, context=context)
             case ResolvedBase64DataUrl():
-                return await _prepare_data_url(content=content, resolved_uri=resolved_uri, path=path, context=context)
+                return await _prepare_data_url(
+                    content=content, resolved_uri=resolved_uri, data_url_media_type=data_url_media_type, path=path, context=context
+                )
             case ResolvedLocalPath():
                 return await _prepare_local_path(content=content, resolved_uri=resolved_uri, path=path, context=context)
 
@@ -542,10 +571,64 @@ async def _prepare_storage_reference(
     return content.model_copy(update=updates)
 
 
+def _refused_declaration(
+    *, content: NormalizableContent, path: FileInputPath, field: str, reason: FileInputUnreadableReason, msg: str
+) -> PipelineInputContentError:
+    """The refusal of a file input whose declaration is not one this runtime reads, naming the field at fault.
+
+    `input.file_unreadable`, as a data URL that is not valid base64 is. The message is the operator's and never quotes
+    the declaration, which is the caller's content.
+    """
+    return (
+        PipelineInputContentError(msg, **_refused_file_input(path=path, field_suffix=field))
+        .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
+        .with_params(file_type=_file_type_of(content=content), reason=reason)
+    )
+
+
+def _with_declared_mime_type(*, content: NormalizableContent, path: FileInputPath) -> NormalizableContent:
+    """The content with its `mime_type` field reduced to its bare type, or the content itself when that changes nothing.
+
+    Raises:
+        PipelineInputContentError: The field is not one media type, naming the input's `mime_type`.
+    """
+    try:
+        mime_type = declared_media_type(media_type=content.mime_type)
+    except DeclaredMediaTypeError as exc:
+        msg = (
+            f"{type(content).__name__} input '{format_file_input_path(path)}': its mime_type is not one media type ({exc}). "
+            "Give it as <type>/<subtype>, optionally followed by ;parameters."
+        )
+        raise _refused_declaration(
+            content=content, path=path, field=_MIME_TYPE_FIELD, reason=FileInputUnreadableReason.INVALID_MEDIA_TYPE, msg=msg
+        ) from exc
+    if mime_type == content.mime_type:
+        return content
+    return content.model_copy(update={"mime_type": mime_type})
+
+
+def _declared_data_url_media_type(*, content: NormalizableContent, path: FileInputPath) -> str | None:
+    """The bare type a `data:` input's header declares, `None` when it declares none.
+
+    Raises:
+        PipelineInputContentError: The URL is not a base64 data URL, or its header declares a type that is not one media
+            type, naming the input's `url`.
+    """
+    try:
+        return declared_media_type(media_type=parse_base64_data_url(uri=content.url).media_type)
+    except (DataUrlError, DeclaredMediaTypeError) as exc:
+        msg = (
+            f"{type(content).__name__} input '{format_file_input_path(path)}': the data URL is not one this runtime reads ({exc}). "
+            f"Give it as {ACCEPTED_DATA_URL_FORM}."
+        )
+        raise _refused_declaration(content=content, path=path, field=_URL_FIELD, reason=FileInputUnreadableReason.INVALID_DATA_URL, msg=msg) from exc
+
+
 async def _prepare_data_url(
     *,
     content: NormalizableContent,
     resolved_uri: ResolvedBase64DataUrl,
+    data_url_media_type: str | None,
     path: FileInputPath,
     context: _PreparationContext,
 ) -> NormalizableContent:
@@ -563,7 +646,8 @@ async def _prepare_data_url(
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],
-        declared_mime_type=resolved_uri.mime_type or content.mime_type,
+        # The header's bare type, else the content's field, both already reduced (`_prepare_url_content`).
+        declared_mime_type=data_url_media_type or content.mime_type,
         file_name=content.filename,
         path=path,
     )
