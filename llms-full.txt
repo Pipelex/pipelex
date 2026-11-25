@@ -9790,6 +9790,14 @@ Results always preserve input order regardless of the concurrency bound. If a br
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
 
+## Very wide batches on a durable runtime
+
+On a durable runtime, a run keeps a history of what it did, and its engine bounds that history in bytes and in events. Every item of a batch writes into its run's history what its branch starts with and what it hands back, so the number of items a batch can run depends on how large each item and its branch's inputs are, not on a fixed item count.
+
+Before its first item starts, a `PipeBatch` asks the runtime's router whether the whole batch fits. A runtime that runs in one process keeps no such history and always answers yes. A durable runtime may estimate what the batch would write from its first item and its item count, and refuse a batch that would not fit, before any item is billed, rather than let its engine end the run halfway; a runtime that does not check lets the batch run. A refused batch fails at the `PipeBatch` with `input.too_large`, whose `input` is the batched list as you named it, whose `size` is its item count and whose `limit` is the largest item count that fits, left out when not even one item fits; its message, for the operator, also names the bytes and the events the batch would write and those the run had left. When items later in the list turn out much larger than the first, the runtime may also stop the batch during its fan-out, with the same code and a message saying how many items had started.
+
+To run a list that is refused, split it into shorter lists, each batched by a run of its own, or make each item, and what its branch pipe reads besides it, smaller. When not even one item fits, only smaller items help, and the refusal says so.
+
 ## Compaction Under Absence
 
 When a branch's result resolves as a recorded absence — typically because the branch pipe is a `PipeCondition` whose outcome was `continue`, or the branch was skipped (lifted) on an absent optional value — that branch contributes **no item** to the aggregated output list. The list is compacted: a list cannot hold a hole, and absent results are dropped rather than replaced by placeholders. Order is preserved among the results that did produce a value, and each dropped branch is logged at `DEBUG`, with its index among the inputs and its absence reason as the fields `branch_index` and `absence_reason`, which is how a log explains an output list shorter than its input.
@@ -16957,6 +16965,8 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `delivery_failure` | string | Why a caller webhook's delivery, or one attempt of it, failed: `http_status`, `timeout`, `unreachable`, `refused_address` or `secret_unavailable` |
 | `storage_scheme` | string or `null` | The kind of storage a deployment's storage provider is, as a `pipelex.storage.*` problem names it: `s3`, `local`; `null` for a storage plugin whose kind the registry does not list |
 | `blob_sha256` | string | The SHA-256 a blob is stored under in the API server's blob store, in lowercase hex: its content's hash, never its content |
+| `requested_reference_count` | integer | The number of `pipelex-storage://` references one request to the API server's bulk resolve route asked to resolve |
+| `refused_reference_count` | integer | The number of those references the route refused because they lie outside the caller's scope |
 | `blob_size_bytes`, `read_size_bytes` | integer | The size the API server's blob store holds a blob at, and the size of the bytes a read of it returned, in bytes |
 | `env_var` | string | The name of an environment variable, never its value |
 | `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
@@ -22524,6 +22534,18 @@ async def run_batch_branch(self, pipe_job: PipeJob) -> PipeOutput:
 
 The default body IS the behavior for in-process routers — a branch is just a run, so `PipeRouter` deliberately does not override it and nothing about direct execution changed. A **distributed** router may override it to give each branch its own isolation (own retry, own history partition) while every other dispatch it receives runs inline. Because the default delegates to `run` and not to `_run_pipe_job`, batch branches still pass through the observer hooks.
 
+### The batch-fits hook
+
+A distributed router sees a batch's branches one at a time, through `run_batch_branch`, and never the batch's width; `PipeBatch` knows the width but not what a branch costs in a durable history. So `PipeRouterProtocol` carries a second batch entry point, synchronous, whose default body does nothing:
+
+```python
+def check_batch_fits(self, *, pipe_code: str, input_list_label: str, item_count: int, first_branch_job: PipeJob) -> None: ...
+```
+
+`PipeBatch` calls it once per batch, after it knows its item count and before it records its fan-out or starts any branch, and never for an empty list. `first_branch_job` is the very job the first branch then dispatches through `run_batch_branch`, built by the same function that builds every branch's job, so a router that measures it measures what it will send; it reads the job and never changes it. `input_list_label` names the list as its author wrote it (`BatchParams.input_list_label`). The hook is called in a dry run too, whose job's `run_mode` says so.
+
+In-process routers keep the default: every batch fits. A durable router may estimate what the whole batch would write into its run's history and refuse by raising `PipeBatchTooWideError` (`pipelex/pipe_controllers/exceptions.py`), which fails the `PipeBatch` located at it, with no fan-out recorded and no branch started. The error takes the batch's figures as keyword arguments (the pipe code, the list's label, the item count, the estimated bytes and events, the bytes and events left, the largest item count that fits, and, for a batch stopped during its fan-out rather than refused before it, the number of items started) and builds its message from them, so the wording is Pipelex's whichever backend raises it. Its problem is `input.too_large`, whose `input` is the list's label, `size` the item count and `limit` the largest count that fits. When that count is zero, no shorter list would run: the problem withholds `limit`, so the code's sentence for a withheld limit applies, and the message and the advice ask for smaller items.
+
 ---
 
 ## Pipe Controllers
@@ -22696,6 +22718,7 @@ flowchart TB
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |
 | PipeBatch | `pipelex/pipe_controllers/batch/pipe_batch.py` |
+| PipeBatchTooWideError | `pipelex/pipe_controllers/exceptions.py` |
 | PipeParallel | `pipelex/pipe_controllers/parallel/pipe_parallel.py` |
 | Router selection | `pipelex/pipelex.py` (in `Pipelex.setup()`) |
 
@@ -24135,6 +24158,10 @@ Besides files, a provider holds the large texts of a run: every `Text`, `Markdow
 ### A provider is not the tenant boundary
 
 A provider reads any key it is handed with the process's own credentials, and it should: it has no notion of whose run asked. On a host serving several tenants, what bounds a run's reads is the **read scope** the host passes with the run, which the content-generation leaves and the input seam check before they call a provider. A key outside that prefix, and any local path, is refused there, so a provider never sees it. A self-hosted deployment serving one tenant passes no read scope and reads as before. See [Distributed Content Generation](distributed-content-generation.md#what-a-leaf-may-read-the-read-scope) for the rule and where it runs.
+
+### How a stored object reaches a client
+
+A run hands its large texts, the images it generates and the files it receives back as `pipelex-storage://` references, and a client reads one through a server, never through the provider. On the hosted platform, the platform resolves a reference to a presigned link on its bucket. A self-hosted API server resolves it to a signed link on its own download route, `GET /v1/storage/{key}`, which reads the object with `load_with_metadata` and answers its bytes under a validated bare media type: the `type/subtype` of the type the provider returns, else the one the key's extension implies. A plugin's provider is taken to return the type an object was stored with, as the S3 and GCP providers do; the local and in-memory providers return a type sniffed from the bytes, so for them the key's extension comes first. So a provider serves those downloads through the same hook a run's reads use, and a missing object must raise `StorageFileNotFoundError`, which the route answers as a `404`. The server decides which references a caller may resolve, the caller's own under `AUTH_MODE=jwt`, as the provider itself checks nothing. See [Storage Transport](../api-server/storage-transport.md).
 
 ---
 
@@ -25731,6 +25758,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | A step names, in an inline model setting, a model the deck neither defines nor names | `ModelNotFoundError`, which the lookup raises with `model.unknown` as the method's: **HTTP 422**, with a `change_model` step and a sentence naming the model as the method wrote it and the type of model the step needs. A model the deck itself names but does not serve (a preset or alias on a backend that is not enabled) keeps the class's `model.unavailable` → HTTP 501, in the operator's domain, whose caller step offers another model |
 | A method names a model a catalog of this deployment knows but no backend it enables serves (a backend switched off in `backends.toml`, such as `claude-4.5-haiku` with `anthropic` disabled) | `ModelNotFoundError` with `model.unavailable` → **HTTP 501**, the operator's, with the parameters `model`, `model_type` and the `reason` `not_served`, located on the pipe and its `model` field; the deck reads the handles every backend declares, enabled or not (`ModelDeck.is_cataloged_but_unserved`), so this is never the method's `model.unknown`. Validation answers it as no verdict, since the method is sound and this deployment cannot run it, and a run answers it before any pipe runs |
 | A `PipeParallel` cannot combine its branch results, or a pipe starts without a required input | The caller's own method or request: `pipe.output_multiplicity`, naming the first branch whose multiplicity differs from its field's, with one item per such branch when there are several, or `input.missing` at the entry pipe and `pipe.input_unresolved` below it → **HTTP 422**, each with its code's step, `change_method` for the method's codes and `change_input` for the input's |
+| A `PipeBatch` whose items a durable router judges would pass what its run's history holds, before its first item starts (`PipeRouterProtocol.check_batch_fits`) or during its fan-out | `PipeBatchTooWideError` (`pipelex/pipe_controllers/exceptions.py`), raised by the router with the batch's figures as keyword arguments, located at the `PipeBatch`: `input.too_large` → **HTTP 422**, whose `input` is the batched list as its author named it, `size` its item count and `limit` the largest item count that fits, so the caller reads "The input 'notes' reaches 2000, past the limit of 1714.", and when not even one item fits the problem withholds `limit` and the caller reads "The input 'notes' reaches 2000, past what the step that reads it accepts."; its message, the operator's, names the bytes and the events the batch would write and those left, and, for a batch stopped during its fan-out, how many items had started. A refused batch records no fan-out and starts no branch |
 | Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `request.pipe_not_found`, `request.pipe_unspecified` or `request.pipe_ambiguous` → **HTTP 422**. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising `PipeNotFoundError` / `PipeLibraryError`, whose codes are the method's: a ref written inside a bundle is not the caller's input |
 | A template naming a filter or a test that does not exist, found only when it renders | `Jinja2TemplateInvalidError` at the pipe, naming the filter or test and none of the template: `method.template_invalid` → **HTTP 422** for a method's `PipeCondition` expression, `PipeLLM` prompt or `PipeDocGen` template, and `runtime.unexpected` for one of Pipelex's own templates |
 | A URL or a storage key refused by the SSRF guard or the run's read scope | A `security.*` code saying whose the URL was: `security.input_url_refused` for one of the run's inputs, the default when the guard cannot tell, `security.method_url_refused` for one the method names and for a read refused inside a step, whose inputs were authorized when they were normalized, both → **HTTP 422**, and `security.provider_url_refused` for one in a model's generated answer, the runtime's → HTTP 502; a traversal in a storage key the caller supplied is `security.input_path_refused`, which `PipelineInputContentError` takes from its cause |
@@ -25759,7 +25787,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.117.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.118.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -25827,6 +25855,7 @@ Pipelex's storage addresses and uploads.
 |---|---|---|---|---|
 | [`pipelex.storage.uri_invalid`](pipelex/storage/uri_invalid.md) | The storage address is malformed | `input` | `no` | `422` |
 | [`pipelex.storage.not_found`](pipelex/storage/not_found.md) | A stored file is gone | `runtime` | `no` | `500` |
+| [`pipelex.storage.object_missing`](pipelex/storage/object_missing.md) | No file is stored at this link | `input` | `no` | `404` |
 | [`pipelex.storage.damaged`](pipelex/storage/damaged.md) | A stored file is damaged | `runtime` | `no` | `500` |
 | [`pipelex.storage.unavailable`](pipelex/storage/unavailable.md) | Storage is unavailable | `runtime` | `yes` | `503` |
 | [`pipelex.storage.not_configured`](pipelex/storage/not_configured.md) | This deployment serves no storage for that address | `operator` | `no` | `500` |
@@ -28177,7 +28206,7 @@ The server is tested with exactly the dependencies it declares, which are not th
 
 The root `make agent-check` ends with `make api-agent-check`, which runs `make -C api agent-check`: the member's install, ruff, pyright and mypy under its own configuration, then two drift checks. The root `make agent-test` ends with `make api-agent-test`, the server's unit tests. A library change that breaks the server therefore fails the gate in the change that makes it, and so does one that moves the server's wire or its inference tree:
 
-- **`make -C api openapi-check`** compares the committed OpenAPI artifact, `docs/api-server/openapi/pipelex-api.openapi.yaml`, with what the app generates. It sits among the server's pages, so the docs site publishes it beside the pages that link to it. pipelex's own models ride the server's wire (the run result, the bundle blueprint, the validation error vocabulary), so a library change can move the artifact with no change to the server's code. Regenerate it with `make -C api openapi-export` and read the diff: it is what the change did to the server's callers.
+- **`make -C api openapi-check`** compares the committed OpenAPI artifact, `docs/api-server/openapi/pipelex-api.openapi.yaml`, with what the app generates. The exporter reads the app as it boots by default, under the default `AUTH_MODE` and with `TRUST_FORWARDED_IDENTITY_HEADERS` off, whatever the environment or a `.env` sets, since both decide which routes are mounted, so the export and the check are the same on every machine. It sits among the server's pages, so the docs site publishes it beside the pages that link to it. pipelex's own models ride the server's wire (the run result, the bundle blueprint, the validation error vocabulary), so a library change can move the artifact with no change to the server's code. Regenerate it with `make -C api openapi-export` and read the diff: it is what the change did to the server's callers.
 - **`make -C api kit-check`** compares the server's vendored inference tree with the kit.
 
 ## Pull-request CI covers it
@@ -29073,7 +29102,7 @@ MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
 ```
 
 - **MTHDS Protocol** — the routes `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`, and the blob routes `POST /blobs/missing` and `PUT /blobs/{sha256}`, which the protocol makes optional and this server serves, declaring `blob_store: true` on `/version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those — the flag is how a conformance suite or a third-party runner extracts the portable subset.
-- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
+- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), editor tooling (`/lint`, `/format`), and the storage transport that reads back what a run stores (`/resolve-storage-url/bulk` and the signed download links it resolves to, `/storage/{key}`), which serves the hosted platform's bulk resolve contract for this server's own storage. `/upload` and the single `/resolve-storage-url` were removed, as [Storage Transport](storage-transport.md) explains.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
 All routes are served under the `/v1` base path (clients compose `{base}/v1/{endpoint}`).
@@ -29253,11 +29282,15 @@ List the models this runner can route to, and check one model reference against 
 
 [Learn more →](models.md)
 
-### Uploader (removed)
+### Storage Transport
+Read back what a run stores: a long text, a generated image or a received file travels in a run's answer as a `pipelex-storage://` reference, which a client resolves to a short-lived link and fetches. Pipelex API extensions serving the hosted platform's bulk resolve contract for this server's own storage, not mounted when the server trusts forwarded identity.
 
-`POST /v1/upload` and `POST /v1/resolve-storage-url` have been **removed** ([Storage Transport](storage-transport.md)). The storage provider itself is untouched — only the two HTTP routes are gone.
+- `POST /v1/resolve-storage-url/bulk` — Resolve up to 100 references to signed download links, one verdict per reference in request order; a caller resolves what its runs may read, only under its own `user_id` under `AUTH_MODE=jwt`, and a refused reference is a value on its item, never a failed request
+- `GET /v1/storage/{key}` — Download one stored object from its signed link (no bearer token: the signature authorizes it), under a validated bare media type that agrees with the type it was stored with
 
-For most use cases you don't need either: pass any public HTTP(S) URL (or base64 data URL) directly as `Document.content.url` and skip the upload step entirely.
+`POST /v1/upload` and the single `POST /v1/resolve-storage-url` are not served. To give a run a file, pass any public HTTP(S) URL (or base64 data URL) directly as `Document.content.url`.
+
+[Learn more →](storage-transport.md)
 
 
 ## Configuration
@@ -29335,16 +29368,27 @@ PIPELEX_ENV=dev
 # A method and the dependency trees it sends beside it are also bounded together:
 # MAX_METHOD_DEPENDENCIES=32          # dependency trees in one request
 # MAX_METHOD_REQUEST_TOTAL_KIB=131072 # bytes across the method's trees (default 128 MiB)
-# BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid
-# The address clients reach this API at, which upload targets start with. Set it
-# behind a proxy that terminates TLS or serves the API under a path prefix, since
-# the URL a request arrives at is then not the one a client can upload to. Unset,
-# a target starts with the URL of the request that asked for it.
+# BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid (at most 604800, seven days)
+# Blobs live in the configured storage under <scope>/blobs/.
+
+# ── Signed links: upload targets and stored-object downloads ──────────────
+# See pipe-run.md → "Sending files by hash" and storage-transport.md.
+# The address clients reach this API at, which every signed link starts with:
+# the upload targets of /v1/blobs/missing and the download links of
+# /v1/resolve-storage-url/bulk. Set it behind a proxy that terminates TLS or
+# serves the API under a path prefix, since the URL a request arrives at is then
+# not the one a client can reach. Unset, a link starts with the URL of the
+# request that asked for it.
 # PUBLIC_BASE_URL=https://runner.example.com
-# The key the upload targets are signed with. Unset, each process draws its own,
-# so a deployment serving one API through several instances sets it, the same on
-# every instance. Blobs live in the configured storage under <scope>/blobs/.
-# BLOB_UPLOAD_SIGNING_KEY=<a-long-random-secret>
+# The key every signed link is signed with, each kind of link under a purpose of
+# its own. Unset, each process draws its own, so its links stop holding when it
+# restarts, and a deployment serving one API through several instances or several
+# worker processes (`uvicorn --workers N`, or a host that sets WEB_CONCURRENCY)
+# sets it, the same on every instance and every worker.
+# LINK_SIGNING_KEY=<a-long-random-secret>
+# STORAGE_LINK_TTL_SECONDS=900        # how long a resolved download link stays valid (at most 604800, seven days)
+# A signed link stays valid for at most seven days, as an S3 presigned URL does:
+# the server refuses to start when either lifetime above is set past that cap.
 
 # ── Running a method by address (`method_ref`) ────────────────────────────
 # See pipe-run.md → "Running a method by address". All read at startup.
@@ -29892,7 +29936,7 @@ The answer is `{"missing": [{"sha256": "…", "size": n, "upload": {"method": "P
 
 **Scopes.** Blobs live in the deployment's configured storage, under `<scope>/blobs/<sha256>`, and recorded listings under `<scope>/trees/<digest>`. The scope is the request's `read_scope`, which a multi-tenant host sends for the organization it serves (a query parameter on `POST /v1/blobs/missing`, a body field on the run and validate routes), else the caller's own id, so a hash entry resolves only in the caller's own blobs and asking whether a hash is held tells a caller nothing of another's files. On a `jwt` deployment a sent scope must lie under the caller's own id, else a `403` `auth.forbidden` whose `requirement` is `read_scope_under_caller` (see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups)). A hash entry the runner does not hold, at the size it states, is a `422` `request.blobs_missing` whose `missing_blobs` parameter lists the hashes to upload before sending the request again.
 
-**Signing key.** Each process draws its own signing key unless `BLOB_UPLOAD_SIGNING_KEY` is set. A deployment serving one API through several instances must set it, the same on every instance, since an upload may reach another instance than the one that named its target.
+**Signing key.** Each process draws its own signing key unless `LINK_SIGNING_KEY` is set, the key that signs the download links of the [storage transport](storage-transport.md) too, each kind of link under a purpose of its own. A deployment serving one API through several instances or several worker processes (`uvicorn --workers N`, or a host that sets `WEB_CONCURRENCY`) must set it, the same on every instance and every worker, since an upload may reach another process than the one that named its target.
 
 ### Sending the method packages the method calls
 
