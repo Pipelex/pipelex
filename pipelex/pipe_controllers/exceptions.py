@@ -31,7 +31,8 @@ class PipeBatchTooWideError(PipeControllerError):
     The error builds its own message from the figures it is given, so a refusal reads the same whichever backend
     raises it, and its problem is ``input.too_large``: the batched list is the step's input, and the remedy is a
     shorter list. The problem names the list as its ``input``, the item count as its ``size`` and the largest item count
-    that fits as its ``limit``; the bytes and the events are the operator's, in the message.
+    that fits as its ``limit``; the bytes and the events are the operator's, in the message. When not even one item fits,
+    no shorter list would run: the problem withholds ``limit``, and the message and the advice ask for smaller items.
     """
 
     error_code = CoreCode.INPUT_TOO_LARGE
@@ -78,13 +79,12 @@ class PipeBatchTooWideError(PipeControllerError):
         self.max_fitting_item_count = max_fitting_item_count
         self.started_item_count = started_item_count
         super().__init__(self._compose_message())
-        self.user_action = UserAction(
-            kind=UserActionKind.CHANGE_INPUT,
-            detail=(
-                f"Split the list '{input_list_label}' into lists of at most {max_fitting_item_count:,} items, "
-                "each batched by a run of its own, or batch over fewer items."
-            ),
-        )
+        self.user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail=self._compose_advice())
+
+    @property
+    def fits_no_item(self) -> bool:
+        """Whether not even one item fits, so that no shorter list would run and only smaller items would."""
+        return self.max_fitting_item_count <= 0
 
     @property
     def is_stopped(self) -> bool:
@@ -108,10 +108,24 @@ class PipeBatchTooWideError(PipeControllerError):
                 f"PipeBatch '{self.pipe_code}' was stopped after {self.started_item_count:,} of its {self.item_count:,} items "
                 f"of '{label}' started: the {items_left:,} items left would write {footprint}."
             )
+        if self.fits_no_item:
+            return f"{outcome} Not even one item fits, so make each item, and what the branch pipe reads besides it, smaller."
         return f"{outcome} At most {self.max_fitting_item_count:,} items fit, so batch over a shorter list."
+
+    def _compose_advice(self) -> str:
+        if self.fits_no_item:
+            return f"Make each item of the list '{self.input_list_label}', and what the branch pipe reads besides it, smaller."
+        return (
+            f"Split the list '{self.input_list_label}' into lists of at most {self.max_fitting_item_count:,} items, "
+            "each batched by a run of its own, or batch over fewer items."
+        )
 
     @override
     def problem_params(self) -> dict[str, Any]:
+        if self.fits_no_item:
+            # No item count fits, so there is no count a shorter list could stay under: the problem withholds `limit`, and
+            # the code's sentence for a withheld limit says the input is past what the step accepts.
+            return {"input": self.input_list_label, "size": self.item_count}
         return {"input": self.input_list_label, "limit": self.max_fitting_item_count, "size": self.item_count}
 
     @override
