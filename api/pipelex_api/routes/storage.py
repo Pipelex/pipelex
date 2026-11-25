@@ -43,7 +43,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex_api.exceptions import RunnerAuthError, StoredObjectMissingError
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.openapi_responses import COMMON_PROBLEM_RESPONSES, PROBLEM_403_STORAGE_LINK, PROBLEM_404_STORAGE_OBJECT, PROBLEM_422, PROBLEM_500
+from pipelex_api.openapi_responses import (
+    COMMON_PROBLEM_RESPONSES,
+    PROBLEM_403_STORAGE_LINK,
+    PROBLEM_404_STORAGE_OBJECT,
+    PROBLEM_422,
+    PROBLEM_500,
+    PROBLEM_503_STORAGE_UNAVAILABLE,
+)
 from pipelex_api.routes.pipelex.pipeline import READ_SCOPE_UNDER_CALLER_REQUIREMENT, caller_read_scope
 from pipelex_api.security import trusts_forwarded_identity
 from pipelex_api.storage_links import (
@@ -185,6 +192,7 @@ async def resolve_storage_urls_in_bulk(request: Request, request_data: BulkResol
         404: PROBLEM_404_STORAGE_OBJECT,
         422: PROBLEM_422,
         500: PROBLEM_500,
+        503: PROBLEM_503_STORAGE_UNAVAILABLE,
     },
 )
 async def get_stored_object(

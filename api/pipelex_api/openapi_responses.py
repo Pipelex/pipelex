@@ -224,6 +224,11 @@ PROBLEM_404_STORAGE_OBJECT: dict[str, Any] = _problem(
     "address it names: resolving a reference checks only that the caller may read it, not that a file is stored there.",
 )
 
+PROBLEM_503_STORAGE_UNAVAILABLE: dict[str, Any] = _problem(
+    "`pipelex.storage.unavailable`, naming the kind of storage as `params.scheme` — the runner's storage backend failed "
+    "the read, which may succeed later: fetch the link again after a while, or resolve the reference again once it has expired.",
+)
+
 # Attached to the composite `/v1` router (`pipelex_api.routes`), so every auth-wrapped operation documents
 # the failures any of them can produce: the router-level auth check (401), the body-size middleware
 # (413), request-shape and input-domain rejections (422), and the server-fault floor (500). Declaring

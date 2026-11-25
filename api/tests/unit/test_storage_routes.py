@@ -18,7 +18,7 @@ import jwt
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pipelex.tools.storage.exceptions import StorageInvalidUriError
+from pipelex.tools.storage.exceptions import StorageInvalidUriError, StorageS3Error
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StoredData
@@ -377,6 +377,17 @@ class TestStorageRoutes:
         (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
 
         assert_problem(_download(client, item["url"]), status=404, code="pipelex.storage.object_missing")
+
+    def test_a_storage_backend_failing_the_read_is_a_503(self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+        provider = mocker.Mock(storage_kind="s3")
+        provider.load_with_metadata = mocker.AsyncMock(side_effect=StorageS3Error("The S3 read failed"))
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+
+        problem = assert_problem(_download(client, item["url"]), status=503, code="pipelex.storage.unavailable")
+        assert problem["params"] == {"scheme": "s3"}
 
     def test_links_start_with_the_configured_public_base_url(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"

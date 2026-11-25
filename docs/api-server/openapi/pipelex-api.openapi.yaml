@@ -1978,6 +1978,14 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
+        '503':
+          description: '`pipelex.storage.unavailable`, naming the kind of storage as `params.scheme` — the runner''s storage
+            backend failed the read, which may succeed later: fetch the link again after a while, or resolve the reference
+            again once it has expired.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
   /v1/resolve-storage-url/bulk:
     post:
       tags:

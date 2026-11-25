@@ -66,7 +66,7 @@ ROUTE_EXTRA_STATUSES = {
     ("/v1/resolve", "post"): (403, 404, 501),
     ("/v1/pipe-io", "post"): (403, 404, 501),
     ("/v1/codegen", "post"): (403, 404, 501),
-    ("/v1/storage/{key}", "get"): (403, 404, 422, 500),
+    ("/v1/storage/{key}", "get"): (403, 404, 422, 500, 503),
 }
 
 
