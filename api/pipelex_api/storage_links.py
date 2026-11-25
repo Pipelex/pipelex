@@ -30,14 +30,19 @@ SIGNATURE_PARAM = "signature"
 # The fewest segments a stored object's key has: a scope and a file name.
 _MIN_KEY_SEGMENTS = 2
 
+# The longest name, in UTF-8 bytes, the filesystems a storage provider writes to hold for one path segment: a longer
+# segment names no object any of them stores.
+_MAX_SEGMENT_BYTES = 255
+
 
 def storage_key_of(*, uri: str) -> str | None:
     """The storage key a `pipelex-storage://` reference names, or None when the reference does not parse.
 
     A reference parses when it starts with the scheme and its key has at least a scope and a file name, none of its
-    segments empty, `.` or `..`, and no character in it a backslash, a control character or DEL: the local storage
-    provider resolves a key against a directory, where any of those would name another file than the one the key
-    reads as, and a key parsed so is safe in the path of a download link once each segment is percent-encoded.
+    segments empty, `.`, `..` or longer than 255 UTF-8 bytes, and no character in it a backslash, a control character
+    or DEL: the local storage provider resolves a key against a directory, where any of those would name another file
+    than the one the key reads as, or a name the filesystem cannot hold, and a key parsed so is safe in the path of a
+    download link once each segment is percent-encoded.
     """
     if not uri.startswith(PIPELEX_STORAGE_SCHEME):
         return None
@@ -45,8 +50,11 @@ def storage_key_of(*, uri: str) -> str | None:
     if any(char == "\\" or ord(char) < 0x20 or ord(char) == 0x7F for char in key):
         return None
     segments = key.split("/")
-    if len(segments) < _MIN_KEY_SEGMENTS or any(segment in {"", ".", ".."} for segment in segments):
+    if len(segments) < _MIN_KEY_SEGMENTS:
         return None
+    for segment in segments:
+        if segment in {"", ".", ".."} or len(segment.encode("utf-8", "surrogatepass")) > _MAX_SEGMENT_BYTES:
+            return None
     return key
 
 

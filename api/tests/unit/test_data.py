@@ -242,6 +242,8 @@ class StorageRouteTestData:
         "pipelex-storage://single-tenant/./value.txt",
         "pipelex-storage://single-tenant\\other/value.txt",
         "pipelex-storage://single-tenant/value\n.txt",
+        "pipelex-storage://single-tenant/" + "a" * 252 + ".txt",
+        "pipelex-storage://single-tenant/" + "é" * 128 + "/value.txt",
     )
     # The platform's wire, field for field (`pipelex-server/platform/src/pipelex_platform/routers/v1/storage.py`):
     # `BulkResolveStorageUrlResponse`, `BulkResolveStorageUrlItem` and `RefusalItem`, and its two bounds.

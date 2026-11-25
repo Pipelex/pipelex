@@ -1,4 +1,5 @@
 import contextlib
+import errno
 import json
 import os
 import threading
@@ -14,6 +15,10 @@ from pipelex.tools.misc.exceptions import FileTypeError
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_path
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError, StorageLocalError
 from pipelex.tools.storage.storage_provider_abstract import StorageKind, StorageProviderAbstract, StoredData
+
+# The errors a read of a key raises when the key names no stored file: a path whose name, or one of whose segments, is
+# longer than the filesystem allows, and a path naming a directory, which a write never leaves under a key.
+_NAMES_NO_STORED_FILE_ERRNOS = frozenset({errno.ENAMETOOLONG, errno.EISDIR, errno.ENOTDIR})
 
 # The name of the file holding a stored file's metadata, beside it: hidden, as the temporary files of a write are, and
 # never a key a caller can name, so no read or write reaches it as a stored file of its own.
@@ -116,13 +121,24 @@ class LocalStorageProvider(StorageProviderAbstract):
             StoredData containing file contents and detected MIME type.
 
         Raises:
-            StorageFileNotFoundError: If the file does not exist.
+            StorageFileNotFoundError: If no regular file is stored under the key: nothing is there, a directory is, or
+                the filesystem cannot hold a name the key holds.
             StorageInvalidUriError: If the key is invalid.
             StorageLocalError: If the filesystem read fails (e.g. permission denied, I/O error).
         """
         file_path = self._validate_key(key)
 
-        if not file_path.exists():
+        # Only a regular file is a stored file: a key naming a directory, or a name the filesystem cannot hold, stores
+        # nothing, as a key no write was made to does not.
+        try:
+            is_stored_file = file_path.is_file()
+        except OSError as exc:
+            if exc.errno not in _NAMES_NO_STORED_FILE_ERRNOS:
+                msg = f"Failed to read file '{key}': {exc}"
+                raise StorageLocalError(msg) from exc
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
+        if not is_stored_file:
             msg = f"File not found: '{key}'"
             raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
 
@@ -130,10 +146,13 @@ class LocalStorageProvider(StorageProviderAbstract):
             async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
                 data = await file_handle.read()
         except FileNotFoundError as exc:
-            # TOCTOU: the file passed exists() above but was removed before the open.
+            # TOCTOU: the file passed is_file() above but was removed before the open.
             msg = f"File not found: '{key}'"
             raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
         except OSError as exc:
+            if exc.errno in _NAMES_NO_STORED_FILE_ERRNOS:
+                msg = f"File not found: '{key}'"
+                raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
             msg = f"Failed to read file '{key}': {exc}"
             raise StorageLocalError(msg) from exc
 

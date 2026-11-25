@@ -7,10 +7,11 @@ the signed link's refusals; downloads of a stored text, an image and a document 
 trip through the Python SDK's `load_stored_texts`, the composition every template's blocking path runs.
 """
 
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import httpx
 import jwt
@@ -302,6 +303,30 @@ class TestStorageRoutes:
         problem = assert_problem(_download(client, item["url"]), status=404, code="pipelex.storage.object_missing")
         assert problem["detail"] == "No file is stored at the storage address this link names."
         assert not storage.root
+
+    @pytest.mark.parametrize(
+        ("key", "status", "code"),
+        [
+            pytest.param("single-tenant/generated", 404, "pipelex.storage.object_missing", id="a_directory"),
+            pytest.param("single-tenant/generated/value.txt/inner.txt", 404, "pipelex.storage.object_missing", id="through_a_file"),
+            pytest.param("single-tenant/" + "a" * 300 + ".txt", 403, "auth.forbidden", id="a_segment_no_filesystem_holds"),
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_signed_link_naming_no_stored_file_is_never_a_server_error(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path, key: str, status: int, code: str
+    ) -> None:
+        """Whatever key a validly signed link names, the local provider answers a refusal of the caller's, never a 500."""
+        local = LocalStorageProvider(root_path=tmp_path)
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=local)
+        await local.store(b"a text", key="single-tenant/generated/value.txt", content_type="text/plain")
+        client = _build_client(monkeypatch=monkeypatch)
+        expires = str(int(time.time()) + 60)
+        signature = link_signature(purpose=LinkPurpose.STORAGE_DOWNLOAD, message=f"{key}\n{expires}")
+
+        response = client.get(f"/v1/storage/{quote(key, safe='/')}", params={"expires": expires, "signature": signature})
+
+        assert_problem(response, status=status, code=code)
 
     def test_links_start_with_the_configured_public_base_url(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"

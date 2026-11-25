@@ -10,6 +10,10 @@
 
 - **`LINK_SIGNING_KEY` replaces `BLOB_UPLOAD_SIGNING_KEY` (Breaking)**: the API server signs its upload targets and its download links with one key, each kind of link under a purpose of its own, so a deployment of several instances that set `BLOB_UPLOAD_SIGNING_KEY` sets `LINK_SIGNING_KEY` instead; unset, each process still draws its own key.
 
+### Fixed
+
+- **The local storage provider reads a key naming no regular file as a missing file**: a key naming a directory, a path through a file, or a segment longer than the filesystem holds raises `StorageFileNotFoundError` instead of `StorageLocalError` or a raw `OSError`.
+
 ## [v0.117.0] - 2026-11-25
 
 ### Added
