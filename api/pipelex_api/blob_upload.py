@@ -10,7 +10,7 @@ only a caller who passed the deployment's authentication on `POST /v1/blobs/miss
 its own scope, for a while.
 
 The signing key and the address a target starts with are those of every link this runner signs
-(`pipelex_api.signed_links`): `LINK_SIGNING_KEY`, which a deployment of several instances must set, and
+(`pipelex_api.signed_links`): `LINK_SIGNING_KEY`, which a deployment of several instances or worker processes must set, and
 `PUBLIC_BASE_URL`, else the URL of the request that asked for the target.
 """
 

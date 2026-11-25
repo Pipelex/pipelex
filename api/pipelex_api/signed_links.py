@@ -5,9 +5,10 @@ object store does: the upload targets `POST /v1/blobs/missing` names (`pipelex_a
 `POST /v1/resolve-storage-url/bulk` resolves a stored reference to (`pipelex_api.storage_links`). Both are signed with
 one key, each under a purpose of its own, so a signature made for one kind of link never holds for the other.
 
-The key is `LINK_SIGNING_KEY` when the deployment sets it, which it must when several instances serve one deployment,
-since a link one instance signed is checked by whichever instance receives it; otherwise each process draws a random key
-of its own at its first signature, so its links stop holding when it restarts.
+The key is `LINK_SIGNING_KEY` when the deployment sets it, which it must when several instances or several worker
+processes serve one deployment (`uvicorn --workers N`, or a host that sets `WEB_CONCURRENCY`), since a link one process
+signed is checked by whichever process receives it; otherwise each process draws a random key of its own at its first
+signature, so its links stop holding when it restarts.
 
 A link starts with `PUBLIC_BASE_URL` when the deployment sets it, the address its clients reach the API at, such as
 `https://runner.example.com`: behind a proxy that terminates TLS or serves the API under a path prefix, the URL the

@@ -8,7 +8,7 @@ signature over the key and the expiry, so the download route needs no bearer tok
 deployment's authentication on the resolve route, for a reference under its own scope, holds a link, for a while.
 
 The signing key and the address a link starts with are those of every link this runner signs
-(`pipelex_api.signed_links`): `LINK_SIGNING_KEY`, which a deployment of several instances must set, and
+(`pipelex_api.signed_links`): `LINK_SIGNING_KEY`, which a deployment of several instances or worker processes must set, and
 `PUBLIC_BASE_URL`, else the URL of the request that resolved the reference.
 """
 

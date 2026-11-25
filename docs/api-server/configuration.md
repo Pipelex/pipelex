@@ -85,8 +85,9 @@ PIPELEX_ENV=dev
 # PUBLIC_BASE_URL=https://runner.example.com
 # The key every signed link is signed with, each kind of link under a purpose of
 # its own. Unset, each process draws its own, so its links stop holding when it
-# restarts, and a deployment serving one API through several instances sets it,
-# the same on every instance.
+# restarts, and a deployment serving one API through several instances or several
+# worker processes (`uvicorn --workers N`, or a host that sets WEB_CONCURRENCY)
+# sets it, the same on every instance and every worker.
 # LINK_SIGNING_KEY=<a-long-random-secret>
 # STORAGE_LINK_TTL_SECONDS=900        # how long a resolved download link stays valid
 
