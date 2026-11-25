@@ -140,6 +140,40 @@ class PipeRouterProtocol(Protocol):
         """
         return await self.run(pipe_job)
 
+    def check_batch_fits(
+        self,
+        *,
+        pipe_code: str,
+        input_list_label: str,
+        item_count: int,
+        first_branch_job: PipeJob,
+    ) -> None:
+        """Let the router refuse a ``PipeBatch`` it cannot run, before any of its branches starts.
+
+        ``PipeBatch`` calls it once per batch, when it knows how many items its list holds and before it records its
+        fan-out or starts a branch, and never for an empty list. A durable router, whose run keeps a history its engine
+        bounds, may estimate there what the whole batch would write into that history from ``first_branch_job`` and
+        ``item_count``, and refuse by raising
+        :class:`~pipelex.pipe_controllers.exceptions.PipeBatchTooWideError`, so that a batch which cannot finish is
+        refused before its first item is billed rather than ended halfway by its engine. The refusal fails the
+        ``PipeBatch`` itself, located at it as any failure of its run is.
+
+        The default body IS the behavior for in-process routers, which keep no such history: every batch fits, so
+        they answer yes without looking. It is called in a dry run too, whose job's ``pipe_run_params.run_mode`` says
+        so, for a router that would check only live runs.
+
+        Args:
+            pipe_code: The code of the ``PipeBatch``.
+            input_list_label: The list the batch runs over, named as its author wrote it (``BatchParams.input_list_label``),
+                never by the private name a sequence may bind a dotted ``batch_over`` under.
+            item_count: How many items the list holds, at least one.
+            first_branch_job: The very job the batch's first branch will dispatch through :meth:`run_batch_branch`.
+                It is the job that runs, not a copy, so the router reads it and never changes it.
+        """
+        # Every batch fits an in-process router, which reads none of what it is given; the body is not empty, so the type
+        # checkers read a default that does nothing rather than an abstract method.
+        del pipe_code, input_list_label, item_count, first_branch_job
+
     @abstractmethod
     async def _run_pipe_job(
         self,
