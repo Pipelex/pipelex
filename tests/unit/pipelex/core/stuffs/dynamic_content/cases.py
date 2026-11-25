@@ -10,7 +10,7 @@ class SampleDynamicContent(DynamicContent):
     value: int
 
 
-class TestData:
+class DynamicContentCases:
     # Input content
     SAMPLE_NAME = "Dynamic Item"
     SAMPLE_VALUE = 100

@@ -13,8 +13,8 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.tools.misc.python_literals import normalized_docstring_text
+from tests.unit.pipelex.codegen.cases import DescriptionEscapingCases
 from tests.unit.pipelex.codegen.conftest import load_generated_module
-from tests.unit.pipelex.codegen.test_data import DescriptionEscapingCases
 
 
 class TestDescriptionEscaping:

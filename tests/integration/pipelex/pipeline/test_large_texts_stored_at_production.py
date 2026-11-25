@@ -27,7 +27,7 @@ from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.storage.storage_file_name import STORAGE_FILE_EXTENSION_PATTERN, STORAGE_FILE_STEM_PATTERN
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.tools.uri.exceptions import UriReadRefusedError
-from tests.integration.pipelex.pipeline.test_data import LargeTextsStoredTestData
+from tests.integration.pipelex.pipeline.cases import LargeTextsStoredTestData
 
 # No `from __future__ import annotations`: the function a `PipeFunc` calls has its annotations read when it is bound.
 STORAGE_URI_SCHEME = "pipelex-storage://"

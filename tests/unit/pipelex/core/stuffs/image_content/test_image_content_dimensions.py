@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.core.stuffs.image_content import ImageContent
-from tests.unit.pipelex.core.stuffs.image_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.image_content.cases import ImageContentCases
 
 
 class TestImageContentDimensions:
@@ -17,7 +17,7 @@ class TestImageContentDimensions:
     )
     def test_rejects_unpaired_or_non_positive_dimensions(self, width: int | None, height: int | None) -> None:
         with pytest.raises(ValidationError):
-            ImageContent(url=TestData.SAMPLE_URL, width=width, height=height)
+            ImageContent(url=ImageContentCases.SAMPLE_URL, width=width, height=height)
 
     @pytest.mark.parametrize(
         ("width", "height"),
@@ -27,6 +27,6 @@ class TestImageContentDimensions:
         ],
     )
     def test_accepts_both_dimensions_or_neither(self, width: int | None, height: int | None) -> None:
-        image = ImageContent(url=TestData.SAMPLE_URL, width=width, height=height)
+        image = ImageContent(url=ImageContentCases.SAMPLE_URL, width=width, height=height)
         assert image.width == width
         assert image.height == height

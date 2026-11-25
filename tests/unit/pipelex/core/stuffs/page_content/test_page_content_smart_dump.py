@@ -3,7 +3,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.urls import URLs
-from tests.unit.pipelex.core.stuffs.page_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.page_content.cases import PageContentCases
 
 
 class TestPageContentSmartDump:
@@ -17,7 +17,7 @@ class TestPageContentSmartDump:
         )
         content = PageContent(text_and_images=text_and_images, page_view=None)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP_MINIMAL
+        assert result == PageContentCases.EXPECTED_SMART_DUMP_MINIMAL
         assert isinstance(result, dict)
 
     def test_smart_dump_returns_dict_full(self):
@@ -29,5 +29,5 @@ class TestPageContentSmartDump:
         page_view = ImageContent(url=URLs.png_example_1)
         content = PageContent(text_and_images=text_and_images, page_view=page_view)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP_FULL
+        assert result == PageContentCases.EXPECTED_SMART_DUMP_FULL
         assert isinstance(result, dict)

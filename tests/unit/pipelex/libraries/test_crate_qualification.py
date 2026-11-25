@@ -27,7 +27,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from tests.unit.pipelex.libraries.test_data import CrateQualificationTestData
+from tests.unit.pipelex.libraries.cases import CrateQualificationTestData
 
 
 def _report_structure(result: QualifiedCrateContent) -> dict[str, ConceptStructureBlueprint]:

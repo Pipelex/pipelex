@@ -21,7 +21,7 @@ from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_t
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.pipeline.test_data import ResolveBundleTestData
+from tests.integration.pipelex.pipeline.cases import ResolveBundleTestData
 
 
 @contextmanager

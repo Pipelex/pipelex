@@ -8,7 +8,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.unit.pipelex.cogt.content_generation.test_data import SchemaRebuildTestData
+from tests.unit.pipelex.cogt.content_generation.cases import SchemaRebuildTestData
 
 _CORPUS_DOMAIN = "schema_rebuild_corpus"
 

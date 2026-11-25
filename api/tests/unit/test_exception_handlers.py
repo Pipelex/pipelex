@@ -59,7 +59,7 @@ from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from pipelex_api.routes.pipelex.tools import router as tools_router
 from pipelex_api.security import RequestUser
 from tests.unit._problems import assert_problem, problem_items_fields
-from tests.unit.test_data import ProblemTestData, rate_limited_failure
+from tests.unit.cases import ProblemTestData, rate_limited_failure
 
 # Crockford Base32, 26 chars — the ULID alphabet RequestIdMiddleware mints.
 _ULID_RE = re.compile(r"\A[0-9A-HJKMNP-TV-Z]{26}\Z")

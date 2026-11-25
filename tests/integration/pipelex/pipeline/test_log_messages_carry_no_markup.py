@@ -32,7 +32,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, JsonLogSink
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE, LOGGING_LEVEL_VERBOSE_NAME
-from tests.integration.pipelex.pipeline.test_data import LogMarkupTestData
+from tests.integration.pipelex.pipeline.cases import LogMarkupTestData
 
 if TYPE_CHECKING:
     from collections.abc import Generator

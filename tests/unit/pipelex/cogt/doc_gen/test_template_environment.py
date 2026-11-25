@@ -8,7 +8,7 @@ from pipelex.cogt.doc_gen.formatted_markdown import FormattedMarkdown
 from pipelex.cogt.doc_gen.template_environment import make_plain_data_template_environment
 from pipelex.tools.jinja2.jinja2_filters import markdown_to_formatted
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, MARKDOWN_UNITS_PER_CHARACTER, RenderBudgetExceededError
-from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
 
 
 def _kinds_of_formatted(value: object) -> object:

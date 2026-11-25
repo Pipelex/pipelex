@@ -9,7 +9,7 @@ from pipelex.runtime_hub import get_runtime_hub
 from pipelex.tools.document_conversion.document_converter_protocol import DocumentConverterProtocol
 from pipelex.tools.document_conversion.gotenberg_converter import GotenbergConverter
 from pipelex.tools.document_conversion.soffice_converter import SofficeConverter
-from tests.integration.pipelex.tools.document_conversion.test_data import DocumentConversionTestData
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionTestData
 
 _MAX_SOURCE_BYTES = 50_000_000
 

@@ -133,7 +133,7 @@ class GalleryWithListContent(StructuredContent):
     album_list: ListContent[PhotoAlbumItem]
 
 
-class TestData:
+class NestedImageFieldsCases:
     """Test data for find_nested_image_fields_in_structure_class tests."""
 
     DOMAIN: ClassVar[str] = "test_images"

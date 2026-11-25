@@ -16,8 +16,8 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, STORED_TEXT_URL, StoredValuePromptTestData
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import RecordingContentGenerator
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import STORED_TEXT, STORED_TEXT_URL, StoredValuePromptTestData
 
 
 @pytest.mark.asyncio(loop_scope="class")

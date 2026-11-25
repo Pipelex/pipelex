@@ -3,7 +3,7 @@
 from typing import Any, ClassVar
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
 
 
 class AnthropicErrorHandlingTestData:

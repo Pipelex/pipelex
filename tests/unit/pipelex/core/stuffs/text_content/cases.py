@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class TextContentCases:
     # Input content
     SAMPLE_TEXT = "Hello World"
     SAMPLE_TEXT_WITH_MARKDOWN = "# Header\n\nSome **bold** text"

@@ -14,7 +14,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import STORED_HTML, STORED_TEXT, TEXT_URL, StoredValueTestData
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_HTML, STORED_TEXT, TEXT_URL, StoredValueTestData
 
 
 class StoredValueReport(StructuredContent):

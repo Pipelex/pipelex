@@ -4,8 +4,8 @@ import pytest
 
 from pipelex.core.method_trees.tree_file_reads import TreeFileRead, TreeFileUse
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, write_bundle
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _PIPE_REF = "doc_gen_tests.print_invoice"
 _TEMPLATE = """<link rel="stylesheet" href="../styles/print.css">

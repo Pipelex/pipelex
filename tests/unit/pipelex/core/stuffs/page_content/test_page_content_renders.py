@@ -3,7 +3,7 @@ import pytest
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.stuffs.page_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.page_content.cases import PageContentCases
 
 
 class TestPageContentRenders:
@@ -17,7 +17,7 @@ class TestPageContentRenders:
         )
         content = PageContent(text_and_images=text_and_images, page_view=None)
         result = content.rendered_markdown()
-        assert result == TestData.EXPECTED_RENDERED_MARKDOWN
+        assert result == PageContentCases.EXPECTED_RENDERED_MARKDOWN
 
     def test_rendered_for_prompt(self):
         """Verify rendered_for_prompt returns markdown format."""
@@ -27,7 +27,7 @@ class TestPageContentRenders:
         )
         content = PageContent(text_and_images=text_and_images, page_view=None)
         result = content.rendered_for_prompt()
-        assert result == TestData.EXPECTED_RENDERED_FOR_PROMPT
+        assert result == PageContentCases.EXPECTED_RENDERED_FOR_PROMPT
 
     def test_rendered_html(self):
         """Verify rendered_html returns HTML table format."""
@@ -37,7 +37,7 @@ class TestPageContentRenders:
         )
         content = PageContent(text_and_images=text_and_images, page_view=None)
         result = content.rendered_html()
-        assert result == TestData.EXPECTED_RENDERED_HTML
+        assert result == PageContentCases.EXPECTED_RENDERED_HTML
 
     @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
@@ -48,7 +48,7 @@ class TestPageContentRenders:
         )
         content = PageContent(text_and_images=text_and_images, page_view=None)
         result = await content.rendered_markdown_async()
-        assert result == TestData.EXPECTED_RENDERED_MARKDOWN
+        assert result == PageContentCases.EXPECTED_RENDERED_MARKDOWN
 
     @pytest.mark.asyncio
     async def test_rendered_html_async(self):
@@ -59,4 +59,4 @@ class TestPageContentRenders:
         )
         content = PageContent(text_and_images=text_and_images, page_view=None)
         result = await content.rendered_html_async()
-        assert result == TestData.EXPECTED_RENDERED_HTML
+        assert result == PageContentCases.EXPECTED_RENDERED_HTML

@@ -11,6 +11,7 @@ from pipelex.interpreter_hub import clear_current_library, get_current_library_i
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     StubEngines,
     caller_text,
@@ -18,7 +19,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _HOST_TEMPLATE_FILE = "templates/host-invoice.docx"
 

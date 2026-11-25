@@ -21,8 +21,8 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORAGE_SCOPE, STORED_TEXT, STORED_TEXT_URL, StoredValuePromptTestData
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import RecordingContentGenerator
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import STORAGE_SCOPE, STORED_TEXT, STORED_TEXT_URL, StoredValuePromptTestData
 
 
 def _make_pipe(*, prompt: str, inputs: dict[str, str], output: str = NativeConceptCode.TEXT) -> PipeLLM:

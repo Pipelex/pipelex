@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class HtmlContentCases:
     # Input content
     SAMPLE_INNER_HTML = "<p>Hello World</p>"
     SAMPLE_CSS_CLASS = "my-class"

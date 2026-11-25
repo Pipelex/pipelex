@@ -22,7 +22,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipeline.test_data import RenderTimeTemplateTestData
+from tests.integration.pipelex.pipeline.cases import RenderTimeTemplateTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

@@ -22,7 +22,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGen
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView, ProviderDiagnostics
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
 
 
 def _make_google_client_error(code: int, message: str, status: str = "ERROR") -> genai_errors.ClientError:

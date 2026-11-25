@@ -3,6 +3,7 @@ from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     caller_text,
     engine_unavailable_report,
@@ -10,7 +11,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     refusal_report,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 
 @pytest.mark.asyncio(loop_scope="class")

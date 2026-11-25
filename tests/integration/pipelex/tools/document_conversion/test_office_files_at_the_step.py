@@ -14,7 +14,7 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.document_conversion.document_converter_protocol import DocumentConverterProtocol
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin, ReadablePdf
-from tests.integration.pipelex.tools.document_conversion.test_data import DocumentConversionTestData, OfficeFileCase
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionTestData, OfficeFileCase
 
 _OFFICE_FILES_MTHDS = """
 domain = "office_files_at_the_step"

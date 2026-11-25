@@ -13,7 +13,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.fal.fal_img_gen_worker import FalImgGenWorker
-from tests.unit.pipelex.providers.fal.test_data import FalErrorHandlingTestData
+from tests.unit.pipelex.providers.fal.cases import FalErrorHandlingTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

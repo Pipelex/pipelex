@@ -17,7 +17,7 @@ from pipelex.graph.graphspec import (
     PipelineRef,
 )
 from pipelex.graph.validation import validate_graphspec
-from tests.unit.pipelex.graph.test_data import ValidGraphData
+from tests.unit.pipelex.graph.cases import ValidGraphData
 
 
 class TestGraphSpecValidation:

@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from pipelex.urls import URLs
 
 
-class TestData:
+class DocumentContentCases:
     # Input content
     SAMPLE_URL = URLs.pdf_example_1
     SAMPLE_PUBLIC_URL = "https://cdn.example.com/docs/Report.pdf"

@@ -18,8 +18,8 @@ from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation, BindingRoot, derive_binding
 from pipelex.pipe_controllers.binding.binding_value import FoundNothing, bind_content
 from pipelex.pipe_controllers.binding.exceptions import BindingStepRunError
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import STORED_HTML, StoredValueTestData
-from tests.unit.pipelex.pipe_controllers.binding.test_data import (
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_HTML, StoredValueTestData
+from tests.unit.pipelex.pipe_controllers.binding.cases import (
     INVOICE,
     INVOICE_ISSUED_AT,
     RESOLVER,

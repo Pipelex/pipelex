@@ -22,17 +22,17 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.providers.typesafe.typesafe_judgment_worker import TypesafeJudgmentWorker
 from pipelex.reporting.reporting_protocol import ReportingNoOp
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from tests.unit.pipelex.cogt.judgment.test_data import described_levels
-from tests.unit.pipelex.providers.typesafe.test_data import TestData, load_recorded_response, rebuild_recorded_exception
+from tests.unit.pipelex.cogt.judgment.cases import described_levels
+from tests.unit.pipelex.providers.typesafe.cases import TypesafeCases, load_recorded_response, rebuild_recorded_exception
 
 THREE_SHAPES_QUESTIONS: dict[str, JudgmentQuestion] = {
-    "is_urgent": YesNoQuestion(instructions=TestData.THREE_SHAPES_INSTRUCTIONS["is_urgent"]),
+    "is_urgent": YesNoQuestion(instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["is_urgent"]),
     "team": ChoiceQuestion(
-        instructions=TestData.THREE_SHAPES_INSTRUCTIONS["team"],
+        instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["team"],
         options={"payments": None, "shipping": None, "accounts": None, "other": None},
     ),
     "severity": RatingQuestion(
-        instructions=TestData.THREE_SHAPES_INSTRUCTIONS["severity"],
+        instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["severity"],
         levels=described_levels("Cosmetic", "Degraded with a workaround", "Blocking"),
     ),
 }
@@ -92,11 +92,11 @@ class TestTypesafeJudgmentWorker:
     ) -> None:
         """TypeSafe judges text alone, so a spec claiming it reads files would have its files dropped from the request."""
         client = mocker.Mock(spec=AsyncTypeSafeClient)
-        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TestData.THREE_SHAPES))
+        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TypesafeCases.THREE_SHAPES))
         worker = TypesafeJudgmentWorker(sdk_instance=cast("AsyncTypeSafeClient", client), inference_model=_model(inputs=inputs))
         job = JudgmentJobFactory.make_judgment_job(
             prompt=JudgmentPrompt(text="See the attached file: [Image 1] [Document 1]", images=images, documents=documents),
-            questions={"is_urgent": YesNoQuestion(instructions=TestData.THREE_SHAPES_INSTRUCTIONS["is_urgent"])},
+            questions={"is_urgent": YesNoQuestion(instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["is_urgent"])},
             judgment_setting=JudgmentSetting(model="jev-1.13.0"),
             job_metadata=JobMetadata(
                 run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_typesafe")
@@ -111,7 +111,7 @@ class TestTypesafeJudgmentWorker:
     async def test_one_request_carries_the_whole_job_and_its_usage_is_recorded(self, mocker: MockerFixture) -> None:
         """The job goes out as a single request under the pinned model id, and the billed tokens land on the report."""
         client = mocker.Mock(spec=AsyncTypeSafeClient)
-        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TestData.THREE_SHAPES))
+        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TypesafeCases.THREE_SHAPES))
         delegate = _RecordingDelegate()
         worker = TypesafeJudgmentWorker(sdk_instance=cast("AsyncTypeSafeClient", client), inference_model=_model(), reporting_delegate=delegate)
         job = _job(THREE_SHAPES_QUESTIONS)
@@ -135,7 +135,7 @@ class TestTypesafeJudgmentWorker:
         assert delegate.reported == [job]
 
     async def test_absent_usage_records_no_tokens_rather_than_a_guess(self, mocker: MockerFixture) -> None:
-        response = load_recorded_response(TestData.USAGE_ONE_QUESTION)
+        response = load_recorded_response(TypesafeCases.USAGE_ONE_QUESTION)
         response_without_usage = SystemOneResponse.model_validate_json(
             response.model_dump_json().replace('"input_tokens":354', '"input_tokens":null').replace('"output_tokens":23', '"output_tokens":null')
         )
@@ -153,7 +153,7 @@ class TestTypesafeJudgmentWorker:
     async def test_a_refusal_is_classified_rendered_and_still_reported(self, mocker: MockerFixture) -> None:
         """An unknown model surfaces as the family's model-not-found error, carrying this backend, and the attempt is reported."""
         client = mocker.Mock(spec=AsyncTypeSafeClient)
-        client.system_one = mocker.AsyncMock(side_effect=rebuild_recorded_exception(TestData.UNKNOWN_MODEL))
+        client.system_one = mocker.AsyncMock(side_effect=rebuild_recorded_exception(TypesafeCases.UNKNOWN_MODEL))
         delegate = _RecordingDelegate()
         worker = TypesafeJudgmentWorker(sdk_instance=cast("AsyncTypeSafeClient", client), inference_model=_model(), reporting_delegate=delegate)
         job = _job({"is_urgent": YesNoQuestion(instructions="Is the message urgent?")})
@@ -180,7 +180,7 @@ class TestTypesafeJudgmentWorker:
         """The recorded response names ``jev-1.13.0``; asking for anything else is a pin the API did not honour."""
         warning = mocker.patch("pipelex.providers.typesafe.typesafe_judgment_worker.log.warning")
         client = mocker.Mock(spec=AsyncTypeSafeClient)
-        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TestData.USAGE_ONE_QUESTION))
+        client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TypesafeCases.USAGE_ONE_QUESTION))
         worker = TypesafeJudgmentWorker(
             sdk_instance=cast("AsyncTypeSafeClient", client),
             inference_model=_model().model_copy(update={"model_id": requested_model_id}),

@@ -17,7 +17,7 @@ from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFil
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 
 _TEMPLATE = "<h1>{{ invoice.number }}</h1>"
 _PIPE_REF = "doc_gen_tests.print_invoice"

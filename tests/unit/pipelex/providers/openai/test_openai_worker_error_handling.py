@@ -23,8 +23,8 @@ from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemVi
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker
 from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
-from tests.unit.pipelex.providers.openai.test_data import OpenAIErrorHandlingTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
+from tests.unit.pipelex.providers.openai.cases import OpenAIErrorHandlingTestData
 
 
 def _mock_httpx_response(status_code: int = 429) -> httpx.Response:

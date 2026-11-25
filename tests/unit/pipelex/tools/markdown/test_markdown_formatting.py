@@ -18,7 +18,7 @@ from pipelex.tools.markdown.markdown_formatting import (
     format_markdown_within_budget,
     spans_text,
 )
-from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
 
 
 def _formatted(*, markdown: str) -> FormattedMarkdown:

@@ -5,8 +5,8 @@ import pytest
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 READ_SCOPE = "org_doc_gen"
 # Past the default inline threshold of 4096 bytes, and free of anything an HTML render would escape.

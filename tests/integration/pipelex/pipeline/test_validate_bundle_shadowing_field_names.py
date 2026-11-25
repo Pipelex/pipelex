@@ -12,7 +12,7 @@ from pipelex.interpreter_hub import clear_current_library, get_current_library_i
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.integration.pipelex.pipeline.test_data import ShadowingFieldNamesTestData
+from tests.integration.pipelex.pipeline.cases import ShadowingFieldNamesTestData
 
 
 @contextmanager

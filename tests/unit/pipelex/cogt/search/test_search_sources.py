@@ -3,7 +3,7 @@ import pytest
 from pipelex.cogt.search.search_sources import deduplicate_search_sources
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from tests.unit.pipelex.cogt.search.test_data import SearchSourcesTestData
+from tests.unit.pipelex.cogt.search.cases import SearchSourcesTestData
 
 
 def _search_result(*, sources: list[tuple[str, str]], answer: str) -> SearchResultContent:

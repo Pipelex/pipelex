@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The pytest agent rule puts test data in `cases.py`**: the kit's pytest standards told agents to keep test data in `test_data.py`, a name pytest collects as a test module, inside classes such as `TestData`, which it collects as test classes. The rule now names `cases.py` and data classes ending in `Cases`, and this repository's own data modules follow it.
+
 ### Fixed
 
 - **A provider refusing a file as over its size limit is the caller's `input.too_large`**: a provider's 400, or another 4xx a gateway relays, refusing a file, an image or a request payload as too large in its own words (Anthropic's "The file exceeds the maximum allowed size.", its per-image "image exceeds 5 MB maximum" and its `request_too_large`, Gemini's "Request payload size exceeds the limit") read as `runtime.unexpected`, our defect, and told the caller to contact support; it now reads `input.too_large`, answered 422, with advice that the request built from the inputs exceeds the provider's size limit and that the inputs should be made smaller or split. A bare 413, which already read `input.too_large`, gives the same advice, and a web page too large to fetch points at a smaller page.

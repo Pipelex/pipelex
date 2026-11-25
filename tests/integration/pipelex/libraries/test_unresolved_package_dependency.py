@@ -32,8 +32,8 @@ from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.integration.pipelex.libraries.cases import ProbePackageTestData
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, write_consumer
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 PROBE_REFERENCE = f"{ProbePackageTestData.DEP_ALIAS}->probe_dep.entry"
 GITLAB_REFERENCE = "gitlab.com/someone/pkg->other_dep.entry"

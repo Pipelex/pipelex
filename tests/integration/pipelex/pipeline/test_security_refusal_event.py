@@ -20,7 +20,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE
 from pipelex.tools.log.json_log_sink import JsonLogSink
 from pipelex.tools.uri.exceptions import UriReadRefusedError
-from tests.integration.pipelex.pipeline.test_data import SecurityRefusalTestData
+from tests.integration.pipelex.pipeline.cases import SecurityRefusalTestData
 
 if TYPE_CHECKING:
     from collections.abc import Generator

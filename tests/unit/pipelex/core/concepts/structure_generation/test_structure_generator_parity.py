@@ -12,7 +12,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from tests.unit.pipelex.codegen.conftest import CRATE_TEST_VERSION, load_generated_module
-from tests.unit.pipelex.core.concepts.structure_generation.test_data import StructureParityTestData
+from tests.unit.pipelex.core.concepts.structure_generation.cases import StructureParityTestData
 
 _CONCEPTS = StructureParityTestData.CONCEPTS
 

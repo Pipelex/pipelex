@@ -16,6 +16,7 @@ from pipelex.interpreter_hub import get_library_manager, scoped_current_library
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.integration.pipelex.libraries.cases import ProbePackageTestData, TwoDomainPackageTestData
 from tests.integration.pipelex.libraries.installed_packages import (
     install_package,
     install_probe,
@@ -23,7 +24,6 @@ from tests.integration.pipelex.libraries.installed_packages import (
     refusal_types,
     write_consumer,
 )
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData, TwoDomainPackageTestData
 
 PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
 

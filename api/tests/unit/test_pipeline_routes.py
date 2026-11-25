@@ -30,7 +30,7 @@ from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
-from tests.unit.test_data import ProblemTestData
+from tests.unit.cases import ProblemTestData
 
 
 def _build_client(mocker: MockerFixture, *, with_request_id_middleware: bool = False) -> tuple[TestClient, Any, Any]:

@@ -4,7 +4,7 @@ from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.pipes.operator.pipe_llm.test_data import LLMSettingCheckTestData
+from tests.integration.pipelex.pipes.operator.pipe_llm.cases import LLMSettingCheckTestData
 
 _WITHOUT_THINKING = LLMSettingCheckTestData.MODEL_WITHOUT_THINKING
 _WITH_EFFORT = LLMSettingCheckTestData.MODEL_WITH_EFFORT

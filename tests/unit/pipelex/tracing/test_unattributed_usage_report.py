@@ -14,7 +14,7 @@ from pipelex.tracing import unattributed_usage_report as unattributed_usage_repo
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import UNATTRIBUTED_NODE_ID, TraceEvent
 from pipelex.tracing.unattributed_usage_report import REPORTED_NODE_IDS_LIMIT, report_unattributed_usage
-from tests.unit.pipelex.tracing.test_data import IncompleteGraphRun
+from tests.unit.pipelex.tracing.cases import IncompleteGraphRun
 
 
 def _assemble_and_report(*, events: list[TraceEvent], reports_incomplete_graph: bool = True) -> TracingAssembly:

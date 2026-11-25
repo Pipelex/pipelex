@@ -20,7 +20,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from tests.unit.pipelex.pipeline.test_data import FileInputRefusalCase, InputRefusalNamingTestData
+from tests.unit.pipelex.pipeline.cases import FileInputRefusalCase, InputRefusalNamingTestData
 
 
 def _file_content(*, native_concept_code: NativeConceptCode, url: str) -> StuffContent:

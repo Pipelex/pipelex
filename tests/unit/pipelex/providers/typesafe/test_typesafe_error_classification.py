@@ -15,7 +15,7 @@ from pipelex.cogt.inference.error_classify import InferenceErrorFamily
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.providers.typesafe.typesafe_error_classification import classify_typesafe_error
-from tests.unit.pipelex.providers.typesafe.test_data import TestData, rebuild_recorded_exception
+from tests.unit.pipelex.providers.typesafe.cases import TypesafeCases, rebuild_recorded_exception
 
 
 class TestTypesafeErrorClassification:
@@ -23,7 +23,7 @@ class TestTypesafeErrorClassification:
         ("recorded", "status_code", "provider_error_code", "category", "user_action_kind", "is_model_not_found"),
         [
             pytest.param(
-                TestData.WRONG_KEY,
+                TypesafeCases.WRONG_KEY,
                 401,
                 TYPESAFE_AUTHENTICATION_ERROR_TYPE,
                 InferenceErrorCategory.CONFIGURATION,
@@ -32,7 +32,7 @@ class TestTypesafeErrorClassification:
                 id="wrong_key_is_credentials",
             ),
             pytest.param(
-                TestData.STATE_TOO_LARGE,
+                TypesafeCases.STATE_TOO_LARGE,
                 400,
                 TYPESAFE_MAX_TOKENS_EXCEEDED_ERROR_TYPE,
                 InferenceErrorCategory.CONTENT,
@@ -41,7 +41,7 @@ class TestTypesafeErrorClassification:
                 id="oversized_state_is_the_callers_content",
             ),
             pytest.param(
-                TestData.UNKNOWN_MODEL,
+                TypesafeCases.UNKNOWN_MODEL,
                 400,
                 TYPESAFE_API_USAGE_ERROR_TYPE,
                 InferenceErrorCategory.CONFIGURATION,
@@ -50,7 +50,7 @@ class TestTypesafeErrorClassification:
                 id="unknown_model_is_a_missing_model",
             ),
             pytest.param(
-                TestData.MALFORMED_QUESTION,
+                TypesafeCases.MALFORMED_QUESTION,
                 400,
                 TYPESAFE_MALFORMED_REQUEST_CODE,
                 InferenceErrorCategory.CONFIGURATION,
@@ -59,7 +59,7 @@ class TestTypesafeErrorClassification:
                 id="illegal_question_is_a_pipelex_defect",
             ),
             pytest.param(
-                TestData.TOO_MANY_LEVELS,
+                TypesafeCases.TOO_MANY_LEVELS,
                 400,
                 TYPESAFE_MALFORMED_REQUEST_CODE,
                 InferenceErrorCategory.CONFIGURATION,
@@ -68,7 +68,7 @@ class TestTypesafeErrorClassification:
                 id="scale_past_the_cap_is_a_pipelex_defect",
             ),
             pytest.param(
-                TestData.EMPTY_QUESTIONS,
+                TypesafeCases.EMPTY_QUESTIONS,
                 None,
                 None,
                 InferenceErrorCategory.CONFIGURATION,
@@ -77,7 +77,7 @@ class TestTypesafeErrorClassification:
                 id="client_side_refusal_is_a_pipelex_defect",
             ),
             pytest.param(
-                TestData.TIMEOUT,
+                TypesafeCases.TIMEOUT,
                 None,
                 None,
                 InferenceErrorCategory.TRANSIENT,
@@ -150,19 +150,19 @@ class TestTypesafeErrorClassification:
 
     def test_an_api_error_carries_its_request_id(self) -> None:
         """On the error path the request id is a plain attribute, read without the guard the success path needs."""
-        metadata = extract_typesafe_metadata(rebuild_recorded_exception(TestData.UNKNOWN_MODEL))
+        metadata = extract_typesafe_metadata(rebuild_recorded_exception(TypesafeCases.UNKNOWN_MODEL))
         assert metadata.request_id == "req_01a0b97aa532770083aece1331cb7c76"
 
     def test_a_client_side_refusal_has_no_request_id(self) -> None:
-        metadata = extract_typesafe_metadata(rebuild_recorded_exception(TestData.EMPTY_QUESTIONS))
+        metadata = extract_typesafe_metadata(rebuild_recorded_exception(TypesafeCases.EMPTY_QUESTIONS))
         assert metadata.request_id is None
         assert metadata.sdk_exception_type == "TypeSafeError"
 
     @pytest.mark.parametrize(
         ("recorded", "expected_class"),
         [
-            pytest.param(TestData.UNKNOWN_MODEL, JudgmentModelNotFoundError, id="unknown_model"),
-            pytest.param(TestData.STATE_TOO_LARGE, JudgmentJobFailureError, id="state_too_large"),
+            pytest.param(TypesafeCases.UNKNOWN_MODEL, JudgmentModelNotFoundError, id="unknown_model"),
+            pytest.param(TypesafeCases.STATE_TOO_LARGE, JudgmentJobFailureError, id="state_too_large"),
         ],
     )
     def test_the_verdict_selects_the_judgment_family_class(self, recorded: str, expected_class: type[Exception]) -> None:

@@ -19,7 +19,7 @@ from pipelex.system.error_tracking.error_tracking import installed_error_tracker
 from pipelex.system.error_tracking.error_tracking_config import ErrorTrackerMethod
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.test_extras.recording_error_tracker import RecordingErrorTracker
-from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureTestData
 
 if TYPE_CHECKING:
     from collections.abc import Generator

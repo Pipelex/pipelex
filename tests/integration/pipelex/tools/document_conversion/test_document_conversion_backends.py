@@ -5,7 +5,7 @@ import pytest
 
 from pipelex.tools.document_conversion.document_converter_protocol import PDF_MAGIC, DocumentConverterProtocol
 from pipelex.tools.document_conversion.exceptions import DocumentUnreadableByConverterError
-from tests.integration.pipelex.tools.document_conversion.test_data import DocumentConversionTestData, OfficeFileCase
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionTestData, OfficeFileCase
 
 
 def _read_pdf(*, pdf_bytes: bytes) -> tuple[int, str]:

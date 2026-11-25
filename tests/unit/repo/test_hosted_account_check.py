@@ -16,7 +16,7 @@ from tests.helpers.hosted_account_check import (
     require_hosted_account,
     stop_message,
 )
-from tests.unit.repo.test_data import HostedAccountCheckTestData
+from tests.unit.repo.cases import HostedAccountCheckTestData
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -47,7 +47,7 @@ from pipelex_api.run_webhooks import (
 )
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
-from tests.unit.test_data import ProblemTestData
+from tests.unit.cases import ProblemTestData
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _CALLER_URL = "https://hooks.example.com/runs?token=caller-s3cr3t"

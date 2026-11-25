@@ -15,8 +15,8 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, 
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
-from tests.unit.pipelex.providers.anthropic.test_data import AnthropicErrorHandlingTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
+from tests.unit.pipelex.providers.anthropic.cases import AnthropicErrorHandlingTestData
 
 
 def _mock_httpx_response(status_code: int = 429) -> httpx.Response:

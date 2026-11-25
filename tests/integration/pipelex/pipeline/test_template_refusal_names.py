@@ -9,7 +9,7 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.errors.problem import ProblemView, problem_metadata
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from tests.integration.pipelex.pipeline.test_data import SecurityRefusalTestData
+from tests.integration.pipelex.pipeline.cases import SecurityRefusalTestData
 
 # A construct whose fields render templates, one at its root and one inside a nested field.
 _CONSTRUCT_MTHDS = """

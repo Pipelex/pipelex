@@ -12,7 +12,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.methods.exceptions import MethodLockInvalidError, MethodLockMismatchError
 from pipelex.methods.method_lock import FetchedCopy, FetchedTree, ensure_fetched_tree_locked
 from pipelex.methods.package_reason import MethodPackageReason
-from tests.unit.pipelex.methods.test_data import MethodLockTestData
+from tests.unit.pipelex.methods.cases import MethodLockTestData
 
 _HOLDER = "method-lock-tests"
 

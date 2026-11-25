@@ -31,7 +31,7 @@ from pipelex.errors.problem import (
     problem_metadata,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from tests.unit.pipelex.errors.test_data import ProblemViewsTestData
+from tests.unit.pipelex.errors.cases import ProblemViewsTestData
 
 
 class _MisconfiguredError(PipelexError):

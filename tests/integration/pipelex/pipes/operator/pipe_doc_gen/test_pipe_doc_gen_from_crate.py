@@ -23,7 +23,7 @@ from pipelex.pipe_operators.func.pipe_func_execution_transport import build_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 
 _HTML_STEP = 'format = "pdf"\ntemplate_file = "invoice.html"'
 _TEMPLATE = b"<h1>{{ invoice.number }}</h1>"

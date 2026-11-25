@@ -8,7 +8,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData, PipeJudgeSeveralQuestionsTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadTestData, PipeJudgeSeveralQuestionsTestData
 
 # A question that reads a private name its own source spells, which the sandbox refuses whatever the run's data.
 _REFUSED_QUESTION = "Is {{ message['_owner'] }} urgent?"

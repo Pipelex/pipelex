@@ -20,7 +20,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipeline.test_data import ConditionMethodFaultsTestData
+from tests.integration.pipelex.pipeline.cases import ConditionMethodFaultsTestData
 
 _EMPTY_EXPRESSION_REASON = "PipeCondition 'route_parcel': Conditional expression returned no result"
 # The sentences the condition's refusals render for a caller, naming the pipe and no text of the expression.

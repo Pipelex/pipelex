@@ -19,7 +19,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, load_text_from_path
 from tests.conftest import TEST_OUTPUTS_DIR
-from tests.e2e.pipelex.graph.test_data import GraphTestData
+from tests.e2e.pipelex.graph.cases import GraphTestData
 
 
 def _get_next_output_folder() -> Path:

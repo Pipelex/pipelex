@@ -7,7 +7,7 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import STORED_TEXT, StoredValueTestData
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_TEXT, StoredValueTestData
 
 
 class TestStoredValueAssignment:

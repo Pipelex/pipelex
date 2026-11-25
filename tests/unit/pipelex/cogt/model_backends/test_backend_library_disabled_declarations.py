@@ -8,7 +8,7 @@ from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
-from tests.unit.pipelex.cogt.model_backends.test_data import BackendLibraryTomls
+from tests.unit.pipelex.cogt.model_backends.cases import BackendLibraryTomls
 
 
 class TestBackendLibraryDisabledDeclarations:

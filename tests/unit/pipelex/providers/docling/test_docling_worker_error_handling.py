@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.docling.docling_extract_worker import DoclingExtractWorker
-from tests.unit.pipelex.providers.docling.test_data import DoclingErrorHandlingTestData
+from tests.unit.pipelex.providers.docling.cases import DoclingErrorHandlingTestData
 
 
 def _make_docling_extract_worker(mocker: MockerFixture) -> DoclingExtractWorker:

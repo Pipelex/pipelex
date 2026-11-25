@@ -6,7 +6,7 @@ import random
 import pytest
 
 from pipelex.tools.misc.python_literals import escape_py_string
-from tests.unit.pipelex.tools.misc.test_data import PythonLiteralsTestData
+from tests.unit.pipelex.tools.misc.cases import PythonLiteralsTestData
 
 
 class TestEscapePyString:

@@ -5,7 +5,7 @@ import pytest
 from pytest_mock import MockerFixture, MockType
 
 from tests.helpers.slow_tests import DURATIONS_FILE_NAME, SLOW_MARKER_NAME, SLOW_TEST_SECONDS_OPTION, apply_slow_marker, mark_slow_tests
-from tests.unit.repo.test_data import SlowTestMarkerTestData
+from tests.unit.repo.cases import SlowTestMarkerTestData
 
 
 def _make_item(*, mocker: MockerFixture, node_id: str) -> MockType:

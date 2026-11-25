@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from pipelex.core.stuffs.text_content import TextContent
 
 
-class TestData:
+class ListContentCases:
     # Input content - list of TextContent
     SAMPLE_TEXT_ITEMS: ClassVar[list[TextContent]] = [
         TextContent(text="Item 1"),

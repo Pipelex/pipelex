@@ -15,7 +15,7 @@ from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.errors.error_codes import ErrorCode
 from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.located_failure import find_root_fault
-from tests.unit.pipelex.cogt.test_data import ExceptionTestData
+from tests.unit.pipelex.cogt.cases import ExceptionTestData
 
 
 class _CodedCauseError(PipelexError):

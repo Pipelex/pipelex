@@ -25,7 +25,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.errors.problem import PipelexProblem, ProblemView
-from tests.unit.pipelex.cogt.test_data import ExceptionTestData
+from tests.unit.pipelex.cogt.cases import ExceptionTestData
 
 
 class TestErrorCategoryInfrastructure:

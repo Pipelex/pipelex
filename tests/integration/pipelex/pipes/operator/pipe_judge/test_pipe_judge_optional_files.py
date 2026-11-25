@@ -14,7 +14,7 @@ from pipelex.kernel.prompt_assembly import AssembledUserPrompt
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeOptionalFileTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeOptionalFileTestData
 
 
 def _answer_yes(*, judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentOutcome]:

@@ -12,7 +12,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.runtime_hub import get_llm_worker
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.base64_utils import load_binary_as_base64
-from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
+from tests.integration.pipelex.cogt.cases import LLMVisionTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

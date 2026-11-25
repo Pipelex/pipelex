@@ -14,7 +14,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, GENERATED_CONTENT_LEAF, INPUT_ASSETS_LEAF
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.storage_file_name import STORAGE_FILE_EXTENSION_PATTERN, STORAGE_FILE_STEM_PATTERN
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import STORED_HTML, STORED_JSON_OBJ, STORED_TEXT
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_HTML, STORED_JSON_OBJ, STORED_TEXT
 
 STORAGE_SCOPE = "org_abc/mt_1/run_9"
 STORAGE_URI_SCHEME = "pipelex-storage://"

@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.runtime_hub import get_class_registry, get_model_deck
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import ClassBackedOpenTriage, ClassBackedTriage, PipeJudgeLoadTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import ClassBackedOpenTriage, ClassBackedTriage, PipeJudgeLoadTestData
 
 
 @pytest.fixture

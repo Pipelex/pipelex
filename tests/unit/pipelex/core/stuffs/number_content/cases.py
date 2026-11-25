@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class NumberContentCases:
     # Input content - integer
     SAMPLE_INT = 42
 

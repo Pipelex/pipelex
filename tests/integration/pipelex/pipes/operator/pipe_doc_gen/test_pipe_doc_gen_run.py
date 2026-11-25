@@ -11,8 +11,8 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngine, StubEngines
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 
 class _ThreadRecordingEngine(StubEngine):

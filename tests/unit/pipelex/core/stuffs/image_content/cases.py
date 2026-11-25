@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from pipelex.urls import URLs
 
 
-class TestData:
+class ImageContentCases:
     # Input content
     SAMPLE_URL = URLs.png_example_1
     SAMPLE_PUBLIC_URL = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-wot-1119x352.png"

@@ -23,7 +23,7 @@ from pipelex.methods.exceptions import MethodLockInvalidError, MethodLockMismatc
 from pipelex.methods.fetching import FetchedMethodPackage
 from pipelex.methods.method_ref import parse_method_ref
 from pipelex.mthds_parsing.parser import MthdsParser
-from tests.integration.pipelex.libraries.test_data import FetchedDependencyLockTestData
+from tests.integration.pipelex.libraries.cases import FetchedDependencyLockTestData
 
 if TYPE_CHECKING:
     from pathlib import Path

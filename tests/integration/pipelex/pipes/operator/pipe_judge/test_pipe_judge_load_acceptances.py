@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import (
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import (
     ClassBackedTriage,
     PipeJudgeClassBackedTestData,
     PipeJudgeLoadTestData,

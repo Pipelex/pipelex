@@ -10,7 +10,7 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
-from tests.unit.pipelex.libraries.test_data import PackageVisibilityTestData
+from tests.unit.pipelex.libraries.cases import PackageVisibilityTestData
 
 
 def _refused_items(

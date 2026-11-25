@@ -16,6 +16,7 @@ from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
     StubEngines,
@@ -24,7 +25,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "invoice.docx"'
 

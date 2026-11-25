@@ -23,7 +23,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 from pipelex.providers.google.google_llm_worker import GoogleLLMWorker
-from tests.unit.pipelex.providers.google.test_data import GoogleErrorHandlingTestData
+from tests.unit.pipelex.providers.google.cases import GoogleErrorHandlingTestData
 
 
 def _make_google_client_error(code: int, message: str) -> genai_errors.ClientError:

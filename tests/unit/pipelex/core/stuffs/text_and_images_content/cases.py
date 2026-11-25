@@ -5,7 +5,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.urls import URLs
 
 
-class TestData:
+class TextAndImagesContentCases:
     # Input content
     SAMPLE_TEXT = TextContent(text="Hello World")
     SAMPLE_IMAGES: ClassVar[list[ImageContent]] = [

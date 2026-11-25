@@ -15,7 +15,7 @@ from pipelex.plugins.pipe_func_package_offer_registry import (
     PipeFuncPackageRefusal,
 )
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
-from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
 
 _MODULE = "pipelex.libraries.package_environments"
 

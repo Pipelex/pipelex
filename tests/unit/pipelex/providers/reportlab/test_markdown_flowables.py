@@ -12,6 +12,7 @@ from pipelex.providers.reportlab.markdown_flowables import inline_markup, markdo
 from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles, data_table
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
 from pipelex.tools.markdown.markdown_rules import is_linked_href, plain_text
+from tests.unit.pipelex.providers.reportlab.cases import MarkdownFlowablesTestData
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     StubRenderResources,
     document_text,
@@ -21,8 +22,7 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     render_layout,
     render_markdown,
 )
-from tests.unit.pipelex.providers.reportlab.test_data import MarkdownFlowablesTestData
-from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
 
 
 def _list_lines(*, text: str) -> list[str]:

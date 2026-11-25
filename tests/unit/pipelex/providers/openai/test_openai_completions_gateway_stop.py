@@ -11,7 +11,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from tests.helpers.completion_stop import STOP_TEST_PIPE_CODE, make_text_llm_job
-from tests.unit.pipelex.providers.openai.test_data import GatewayStopTestData
+from tests.unit.pipelex.providers.openai.cases import GatewayStopTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

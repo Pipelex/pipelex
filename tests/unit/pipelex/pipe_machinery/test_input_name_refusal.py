@@ -13,7 +13,7 @@ from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.unit.pipelex.pipe_machinery.test_data import InputNameRefusalTestData
+from tests.unit.pipelex.pipe_machinery.cases import InputNameRefusalTestData
 
 _PIPE_TABLES = InputNameRefusalTestData.PIPE_TABLES
 _SIGNATURE_ID = "PipeSignature"

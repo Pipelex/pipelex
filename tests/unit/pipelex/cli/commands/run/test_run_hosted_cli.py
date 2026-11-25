@@ -38,8 +38,8 @@ from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import PIPELEX_HOME_ENV_KEY, PIPELEXPATH_ENV_KEY
-from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems
-from tests.unit.pipelex.hosted.test_data import HostedRefusals, HostedStoredTexts, HostedVersions
+from tests.unit.pipelex.cli.agent_cli.cases import PipeIoItems
+from tests.unit.pipelex.hosted.cases import HostedRefusals, HostedStoredTexts, HostedVersions
 
 if TYPE_CHECKING:
     from unittest.mock import AsyncMock

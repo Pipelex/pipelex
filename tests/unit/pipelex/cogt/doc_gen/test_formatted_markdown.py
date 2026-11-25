@@ -20,7 +20,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
 )
 from pipelex.tools.markdown import markdown_formatting, markdown_rules
 from pipelex.tools.markdown.markdown_parser import markdown_syntax_tree, table_cells_bound
-from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
 
 # What a conversion refused for its tables may hold before the refusal: its source and the scan of its lines, never the
 # tokens of its cells, which take tens of megabytes here.

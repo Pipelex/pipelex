@@ -2,7 +2,7 @@ import datetime
 from typing import Any, ClassVar
 
 
-class TestData:
+class DateContentCases:
     OFFSET_PLUS_2 = datetime.timezone(datetime.timedelta(hours=2))
 
     # Sample values in the three precision states

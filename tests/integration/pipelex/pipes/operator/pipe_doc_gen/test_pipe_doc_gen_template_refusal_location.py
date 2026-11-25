@@ -6,7 +6,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 
 # A template that reads a private name its own source spells, which the sandbox refuses whatever the run's data.
 _REFUSED_TEMPLATE = "<p>{{ invoice['_owner'] }}</p>"

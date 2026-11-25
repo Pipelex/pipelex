@@ -17,7 +17,7 @@ from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.errors.problem import ProblemView
-from tests.unit.pipelex.cogt.test_data import GatewayThrottleTestData
+from tests.unit.pipelex.cogt.cases import GatewayThrottleTestData
 
 if TYPE_CHECKING:
     from collections.abc import Callable

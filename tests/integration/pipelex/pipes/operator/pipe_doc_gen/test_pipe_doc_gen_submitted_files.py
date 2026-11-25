@@ -22,6 +22,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
     RecordingMethodFileStore,
@@ -33,7 +34,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "templates/invoice.docx"'
 _DOCX_BYTES = b"PK docx template bytes"

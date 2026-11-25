@@ -33,7 +33,7 @@ from pipelex_api.middleware import RequestIdMiddleware
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.security import ForwardedIdentityHeader, no_auth, verify_api_key, verify_jwt
 from tests.unit._problems import assert_problem
-from tests.unit.test_data import ProblemTestData, rate_limited_failure
+from tests.unit.cases import ProblemTestData, rate_limited_failure
 
 _GATEWAY_CONFIG_MESSAGE = "the gateway config is missing"
 _COMPONENT = "pipe_func_sandbox"

@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.core.method_trees.requirements_file import parse_requirements_text
-from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
 
 
 class TestMethodRequirementsParsing:

@@ -28,7 +28,7 @@ from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKi
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
-from tests.unit.pipelex.cogt.models.test_data import ModelDeckCheckTestData
+from tests.unit.pipelex.cogt.models.cases import ModelDeckCheckTestData
 
 CheckFunction = Callable[[Any], None]
 

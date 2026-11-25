@@ -6,7 +6,7 @@ from typing import Any
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from tests.helpers.backend_library_loading import load_library
-from tests.unit.pipelex.cogt.model_backends.test_data import BackendLibraryTomls
+from tests.unit.pipelex.cogt.model_backends.cases import BackendLibraryTomls
 
 TWIN_FILE = """
 [defaults]

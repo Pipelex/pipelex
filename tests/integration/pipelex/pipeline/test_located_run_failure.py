@@ -20,7 +20,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_bridge.direct_orchestrator import DirectOrchestrator
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureTestData
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput

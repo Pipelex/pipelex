@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from pipelex.cli.commands.run._run_core import _execute_run  # pyright: ignore[reportPrivateUsage]
-from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureTestData
 
 if TYPE_CHECKING:
     from pathlib import Path

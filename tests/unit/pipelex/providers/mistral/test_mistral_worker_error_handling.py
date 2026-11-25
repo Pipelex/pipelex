@@ -23,7 +23,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.mistral.mistral_extract_worker import MistralExtractWorker
 from pipelex.providers.mistral.mistral_llm_worker import MistralLLMWorker
-from tests.unit.pipelex.providers.mistral.test_data import (
+from tests.unit.pipelex.providers.mistral.cases import (
     MistralExtractErrorHandlingTestData,
     MistralLLMErrorHandlingTestData,
 )

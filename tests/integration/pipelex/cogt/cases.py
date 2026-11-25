@@ -27,7 +27,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from tests.cases import ImageTestCases
 from tests.cases.documents import DocumentTestCases
-from tests.integration.pipelex.test_data import PipeTestCases
+from tests.integration.pipelex.cases import PipeTestCases
 
 
 class Person(BaseModel):

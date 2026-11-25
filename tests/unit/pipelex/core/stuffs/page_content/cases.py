@@ -6,7 +6,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.urls import URLs
 
 
-class TestData:
+class PageContentCases:
     # Input content
     SAMPLE_TEXT_AND_IMAGES = TextAndImagesContent(
         text=TextContent(text="Page content text"),

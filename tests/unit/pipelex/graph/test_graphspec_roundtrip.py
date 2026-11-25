@@ -25,7 +25,7 @@ from pipelex.graph.graphspec import (
     TimingSpec,
 )
 from pipelex.tools.misc.file_utils import load_text_from_path, save_text_to_path
-from tests.unit.pipelex.graph.test_data import (
+from tests.unit.pipelex.graph.cases import (
     PreviewTruncationData,
     ValidGraphData,
 )

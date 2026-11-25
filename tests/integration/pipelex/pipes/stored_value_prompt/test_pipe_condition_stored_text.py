@@ -16,8 +16,8 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, StoredValuePromptTestData
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import RecordingContentGenerator
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import STORED_TEXT, StoredValuePromptTestData
 
 # Tells a long text from a short one by its real length: the stored text is far past the bound, its preview is not.
 _EXPRESSION = "{% if verdict.text|length > 500 %}long{% else %}short{% endif %}"

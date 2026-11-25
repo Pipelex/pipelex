@@ -10,7 +10,7 @@ from pytest_mock import MockerFixture
 from pipelex.core.method_trees.requirements_file import parse_requirements_text
 from pipelex.libraries.method_requirements import marker_variables_of, requirements_needed_in, unmet_requirements
 from pipelex.libraries.package_environments import InterpreterPackageEnvironment, OfferedPackageEnvironment
-from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
 
 _DISTRIBUTION_TARGET = "pipelex.libraries.package_environments.distribution"
 

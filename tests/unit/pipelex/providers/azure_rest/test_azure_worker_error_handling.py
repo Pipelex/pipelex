@@ -11,7 +11,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.azure_rest.azure_img_gen_worker import AzureImgGenWorker
-from tests.unit.pipelex.providers.azure_rest.test_data import AzureErrorHandlingTestData
+from tests.unit.pipelex.providers.azure_rest.cases import AzureErrorHandlingTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

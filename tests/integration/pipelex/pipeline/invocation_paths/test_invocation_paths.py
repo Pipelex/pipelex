@@ -17,8 +17,8 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeEndErrorEvent, PipeStartEvent, TraceEvent
+from tests.integration.pipelex.pipeline.invocation_paths.cases import InvocationPathsTestData
 from tests.integration.pipelex.pipeline.invocation_paths.invocation_paths_helpers import ItemExecutionRouter
-from tests.integration.pipelex.pipeline.invocation_paths.test_data import InvocationPathsTestData
 
 _BINDING_PIPE_TYPE = "BindingStep"
 

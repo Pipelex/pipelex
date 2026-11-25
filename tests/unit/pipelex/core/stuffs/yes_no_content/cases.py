@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class YesNoContentCases:
     # Input content
     SAMPLE_TRUE = True
     SAMPLE_FALSE = False

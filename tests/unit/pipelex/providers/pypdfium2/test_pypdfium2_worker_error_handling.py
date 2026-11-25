@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.pypdfium2.pypdfium2_worker import Pypdfium2Worker
-from tests.unit.pipelex.providers.pypdfium2.test_data import Pypdfium2ErrorHandlingTestData
+from tests.unit.pipelex.providers.pypdfium2.cases import Pypdfium2ErrorHandlingTestData
 
 
 def _make_pypdfium2_worker(mocker: MockerFixture) -> Pypdfium2Worker:

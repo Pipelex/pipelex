@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class JsonContentCases:
     # Input content
     SAMPLE_JSON_OBJ: ClassVar[dict[str, Any]] = {"name": "John", "age": 30, "active": True}
     SAMPLE_NESTED_JSON_OBJ: ClassVar[dict[str, Any]] = {"user": {"name": "John", "email": "john@example.com"}, "count": 5}

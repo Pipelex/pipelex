@@ -23,8 +23,8 @@ from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACE
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.validation_error_types import TemplateCheckErrorType
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockType

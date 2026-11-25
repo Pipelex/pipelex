@@ -8,7 +8,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData, PipeJudgeSeveralQuestionsTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadTestData, PipeJudgeSeveralQuestionsTestData
 
 _ANSWERS: dict[str, JudgmentOutcome] = {
     "urgent": YesNoAnswer(probability=0.9),

@@ -18,7 +18,7 @@ from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 
-class TestData:
+class PipeSequenceListOutputCases:
     """Test data for pipe_sequence list output bug."""
 
     MTHDS_BUNDLE: ClassVar[str] = """
@@ -87,7 +87,7 @@ class TestPipeSequenceListOutputBug:
 
             # Create the .mthds file
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestData.MTHDS_BUNDLE)
+            mthds_file.write_text(PipeSequenceListOutputCases.MTHDS_BUNDLE)
 
             # Load the bundle
             result = await validate_bundle(
@@ -119,7 +119,7 @@ class TestPipeSequenceListOutputBug:
 
             # Create the .mthds file
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestData.MTHDS_BUNDLE)
+            mthds_file.write_text(PipeSequenceListOutputCases.MTHDS_BUNDLE)
 
             # Load the bundle
             await validate_bundle(

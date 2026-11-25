@@ -7,7 +7,7 @@ import pytest
 from typing_extensions import override
 
 from pipelex.tools.document_conversion.gotenberg_converter import CONVERTER_VERSION_HEADER, GotenbergConverter
-from tests.integration.pipelex.tools.document_conversion.test_data import DocumentConversionTestData
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionTestData
 
 
 class _AnswerRecordingTransport(httpx.AsyncBaseTransport):

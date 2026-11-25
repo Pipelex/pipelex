@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, find_inference_error_category_in_chain
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker
-from tests.unit.pipelex.providers.bedrock.test_data import BedrockLLMErrorHandlingTestData
+from tests.unit.pipelex.providers.bedrock.cases import BedrockLLMErrorHandlingTestData
 
 
 def _make_bedrock_client_error(error_code: str, error_message: str) -> ClientError:

@@ -20,8 +20,8 @@ from pipelex.libraries.library import Library
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.libraries.cases import ProbePackageTestData
 from tests.integration.pipelex.libraries.installed_packages import install_probe_globally, isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
 VENDORED_HELPER = "DEPENDENCY helper"

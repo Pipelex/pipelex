@@ -33,7 +33,7 @@ class CompanyContent(StructuredContent):
     employees: list[PersonContent]
 
 
-class TestData:
+class StructuredContentCases:
     # Input content
     SAMPLE_NAME = "Test Item"
     SAMPLE_VALUE = 42

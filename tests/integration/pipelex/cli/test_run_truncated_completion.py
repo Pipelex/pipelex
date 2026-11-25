@@ -14,7 +14,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
-from tests.integration.pipelex.cli.test_data import TruncatedCompletionRunTestData
+from tests.integration.pipelex.cli.cases import TruncatedCompletionRunTestData
 
 if TYPE_CHECKING:
     from pathlib import Path

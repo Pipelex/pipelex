@@ -17,8 +17,8 @@ from pipelex.plugins.pipe_func_package_offer_registry import (
     PipeFuncPackageOfferRequest,
     PipeFuncPackageRefusal,
 )
+from tests.integration.pipelex.libraries.cases import ProbePackageTestData
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"
 _FUNCTION_NAME = "requirements_test_crunch"

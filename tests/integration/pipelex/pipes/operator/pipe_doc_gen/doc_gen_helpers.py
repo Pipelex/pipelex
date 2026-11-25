@@ -36,7 +36,7 @@ from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_inference_backend_registry, get_models_manager, get_runtime_hub, get_secrets_provider
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 
 if TYPE_CHECKING:
     from mthds.protocol.problem.models import ProblemItem

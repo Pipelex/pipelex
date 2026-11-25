@@ -12,7 +12,7 @@ import random
 import pytest
 
 from pipelex.tools.misc.python_literals import class_docstring, normalized_docstring_text
-from tests.unit.pipelex.tools.misc.test_data import PythonLiteralsTestData
+from tests.unit.pipelex.tools.misc.cases import PythonLiteralsTestData
 
 
 def _class_source(description: str) -> str:

@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class MarkdownContentCases:
     # A short report, as an LLM writes one
     SAMPLE_REPORT = "# Inspection report\n\nThe **roof** needs work.\n\n- cracked tiles\n- sagging gutter"
     EXPECTED_REPORT_HTML = (

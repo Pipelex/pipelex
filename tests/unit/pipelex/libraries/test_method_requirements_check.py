@@ -31,7 +31,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
-from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
 
 _MODULE = "pipelex.libraries.method_requirements"
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"

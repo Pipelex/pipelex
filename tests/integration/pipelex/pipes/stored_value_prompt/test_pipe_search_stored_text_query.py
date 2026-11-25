@@ -10,8 +10,8 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.system.job_metadata import JobMetadata
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, STORED_TEXT_URL
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import RecordingContentGenerator, make_text_memory, run_pipe_dry, stored_pages
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import STORED_TEXT, STORED_TEXT_URL
 
 _SUBJECT = "tide tables for Brest"
 

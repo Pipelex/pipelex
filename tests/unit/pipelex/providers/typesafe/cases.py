@@ -177,7 +177,7 @@ def rebuild_recorded_exception(name: str) -> BaseException:
     return TypeSafeError(envelope["str"])
 
 
-class TestData:
+class TypesafeCases:
     """The recorded cases each test reads, named by what they demonstrate."""
 
     # Successes — wire bodies.

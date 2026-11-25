@@ -8,7 +8,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
-from tests.integration.pipelex.pipeline.test_data import RunContentMarkerTestData
+from tests.integration.pipelex.pipeline.cases import RunContentMarkerTestData
 
 READ_SCOPE = "org_choices"
 

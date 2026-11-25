@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
-from tests.unit.pipelex.core.concepts.structure_generation.test_data import ShadowingFieldCase, ShadowingFieldNamesTestData
+from tests.unit.pipelex.core.concepts.structure_generation.cases import ShadowingFieldCase, ShadowingFieldNamesTestData
 
 _DOMAIN = ShadowingFieldNamesTestData.FORWARD_REF_DOMAIN
 _CLASS_NAME = f"{_DOMAIN}__Shadowing"

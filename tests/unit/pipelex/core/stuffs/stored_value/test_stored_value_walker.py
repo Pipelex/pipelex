@@ -14,7 +14,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.uri.exceptions import UriReadRefusedError
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
+from tests.unit.pipelex.core.stuffs.stored_value.cases import (
     FOREIGN_URL,
     HTML_KEY,
     JSON_KEY,

@@ -52,8 +52,8 @@ from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPolling
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY
-from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems, RetiredEnvelope, StoredRunReports
-from tests.unit.pipelex.hosted.test_data import HostedStoredTexts
+from tests.unit.pipelex.cli.agent_cli.cases import PipeIoItems, RetiredEnvelope, StoredRunReports
+from tests.unit.pipelex.hosted.cases import HostedStoredTexts
 
 if TYPE_CHECKING:
     from pathlib import Path

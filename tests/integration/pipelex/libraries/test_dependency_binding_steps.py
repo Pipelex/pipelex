@@ -18,8 +18,8 @@ from pipelex.libraries.library import Library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.libraries.cases import LedgerPackageTestData
 from tests.integration.pipelex.libraries.installed_packages import install_package, isolate_installed_methods, write_consumer
-from tests.integration.pipelex.libraries.test_data import LedgerPackageTestData
 
 if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs

@@ -50,7 +50,7 @@ from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, Webh
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from tests.helpers.pipe_io_artifacts import make_pipe_io_artifacts
-from tests.unit.pipelex.errors.test_data import ProblemViewsTestData
+from tests.unit.pipelex.errors.cases import ProblemViewsTestData
 
 
 def _records_with_message(*, caplog: pytest.LogCaptureFixture, message: str) -> list[logging.LogRecord]:

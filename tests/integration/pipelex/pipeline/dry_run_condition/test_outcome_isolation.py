@@ -14,8 +14,8 @@ from pytest_mock import MockerFixture
 from pipelex.core.memory import working_memory as working_memory_module
 from pipelex.core.memory.working_memory import STUFF_REPLACED_MESSAGE
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
+from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionTestData
 from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import input_named, node_by_code, only_output
-from tests.integration.pipelex.pipeline.dry_run_condition.test_data import DryRunConditionTestData
 
 
 def _replacements_of(debug_calls: Sequence[Any], *, stuff_name: str) -> list[str]:

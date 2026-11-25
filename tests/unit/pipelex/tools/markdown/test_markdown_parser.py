@@ -13,7 +13,7 @@ from pipelex.tools.markdown.markdown_parser import (
     table_cells_bound,
 )
 from pipelex.tools.markdown.markdown_rules import plain_text
-from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
 
 # The pieces the generated documents are made of: emphasis and its unmatched delimiters, links, references and
 # images, tables in and out of containers, padded rows, code, escapes, and every line ending markdown-it knows,

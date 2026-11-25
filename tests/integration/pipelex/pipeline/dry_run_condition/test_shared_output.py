@@ -18,6 +18,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.mermaid.mermaid_utils import sanitize_mermaid_id
+from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionTestData
 from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import (
     first_item_on,
     input_named,
@@ -28,7 +29,6 @@ from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import (
     output_named,
     read_digests,
 )
-from tests.integration.pipelex.pipeline.dry_run_condition.test_data import DryRunConditionTestData
 from tests.unit.pipelex.graph.conftest import make_graph_config
 
 _SUBGRAPH_OPENING = re.compile(r"^\s*subgraph (\S+?)\[")

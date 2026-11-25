@@ -10,7 +10,7 @@ from pathlib import Path
 from pytest_mock import MockerFixture
 
 from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
-from tests.integration.pipelex.libraries.test_data import InstalledNotesPackageTestData
+from tests.integration.pipelex.libraries.cases import InstalledNotesPackageTestData
 
 
 def _write_consumer_and_its_dependency(*, root: Path, dep_bundle: str = InstalledNotesPackageTestData.DEP_BUNDLE) -> Path:

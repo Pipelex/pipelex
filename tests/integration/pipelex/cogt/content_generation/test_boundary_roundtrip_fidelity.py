@@ -35,7 +35,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
-from tests.unit.pipelex.cogt.content_generation.test_data import FactoryDefaults, SchemaRebuildTestData
+from tests.unit.pipelex.cogt.content_generation.cases import FactoryDefaults, SchemaRebuildTestData
 
 
 class ShadowingNames(StructuredContent):

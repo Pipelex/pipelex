@@ -8,7 +8,7 @@ from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library import Library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
+from tests.integration.pipelex.libraries.cases import ProbePackageTestData
 
 
 def isolate_installed_methods(*, mocker: MockerFixture, root: Path) -> None:

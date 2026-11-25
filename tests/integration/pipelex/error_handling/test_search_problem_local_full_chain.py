@@ -24,7 +24,7 @@ from pipelex.interpreter_hub import get_pipe_router
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.error_handling.test_data import SearchProblemParityTestData
+from tests.integration.pipelex.error_handling.cases import SearchProblemParityTestData
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 
 

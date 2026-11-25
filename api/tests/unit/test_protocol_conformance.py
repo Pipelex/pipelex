@@ -49,7 +49,7 @@ from pipelex_api.routes.version import router as version_router
 from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV
 from pipelex_api.security import verify_api_key
 from tests.unit._constants import VALID_MTHDS
-from tests.unit.test_data import ProblemTestData
+from tests.unit.cases import ProblemTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

@@ -10,7 +10,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.e2e.pipelex.pipes.pipe_operators.pipe_judge.test_data import PipeJudgeTestCases
+from tests.e2e.pipelex.pipes.pipe_operators.pipe_judge.cases import PipeJudgeTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_judge"]
 

@@ -27,11 +27,11 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import ContentConversionTestData
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for_pipe_compose import (
     MarkdownText,
     TeamMember,
 )
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import ContentConversionTestData
 
 
 @pytest.mark.dry_runnable

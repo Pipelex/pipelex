@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class TestData:
+class MermaidContentCases:
     # Input content
     SAMPLE_MERMAID_CODE = """graph TD
     A[Start] --> B{Decision}

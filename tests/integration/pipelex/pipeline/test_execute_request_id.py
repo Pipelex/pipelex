@@ -11,7 +11,7 @@ from pipelex.interpreter_hub import get_pipe_run
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.exceptions import RunParameterError
-from tests.integration.pipelex.pipeline.test_data import ExecuteRequestIdTestData
+from tests.integration.pipelex.pipeline.cases import ExecuteRequestIdTestData
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput

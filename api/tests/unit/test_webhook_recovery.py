@@ -46,7 +46,7 @@ from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV
 from tests.unit._constants import VALID_MTHDS
-from tests.unit.test_data import ProblemTestData, rate_limited_failure
+from tests.unit.cases import ProblemTestData, rate_limited_failure
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _MODE = "temporal"

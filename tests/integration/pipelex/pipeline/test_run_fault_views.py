@@ -18,7 +18,7 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData, RunFaultViewsTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureTestData, RunFaultViewsTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

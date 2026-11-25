@@ -6,7 +6,7 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.jinja2.jinja2_scopes import LIST_ITEM_SEGMENT
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from tests.unit.pipelex.tools.test_jinja2_required_variables import TestData as RequiredVariablesData
+from tests.unit.pipelex.tools.test_jinja2_required_variables import RequiredVariablesCases as RequiredVariablesData
 
 
 def _paths(template_source: str) -> list[tuple[str, ...]]:

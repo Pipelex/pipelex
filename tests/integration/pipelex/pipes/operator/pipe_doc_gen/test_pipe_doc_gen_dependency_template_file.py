@@ -13,8 +13,8 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import refusal_messages
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _PACKAGE_ADDRESS = "github.com/acme/invoicing"
 _TEMPLATE = "<h1>{{ invoice.number }}</h1>"

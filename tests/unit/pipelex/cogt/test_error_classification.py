@@ -14,7 +14,7 @@ import pytest
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, ProviderLimitVerdict
 from pipelex.cogt.inference.provider_name import ProviderName
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData, GatewayThrottleTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData, GatewayThrottleTestData
 
 _Bodies = DirectProviderQuotaTestData
 

@@ -18,7 +18,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.condition.pipe_condition import DryRunOutcomeSlot, PipeCondition
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from tests.integration.pipelex.pipeline.dry_run_condition.test_data import DryRunConditionTestData
+from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionTestData
 from tests.unit.pipelex.graph.conftest import make_trace_context
 
 _CONDITION_NODE_ID = "graph:node_route"

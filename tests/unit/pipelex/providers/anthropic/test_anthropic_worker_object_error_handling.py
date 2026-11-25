@@ -21,7 +21,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
 
 
 def _mock_httpx_response(status_code: int) -> httpx.Response:

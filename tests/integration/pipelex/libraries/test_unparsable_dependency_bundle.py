@@ -18,8 +18,8 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
+from tests.integration.pipelex.libraries.cases import ProbePackageTestData
 from tests.integration.pipelex.libraries.installed_packages import install_probe_globally, isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
 

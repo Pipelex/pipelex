@@ -20,7 +20,7 @@ from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProv
 from pipelex.tools.storage.storage_provider_abstract import StoredData
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError, UriTextNotUtf8Error, UriTextTooLargeError
 from pipelex.tools.uri.uri_bytes import MAX_CONCURRENT_URI_READS
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
+from tests.unit.pipelex.core.stuffs.stored_value.cases import (
     FOREIGN_URL,
     HTML_KEY,
     JSON_KEY,

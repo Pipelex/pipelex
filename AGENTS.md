@@ -399,7 +399,7 @@ NEVER EVER put more than one TestClass into a test module.
     - `tests/e2e/` - for end-to-end tests that test complete methods
 - Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
-- Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
+- Test data is placed inside `cases.py` modules at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.cases`. Their content is all constants, regrouped inside classes named with a `Cases` suffix (`ImageContentCases`), never a `Test` prefix. A data module is never named `test_*.py` and a data class never starts with `Test`, because pytest collects both as tests.
 - Always put tests inside Test classes: 1 TestClass per module.
 - NEVER EVER put more than one TestClass into a test module.
 - Put fixtures into conftest.py files for easy sharing.
@@ -450,7 +450,7 @@ class TestFooBar:
 
 #### Test Data Organization
 
-- If it's not already there, create a `test_data.py` file in the proper test directory
+- If it's not already there, create a `cases.py` file in the proper test directory
 - Note how we avoid initializing a default mutable value within a class instance, instead we use ClassVar.
 - Also note that we provide a topic for the test case, which is purely for convenience.
 

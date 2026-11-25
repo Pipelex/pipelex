@@ -10,7 +10,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_model_deck
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import (
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import (
     ClassBackedOpenTriage,
     PipeJudgeClassBackedTestData,
     PipeJudgeLoadTestData,

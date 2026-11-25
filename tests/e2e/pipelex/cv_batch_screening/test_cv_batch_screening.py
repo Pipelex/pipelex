@@ -2,7 +2,7 @@
 
 Runs the CV batch screening pipeline through ``PipelexMTHDSProtocol`` without any
 Temporal layer. The same bundle is also exercised by the in-process Temporal test in
-our Temporal plugin and by our distributed 3-process validation harness. Each repo keeps its own copy of the crate (see ``test_data.py``).
+our Temporal plugin and by our distributed 3-process validation harness. Each repo keeps its own copy of the crate (see ``cases.py``).
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases.documents import DocumentTestCases
-from tests.e2e.pipelex.cv_batch_screening.test_data import CvBatchScreeningTemporalTestData
+from tests.e2e.pipelex.cv_batch_screening.cases import CvBatchScreeningTemporalTestData
 
 
 @pytest.mark.dry_runnable

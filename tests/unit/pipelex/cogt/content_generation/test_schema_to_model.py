@@ -16,7 +16,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.exceptions import UnsupportedSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory, _SchemaModelBuilder  # pyright: ignore[reportPrivateUsage]
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.unit.pipelex.cogt.content_generation.test_data import (
+from tests.unit.pipelex.cogt.content_generation.cases import (
     MODEL_CHAIN_LENGTH,
     MODEL_CHAIN_VALUES,
     AliasedProperties,

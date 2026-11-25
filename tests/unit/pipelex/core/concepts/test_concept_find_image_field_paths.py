@@ -10,7 +10,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.concepts import data
-from tests.unit.pipelex.core.concepts.data import TestData
+from tests.unit.pipelex.core.concepts.data import NestedImageFieldsCases
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
@@ -61,7 +61,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
     # Create and register concepts
     concepts_to_register: list[Concept] = [
         ConceptFactory.make(
-            domain_code=TestData.DOMAIN,
+            domain_code=NestedImageFieldsCases.DOMAIN,
             concept_code=code,
             description=description,
             structure_class_name=structure_class_name,
@@ -86,8 +86,8 @@ class TestConceptFindImageFieldPaths:
 
     @pytest.mark.parametrize(
         ("concept_code", "expected_paths"),
-        TestData.IMAGE_FIELD_TEST_CASES,
-        ids=[case[0] for case in TestData.IMAGE_FIELD_TEST_CASES],
+        NestedImageFieldsCases.IMAGE_FIELD_TEST_CASES,
+        ids=[case[0] for case in NestedImageFieldsCases.IMAGE_FIELD_TEST_CASES],
     )
     def test_find_image_fields(self, concept_code: str, expected_paths: list[str]):
         """Test finding image fields in various structure classes.
@@ -110,7 +110,7 @@ class TestConceptFindImageFieldPaths:
             expected_paths: The expected list of image field paths
         """
         # Get concept
-        concept = get_required_concept(f"{TestData.DOMAIN}.{concept_code}")
+        concept = get_required_concept(f"{NestedImageFieldsCases.DOMAIN}.{concept_code}")
 
         # Find image paths
         image_paths = search_for_nested_image_fields(content_class=get_concept_library().get_structure_class(concept=concept))

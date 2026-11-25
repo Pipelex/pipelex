@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.cogt.doc_gen.layout_display import display_scalar, is_numeric_column, markdown_as_html
 from pipelex.cogt.doc_gen.layout_tree import LayoutScalar
-from tests.unit.pipelex.cogt.doc_gen.test_data import LayoutDisplayTestData
+from tests.unit.pipelex.cogt.doc_gen.cases import LayoutDisplayTestData
 
 
 class TestLayoutDisplay:

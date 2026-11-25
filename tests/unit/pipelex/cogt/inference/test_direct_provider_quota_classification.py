@@ -31,7 +31,7 @@ from pipelex.cogt.inference.error_classify import ClassificationResult, Inferenc
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
 
 if TYPE_CHECKING:
     from pipelex.errors.error_codes import ErrorCode

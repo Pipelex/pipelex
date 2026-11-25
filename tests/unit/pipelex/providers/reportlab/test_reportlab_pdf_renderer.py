@@ -27,6 +27,7 @@ from pipelex.cogt.doc_gen.layout_tree import (
 from pipelex.cogt.doc_gen.render_job import RenderJob
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from tests.unit.pipelex.providers.reportlab.cases import MARKUP_VALUE, ReportlabRendererTestData, line_items_table
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     TEST_FILENAME,
     TEST_TITLE,
@@ -42,7 +43,6 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     png_data_url,
     render_layout,
 )
-from tests.unit.pipelex.providers.reportlab.test_data import MARKUP_VALUE, ReportlabRendererTestData, line_items_table
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

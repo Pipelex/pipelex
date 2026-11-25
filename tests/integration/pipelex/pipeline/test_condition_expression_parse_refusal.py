@@ -23,7 +23,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipeline.test_data import ConditionExpressionParseTestData, ConditionMethodFaultsTestData
+from tests.integration.pipelex.pipeline.cases import ConditionExpressionParseTestData, ConditionMethodFaultsTestData
 
 
 def _routing_bundle(*, expression: str) -> str:

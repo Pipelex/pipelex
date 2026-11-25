@@ -29,7 +29,7 @@ from pipelex.cogt.llm.completion_stop import (
     classify_stop_reason,
     raise_for_completion_stop,
 )
-from tests.unit.pipelex.cogt.llm.test_data import CompletionStopTestData
+from tests.unit.pipelex.cogt.llm.cases import CompletionStopTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

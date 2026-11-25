@@ -15,7 +15,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.linkup.linkup_extract_worker import LinkupExtractWorker
 from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker
-from tests.unit.pipelex.providers.linkup.test_data import LinkupExtractErrorHandlingTestData, LinkupSearchErrorHandlingTestData
+from tests.unit.pipelex.providers.linkup.cases import LinkupExtractErrorHandlingTestData, LinkupSearchErrorHandlingTestData
 
 
 def _make_linkup_extract_worker(mocker: MockerFixture) -> LinkupExtractWorker:
