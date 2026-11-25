@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from urllib.parse import quote, urlencode
 
 from fastapi import Request
+from pipelex.tools.storage.local_storage_provider import is_metadata_sidecar_name
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 from pipelex_api.limits import STORAGE_LINK_TTL_SECONDS
@@ -39,10 +40,11 @@ def storage_key_of(*, uri: str) -> str | None:
     """The storage key a `pipelex-storage://` reference names, or None when the reference does not parse.
 
     A reference parses when it starts with the scheme and its key has at least a scope and a file name, none of its
-    segments empty, `.`, `..` or longer than 255 UTF-8 bytes, and no character in it a backslash, a control character
-    or DEL: the local storage provider resolves a key against a directory, where any of those would name another file
-    than the one the key reads as, or a name the filesystem cannot hold, and a key parsed so is safe in the path of a
-    download link once each segment is percent-encoded.
+    segments empty, `.`, `..` or longer than 255 UTF-8 bytes, no character in it a backslash, a control character
+    or DEL, and its file name not the one the local storage provider reserves for a stored file's metadata,
+    `.<name>.metadata.json`: that provider resolves a key against a directory, where any of those would name another
+    file than the one the key reads as, a name the filesystem cannot hold, or a name it refuses, and a key parsed so is
+    safe in the path of a download link once each segment is percent-encoded.
     """
     if not uri.startswith(PIPELEX_STORAGE_SCHEME):
         return None
@@ -55,6 +57,8 @@ def storage_key_of(*, uri: str) -> str | None:
     for segment in segments:
         if segment in {"", ".", ".."} or len(segment.encode("utf-8", "surrogatepass")) > _MAX_SEGMENT_BYTES:
             return None
+    if is_metadata_sidecar_name(name=segments[-1]):
+        return None
     return key
 
 

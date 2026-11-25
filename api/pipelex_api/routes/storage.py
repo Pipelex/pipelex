@@ -37,7 +37,7 @@ from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.storage_scope import is_key_within_read_scope
 from pipelex.tools.misc.filetype_utils import mime_type_of_file_name
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageKind
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -196,10 +196,10 @@ async def get_stored_object(
 
     The link's signed query is its authorization, so the route needs no bearer token. A link whose signature does not
     hold, or that has expired, is a 403 `auth.forbidden` whose `requirement` is `signed_storage_link`, as is a query
-    that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
-    bytes come from the runner's configured storage provider, under the bare media type `served_media_type` derives;
-    the answer is sandboxed, so a stored HTML page never runs a script on the runner's origin, except a PDF, which a
-    sandbox keeps a browser's own viewer from displaying.
+    that is not one this runner signs; a link whose address holds no file, or one the storage provider refuses as an
+    address, a 404 `pipelex.storage.object_missing`. The bytes come from the runner's configured storage provider,
+    under the bare media type `served_media_type` derives; the answer is sandboxed, so a stored HTML page never runs a
+    script on the runner's origin, except a PDF, which a sandbox keeps a browser's own viewer from displaying.
     """
     if storage_key_of(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") is None or not is_download_authorized(key=key, expires=expires, signature=signature):
         msg = (
@@ -211,6 +211,10 @@ async def get_stored_object(
         stored = await provider.load_with_metadata(f"{PIPELEX_STORAGE_SCHEME}{key}")
     except StorageFileNotFoundError as exc:
         msg = "The link's signature holds, but the runner's storage holds no file at the address it names."
+        raise StoredObjectMissingError(msg) from exc
+    except StorageInvalidUriError as exc:
+        # A key the provider refuses as an address names no stored file, which is all this link's holder needs to know.
+        msg = "The link's signature holds, but the runner's storage refuses the address it names as holding no stored file."
         raise StoredObjectMissingError(msg) from exc
     media_type = served_media_type(key=key, provider_type=stored.mime_type, storage_kind=provider.storage_kind)
     return Response(content=stored.data, media_type=media_type, headers=_download_headers(media_type=media_type))

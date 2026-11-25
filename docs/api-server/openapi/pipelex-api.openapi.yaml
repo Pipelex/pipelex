@@ -1898,13 +1898,13 @@ paths:
 
         hold, or that has expired, is a 403 `auth.forbidden` whose `requirement` is `signed_storage_link`, as is a query
 
-        that is not one this runner signs; a link whose address holds no file a 404 `pipelex.storage.object_missing`. The
+        that is not one this runner signs; a link whose address holds no file, or one the storage provider refuses as an
 
-        bytes come from the runner''s configured storage provider, under the bare media type `served_media_type` derives;
+        address, a 404 `pipelex.storage.object_missing`. The bytes come from the runner''s configured storage provider,
 
-        the answer is sandboxed, so a stored HTML page never runs a script on the runner''s origin, except a PDF, which a
+        under the bare media type `served_media_type` derives; the answer is sandboxed, so a stored HTML page never runs a
 
-        sandbox keeps a browser''s own viewer from displaying.'
+        script on the runner''s origin, except a PDF, which a sandbox keeps a browser''s own viewer from displaying.'
       operationId: get_stored_object_v1_storage__key__get
       parameters:
       - name: key

@@ -18,6 +18,7 @@ import jwt
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pipelex.tools.storage.exceptions import StorageInvalidUriError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StoredData
@@ -345,6 +346,37 @@ class TestStorageRoutes:
 
         status, code = expected
         assert_problem(response, status=status, code=code)
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_metadata_sidecar_is_never_resolved_nor_downloaded(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """The file the local provider keeps a stored file's metadata in is not a stored object of its own."""
+        local = LocalStorageProvider(root_path=tmp_path)
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=local)
+        await local.store(b"a text", key="single-tenant/generated/value.txt", content_type="text/plain", metadata={"origin": "test"})
+        sidecar_key = "single-tenant/generated/.value.txt.metadata.json"
+        assert (tmp_path / sidecar_key).is_file()
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(sidecar_key))
+        expires = str(int(time.time()) + 60)
+        signature = link_signature(purpose=LinkPurpose.STORAGE_DOWNLOAD, message=f"{sidecar_key}\n{expires}")
+        downloaded = client.get(f"/v1/storage/{sidecar_key}", params={"expires": expires, "signature": signature})
+
+        assert item["url"] is None
+        assert item["error"]["code"] == "pipelex.storage.uri_invalid"
+        _assert_refused_link(downloaded)
+
+    def test_a_signed_link_to_an_address_the_provider_refuses_is_a_404(self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+        provider = mocker.Mock(storage_kind="local")
+        provider.load_with_metadata = mocker.AsyncMock(side_effect=StorageInvalidUriError("Invalid key: refused by the provider"))
+        mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
+        client = _build_client(monkeypatch=monkeypatch)
+
+        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+
+        assert_problem(_download(client, item["url"]), status=404, code="pipelex.storage.object_missing")
 
     def test_links_start_with_the_configured_public_base_url(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"

@@ -30,7 +30,12 @@ def _sidecar_path_of(*, file_path: Path) -> Path:
     return file_path.with_name(f"{_SIDECAR_PREFIX}{file_path.name}{_SIDECAR_SUFFIX}")
 
 
-def _is_sidecar_name(*, name: str) -> bool:
+def is_metadata_sidecar_name(*, name: str) -> bool:
+    """Whether a file name is the one the local provider reserves for a stored file's metadata, `.<name>.metadata.json`.
+
+    No key whose last segment has such a name names a stored file: the provider refuses it, and so does the API server's
+    storage transport before it signs a link to it.
+    """
     return name.startswith(_SIDECAR_PREFIX) and name.endswith(_SIDECAR_SUFFIX)
 
 
@@ -95,7 +100,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             raise StorageInvalidUriError(msg)
 
         # The sidecar of a file's metadata is not a stored file: a key naming one would read or overwrite another's metadata.
-        if _is_sidecar_name(name=relative_path.name):
+        if is_metadata_sidecar_name(name=relative_path.name):
             msg = f"Invalid key '{key}': the name is reserved for a stored file's metadata"
             raise StorageInvalidUriError(msg)
 
