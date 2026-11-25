@@ -28,10 +28,13 @@ parser refuses a count written with more digits than any maximum could allow (`p
 A length the dry run chooses itself for a variable list, `Concept[]`, is no declared count: it is shortened to the
 maximum rather than refused (:func:`capped_synthetic_mock_count`).
 
-**One budget for the whole dry run.** The per-slot maximum leaves the sum and the products of the slots unbounded, so
-every mock builder also adds what it builds to one tally per validation or per run (:func:`spend_dry_run_mock_items`),
-refused past `[interpreter.method_limits] max_dry_run_mock_items` with
-:class:`~pipelex.core.pipes.exceptions.DryRunMockBudgetError`.
+**One budget per process's share of a dry run.** The per-slot maximum leaves the sum and the products of the slots
+unbounded, so every mock builder also adds what it builds to one tally (:func:`spend_dry_run_mock_items`), refused past
+`[interpreter.method_limits] max_dry_run_mock_items` with :class:`~pipelex.core.pipes.exceptions.DryRunMockBudgetError`.
+The tally covers one in-process validation, the hosted validation sweep included since it runs in one activity, and one
+in-process dry run, its mock inputs and its pipes together. It lives in one process, so a distributed dry run, whose
+pipes run in worker activities, counts each activity against a budget of its own: the bound holds per activity there,
+not per run.
 """
 
 from collections.abc import Generator
@@ -169,8 +172,8 @@ def spend_dry_run_mock_items(*, count: int, slot: str) -> None:
     """Add `count` mock items about to be built for `slot` to the dry run's tally, refused when it would pass the budget.
 
     Every dry-run mock builder calls it before it builds. Inside a budget scope (`scoped_dry_run_mock_budget`) the items
-    add to the scope's one tally, shared by the whole validation or run; outside every scope, such as a builder called on
-    its own, the call is a budget of its own.
+    add to the scope's one tally, shared by a whole in-process validation or dry run, or by one worker activity of a
+    distributed dry run; outside every scope, such as a builder called on its own, the call is a budget of its own.
 
     Raises:
         DryRunMockBudgetError: The tally would pass `max_dry_run_mock_items`; nothing is added.

@@ -135,9 +135,10 @@ class MethodLimitsConfig(ConfigModel):
     The deployment's own `max_declared_item_count` may not pass it either. Neither can pass `DECLARED_ITEM_COUNT_CEILING`,
     the most digits the parser reads in a count.
 
-    `max_dry_run_mock_items` is the most mock items one dry run or one validation builds in all, whatever the slots: the
-    per-slot maximum leaves their sum and their products unbounded, such as many inputs each declaring the maximum, or a
-    batch over a list whose every branch builds another list. A request cannot change it.
+    `max_dry_run_mock_items` is the most mock items one in-process validation or dry run builds in all, whatever the
+    slots: the per-slot maximum leaves their sum and their products unbounded, such as many inputs each declaring the
+    maximum, or a batch over a list whose every branch builds another list. A distributed dry run counts each of its
+    worker activities against a budget of its own. A request cannot change it.
     """
 
     max_declared_item_count: int = Field(ge=1, le=DECLARED_ITEM_COUNT_CEILING)

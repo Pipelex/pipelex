@@ -18,7 +18,7 @@ description: "A dry run of the method would build more mock items than this runt
 
 ## What it means
 
-A validation dry-runs the method, building one mock item for every item a slot holds. Each slot is bounded by the maximum declared item count, and their sum by a budget: many inputs each declaring the maximum, or a batch over a list whose every branch builds another list, multiply what one dry run builds. The method is valid, but this runtime refuses to finish its dry run once the mock items it built would pass the budget.
+A validation dry-runs the method, building one mock item for every item a slot holds. Each slot is bounded by the maximum declared item count, and their sum by a budget: many inputs each declaring the maximum, or a batch over a list whose every branch builds another list, multiply what one dry run builds. The method is valid, but this runtime refuses to finish its dry run once the mock items it built would pass the budget. The budget covers one in-process validation or dry run, its mock inputs and its pipes together; a distributed dry run counts each of its worker activities against a budget of its own.
 
 ## What to do
 
