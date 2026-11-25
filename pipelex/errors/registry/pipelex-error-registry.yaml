@@ -407,6 +407,22 @@ codes:
     meaning: "A file the run wrote, or that the runtime handed out, is no longer in storage. A caller's own reference to something that does not exist is `input.reference_not_found` instead."
     what_to_do: "Report the problem to whoever runs the runtime, with the run's `pipeline_run_id` when it has one."
 
+  - code: pipelex.storage.object_missing
+    title: "No file is stored at this link"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 404
+    detail: "No file is stored at the storage address this link names."
+    steps:
+      actor: {kind: change_input, detail: "Resolve a storage address that a run or an upload returned, then fetch the link the answer gives."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose link names a storage address where no file is stored."}
+    params: {}
+    meaning: "A signed download link a self-hosted runner handed out names a storage address where its storage holds no file. Resolving an address checks only that the caller may read it, not that a file is stored there, so a link to an address nothing was stored at answers this."
+    what_to_do: "Resolve a storage address exactly as a run's results or an upload returned it, and fetch the link the answer gives before it expires."
+    see:
+      - {title: "API Server", href: "api-server/index.md"}
+
   - code: pipelex.storage.damaged
     title: "A stored file is damaged"
     domain: runtime

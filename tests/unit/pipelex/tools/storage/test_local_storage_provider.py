@@ -1,5 +1,8 @@
 import asyncio
+import errno
+import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
@@ -13,6 +16,21 @@ from pipelex.tools.storage.exceptions import (
 )
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+
+
+async def _read(*, provider: LocalStorageProvider, read: str, uri: str) -> object:
+    """Run one of the provider's reads of `uri`, named as the parametrized tests name it."""
+    match read:
+        case "load_with_metadata":
+            return await provider.load_with_metadata(uri=uri)
+        case "load_head":
+            return await provider.load_head(uri=uri, nb_bytes=4)
+        case "load_size":
+            return await provider.load_size(uri=uri)
+        case "load_metadata":
+            return await provider.load_metadata(uri=uri)
+        case _:
+            pytest.fail(f"unknown read {read}")
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -190,25 +208,78 @@ class TestLocalStorageProvider:
         assert "blocker/foo.txt" in str(exc_info.value)
         assert isinstance(exc_info.value.__cause__, OSError)
 
-    async def test_load_wraps_oserror_as_storage_local_error(self, tmp_path: Path) -> None:
-        """Test that a non-not-found OSError during load is wrapped as StorageLocalError.
-
-        Opening a directory as a file raises IsADirectoryError (an OSError subclass),
-        which must surface as StorageLocalError rather than leaking raw.
-        """
+    async def test_load_wraps_oserror_as_storage_local_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that an OSError during load that names no missing file is wrapped as StorageLocalError, not leaked raw."""
         provider = LocalStorageProvider(root_path=tmp_path)
-        (tmp_path / "a_directory").mkdir()
+        await provider.store(data=b"unreadable", key="locked.bin")
+        mocker.patch(
+            "pipelex.tools.storage.local_storage_provider.aiofiles.open",
+            side_effect=PermissionError(13, "Permission denied"),
+        )
 
         with pytest.raises(StorageLocalError) as exc_info:
-            await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}a_directory")
+            await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}locked.bin")
 
-        assert "a_directory" in str(exc_info.value)
-        assert isinstance(exc_info.value.__cause__, OSError)
+        assert "locked.bin" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, PermissionError)
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            pytest.param("a_directory", id="a_directory"),
+            pytest.param("a_directory/" + "a" * 300 + ".txt", id="a_segment_past_the_filesystem_s_name_limit"),
+            pytest.param("a_directory/inner.txt/deeper.txt", id="a_file_read_as_a_directory"),
+        ],
+    )
+    @pytest.mark.parametrize("read", ["load_with_metadata", "load_head", "load_size", "load_metadata"])
+    async def test_a_key_naming_no_regular_file_is_not_found(self, tmp_path: Path, key: str, read: str) -> None:
+        """A directory, a name the filesystem cannot hold, or a path through a file stores nothing: a not-found, never a local failure."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        await provider.store(data=b"inner", key="a_directory/inner.txt")
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
+
+        with pytest.raises(StorageFileNotFoundError) as exc_info:
+            await _read(provider=provider, read=read, uri=uri)
+
+        assert key in str(exc_info.value)
+
+    @pytest.mark.parametrize("read", ["load_with_metadata", "load_head", "load_size"])
+    async def test_a_permission_refused_on_the_status_is_a_local_failure(self, tmp_path: Path, mocker: MockerFixture, read: str) -> None:
+        """A path whose status the filesystem refuses to read is a fault of the directory, never a missing file, on every Python."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        await provider.store(data=b"behind a locked folder", key="locked/inner.bin")
+        locked_path = (tmp_path / "locked" / "inner.bin").resolve()
+        real_stat = Path.stat
+
+        def _stat(path: Path, *args: Any, **kwargs: Any) -> os.stat_result:
+            if path == locked_path:
+                raise PermissionError(errno.EACCES, "Permission denied")
+            return real_stat(path, *args, **kwargs)
+
+        mocker.patch.object(Path, "stat", autospec=True, side_effect=_stat)
+        uri = f"{PIPELEX_STORAGE_SCHEME}locked/inner.bin"
+
+        with pytest.raises(StorageLocalError) as exc_info:
+            await _read(provider=provider, read=read, uri=uri)
+
+        assert isinstance(exc_info.value.__cause__, PermissionError)
+
+    async def test_a_name_too_long_raised_by_the_open_is_not_found(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A filesystem that admits the name to a stat but refuses it to an open still reads no stored file there."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        await provider.store(data=b"present at check time", key="named.bin")
+        mocker.patch(
+            "pipelex.tools.storage.local_storage_provider.aiofiles.open",
+            side_effect=OSError(errno.ENAMETOOLONG, "File name too long"),
+        )
+
+        with pytest.raises(StorageFileNotFoundError):
+            await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}named.bin")
 
     async def test_load_toctou_filenotfound_maps_to_not_found(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that a FileNotFoundError raised after the exists() check maps to StorageFileNotFoundError.
+        """Test that a FileNotFoundError raised after the status check maps to StorageFileNotFoundError.
 
-        Simulates the TOCTOU window: the file passes exists() but is gone by the time
+        Simulates the TOCTOU window: the file passes the status check but is gone by the time
         open() runs. A missing file is a not-found, not a generic local-storage error.
         """
         provider = LocalStorageProvider(root_path=tmp_path)

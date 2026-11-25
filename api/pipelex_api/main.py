@@ -32,6 +32,7 @@ from pipelex_api.openapi_schema import PipelexFastAPI
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
 from pipelex_api.routes.health import router as health_router
+from pipelex_api.routes.storage import mount_storage_routes
 from pipelex_api.routes.version import router as version_router
 from pipelex_api.run_webhooks import ensure_completion_target_configured
 from pipelex_api.security import get_auth_dependency
@@ -146,7 +147,9 @@ fastapi_app = PipelexFastAPI(
         "(`POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version` — "
         "marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve and codegen "
         "(`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), the model reference check (`/models/check`), "
-        "and editor tooling (`/lint`, `/format`). "
+        "editor tooling (`/lint`, `/format`), and the storage transport that reads back what a run stores "
+        "(`/resolve-storage-url/bulk` and the signed download links of `/storage/{key}` it resolves to, not served "
+        "when the server trusts forwarded identity). "
         "Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. "
         "All endpoints are served under the `/v1` base path; "
         "every error is an RFC 7807 `application/problem+json` problem document, documented per "
@@ -194,6 +197,12 @@ fastapi_app.include_router(blob_upload_router, prefix="/v1")
 # mount and no alias remain.
 auth_dependency = get_auth_dependency()
 fastapi_app.include_router(api_router, prefix="/v1", dependencies=[Depends(auth_dependency)])
+
+# `POST /v1/resolve-storage-url/bulk` behind the same authentication, and `GET /v1/storage/{key}` without it, since the
+# signed query of the link the first hands out authorizes the second (`pipelex_api.routes.storage`). Neither is mounted
+# when the runner trusts forwarded identity: its host's platform serves the route, for the organization the runner
+# cannot see.
+mount_storage_routes(app=fastapi_app, auth_dependency=auth_dependency)
 
 
 class ServiceIdentity(BaseModel):

@@ -1050,6 +1050,6 @@ nav:
     - Error Responses: api-server/error-responses.md
     - Webhooks: api-server/webhooks.md
     - Logging: api-server/logging.md
-    - Storage Transport (Removed): api-server/storage-transport.md
+    - Storage Transport: api-server/storage-transport.md
     - Pipe Builder (Removed): api-server/pipe-builder.md
     - Changelog to v0.33.2: api-server/changelog.md
