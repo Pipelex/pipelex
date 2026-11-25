@@ -985,7 +985,7 @@ class LibraryManager(LibraryManagerAbstract):
             # it may not hold in scope, so it is not checked again; its pipe runs still bound their mock builders by the
             # maximum their run metadata carries.
             if not is_crate_prevalidated:
-                self._ensure_declared_item_counts_allowed(crate=crate)
+                self._ensure_declared_item_counts_allowed(crate=crate, pipes=crate.pipes)
             library = self.get_library(library_id=library_id)
 
             # Load domains from crate metadata
@@ -1114,14 +1114,19 @@ class LibraryManager(LibraryManagerAbstract):
             return all_pipes
 
     @staticmethod
-    def _ensure_declared_item_counts_allowed(*, crate: LibraryCrate) -> None:
+    def _ensure_declared_item_counts_allowed(*, crate: LibraryCrate, pipes: Mapping[str, PipeBlueprintUnion]) -> None:
         """Refuse a crate whose pipe declares more items for one slot than the maximum in force, located on that pipe.
+
+        Args:
+            crate: The crate the pipes come from, whose source map and elaboration metadata locate a refusal.
+            pipes: The pipes to check, by the ref the crate's maps key them under: every pipe of a loaded crate, or the
+                pipes of a dependency package the load builds.
 
         Raises:
             PipeLoadRefusalError: A pipe declares a count past the maximum, raised from its `DeclaredItemCountLimitError`.
         """
         maximum = get_max_declared_item_count()
-        for pipe_ref, pipe_blueprint in crate.pipes.items():
+        for pipe_ref, pipe_blueprint in pipes.items():
             parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
             elaboration = crate.elaboration_metadata.get(pipe_ref)
             # A helper pipe the bundle elaborator generated is named by the authored pipe it came from.
@@ -1873,6 +1878,13 @@ class LibraryManager(LibraryManagerAbstract):
                 loaded_pipe_refs = reachable_dependency_pipe_refs(
                     public_pipe_refs=public_pipe_refs, qualified_pipes=qualified_dep_pipes, package_alias=alias
                 )
+            # Before any of them is built, the package's pipes the load builds are held to the maximum declared item count
+            # in force, as the main crate's are: a dependency's dry run builds one mock item per item it declares too. A
+            # private pipe nothing public reaches is never built, so its counts are not the load's to refuse.
+            self._ensure_declared_item_counts_allowed(
+                crate=crate,
+                pipes={pipe_ref: pipe_blueprint for pipe_ref, pipe_blueprint in qualified_dep_pipes.items() if pipe_ref in loaded_pipe_refs},
+            )
             for pipe_ref, pipe_blueprint in qualified_dep_pipes.items():
                 parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed_pipe.domain_path is None:
