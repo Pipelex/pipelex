@@ -37,7 +37,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `pipe_code` (string, optional): The code identifying the pipe to execute. Beside a method sent in `files`, it names the pipe to start at in place of the method's entry pipe; beside `method_ref`, it overrides the package's `main_pipe`; sent alone, it must name a pipe already registered on the server.
 - `inputs` (PipelineInputs, optional): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
-- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
+- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number). A specific number is held to the maximum declared item count in force, and one above it is a `422` `pipelex.deployment.declared_count_over_limit` — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address — see [Sending the method packages the method calls](#sending-the-method-packages-the-method-calls). Accompanies `files`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method sent as a tree; `pipe_code` may accompany it to override the package's `main_pipe`.
@@ -158,7 +158,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `pipe_code` (string, optional): The code identifying the pipe to execute. Beside a method sent in `files`, it names the pipe to start at in place of the method's entry pipe; beside `method_ref`, it overrides the package's `main_pipe`; sent alone, it must name a pipe already registered on the server.
 - `inputs` (PipelineInputs, optional): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
-- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
+- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number). A specific number is held to the maximum declared item count in force, and one above it is a `422` `pipelex.deployment.declared_count_over_limit` — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address — see [Sending the method packages the method calls](#sending-the-method-packages-the-method-calls). Accompanies `files`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method sent as a tree; `pipe_code` may accompany it to override the package's `main_pipe`.
@@ -430,11 +430,13 @@ A method declares a fixed number of items for one slot with `Concept[N]` on an i
 ```json
 {
   "pipe_code": "summarize_reviews",
-  "max_declared_item_count": 5000
+  "max_declared_item_count": 500
 }
 ```
 
-A method declaring more items for one slot than the maximum in force is refused with a `422` [`pipelex.deployment.declared_count_over_limit`](../errors/pipelex/deployment/declared_count_over_limit.md), whose parameters name the `slot`, the `count` and the `limit`, before the run starts. The maximum travels with the run to every process that runs a part of it, so a worker's dry-run mock builders hold the request's maximum rather than their own deployment's. The value is a whole number from 1 to 999,999,999; any other is a `422` `request.invalid` naming the field. A multi-tenant host sends the maximum of the caller's plan; omit it, or send `null`, to keep the deployment's maximum. The same field is taken by [`/v1/validate`](pipe-validate.md) and by the method routes `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io`.
+A method declaring more items for one slot than the maximum in force is refused with a `422` [`pipelex.deployment.declared_count_over_limit`](../errors/pipelex/deployment/declared_count_over_limit.md), whose parameters name the `slot`, the `count` and the `limit`, before the run starts. The run's own `output_multiplicity` is held to the same maximum: an integer above it is refused with the same `422`, its `slot` naming the run's output, before the run starts, since a live run would ask a model for that many items. The maximum travels with the run to every process that runs a part of it, so a worker's dry-run mock builders hold the request's maximum rather than their own deployment's. Whatever the maximum, a dry run builds at most the deployment's `max_dry_run_mock_items` mock items in all, past which it is refused with [`pipelex.deployment.dry_run_mock_budget_exceeded`](../errors/pipelex/deployment/dry_run_mock_budget_exceeded.md).
+
+The value must be a JSON integer, never a boolean or a string such as `"500"`, from 1 to the deployment's `[interpreter.method_limits] max_declared_item_count_ceiling`, 1,000 by default; any other is a `422` `request.invalid` naming the field. A request may always lower the maximum, but it raises it only as far as the ceiling allows: the field arrives in the request's JSON, so by default no caller can raise its own limit. A deployment behind a trusted front that sets each request's maximum itself, such as a multi-tenant host sending the maximum of the caller's plan, raises the ceiling to the highest maximum that front sends. The host's own library directories load under the deployment's maximum, whatever the request states. Omit the field, or send `null`, to keep the deployment's maximum. The same field is taken by [`/v1/validate`](pipe-validate.md) and by the method routes `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io`.
 
 ## Input Format: PipelineInputs
 

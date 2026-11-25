@@ -360,7 +360,7 @@ Use fixed output multiplicity when:
 - External requirements dictate a fixed count
 - You want consistent batch sizes for processing
 
-The language sets no upper bound on `N`, but a runtime may: validating a method dry-runs it with one mock item per declared item, so a runtime can refuse to load a method declaring more items for one slot than it allows. Pipelex's maximum, and how to raise it, is described in [Library Configuration](../../configuration/config-technical/library-config.md#how-many-items-a-method-may-declare). It covers `Concept[N]` on inputs and outputs and a controller step's `nb_output` alike.
+The language sets no upper bound on `N`, but a runtime may: validating a method dry-runs it with one mock item per declared item, so a runtime can refuse to load a method declaring more items for one slot than it allows. Pipelex's maximum, and how to raise it, is described in [Library Configuration](../../configuration/config-technical/library-config.md#how-many-items-a-method-may-declare). It covers `Concept[N]` on inputs and outputs, a controller step's `nb_output`, and a run's own `output_multiplicity` alike, and a dependency package's pipes as well as the method's own. Variable lists, `Concept[]`, declare no count and are never refused by it. A dry run also builds at most a budget of mock items in all, `max_dry_run_mock_items`, so many fixed counts together, or a batch over a fixed list whose branches each build another, can be refused even when every count is within the maximum.
 
 ### When to Use Variable Input (Empty Brackets `[]`)
 
