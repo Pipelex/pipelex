@@ -33,7 +33,7 @@ from tests.integration.pipelex.pipes.stored_value_prompt.cases import (
     STORAGE_SCOPE,
     STORED_TEXT,
     STORED_TEXT_KEY,
-    StoredValuePromptTestData,
+    StoredValuePromptCases,
 )
 
 
@@ -167,7 +167,7 @@ def scoped_job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
 
 def stored_pages() -> TextContent:
     """A fresh referenced form of the stored text: a load keeps the text on the instance, so each test builds its own."""
-    return TextContent.model_validate(StoredValuePromptTestData.TEXT_REFERENCE)
+    return TextContent.model_validate(StoredValuePromptCases.TEXT_REFERENCE)
 
 
 def make_text_memory(*, texts: dict[str, TextContent]) -> WorkingMemory:

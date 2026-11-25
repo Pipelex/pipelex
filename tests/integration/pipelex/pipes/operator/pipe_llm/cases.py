@@ -1,4 +1,4 @@
-class LLMSettingCheckTestData:
+class LLMSettingCheckCases:
     """Bundles whose one step generates with a model setting the model it resolves to may refuse.
 
     The models are the dev configuration's OpenAI entries, on the Responses SDK: one declares no thinking

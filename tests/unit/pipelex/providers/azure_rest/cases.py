@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 
 
-class AzureErrorHandlingTestData:
+class AzureErrorHandlingCases:
     """Test cases for Azure ImgGen worker HTTP exception handling.
 
     Each tuple: (topic, status_code, response_text, expected_category, expected_user_action_kind)

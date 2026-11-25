@@ -20,7 +20,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from tests.unit.pipelex.pipeline.cases import FileInputRefusalCase, InputRefusalNamingTestData
+from tests.unit.pipelex.pipeline.cases import FileInputRefusalCase, InputRefusalNamingCases
 
 
 def _file_content(*, native_concept_code: NativeConceptCode, url: str) -> StuffContent:
@@ -38,7 +38,7 @@ async def _refusal_of_the_second_item(*, mocker: MockerFixture, case: FileInputR
         "pipelex.pipeline.input_normalizer.get_config",
         return_value=mocker.Mock(runtime=mocker.Mock(storage=mocker.Mock(is_upload_local_content_enabled=True))),
     )
-    urls = (InputRefusalNamingTestData.FINE_URL, case.refused_url)
+    urls = (InputRefusalNamingCases.FINE_URL, case.refused_url)
     items = [_file_content(native_concept_code=case.native_concept_code, url=url) for url in urls]
     memory = WorkingMemoryFactory.make_from_single_stuff(
         StuffFactory.make_stuff(
@@ -64,7 +64,7 @@ def _assert_named_by_root_and_path(*, refusal: PipelexError, case: FileInputRefu
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestInputNormalizerRefusalNaming:
-    @pytest.mark.parametrize(("_topic", "case"), InputRefusalNamingTestData.CASES)
+    @pytest.mark.parametrize(("_topic", "case"), InputRefusalNamingCases.CASES)
     async def test_a_refused_list_item_is_named_by_its_root_input_and_its_path(
         self, mocker: MockerFixture, _topic: str, case: FileInputRefusalCase
     ) -> None:
@@ -74,6 +74,6 @@ class TestInputNormalizerRefusalNaming:
 
     @pytest.mark.builds_problems_without_required_params(reason="an Image input holding a PDF is refused before any model reads it")
     async def test_an_image_item_holding_a_pdf_is_named_by_its_root_input_and_its_path(self, mocker: MockerFixture) -> None:
-        refusal = await _refusal_of_the_second_item(mocker=mocker, case=InputRefusalNamingTestData.IMAGE_HOLDING_A_PDF)
+        refusal = await _refusal_of_the_second_item(mocker=mocker, case=InputRefusalNamingCases.IMAGE_HOLDING_A_PDF)
 
-        _assert_named_by_root_and_path(refusal=refusal, case=InputRefusalNamingTestData.IMAGE_HOLDING_A_PDF)
+        _assert_named_by_root_and_path(refusal=refusal, case=InputRefusalNamingCases.IMAGE_HOLDING_A_PDF)

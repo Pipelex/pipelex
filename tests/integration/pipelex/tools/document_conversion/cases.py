@@ -10,7 +10,7 @@ class OfficeFileCase(NamedTuple):
     first_page_words: tuple[str, ...]
 
 
-class DocumentConversionTestData:
+class DocumentConversionCases:
     # Where the backends are found: the Gotenberg container's base URL, and the soffice executable (else `soffice` on the PATH).
     GOTENBERG_URL_ENV_VAR = "PIPELEX_TEST_GOTENBERG_URL"
     SOFFICE_BINARY_ENV_VAR = "PIPELEX_TEST_SOFFICE_BINARY"

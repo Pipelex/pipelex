@@ -12,7 +12,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker
-from tests.unit.pipelex.providers.huggingface.cases import HuggingFaceErrorHandlingTestData
+from tests.unit.pipelex.providers.huggingface.cases import HuggingFaceErrorHandlingCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -74,7 +74,7 @@ class TestHuggingFaceWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "status_code", "message", "expected_category", "expected_user_action_kind"),
-        HuggingFaceErrorHandlingTestData.HF_HTTP_ERROR_CASES,
+        HuggingFaceErrorHandlingCases.HF_HTTP_ERROR_CASES,
     )
     async def test_hf_http_error_categorization(
         self,
@@ -106,7 +106,7 @@ class TestHuggingFaceWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "expected_category", "expected_user_action_kind"),
-        HuggingFaceErrorHandlingTestData.TIMEOUT_CASES,
+        HuggingFaceErrorHandlingCases.TIMEOUT_CASES,
     )
     async def test_inference_timeout_is_an_unknown_outcome(
         self,

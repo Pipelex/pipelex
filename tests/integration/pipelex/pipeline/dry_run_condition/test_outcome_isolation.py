@@ -14,7 +14,7 @@ from pytest_mock import MockerFixture
 from pipelex.core.memory import working_memory as working_memory_module
 from pipelex.core.memory.working_memory import STUFF_REPLACED_MESSAGE
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
-from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionTestData
+from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionCases
 from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import input_named, node_by_code, only_output
 
 
@@ -28,7 +28,7 @@ def _replacements_of(debug_calls: Sequence[Any], *, stuff_name: str) -> list[str
 class TestDryRunConditionOutcomeIsolation:
     async def test_an_outcome_reads_the_slot_as_the_condition_received_it(self) -> None:
         """`b_polish` runs after `a_rewrite` and reads `draft`: it must read `first_draft`'s value."""
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.SLOT_CROSS_READ_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.SLOT_CROSS_READ_MTHDS])
 
         first_draft_digest = only_output(node_by_code(graph_spec, "first_draft")).digest
         polish_read_digest = input_named(node_by_code(graph_spec, "b_polish"), "draft").digest
@@ -42,13 +42,13 @@ class TestDryRunConditionOutcomeIsolation:
         """`follow_up` holds nothing before the condition, so no outcome may find it already written."""
         debug_spy = mocker.spy(working_memory_module.log, "debug")
 
-        await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.REPORT_SHAPE_MTHDS])
+        await dry_run_pipeline(mthds_contents=[DryRunConditionCases.REPORT_SHAPE_MTHDS])
 
         assert _replacements_of(debug_spy.call_args_list, stuff_name="follow_up") == []
 
     async def test_the_default_outcome_names_the_shared_stuff(self) -> None:
         """The default outcome runs last, so its value is the one the next step reads."""
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.SLOT_CROSS_READ_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.SLOT_CROSS_READ_MTHDS])
 
         shared_digest = only_output(node_by_code(graph_spec, "route")).digest
         assert only_output(node_by_code(graph_spec, "b_polish")).digest == shared_digest

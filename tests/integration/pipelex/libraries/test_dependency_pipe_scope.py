@@ -18,9 +18,9 @@ from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
 from pipelex.validation_error_types import PipeValidationErrorType
 from tests.integration.pipelex.libraries.cases import (
-    FailedExportWithAPrivateNamesakeTestData,
-    ProbePackageTestData,
-    TwoPackagesSharingADomainTestData,
+    FailedExportWithAPrivateNamesakeCases,
+    ProbePackageCases,
+    TwoPackagesSharingADomainCases,
 )
 from tests.integration.pipelex.libraries.installed_packages import (
     install_package,
@@ -31,7 +31,7 @@ from tests.integration.pipelex.libraries.installed_packages import (
     write_consumer,
 )
 
-PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
+PROBE_ALIAS = ProbePackageCases.DEP_ALIAS
 
 
 class TestDependencyPipeScope:
@@ -43,8 +43,8 @@ class TestDependencyPipeScope:
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
-                "consumer_probe_dep.mthds": ProbePackageTestData.CONSUMER_HELPER_BUNDLE,
+                "consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE,
+                "consumer_probe_dep.mthds": ProbePackageCases.CONSUMER_HELPER_BUNDLE,
             },
         )
         library_manager = get_library_manager()
@@ -74,7 +74,7 @@ class TestDependencyPipeScope:
         """With nothing of the dependency's domain in the consumer, the load succeeds and the entry needs the helper's input."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_probe(root=tmp_path)
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:
@@ -90,21 +90,21 @@ class TestDependencyPipeScope:
 
     def test_two_packages_declaring_the_same_domain_code_each_call_their_own(self, tmp_path: Path, mocker: MockerFixture) -> None:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        for name in TwoPackagesSharingADomainTestData.PACKAGES:
+        for name in TwoPackagesSharingADomainCases.PACKAGES:
             install_package(
                 root=tmp_path,
                 method_name=name,
-                manifest=TwoPackagesSharingADomainTestData.manifest(name=name),
-                bundles={"shared.mthds": TwoPackagesSharingADomainTestData.bundle(name=name)},
+                manifest=TwoPackagesSharingADomainCases.manifest(name=name),
+                bundles={"shared.mthds": TwoPackagesSharingADomainCases.bundle(name=name)},
             )
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": TwoPackagesSharingADomainTestData.CONSUMER_BUNDLE})
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": TwoPackagesSharingADomainCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:
             library_manager.load_libraries(library_id=library_id, library_file_paths=consumer_files)
 
             reached: dict[str, str] = {}
-            for name, alias in TwoPackagesSharingADomainTestData.PACKAGES.items():
+            for name, alias in TwoPackagesSharingADomainCases.PACKAGES.items():
                 step_target = sole_step_target(library=library, pipe_key=f"{alias}->shared.entry")
                 reached[name] = library.pipe_library.get_required_pipe(pipe_code=step_target).description
         finally:
@@ -120,8 +120,8 @@ class TestDependencyPipeScope:
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
-                "typo.mthds": ProbePackageTestData.consumer_calling(pipe_ref=missing_ref).replace("probe_consumer", "probe_typo"),
+                "consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE,
+                "typo.mthds": ProbePackageCases.consumer_calling(pipe_ref=missing_ref).replace("probe_consumer", "probe_typo"),
             },
         )
         library_manager = get_library_manager()
@@ -142,7 +142,7 @@ class TestDependencyPipeScope:
         """A worker loads the consumer's crate with no package loaded: a reference into an alias never loaded is still tolerated."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_probe(root=tmp_path)
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         worker_library_id, worker_library = library_manager.open_library()
@@ -164,7 +164,7 @@ class TestDependencyPipeScope:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_probe(root=tmp_path)
         consumer_files = write_consumer(
-            root=tmp_path, bundles={"consumer_probe_dep.mthds": ProbePackageTestData.CONSUMER_ENTRY_WRAPPING_THE_DEPENDENCY_BUNDLE}
+            root=tmp_path, bundles={"consumer_probe_dep.mthds": ProbePackageCases.CONSUMER_ENTRY_WRAPPING_THE_DEPENDENCY_BUNDLE}
         )
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
@@ -181,8 +181,8 @@ class TestDependencyPipeScope:
     def test_a_dependency_pipe_that_fails_to_build_is_refused_naming_why(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """The package declares `helper`, so a reference to it is not to a pipe the package lacks: the refusal says it failed to build."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, bundle=ProbePackageTestData.DEP_BUNDLE_WITH_AN_UNBUILDABLE_HELPER)
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        install_probe(root=tmp_path, bundle=ProbePackageCases.DEP_BUNDLE_WITH_AN_UNBUILDABLE_HELPER)
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         try:
@@ -201,15 +201,15 @@ class TestDependencyPipeScope:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_package(
             root=tmp_path,
-            method_name=ProbePackageTestData.METHOD_NAME,
-            manifest=FailedExportWithAPrivateNamesakeTestData.MANIFEST,
+            method_name=ProbePackageCases.METHOD_NAME,
+            manifest=FailedExportWithAPrivateNamesakeCases.MANIFEST,
             bundles={
-                "dom_a.mthds": FailedExportWithAPrivateNamesakeTestData.BUNDLE_A,
-                "dom_b.mthds": FailedExportWithAPrivateNamesakeTestData.BUNDLE_B,
+                "dom_a.mthds": FailedExportWithAPrivateNamesakeCases.BUNDLE_A,
+                "dom_b.mthds": FailedExportWithAPrivateNamesakeCases.BUNDLE_B,
             },
         )
         consumer_files = write_consumer(
-            root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.consumer_calling(pipe_ref=f"{PROBE_ALIAS}->dom_a.entry")}
+            root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.consumer_calling(pipe_ref=f"{PROBE_ALIAS}->dom_a.entry")}
         )
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
@@ -225,10 +225,10 @@ class TestDependencyPipeScope:
     def test_a_dependency_s_reference_to_another_package_is_not_validated_against_the_consumer_s(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A package's own dependencies are never loaded, so the consumer's package of the same alias says nothing about its reference."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        left_alias = TwoPackagesSharingADomainTestData.PACKAGES["left"]
+        left_alias = TwoPackagesSharingADomainCases.PACKAGES["left"]
         install_probe(
             root=tmp_path,
-            bundle=ProbePackageTestData.DEP_BUNDLE.replace(
+            bundle=ProbePackageCases.DEP_BUNDLE.replace(
                 '{ pipe = "helper", result = "helped" }',
                 f'{{ pipe = "helper", result = "helped" }}, {{ pipe = "{left_alias}->shared.not_in_left", result = "further" }}',
             ),
@@ -236,16 +236,14 @@ class TestDependencyPipeScope:
         install_package(
             root=tmp_path,
             method_name="left",
-            manifest=TwoPackagesSharingADomainTestData.manifest(name="left"),
-            bundles={"shared.mthds": TwoPackagesSharingADomainTestData.bundle(name="left")},
+            manifest=TwoPackagesSharingADomainCases.manifest(name="left"),
+            bundles={"shared.mthds": TwoPackagesSharingADomainCases.bundle(name="left")},
         )
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
-                "left.mthds": ProbePackageTestData.consumer_calling(pipe_ref=f"{left_alias}->shared.entry").replace(
-                    "probe_consumer", "left_consumer"
-                ),
+                "consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE,
+                "left.mthds": ProbePackageCases.consumer_calling(pipe_ref=f"{left_alias}->shared.entry").replace("probe_consumer", "left_consumer"),
             },
         )
         library_manager = get_library_manager()

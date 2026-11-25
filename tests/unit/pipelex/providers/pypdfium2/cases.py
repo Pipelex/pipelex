@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 
 
-class Pypdfium2ErrorHandlingTestData:
+class Pypdfium2ErrorHandlingCases:
     """Test cases for pypdfium2 extract worker exception handling.
 
     Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)

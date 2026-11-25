@@ -18,7 +18,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.mermaid.mermaid_utils import sanitize_mermaid_id
-from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionTestData
+from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionCases
 from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import (
     first_item_on,
     input_named,
@@ -57,7 +57,7 @@ def _shared_digest(graph_spec: GraphSpec, *, condition_code: str) -> str:
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryRunConditionSharedOutput:
     async def test_every_outcome_produces_the_stuff_the_next_step_reads(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.REPORT_SHAPE_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.REPORT_SHAPE_MTHDS])
 
         shared_digest = _shared_digest(graph_spec, condition_code="route")
         assert only_output(node_by_code(graph_spec, "write_questions")).digest == shared_digest
@@ -78,7 +78,7 @@ class TestDryRunConditionSharedOutput:
             assert only_output(node_by_code(graph_spec, outcome_code)).digest in digests_read
 
     async def test_outcomes_that_disagree_type_the_stuff_by_the_declaration(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.DIFFERING_OUTCOMES_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.DIFFERING_OUTCOMES_MTHDS])
 
         route_output = only_output(node_by_code(graph_spec, "route"))
         questions_output = only_output(node_by_code(graph_spec, "write_questions"))
@@ -96,14 +96,14 @@ class TestDryRunConditionSharedOutput:
         assert not rejection_output.multiplicity
 
     async def test_outcomes_that_agree_keep_their_typing(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.REPORT_SHAPE_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.REPORT_SHAPE_MTHDS])
 
         route_output = only_output(node_by_code(graph_spec, "route"))
         assert route_output.concept == "Text"
         assert not route_output.multiplicity
 
     async def test_a_sequence_outcome_moves_its_last_step_with_it(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.SEQUENCE_OUTCOME_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.SEQUENCE_OUTCOME_MTHDS])
 
         shared_digest = _shared_digest(graph_spec, condition_code="route")
         assert only_output(node_by_code(graph_spec, "questions_flow")).digest == shared_digest
@@ -112,7 +112,7 @@ class TestDryRunConditionSharedOutput:
         assert only_output(node_by_code(graph_spec, "draft_questions")).digest != shared_digest
 
     async def test_a_batch_outcome_moves_its_aggregate_with_it(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.BATCH_OUTCOME_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.BATCH_OUTCOME_MTHDS])
 
         shared_digest = _shared_digest(graph_spec, condition_code="route")
         batch_node = node_by_code(graph_spec, "ask_each_topic")
@@ -130,7 +130,7 @@ class TestDryRunConditionSharedOutput:
 
     async def test_a_nested_condition_types_the_outer_stuff_by_the_declaration(self) -> None:
         """Both of `outer`'s outcomes hand back Text, but `inner` declares `Anything` over a Number outcome."""
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.NESTED_CONDITIONS_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.NESTED_CONDITIONS_MTHDS])
 
         shared_digest = _shared_digest(graph_spec, condition_code="outer")
         for writer_code in ("inner", "score_cv", "summarize_cv", "write_note"):
@@ -147,7 +147,7 @@ class TestDryRunConditionSharedOutput:
         assert analysis.stuff_registry[shared_digest].concept == "Anything"
 
     async def test_a_condition_run_as_a_batch_branch_types_its_stuff_by_the_declaration(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.BATCH_BRANCH_CONDITION_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.BATCH_BRANCH_CONDITION_MTHDS])
 
         analysis = GraphAnalysis.from_graphspec(graph_spec)
         route_nodes = nodes_by_code(graph_spec, "route")
@@ -162,7 +162,7 @@ class TestDryRunConditionSharedOutput:
             assert analysis.stuff_registry[branch_output.digest].concept == "Anything"
 
     async def test_a_parallel_outcome_writes_the_stuff_its_condition_owns(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.PARALLEL_OUTCOME_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.PARALLEL_OUTCOME_MTHDS])
 
         shared_digest = _shared_digest(graph_spec, condition_code="route")
         parallel_node = node_by_code(graph_spec, "write_both")
@@ -184,7 +184,7 @@ class TestDryRunConditionSharedOutput:
         assert declarations == [f"sg_{sanitize_mermaid_id(route_node_id)}"]
 
     async def test_a_sequence_ending_on_the_condition_carries_the_declaration(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.WRAPPED_CONDITION_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.WRAPPED_CONDITION_MTHDS])
 
         shared_digest = _shared_digest(graph_spec, condition_code="route_on_match")
         outcome_typings = {"generate_interview_questions": ("InterviewQuestion", True), "write_refusal_email": ("Email", None)}
@@ -197,7 +197,7 @@ class TestDryRunConditionSharedOutput:
         assert node_by_code(graph_spec, "screen_candidate") is graph_spec.nodes[0]
 
     async def test_a_batch_branch_sequence_ending_on_the_condition_carries_the_declaration(self) -> None:
-        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.BATCH_BRANCH_SEQUENCE_MTHDS])
+        graph_spec, _ = await dry_run_pipeline(mthds_contents=[DryRunConditionCases.BATCH_BRANCH_SEQUENCE_MTHDS])
 
         condition_nodes = nodes_by_code(graph_spec, "route_by_match")
         assert len(condition_nodes) > 1, "the batch runs its branch once per item"

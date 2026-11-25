@@ -14,7 +14,7 @@ from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.errors.problem import ProblemView
 from pipelex.system.runtime import ProblemReaction
-from tests.unit.pipelex.cogt.models.cases import UnservedReferenceTestData as Data
+from tests.unit.pipelex.cogt.models.cases import UnservedReferenceCases as Data
 
 
 def _make_deck() -> ModelDeck:

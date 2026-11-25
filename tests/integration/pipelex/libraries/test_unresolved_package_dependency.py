@@ -32,10 +32,10 @@ from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.libraries.cases import ProbePackageTestData
+from tests.integration.pipelex.libraries.cases import ProbePackageCases
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, write_consumer
 
-PROBE_REFERENCE = f"{ProbePackageTestData.DEP_ALIAS}->probe_dep.entry"
+PROBE_REFERENCE = f"{ProbePackageCases.DEP_ALIAS}->probe_dep.entry"
 GITLAB_REFERENCE = "gitlab.com/someone/pkg->other_dep.entry"
 
 TWO_REFERENCES_BUNDLE = f"""domain      = "probe_consumer"
@@ -97,11 +97,11 @@ class TestUnresolvedPackageDependency:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         fetch_mock = mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package")
 
-        verdict = await _verdict_for(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+        verdict = await _verdict_for(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
 
         (item,) = _package_items(verdict)
         _assert_located_on_go(item, reference=PROBE_REFERENCE)
-        assert ProbePackageTestData.DEP_ALIAS in item.message
+        assert ProbePackageCases.DEP_ALIAS in item.message
         assert "fetch-on-miss is disabled" in item.message
         fetch_mock.assert_not_called()
 
@@ -111,7 +111,7 @@ class TestUnresolvedPackageDependency:
         library_manager = get_library_manager()
         library_id, _library = library_manager.open_library()
         try:
-            blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+            blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
             with pytest.raises(LibraryLoadingError) as exc_info:
                 library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
         finally:
@@ -125,7 +125,7 @@ class TestUnresolvedPackageDependency:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         _enable_fetch_on_miss(mocker=mocker)
 
-        verdict = await _verdict_for(mthds_content=ProbePackageTestData.consumer_calling(pipe_ref=GITLAB_REFERENCE))
+        verdict = await _verdict_for(mthds_content=ProbePackageCases.consumer_calling(pipe_ref=GITLAB_REFERENCE))
 
         (item,) = _package_items(verdict)
         _assert_located_on_go(item, reference=GITLAB_REFERENCE)
@@ -142,7 +142,7 @@ class TestUnresolvedPackageDependency:
 
         mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package", side_effect=_fetch_from_nowhere)
 
-        verdict = await _verdict_for(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+        verdict = await _verdict_for(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
 
         (item,) = _package_items(verdict)
         _assert_located_on_go(item, reference=PROBE_REFERENCE)
@@ -163,12 +163,12 @@ class TestUnresolvedPackageDependency:
         )
 
         with caplog.at_level(logging.WARNING):
-            await _verdict_for(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+            await _verdict_for(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
 
         warnings = [
             record
             for record in caplog.records
-            if record.levelno == logging.WARNING and getattr(record, "package_address", None) == ProbePackageTestData.DEP_ALIAS
+            if record.levelno == logging.WARNING and getattr(record, "package_address", None) == ProbePackageCases.DEP_ALIAS
         ]
         assert [record.getMessage() for record in warnings] == ["A method package could not be resolved"]
         assert getattr(warnings[0], ERROR_TYPE_FIELD) == "MethodDependencyFetchError"
@@ -185,7 +185,7 @@ class TestUnresolvedPackageDependency:
             side_effect=MethodPackageNotFoundError("No package in 'github.com/invented/probe-lib' matches 'probe'; the repository holds: other."),
         )
 
-        verdict = await _verdict_for(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+        verdict = await _verdict_for(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
 
         (item,) = _package_items(verdict)
         _assert_located_on_go(item, reference=PROBE_REFERENCE)
@@ -207,28 +207,28 @@ class TestUnresolvedPackageDependency:
         _enable_fetch_on_miss(mocker=mocker)
         package_dir = tmp_path / "fetched"
         package_dir.mkdir()
-        (package_dir / "METHODS.toml").write_text(ProbePackageTestData.MANIFEST_EXPORTING_EVERYTHING, encoding="utf-8")
-        (package_dir / "probe_dep.mthds").write_text(ProbePackageTestData.DEP_BUNDLE, encoding="utf-8")
+        (package_dir / "METHODS.toml").write_text(ProbePackageCases.MANIFEST_EXPORTING_EVERYTHING, encoding="utf-8")
+        (package_dir / "probe_dep.mthds").write_text(ProbePackageCases.DEP_BUNDLE, encoding="utf-8")
         fetched = FetchedMethodPackage(
-            ref=parse_method_ref(ProbePackageTestData.DEP_ALIAS),
-            full_address=ProbePackageTestData.DEP_ALIAS,
+            ref=parse_method_ref(ProbePackageCases.DEP_ALIAS),
+            full_address=ProbePackageCases.DEP_ALIAS,
             commit_sha="c" * 40,
             clone_dir=tmp_path,
             package_dir=package_dir,
-            manifest=parse_methods_toml(ProbePackageTestData.MANIFEST_EXPORTING_EVERYTHING),
+            manifest=parse_methods_toml(ProbePackageCases.MANIFEST_EXPORTING_EVERYTHING),
         )
         mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package", return_value=fetched)
         mocker.patch("pipelex.methods.fetch_on_miss.install_method_package", side_effect=MethodInstallError("The install target is occupied."))
 
         with pytest.raises(MethodInstallError):
-            await validate_bundle(mthds_contents=[ProbePackageTestData.CONSUMER_BUNDLE])
+            await validate_bundle(mthds_contents=[ProbePackageCases.CONSUMER_BUNDLE])
 
     async def test_a_host_library_directory_s_unresolved_reference_is_no_verdict(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A host's own directories load untranslated: their refusal is the host's fault, never the caller's verdict."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         host_dir = tmp_path / "host-library"
         host_dir.mkdir()
-        write_consumer(root=host_dir, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        write_consumer(root=host_dir, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
 
         with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
             acquire_library(library_id="", library_dirs=[str(host_dir)])

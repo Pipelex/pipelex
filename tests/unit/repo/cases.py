@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class HostedAccountCheckTestData:
+class HostedAccountCheckCases:
     """An account the hosted end-to-end cases expect, as the environment states it, and the `/v1/me` answers to it."""
 
     KEY_ENV = "PIPELEX_API_KEY"
@@ -35,7 +35,7 @@ class HostedAccountCheckTestData:
     }
 
 
-class SlowTestMarkerTestData:
+class SlowTestMarkerCases:
     """A duration map around a one-second threshold, and the node ids it holds or misses."""
 
     THRESHOLD_SECONDS = 1.0

@@ -13,13 +13,13 @@ from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
-from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_HTML, STORED_JSON_OBJ, STORED_TEXT, StoredValueTestData
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_HTML, STORED_JSON_OBJ, STORED_TEXT, StoredValueCases
 
 _REFERENCED_CASES: list[tuple[NativeConceptCode, type[StoredValueContent], dict[str, Any]]] = [
-    (NativeConceptCode.TEXT, TextContent, StoredValueTestData.TEXT_REFERENCE),
-    (NativeConceptCode.MARKDOWN, MarkdownContent, StoredValueTestData.MARKDOWN_REFERENCE),
-    (NativeConceptCode.HTML, HtmlContent, StoredValueTestData.HTML_REFERENCE),
-    (NativeConceptCode.JSON, JSONContent, StoredValueTestData.JSON_REFERENCE),
+    (NativeConceptCode.TEXT, TextContent, StoredValueCases.TEXT_REFERENCE),
+    (NativeConceptCode.MARKDOWN, MarkdownContent, StoredValueCases.MARKDOWN_REFERENCE),
+    (NativeConceptCode.HTML, HtmlContent, StoredValueCases.HTML_REFERENCE),
+    (NativeConceptCode.JSON, JSONContent, StoredValueCases.JSON_REFERENCE),
 ]
 
 

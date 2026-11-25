@@ -27,7 +27,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import StructuredCompatibilityTestData
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import StructuredCompatibilityCases
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for_pipe_compose import (
     Employee,
     Location,
@@ -71,7 +71,7 @@ class TestPipeComposeStructuredCompatibility:
             {
                 "description": "Compose PersonHolder with exact Person type",
                 "inputs": {"input_person": "Text"},
-                "construct": StructuredCompatibilityTestData.EXACT_TYPE_CONSTRUCT,
+                "construct": StructuredCompatibilityCases.EXACT_TYPE_CONSTRUCT,
                 "output": "compose_structured_test.PersonHolder",
             }
         )
@@ -127,7 +127,7 @@ class TestPipeComposeStructuredCompatibility:
             {
                 "description": "Compose PersonHolder with structurally equivalent Employee",
                 "inputs": {"input_employee": "Text"},
-                "construct": StructuredCompatibilityTestData.EQUIVALENT_CLASS_CONSTRUCT,
+                "construct": StructuredCompatibilityCases.EQUIVALENT_CLASS_CONSTRUCT,
                 "output": "compose_structured_test.PersonHolder",
             }
         )
@@ -184,7 +184,7 @@ class TestPipeComposeStructuredCompatibility:
             {
                 "description": "Compose EmployeeHolder with structurally equivalent Person",
                 "inputs": {"input_person": "Text"},
-                "construct": StructuredCompatibilityTestData.REVERSE_EQUIVALENT_CONSTRUCT,
+                "construct": StructuredCompatibilityCases.REVERSE_EQUIVALENT_CONSTRUCT,
                 "output": "compose_structured_test.EmployeeHolder",
             }
         )
@@ -241,7 +241,7 @@ class TestPipeComposeStructuredCompatibility:
             {
                 "description": "Compose PersonHolder with Manager subclass",
                 "inputs": {"input_manager": "Text"},
-                "construct": StructuredCompatibilityTestData.SUBCLASS_TO_BASE_CONSTRUCT,
+                "construct": StructuredCompatibilityCases.SUBCLASS_TO_BASE_CONSTRUCT,
                 "output": "compose_structured_test.PersonHolder",
             }
         )
@@ -301,7 +301,7 @@ class TestPipeComposeStructuredCompatibility:
             {
                 "description": "Compose PersonHolder with incompatible Location",
                 "inputs": {"input_location": "Text"},
-                "construct": StructuredCompatibilityTestData.INCOMPATIBLE_CONSTRUCT,
+                "construct": StructuredCompatibilityCases.INCOMPATIBLE_CONSTRUCT,
                 "output": "compose_structured_test.PersonHolder",
             }
         )

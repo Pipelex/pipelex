@@ -46,7 +46,7 @@ REAL_RUN_SAME_SITE_PAGES: list[tuple[str, str]] = [
 ]
 
 
-class SearchSourcesTestData:
+class SearchSourcesCases:
     """Sourced answers, as the sources a provider listed and the answer citing them.
 
     `NO_DUPLICATE_CASES` tuples: (topic, sources as (url, title) pairs, answer, renumber_citations).

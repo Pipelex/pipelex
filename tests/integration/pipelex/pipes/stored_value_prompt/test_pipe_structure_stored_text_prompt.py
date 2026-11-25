@@ -16,7 +16,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, STORED_TEXT_URL, StoredValuePromptTestData
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, STORED_TEXT_URL, StoredValuePromptCases
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import RecordingContentGenerator
 
 
@@ -46,7 +46,7 @@ class TestPipeStructureStoredTextPrompt:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.TEXT),
-                content=TextContent.model_validate(StoredValuePromptTestData.TEXT_REFERENCE),
+                content=TextContent.model_validate(StoredValuePromptCases.TEXT_REFERENCE),
                 name="draft_text",
             ),
         )

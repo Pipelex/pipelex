@@ -4,7 +4,7 @@ from typing import ClassVar
 from pipelex.cogt.doc_gen.layout_tree import LayoutScalar
 
 
-class LayoutDisplayTestData:
+class LayoutDisplayCases:
     """Each scalar case: (value, its text). Each numeric column case: (topic, values, whether the column is numeric)."""
 
     SCALAR_CASES: ClassVar[list[tuple[LayoutScalar, str]]] = [

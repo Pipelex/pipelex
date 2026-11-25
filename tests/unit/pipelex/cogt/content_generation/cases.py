@@ -292,7 +292,7 @@ def _field(**blueprint: Any) -> ConceptStructureBlueprint:
     return ConceptStructureBlueprint.model_validate({"description": "A field", **blueprint})
 
 
-class SchemaRebuildTestData:
+class SchemaRebuildCases:
     # Shapes outside the subset and names no field can take, each with a fragment its refusal names.
     REFUSED_SCHEMAS: ClassVar[list[tuple[str, dict[str, Any], str]]] = [
         ("unknown root keyword", {**_object(), "x-python-import": {"module": "os", "name": "system"}}, "x-python-import"),

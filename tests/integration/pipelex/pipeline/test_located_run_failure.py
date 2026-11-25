@@ -20,7 +20,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_bridge.direct_orchestrator import DirectOrchestrator
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipeline.cases import LocatedRunFailureTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureCases
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -86,20 +86,20 @@ class TestLocatedRunFailure:
     async def _run_parallel_failure(self, *, pipe_run: PipeRunProtocol | None = None) -> PipelineExecutionError:
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=_dry_mock_config(), pipe_run=pipe_run)
         with pytest.raises(PipelineExecutionError) as exc_info:
-            await runner.execute(pipe_code="flow", mthds_contents=[LocatedRunFailureTestData.PARALLEL_MTHDS])
+            await runner.execute(pipe_code="flow", mthds_contents=[LocatedRunFailureCases.PARALLEL_MTHDS])
         return exc_info.value
 
     async def test_unserved_model_is_reported_at_the_failing_step(self) -> None:
         """The model example: the failing step, its path and the model error's own identity, code and sentence."""
         runner = PipelexMTHDSProtocol()
         with pytest.raises(PipelineExecutionError) as exc_info:
-            await runner.execute(pipe_code="two_steps", mthds_contents=[LocatedRunFailureTestData.MODEL_MTHDS], inputs={"topic": "cats"})
+            await runner.execute(pipe_code="two_steps", mthds_contents=[LocatedRunFailureCases.MODEL_MTHDS], inputs={"topic": "cats"})
         error = exc_info.value
 
         assert error.pipe_code == "summarize"
         assert error.pipe_stack == ["two_steps", "summarize"]
 
-        unserved_handle = LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
+        unserved_handle = LocatedRunFailureCases.UNSERVED_MODEL_HANDLE
         caller = error.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.MODEL_UNKNOWN
         assert caller.title == error_code_spec(CoreCode.MODEL_UNKNOWN).title
@@ -153,7 +153,7 @@ class TestLocatedRunFailure:
         """Two branches give a list to a single field: the problem names the first, and one item names each."""
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=_dry_mock_config())
         with pytest.raises(PipelineExecutionError) as exc_info:
-            await runner.execute(pipe_code="flow", mthds_contents=[LocatedRunFailureTestData.PARALLEL_TWO_MULTIPLICITIES_MTHDS])
+            await runner.execute(pipe_code="flow", mthds_contents=[LocatedRunFailureCases.PARALLEL_TWO_MULTIPLICITIES_MTHDS])
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.PIPE_OUTPUT_MULTIPLICITY
@@ -174,7 +174,7 @@ class TestLocatedRunFailure:
         """A root fault of the caller's own method reads its code's sentence, located at the failing pipe."""
         runner = PipelexMTHDSProtocol()
         with pytest.raises(PipelineExecutionError) as exc_info:
-            await runner.execute(pipe_code="force_flow", mthds_contents=[LocatedRunFailureTestData.FORCE_MTHDS], inputs={})
+            await runner.execute(pipe_code="force_flow", mthds_contents=[LocatedRunFailureCases.FORCE_MTHDS], inputs={})
         error = exc_info.value
 
         assert error.pipe_code == "force_echo"

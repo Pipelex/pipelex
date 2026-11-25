@@ -31,12 +31,12 @@ from pipelex.cogt.inference.error_classify import ClassificationResult, Inferenc
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
 
 if TYPE_CHECKING:
     from pipelex.errors.error_codes import ErrorCode
 
-_TestData = DirectProviderQuotaTestData
+_TestData = DirectProviderQuotaCases
 
 # Every error Bedrock's runtime API declares, with its status, from botocore's own model of the service, so a code AWS
 # adds is covered without editing this list

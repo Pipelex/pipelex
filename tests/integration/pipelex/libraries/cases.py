@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 
-class InstalledNotesPackageTestData:
+class InstalledNotesPackageCases:
     """A consumer bundle and an installed method package it references by address; nothing here is real."""
 
     METHOD_NAME: ClassVar[str] = "notes"
@@ -99,7 +99,7 @@ prompt      = "Digest the notes about $query."
 """
 
 
-class ProbePackageTestData:
+class ProbePackageCases:
     """An installed method package whose sequence calls its own helper, and consumers of it; nothing here is real.
 
     The helpers' descriptions say whose they are, so a graph or a resolved pipe tells which one a call reached.
@@ -222,7 +222,7 @@ steps       = [{{ pipe = "{pipe_ref}", result = "out" }}]
 """
 
 
-class TwoPackagesSharingADomainTestData:
+class TwoPackagesSharingADomainCases:
     """Two installed packages that both declare `shared.entry` calling `shared.helper`; nothing here is real."""
 
     PACKAGES: ClassVar[dict[str, str]] = {"left": "github.com/invented/left-lib/left", "right": "github.com/invented/right-lib/right"}
@@ -271,7 +271,7 @@ steps       = [
 """
 
 
-class TwoDomainPackageTestData:
+class TwoDomainPackageCases:
     """An installed package with two domains declaring the same pipe code, exporting only one of them; nothing here is real."""
 
     METHOD_NAME: ClassVar[str] = "twodom"
@@ -310,7 +310,7 @@ prompt      = "x: $data"
 """
 
 
-class FailedExportWithAPrivateNamesakeTestData:
+class FailedExportWithAPrivateNamesakeCases:
     """A probe package whose exported `dom_a.x` fails to build while a private `dom_b.x` of the same code loads; nothing here is real.
 
     `dom_a.entry` names `x` through the package's own alias and no domain, and `dom_a.other` reaches the private `dom_b.x`.
@@ -363,7 +363,7 @@ prompt      = "private x: $data"
 """
 
 
-class LedgerPackageTestData:
+class LedgerPackageCases:
     """An installed method package whose sequence binds fields of its own `Invoice`, and consumers binding the same; nothing here is real.
 
     A package's concept reaches a consumer's sequence as the output of one of the package's pipes, or as a field the consumer types
@@ -504,7 +504,7 @@ steps       = [
 """
 
 
-class FetchedDependencyLockTestData:
+class FetchedDependencyLockCases:
     """A calling method, the package it calls by address and fetches on a miss, and the locks it could carry; nothing here is real."""
 
     DEP_ALIAS: ClassVar[str] = "github.com/pipelex-tests/fom-lock-methods/scoring"

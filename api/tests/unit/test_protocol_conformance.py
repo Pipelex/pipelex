@@ -49,7 +49,7 @@ from pipelex_api.routes.version import router as version_router
 from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV
 from pipelex_api.security import verify_api_key
 from tests.unit._constants import VALID_MTHDS
-from tests.unit.cases import ProblemTestData
+from tests.unit.cases import ProblemCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -194,7 +194,7 @@ class TestProtocolConformance:
             {
                 "COMPLETION_CALLBACK_SECRET": completion_secret,
                 COMPLETION_CALLBACK_URL_ENV: f"{receiver_base}/runs/complete/{{pipeline_run_id}}",
-                CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET,
+                CALLER_WEBHOOK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLER_WEBHOOK_SECRET,
             },
         )
 
@@ -283,5 +283,5 @@ class TestProtocolConformance:
         headers = caller_delivery["headers"]
         assert headers["webhook-id"].startswith("whd_")
         signed_content = f"{headers['webhook-id']}.{headers['webhook-timestamp']}.".encode() + caller_delivery["body"]
-        mac = hmac.new(ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_KEY, signed_content, hashlib.sha256).digest()
+        mac = hmac.new(ProblemCases.SYNTHETIC_CALLER_WEBHOOK_KEY, signed_content, hashlib.sha256).digest()
         assert headers["webhook-signature"] == f"v1,{base64.b64encode(mac).decode('ascii')}"

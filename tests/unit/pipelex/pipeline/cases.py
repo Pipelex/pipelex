@@ -19,7 +19,7 @@ def _data_url(*, mime_type: str, raw_bytes: bytes) -> str:
     return f"data:{mime_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
 
 
-class InputRefusalNamingTestData:
+class InputRefusalNamingCases:
     """File-input refusals that each name the root input as `input` and the path down to the file as the location's `field`."""
 
     FINE_URL = "https://example.com/a.pdf"

@@ -20,7 +20,7 @@ _ONE_CELL_ROWS = [
 ]
 
 
-class MarkdownFormattingTestData:
+class MarkdownFormattingCases:
     """Markdown texts the formatting tests read, and what each formats into."""
 
     # A header of three thousand columns over three hundred one-character rows: nine hundred thousand cells, which the

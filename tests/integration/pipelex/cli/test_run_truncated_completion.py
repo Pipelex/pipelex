@@ -14,7 +14,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
-from tests.integration.pipelex.cli.cases import TruncatedCompletionRunTestData
+from tests.integration.pipelex.cli.cases import TruncatedCompletionRunCases
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -29,9 +29,7 @@ def _truncating_worker() -> OpenAICompletionsLLMWorker:
         "object": "chat.completion",
         "created": 0,
         "model": "stand-in-gpt-1",
-        "choices": [
-            {"index": 0, "finish_reason": "length", "message": {"role": "assistant", "content": TruncatedCompletionRunTestData.PARTIAL_TEXT}}
-        ],
+        "choices": [{"index": 0, "finish_reason": "length", "message": {"role": "assistant", "content": TruncatedCompletionRunCases.PARTIAL_TEXT}}],
         "usage": {"prompt_tokens": 12, "completion_tokens": 64, "total_tokens": 76},
     }
 
@@ -46,7 +44,7 @@ def _truncating_worker() -> OpenAICompletionsLLMWorker:
     )
     inference_model = InferenceModelSpec(
         backend_name="stand_in",
-        name=TruncatedCompletionRunTestData.MODEL_HANDLE,
+        name=TruncatedCompletionRunCases.MODEL_HANDLE,
         sdk="openai",
         model_type=ModelType.LLM,
         model_id="stand-in-gpt-1",
@@ -86,11 +84,11 @@ class TestRunTruncatedCompletion:
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=console)
         monkeypatch.setenv("COLUMNS", "400")
         bundle_path = tmp_path / "truncated_completion.mthds"
-        bundle_path.write_text(TruncatedCompletionRunTestData.MTHDS, encoding="utf-8")
+        bundle_path.write_text(TruncatedCompletionRunCases.MTHDS, encoding="utf-8")
 
         with pytest.raises(typer.Exit) as exit_info:
             await _execute_run(
-                pipe_code=TruncatedCompletionRunTestData.PIPE_CODE,
+                pipe_code=TruncatedCompletionRunCases.PIPE_CODE,
                 bundle_path=str(bundle_path),
                 inputs='{"topic": "cats"}',
                 save_working_memory=False,
@@ -109,8 +107,8 @@ class TestRunTruncatedCompletion:
         assert exit_info.value.exit_code == 1
         captured = capsys.readouterr()
         printed = captured.err
-        pipe_code = TruncatedCompletionRunTestData.PIPE_CODE
-        model_handle = TruncatedCompletionRunTestData.MODEL_HANDLE
+        pipe_code = TruncatedCompletionRunCases.PIPE_CODE
+        model_handle = TruncatedCompletionRunCases.MODEL_HANDLE
         assert f"Failed to execute pipeline '{pipe_code}'" in printed
         assert f"Pipe '{pipe_code}' failed: " in printed
         assert (
@@ -121,6 +119,6 @@ class TestRunTruncatedCompletion:
         # The panel names the problem's code and where it happened.
         assert "Code:      model.output_truncated (domain method, retry no)" in printed
         assert f"Location:  pipe '{pipe_code}', path {pipe_code}" in printed
-        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in printed
-        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in captured.out
+        assert TruncatedCompletionRunCases.PARTIAL_TEXT not in printed
+        assert TruncatedCompletionRunCases.PARTIAL_TEXT not in captured.out
         assert "Failed to execute pipeline" not in console.export_text()

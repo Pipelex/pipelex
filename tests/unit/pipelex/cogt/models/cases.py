@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 
-class ModelDeckCheckTestData:
+class ModelDeckCheckCases:
     # Every name `TestModelDeckCheck`'s deck holds, under every kind and spelling, plus names it holds nowhere,
     # so a check made in any model type meets references it accepts and references it refuses.
     EVERY_REFERENCE: ClassVar[list[str]] = [
@@ -37,7 +37,7 @@ class ModelDeckCheckTestData:
     ]
 
 
-class UnservedReferenceTestData:
+class UnservedReferenceCases:
     # The one model the deck serves, as an LLM.
     SERVED_HANDLE = "served-model"
     # A model a catalog of the deployment declares on a backend it does not enable, as `claude-4.5-haiku` is with

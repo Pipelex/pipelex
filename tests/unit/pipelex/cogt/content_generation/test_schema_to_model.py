@@ -31,7 +31,7 @@ from tests.unit.pipelex.cogt.content_generation.cases import (
     Pets,
     PlainDefaults,
     RingEnd,
-    SchemaRebuildTestData,
+    SchemaRebuildCases,
     SetDefaults,
     SharedTitles,
     TitledTypes,
@@ -604,7 +604,7 @@ class TestSchemaToModel:
             SchemaToModelFactory._schema_cache.clear()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             SchemaToModelFactory._schema_cache.update(saved_cache)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-    @pytest.mark.parametrize(("topic", "schema", "expected_fragment"), SchemaRebuildTestData.REFUSED_SCHEMAS)
+    @pytest.mark.parametrize(("topic", "schema", "expected_fragment"), SchemaRebuildCases.REFUSED_SCHEMAS)
     def test_a_schema_outside_the_subset_is_refused(self, topic: str, schema: dict[str, Any], expected_fragment: str) -> None:
         """Each shape outside the supported subset, and each field name no class can hold, is refused by name."""
         with pytest.raises(UnsupportedSchemaError) as exc_info:

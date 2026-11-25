@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 
 
-class FalErrorHandlingTestData:
+class FalErrorHandlingCases:
     """Test cases for FAL ImgGen worker SDK exception handling.
 
     Each tuple: (topic, status_code, message, expected_category, expected_user_action_kind)

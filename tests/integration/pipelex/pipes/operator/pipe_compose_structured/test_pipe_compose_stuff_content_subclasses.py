@@ -36,7 +36,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.urls import URLs
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import StuffContentSubclassTestData
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import StuffContentSubclassCases
 
 
 @pytest.mark.dry_runnable
@@ -77,7 +77,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose image gallery with single image",
                 "inputs": {"cover": "Image"},
-                "construct": StuffContentSubclassTestData.IMAGE_GALLERY_SINGLE_CONSTRUCT,
+                "construct": StuffContentSubclassCases.IMAGE_GALLERY_SINGLE_CONSTRUCT,
                 "output": "compose_structured_test.ImageGallery",
             }
         )
@@ -148,7 +148,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose image gallery with multiple images",
                 "inputs": {"cover": "Image", "featured": "Image"},
-                "construct": StuffContentSubclassTestData.IMAGE_GALLERY_CONSTRUCT,
+                "construct": StuffContentSubclassCases.IMAGE_GALLERY_CONSTRUCT,
                 "output": "compose_structured_test.ImageGallery",
             }
         )
@@ -213,7 +213,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose document archive with document content",
                 "inputs": {"main_pdf": "Document", "supplement_pdf": "Document"},
-                "construct": StuffContentSubclassTestData.DOCUMENT_ARCHIVE_CONSTRUCT,
+                "construct": StuffContentSubclassCases.DOCUMENT_ARCHIVE_CONSTRUCT,
                 "output": "compose_structured_test.DocumentArchive",
             }
         )
@@ -278,7 +278,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose metrics with number content",
                 "inputs": {"primary_metric": "Number", "secondary_metric": "Number"},
-                "construct": StuffContentSubclassTestData.METRICS_CONSTRUCT,
+                "construct": StuffContentSubclassCases.METRICS_CONSTRUCT,
                 "output": "compose_structured_test.Metrics",
             }
         )
@@ -337,7 +337,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose code snippet with mermaid diagram",
                 "inputs": {"mermaid_diagram": "Text"},
-                "construct": StuffContentSubclassTestData.CODE_SNIPPET_CONSTRUCT,
+                "construct": StuffContentSubclassCases.CODE_SNIPPET_CONSTRUCT,
                 "output": "compose_structured_test.CodeSnippet",
             }
         )
@@ -395,7 +395,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose web content with HTML block",
                 "inputs": {"html_content": "Text"},
-                "construct": StuffContentSubclassTestData.WEB_CONTENT_CONSTRUCT,
+                "construct": StuffContentSubclassCases.WEB_CONTENT_CONSTRUCT,
                 "output": "compose_structured_test.WebContent",
             }
         )
@@ -457,7 +457,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose data payload with JSON content",
                 "inputs": {"json_data": "JSON"},
-                "construct": StuffContentSubclassTestData.DATA_PAYLOAD_CONSTRUCT,
+                "construct": StuffContentSubclassCases.DATA_PAYLOAD_CONSTRUCT,
                 "output": "compose_structured_test.DataPayload",
             }
         )
@@ -531,7 +531,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose mixed media report",
                 "inputs": {"cover": "Image", "main_pdf": "Document", "primary_metric": "Number"},
-                "construct": StuffContentSubclassTestData.MIXED_MEDIA_CONSTRUCT,
+                "construct": StuffContentSubclassCases.MIXED_MEDIA_CONSTRUCT,
                 "output": "compose_structured_test.MixedMediaReport",
             }
         )
@@ -596,7 +596,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose gallery with list of images",
                 "inputs": {"image_list": "Image"},
-                "construct": StuffContentSubclassTestData.IMAGE_LIST_GALLERY_CONSTRUCT,
+                "construct": StuffContentSubclassCases.IMAGE_LIST_GALLERY_CONSTRUCT,
                 "output": "compose_structured_test.ImageListGallery",
             }
         )
@@ -658,7 +658,7 @@ class TestPipeComposeStuffContentSubclasses:
             {
                 "description": "Compose bundle with list of PDFs",
                 "inputs": {"pdf_list": "Document"},
-                "construct": StuffContentSubclassTestData.DOCUMENT_BUNDLE_CONSTRUCT,
+                "construct": StuffContentSubclassCases.DOCUMENT_BUNDLE_CONSTRUCT,
                 "output": "compose_structured_test.DocumentBundle",
             }
         )

@@ -27,7 +27,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from tests.unit.pipelex.libraries.cases import CrateQualificationTestData
+from tests.unit.pipelex.libraries.cases import CrateQualificationCases
 
 
 def _report_structure(result: QualifiedCrateContent) -> dict[str, ConceptStructureBlueprint]:
@@ -41,49 +41,49 @@ class TestCrateQualification:
     # --- every ref kind the pass advertises, read back out of the result ---
 
     def test_concept_refines(self):
-        detailed = qualify_crate(CrateQualificationTestData.crate()).concepts["alpha.Detailed"]
+        detailed = qualify_crate(CrateQualificationCases.crate()).concepts["alpha.Detailed"]
         assert isinstance(detailed, ConceptBlueprint)
         assert detailed.refines == "alpha.Report"
 
     def test_structure_field_refs(self):
-        structure = _report_structure(qualify_crate(CrateQualificationTestData.crate()))
+        structure = _report_structure(qualify_crate(CrateQualificationCases.crate()))
         assert structure["label"].concept_ref == "alpha.Category"
         assert structure["tags"].item_concept_ref == "alpha.Category"
 
     def test_pipe_io_refs(self):
-        leaf = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.leaf"]
+        leaf = qualify_crate(CrateQualificationCases.crate()).pipes["alpha.leaf"]
         assert leaf.inputs == {"item": "alpha.Category"}
         assert leaf.output == "alpha.Report"
 
     def test_multiplicity_markers_survive_qualification(self):
-        batched = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.batched"]
+        batched = qualify_crate(CrateQualificationCases.crate()).pipes["alpha.batched"]
         assert batched.inputs == {"items": "alpha.Category[]"}
         assert batched.output == "alpha.Report[]"
 
     def test_sequence_step_refs(self):
-        sequence = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.seq"]
+        sequence = qualify_crate(CrateQualificationCases.crate()).pipes["alpha.seq"]
         assert isinstance(sequence, PipeSequenceBlueprint)
         assert [step.pipe for step in sequence.pipe_steps] == ["alpha.leaf"]
 
     def test_parallel_branch_refs(self):
-        parallel = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.par"]
+        parallel = qualify_crate(CrateQualificationCases.crate()).pipes["alpha.par"]
         assert isinstance(parallel, PipeParallelBlueprint)
         assert [branch.pipe for branch in parallel.branches] == ["alpha.leaf"]
 
     def test_condition_outcome_refs(self):
-        condition = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.cond"]
+        condition = qualify_crate(CrateQualificationCases.crate()).pipes["alpha.cond"]
         assert isinstance(condition, PipeConditionBlueprint)
         assert condition.outcomes == {"hit": "alpha.leaf"}
         assert condition.default_outcome == "alpha.leaf"
 
     def test_batch_branch_ref(self):
-        batched = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.batched"]
+        batched = qualify_crate(CrateQualificationCases.crate()).pipes["alpha.batched"]
         assert isinstance(batched, PipeBatchBlueprint)
         assert batched.branch_pipe_code == "alpha.leaf"
 
     def test_string_described_concept_passes_through(self):
         """A description holds no refs — it must come back as the same string, not a blueprint."""
-        assert qualify_crate(CrateQualificationTestData.crate()).concepts["alpha.Category"] == "a category"
+        assert qualify_crate(CrateQualificationCases.crate()).concepts["alpha.Category"] == "a category"
 
     # --- the rule itself: a bare ref is its own domain's, whoever else declares the code ---
 
@@ -94,7 +94,7 @@ class TestCrateQualification:
         only one domain exists, so every other test in this module would pass just as happily under
         the deleted rule. This one is what pins the rule that was actually chosen.
         """
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         crate.pipes["beta.only_here"] = PipeLLMBlueprint(description="beta's pipe", output="Text", prompt="go")
         crate.pipes["alpha.calls_sibling"] = PipeSequenceBlueprint(
             description="calls a code only beta declares",
@@ -111,7 +111,7 @@ class TestCrateQualification:
         """Ambiguity was a consequence of searching. Nothing is searched for, so nothing is ambiguous —
         an unrelated domain declaring `leaf` cannot change what `alpha.seq` means.
         """
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         crate.pipes["beta.leaf"] = PipeLLMBlueprint(description="beta's own leaf", output="Text", prompt="go")
         crate.domains["beta"] = DomainBlueprint(code="beta", description="beta domain")
 
@@ -121,7 +121,7 @@ class TestCrateQualification:
 
     def test_cross_package_refs_pass_through_untouched(self):
         """`alias->…` refs are the packaging project's to canonicalize; this pass must not touch them."""
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         crate.pipes["alpha.calls_dependency"] = PipeSequenceBlueprint(
             description="calls into a dependency",
             output="Text",
@@ -138,7 +138,7 @@ class TestCrateQualification:
         Exempting it everywhere — which is what the pass did until a review caught it — leaves a real
         reference unqualified, and under the strict lookup an unqualified ref resolves to nothing.
         """
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         crate.pipes["alpha.continue"] = PipeLLMBlueprint(description="a pipe genuinely named continue", output="Text", prompt="go")
         crate.pipes["alpha.calls_continue"] = PipeSequenceBlueprint(
             description="a step naming that pipe",
@@ -152,7 +152,7 @@ class TestCrateQualification:
 
     def test_special_outcomes_pass_through_untouched(self):
         """`fail` / `continue` are outcomes, not pipe refs — in a condition, and only there."""
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         crate.pipes["alpha.route_special"] = PipeConditionBlueprint(
             description="route to special outcomes",
             inputs={"data": "Category"},
@@ -171,7 +171,7 @@ class TestCrateQualification:
 
     def test_input_crate_is_not_mutated(self):
         """The pass runs on a crate the caller still holds — in the library build, one it has cached."""
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         qualify_crate(crate)
 
         sequence = crate.pipes["alpha.seq"]
@@ -186,8 +186,8 @@ class TestCrateQualification:
         """Qualifying an already-qualified ref must be a no-op — `alpha.leaf` must not become
         `alpha.alpha.leaf`. The pass runs in more than one place, so a crate can meet it twice.
         """
-        once = qualify_crate(CrateQualificationTestData.crate())
-        twice = qualify_crate(CrateQualificationTestData.crate().model_copy(update={"concepts": once.concepts, "pipes": once.pipes}))
+        once = qualify_crate(CrateQualificationCases.crate())
+        twice = qualify_crate(CrateQualificationCases.crate().model_copy(update={"concepts": once.concepts, "pipes": once.pipes}))
         assert twice.concepts == once.concepts
         assert twice.pipes == once.pipes
         # Anti-vacuity: two no-ops would also compare equal, so pin that the compared value is the

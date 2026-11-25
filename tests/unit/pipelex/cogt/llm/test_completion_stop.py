@@ -29,7 +29,7 @@ from pipelex.cogt.llm.completion_stop import (
     classify_stop_reason,
     raise_for_completion_stop,
 )
-from tests.unit.pipelex.cogt.llm.cases import CompletionStopTestData
+from tests.unit.pipelex.cogt.llm.cases import CompletionStopCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -47,7 +47,7 @@ def _literal_values(annotation: object) -> set[str]:
 
 
 class TestCompletionStop:
-    @pytest.mark.parametrize(("_topic", "stop_reason", "expected_outcome"), CompletionStopTestData.STOP_REASON_CASES)
+    @pytest.mark.parametrize(("_topic", "stop_reason", "expected_outcome"), CompletionStopCases.STOP_REASON_CASES)
     def test_each_vocabulary_is_classified(self, _topic: str, stop_reason: str, expected_outcome: CompletionStopOutcome) -> None:
         assert classify_stop_reason(stop_reason=stop_reason, model_handle="test-model") == expected_outcome
 
@@ -73,7 +73,7 @@ class TestCompletionStop:
         assert classify_stop_reason(stop_reason=None, model_handle="test-model") == CompletionStopOutcome.NORMAL
         warning.assert_not_called()
 
-    @pytest.mark.parametrize(("_topic", "status", "incomplete_reason", "expected_outcome"), CompletionStopTestData.RESPONSES_CASES)
+    @pytest.mark.parametrize(("_topic", "status", "incomplete_reason", "expected_outcome"), CompletionStopCases.RESPONSES_CASES)
     def test_a_responses_answer_is_classified(
         self, _topic: str, status: str | None, incomplete_reason: str | None, expected_outcome: CompletionStopOutcome
     ) -> None:

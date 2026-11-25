@@ -15,7 +15,7 @@ from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipe_operators.judge.pipe_judge_blueprint import JudgeQuestionBlueprint, PipeJudgeBlueprint
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
-from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadCases
 
 _BUNDLES_DIR = Path("tests/integration/pipelex/pipes/stored_value_prompt/bundles")
 _TEXT_INPUTS = {"subject": NativeConceptCode.TEXT, "pages": NativeConceptCode.TEXT}
@@ -71,7 +71,7 @@ def _make_pipe(*, kind: str) -> PipeAbstract:
                         "is_long": JudgeQuestionBlueprint(question="Do these pages run long: {{ pages.text }}?"),
                         "is_about": JudgeQuestionBlueprint(question="Is it about {{ subject.text }}?"),
                     },
-                    model=PipeJudgeLoadTestData.JUDGMENT_MODEL,
+                    model=PipeJudgeLoadCases.JUDGMENT_MODEL,
                 ),
                 concept_codes_from_the_same_domain=["PagesVerdicts"],
             )

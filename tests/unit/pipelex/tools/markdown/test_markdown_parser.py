@@ -13,7 +13,7 @@ from pipelex.tools.markdown.markdown_parser import (
     table_cells_bound,
 )
 from pipelex.tools.markdown.markdown_rules import plain_text
-from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingCases
 
 # The pieces the generated documents are made of: emphasis and its unmatched delimiters, links, references and
 # images, tables in and out of containers, padded rows, code, escapes, and every line ending markdown-it knows,
@@ -114,8 +114,8 @@ class TestMarkdownParser:
     @pytest.mark.parametrize(
         ("markdown_text", "expected_text"),
         [
-            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
-            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_EMPHASIS, MarkdownFormattingCases.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_MIXED_EMPHASIS, MarkdownFormattingCases.DEEP_MIXED_EMPHASIS_TEXT),
         ],
     )
     def test_a_syntax_tree_caps_inline_nesting_and_keeps_the_text(self, markdown_text: str, expected_text: str) -> None:

@@ -15,17 +15,17 @@ from tests.unit.pipelex.core.stuffs.stored_value.cases import (
     STORED_JSON_OBJ,
     STORED_TEXT,
     TEXT_URL,
-    StoredValueTestData,
+    StoredValueCases,
 )
 
 # A pretty print is a display, which describes a reference never loaded rather than refusing it.
 _RENDERERS = ["rendered_plain", "rendered_markdown", "rendered_html", "rendered_json"]
 
 _REFERENCED_CONTENTS = [
-    pytest.param(lambda: TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE), id="Text"),
-    pytest.param(lambda: MarkdownContent.model_validate(StoredValueTestData.MARKDOWN_REFERENCE), id="Markdown"),
-    pytest.param(lambda: HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE), id="Html"),
-    pytest.param(lambda: JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE), id="JSON"),
+    pytest.param(lambda: TextContent.model_validate(StoredValueCases.TEXT_REFERENCE), id="Text"),
+    pytest.param(lambda: MarkdownContent.model_validate(StoredValueCases.MARKDOWN_REFERENCE), id="Markdown"),
+    pytest.param(lambda: HtmlContent.model_validate(StoredValueCases.HTML_REFERENCE), id="Html"),
+    pytest.param(lambda: JSONContent.model_validate(StoredValueCases.JSON_REFERENCE), id="JSON"),
 ]
 
 
@@ -58,9 +58,9 @@ class TestStoredValueRendering:
     @pytest.mark.parametrize(
         ("make_content", "loaded_value", "expected_plain"),
         [
-            (lambda: TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE), STORED_TEXT, STORED_TEXT),
-            (lambda: MarkdownContent.model_validate(StoredValueTestData.MARKDOWN_REFERENCE), STORED_TEXT, STORED_TEXT),
-            (lambda: HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE), STORED_HTML, STORED_HTML),
+            (lambda: TextContent.model_validate(StoredValueCases.TEXT_REFERENCE), STORED_TEXT, STORED_TEXT),
+            (lambda: MarkdownContent.model_validate(StoredValueCases.MARKDOWN_REFERENCE), STORED_TEXT, STORED_TEXT),
+            (lambda: HtmlContent.model_validate(StoredValueCases.HTML_REFERENCE), STORED_HTML, STORED_HTML),
         ],
     )
     def test_a_loaded_reference_renders_its_value_as_the_inline_form_does(
@@ -78,7 +78,7 @@ class TestStoredValueRendering:
         assert content.rendered_json() == inline.rendered_json()
 
     def test_a_loaded_json_reference_renders_its_object(self):
-        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+        content = JSONContent.model_validate(StoredValueCases.JSON_REFERENCE)
         content.accept_loaded_text(text='{"title": "A large JSON document", "items": [1, 2, 3], "nested": {"accent": "é"}}')
         inline = JSONContent(json_obj=STORED_JSON_OBJ)
         assert content.require_json_obj() == STORED_JSON_OBJ
@@ -91,18 +91,18 @@ class TestStoredValueRendering:
         ("content", "expected_desc"),
         [
             (
-                TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE),
-                f"some stored text ({StoredValueTestData.TEXT_REFERENCE['size']} bytes)",
+                TextContent.model_validate(StoredValueCases.TEXT_REFERENCE),
+                f"some stored text ({StoredValueCases.TEXT_REFERENCE['size']} bytes)",
             ),
             (
-                MarkdownContent.model_validate(StoredValueTestData.MARKDOWN_REFERENCE),
-                f"some stored markdown ({StoredValueTestData.MARKDOWN_REFERENCE['size']} bytes)",
+                MarkdownContent.model_validate(StoredValueCases.MARKDOWN_REFERENCE),
+                f"some stored markdown ({StoredValueCases.MARKDOWN_REFERENCE['size']} bytes)",
             ),
             (
-                HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE),
-                f"some stored html ({StoredValueTestData.HTML_REFERENCE['size']} bytes)",
+                HtmlContent.model_validate(StoredValueCases.HTML_REFERENCE),
+                f"some stored html ({StoredValueCases.HTML_REFERENCE['size']} bytes)",
             ),
-            (JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE), "some stored JSON (77 bytes)"),
+            (JSONContent.model_validate(StoredValueCases.JSON_REFERENCE), "some stored JSON (77 bytes)"),
             (TextContent(url=TEXT_URL), "some stored text (size unknown)"),
             (HtmlContent(url=HTML_URL), "some stored html (size unknown)"),
             (TextContent(text="four"), "some text (4 chars)"),

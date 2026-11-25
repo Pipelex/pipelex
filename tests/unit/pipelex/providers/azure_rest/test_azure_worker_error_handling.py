@@ -11,7 +11,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.azure_rest.azure_img_gen_worker import AzureImgGenWorker
-from tests.unit.pipelex.providers.azure_rest.cases import AzureErrorHandlingTestData
+from tests.unit.pipelex.providers.azure_rest.cases import AzureErrorHandlingCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -60,7 +60,7 @@ class TestAzureWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "status_code", "response_text", "expected_category", "expected_user_action_kind"),
-        AzureErrorHandlingTestData.HTTP_STATUS_ERROR_CASES,
+        AzureErrorHandlingCases.HTTP_STATUS_ERROR_CASES,
     )
     async def test_http_status_error_categorization(
         self,
@@ -99,7 +99,7 @@ class TestAzureWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "expected_category", "expected_user_action_kind"),
-        AzureErrorHandlingTestData.CONNECT_ERROR_CASES,
+        AzureErrorHandlingCases.CONNECT_ERROR_CASES,
     )
     async def test_connect_error_is_transient(
         self,
@@ -135,7 +135,7 @@ class TestAzureWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "expected_category", "expected_user_action_kind"),
-        AzureErrorHandlingTestData.TIMEOUT_ERROR_CASES,
+        AzureErrorHandlingCases.TIMEOUT_ERROR_CASES,
     )
     async def test_read_timeout_is_ambiguous(
         self,

@@ -18,7 +18,7 @@ from pipelex.tools.markdown.markdown_formatting import (
     format_markdown_within_budget,
     spans_text,
 )
-from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingCases
 
 
 def _formatted(*, markdown: str) -> FormattedMarkdown:
@@ -110,7 +110,7 @@ class TestMarkdownFormatting:
             FormattedListItem(list_depth=1, marker="•", heading_level=1, spans=[TextSpan(text="Title")]),
         ]
 
-    @pytest.mark.parametrize(("topic", "markdown", "expected"), MarkdownFormattingTestData.NESTING_CASES)
+    @pytest.mark.parametrize(("topic", "markdown", "expected"), MarkdownFormattingCases.NESTING_CASES)
     def test_a_nested_block_keeps_its_list_and_quote_depths(self, topic: str, markdown: str, expected: list[FormattedBlock]) -> None:
         assert _formatted(markdown=markdown).blocks == expected, topic
 
@@ -193,8 +193,8 @@ class TestMarkdownFormatting:
     @pytest.mark.parametrize(
         ("markdown", "expected_text"),
         [
-            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
-            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_EMPHASIS, MarkdownFormattingCases.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_MIXED_EMPHASIS, MarkdownFormattingCases.DEEP_MIXED_EMPHASIS_TEXT),
         ],
     )
     def test_emphasis_nested_hundreds_deep_prints_its_text_emphasized(self, markdown: str, expected_text: str) -> None:
@@ -203,11 +203,11 @@ class TestMarkdownFormatting:
         assert all(isinstance(span, TextSpan) and span.italic for span in spans)
 
     def test_str_is_the_plain_text(self) -> None:
-        assert str(_formatted(markdown=MarkdownFormattingTestData.EVERY_BLOCK)) == MarkdownFormattingTestData.EVERY_BLOCK_PLAIN_TEXT
+        assert str(_formatted(markdown=MarkdownFormattingCases.EVERY_BLOCK)) == MarkdownFormattingCases.EVERY_BLOCK_PLAIN_TEXT
 
     def test_the_plain_text_indents_every_line_of_a_list_item_s_blocks(self) -> None:
-        plain_text = str(_formatted(markdown=MarkdownFormattingTestData.INSIDE_A_LIST_ITEM))
-        assert plain_text == MarkdownFormattingTestData.INSIDE_A_LIST_ITEM_PLAIN_TEXT
+        plain_text = str(_formatted(markdown=MarkdownFormattingCases.INSIDE_A_LIST_ITEM))
+        assert plain_text == MarkdownFormattingCases.INSIDE_A_LIST_ITEM_PLAIN_TEXT
 
     def test_a_text_without_markdown_is_its_plain_text(self) -> None:
         assert str(_formatted(markdown="Payment within 30 days, by transfer.")) == "Payment within 30 days, by transfer."

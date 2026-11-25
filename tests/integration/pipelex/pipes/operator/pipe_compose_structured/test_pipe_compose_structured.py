@@ -23,7 +23,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import ComposeStructuredTestData
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import ComposeStructuredCases
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for_pipe_compose import (
     Address,
     Deal,
@@ -53,7 +53,7 @@ class TestPipeComposeStructured:
         pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
             {
                 "description": "Compose a simple report with fixed values",
-                "construct": ComposeStructuredTestData.FIXED_ONLY_CONSTRUCT,
+                "construct": ComposeStructuredCases.FIXED_ONLY_CONSTRUCT,
                 "output": "compose_structured_test.SimpleReport",
             }
         )
@@ -120,7 +120,7 @@ class TestPipeComposeStructured:
             {
                 "description": "Compose a sales summary from deal data",
                 "inputs": {"deal": "Text"},
-                "construct": ComposeStructuredTestData.MIXED_CONSTRUCT,
+                "construct": ComposeStructuredCases.MIXED_CONSTRUCT,
                 "output": "compose_structured_test.SalesSummary",
             }
         )
@@ -184,7 +184,7 @@ class TestPipeComposeStructured:
             {
                 "description": "Compose a company with nested address",
                 "inputs": {"company_name": "Text", "addr": "Text"},
-                "construct": ComposeStructuredTestData.NESTED_CONSTRUCT,
+                "construct": ComposeStructuredCases.NESTED_CONSTRUCT,
                 "output": "compose_structured_test.Company",
             }
         )

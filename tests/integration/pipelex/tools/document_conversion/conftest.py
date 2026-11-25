@@ -9,7 +9,7 @@ from pipelex.runtime_hub import get_runtime_hub
 from pipelex.tools.document_conversion.document_converter_protocol import DocumentConverterProtocol
 from pipelex.tools.document_conversion.gotenberg_converter import GotenbergConverter
 from pipelex.tools.document_conversion.soffice_converter import SofficeConverter
-from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionTestData
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionCases
 
 _MAX_SOURCE_BYTES = 50_000_000
 
@@ -23,15 +23,15 @@ def document_converter(request: pytest.FixtureRequest) -> DocumentConverterProto
     """
     match request.param:
         case "soffice":
-            binary = os.environ.get(DocumentConversionTestData.SOFFICE_BINARY_ENV_VAR) or DocumentConversionTestData.DEFAULT_SOFFICE_BINARY
+            binary = os.environ.get(DocumentConversionCases.SOFFICE_BINARY_ENV_VAR) or DocumentConversionCases.DEFAULT_SOFFICE_BINARY
             found_binary = shutil.which(binary)
             if found_binary is None:
-                pytest.skip(f"soffice not found: install LibreOffice or set {DocumentConversionTestData.SOFFICE_BINARY_ENV_VAR}")
+                pytest.skip(f"soffice not found: install LibreOffice or set {DocumentConversionCases.SOFFICE_BINARY_ENV_VAR}")
             return SofficeConverter(binary_path=Path(found_binary), timeout_seconds=120, max_source_bytes=_MAX_SOURCE_BYTES)
         case _:
-            gotenberg_url = os.environ.get(DocumentConversionTestData.GOTENBERG_URL_ENV_VAR)
+            gotenberg_url = os.environ.get(DocumentConversionCases.GOTENBERG_URL_ENV_VAR)
             if not gotenberg_url:
-                pytest.skip(f"no Gotenberg container: set {DocumentConversionTestData.GOTENBERG_URL_ENV_VAR}")
+                pytest.skip(f"no Gotenberg container: set {DocumentConversionCases.GOTENBERG_URL_ENV_VAR}")
             return GotenbergConverter(
                 base_url=gotenberg_url,
                 timeout_seconds=360,

@@ -7,7 +7,7 @@ from typing import ClassVar
 _CRATE_DIR: str = "tests/e2e/pipelex/cv_batch_screening/library_crate"
 
 
-class CvBatchScreeningTemporalTestData:
+class CvBatchScreeningTemporalCases:
     """Nested-controller CV batch screening pipeline.
 
     Exercises PipeSequence -> PipeSequence -> PipeBatch -> PipeSequence with PipeExtract +

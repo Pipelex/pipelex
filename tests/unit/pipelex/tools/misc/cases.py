@@ -33,7 +33,7 @@ class ImageData(BaseModel):
     url: str | None = None
 
 
-class PythonLiteralsTestData:
+class PythonLiteralsCases:
     """Strings for the tests of `pipelex.tools.misc.python_literals`."""
 
     # Characters `str.splitlines` treats as line breaks although `inspect.cleandoc` does not.

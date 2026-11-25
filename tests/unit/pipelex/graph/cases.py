@@ -237,7 +237,7 @@ class PreviewTruncationData:
     EXPECTED_TRUNCATED_STACK: ClassVar[str] = "S" * 1997 + "..."
 
 
-class MermaidTestData:
+class MermaidCases:
     """Test data for Mermaid exporter tests."""
 
     GRAPH_ID: ClassVar[str] = "test_run:123"

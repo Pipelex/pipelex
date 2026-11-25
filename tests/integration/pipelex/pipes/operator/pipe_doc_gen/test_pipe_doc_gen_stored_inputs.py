@@ -5,7 +5,7 @@ import pytest
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines
 
 READ_SCOPE = "org_doc_gen"
@@ -15,7 +15,7 @@ _DOCX_BYTES = b"PK docx template bytes"
 
 
 def _bundle_with_notes(*, step_fields: str) -> str:
-    return PipeDocGenTestData.bundle(step_fields=step_fields).replace(
+    return PipeDocGenCases.bundle(step_fields=step_fields).replace(
         'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", notes = "Text" }'
     )
 
@@ -47,7 +47,7 @@ class TestPipeDocGenStoredInputs:
             storage_scope=f"{READ_SCOPE}/mt_doc_gen/run_{uuid4().hex}", read_scope=READ_SCOPE, submitted_files=submitted_files
         ).execute(
             mthds_contents=[_bundle_with_notes(step_fields=step_fields)],
-            inputs={**PipeDocGenTestData.INVOICE_INPUTS, "notes": {"concept": "Text", "content": {"url": notes_url}}},
+            inputs={**PipeDocGenCases.INVOICE_INPUTS, "notes": {"concept": "Text", "content": {"url": notes_url}}},
         )
 
         (job,) = stub_engines.engine.jobs

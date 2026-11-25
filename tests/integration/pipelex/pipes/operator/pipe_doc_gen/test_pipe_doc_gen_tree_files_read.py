@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.core.method_trees.tree_file_reads import TreeFileRead, TreeFileUse
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, write_bundle
 
 _PIPE_REF = "doc_gen_tests.print_invoice"
@@ -80,7 +80,7 @@ class TestPipeDocGenTreeFilesRead:
     async def test_a_file_submitted_with_content_is_named_by_the_path_it_is_keyed_by(self) -> None:
         """Bundles from content strings sit at the root of the tree their files make, so the template's tree path is its key, collapsed."""
         report = await validate_bundles_in_process(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "templates/invoice.docx"')],
+            mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "docx"\ntemplate_file = "templates/invoice.docx"')],
             submitted_files={"./templates/invoice.docx": b"PK docx template bytes"},
         )
 
@@ -88,7 +88,7 @@ class TestPipeDocGenTreeFilesRead:
         assert report.tree_file_readers == {"templates/invoice.docx": [_PIPE_REF]}
 
     async def test_a_step_laying_its_inputs_out_reads_no_file(self) -> None:
-        report = await validate_bundles_in_process(mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)])
+        report = await validate_bundles_in_process(mthds_contents=[PipeDocGenCases.bundle(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP)])
 
         assert report.tree_files_read == {_PIPE_REF: []}
         assert report.tree_file_readers == {}

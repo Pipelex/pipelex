@@ -27,7 +27,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import ContentConversionTestData
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import ContentConversionCases
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for_pipe_compose import (
     MarkdownText,
     TeamMember,
@@ -68,7 +68,7 @@ class TestPipeComposeContentConversions:
             {
                 "description": "Compose report with str field from TextContent",
                 "inputs": {"title_text": "Text"},
-                "construct": ContentConversionTestData.TEXT_TO_STR_CONSTRUCT,
+                "construct": ContentConversionCases.TEXT_TO_STR_CONSTRUCT,
                 "output": "compose_structured_test.ReportWithStrField",
             }
         )
@@ -123,7 +123,7 @@ class TestPipeComposeContentConversions:
             {
                 "description": "Compose report with TextContent field from TextContent",
                 "inputs": {"title_text": "Text"},
-                "construct": ContentConversionTestData.TEXT_TO_TEXT_CONTENT_CONSTRUCT,
+                "construct": ContentConversionCases.TEXT_TO_TEXT_CONTENT_CONSTRUCT,
                 "output": "compose_structured_test.ReportWithTextContent",
             }
         )
@@ -178,7 +178,7 @@ class TestPipeComposeContentConversions:
             {
                 "description": "Compose report with MarkdownText field from MarkdownText",
                 "inputs": {"markdown_input": "Text"},
-                "construct": ContentConversionTestData.MARKDOWN_TO_MARKDOWN_CONSTRUCT,
+                "construct": ContentConversionCases.MARKDOWN_TO_MARKDOWN_CONSTRUCT,
                 "output": "compose_structured_test.ReportWithMarkdown",
             }
         )
@@ -241,7 +241,7 @@ class TestPipeComposeContentConversions:
             {
                 "description": "Compose team report with list[TeamMember] field from ListContent",
                 "inputs": {"team_members": "Text"},
-                "construct": ContentConversionTestData.LIST_TO_LIST_CONSTRUCT,
+                "construct": ContentConversionCases.LIST_TO_LIST_CONSTRUCT,
                 "output": "compose_structured_test.TeamReport",
             }
         )
@@ -305,7 +305,7 @@ class TestPipeComposeContentConversions:
             {
                 "description": "Compose team report with ListContent field from ListContent",
                 "inputs": {"team_members": "Text"},
-                "construct": ContentConversionTestData.LIST_TO_LIST_CONTENT_CONSTRUCT,
+                "construct": ContentConversionCases.LIST_TO_LIST_CONTENT_CONSTRUCT,
                 "output": "compose_structured_test.TeamReportWithListContent",
             }
         )

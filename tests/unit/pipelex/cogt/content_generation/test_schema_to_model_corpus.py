@@ -8,7 +8,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.unit.pipelex.cogt.content_generation.cases import SchemaRebuildTestData
+from tests.unit.pipelex.cogt.content_generation.cases import SchemaRebuildCases
 
 _CORPUS_DOMAIN = "schema_rebuild_corpus"
 
@@ -21,12 +21,12 @@ def _assert_rebuilds_exactly(*, original_schema: dict[str, Any], class_name: str
 
 
 class TestSchemaToModelCorpus:
-    @pytest.mark.parametrize("model_class", _NATIVE_CLASSES + SchemaRebuildTestData.MODEL_CLASSES, ids=lambda model_class: model_class.__name__)
+    @pytest.mark.parametrize("model_class", _NATIVE_CLASSES + SchemaRebuildCases.MODEL_CLASSES, ids=lambda model_class: model_class.__name__)
     def test_a_model_class_rebuilds_into_its_own_schema(self, model_class: type[BaseModel]) -> None:
         """The class rebuilt from a native content class's schema, or from one of every supported shape, has that schema."""
         _assert_rebuilds_exactly(original_schema=model_class.model_json_schema(), class_name=model_class.__name__)
 
-    @pytest.mark.parametrize(("concept_code", "blueprint"), SchemaRebuildTestData.STRUCTURE_BLUEPRINTS)
+    @pytest.mark.parametrize(("concept_code", "blueprint"), SchemaRebuildCases.STRUCTURE_BLUEPRINTS)
     def test_a_concept_structure_rebuilds_into_its_own_schema(self, concept_code: str, blueprint: ConceptBlueprint) -> None:
         """The class rebuilt from the schema of a concept's structure class, as a method declares it, has that schema."""
         concept = ConceptFactory.make_from_blueprint(domain_code=_CORPUS_DOMAIN, concept_code=concept_code, blueprint_or_string_description=blueprint)

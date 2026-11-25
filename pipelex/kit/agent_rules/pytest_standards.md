@@ -47,8 +47,8 @@ class TestFooBar:
     @pytest.mark.parametrize(
         "topic, test_case_blueprint",
         [
-            TestCases.CASE_1,
-            TestCases.CASE_2,
+            PipeProcessingCases.CASE_1,
+            PipeProcessingCases.CASE_2,
         ],
     )
     async def test_pipe_processing(

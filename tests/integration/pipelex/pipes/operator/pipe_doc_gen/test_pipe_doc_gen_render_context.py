@@ -17,7 +17,7 @@ from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFil
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 
 _TEMPLATE = "<h1>{{ invoice.number }}</h1>"
 _PIPE_REF = "doc_gen_tests.print_invoice"
@@ -41,14 +41,14 @@ async def _composed_template_file() -> AsyncGenerator[tuple[ComposedTemplateFile
     try:
         with scoped_current_library(library_id=library_id):
             library_manager.add_submitted_files(library_id=library_id, submitted_files={"invoice.html": _TEMPLATE.encode("utf-8")})
-            bundle = PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')
+            bundle = PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')
             library_manager.load_from_blueprints(library_id=library_id, blueprints=[MthdsParser.make_pipelex_bundle_blueprint(mthds_content=bundle)])
             crate = library_manager.get_crate(library_id=library_id)
             assert crate is not None
             pipe = library_manager.get_library(library_id=library_id).pipe_library.get_required_pipe(pipe_code=_PIPE_REF)
             assert isinstance(pipe, PipeDocGen)
             working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-                {**PipeDocGenTestData.INVOICE_INPUTS, "unread": {"concept": "Text", "content": "Read by no template"}},
+                {**PipeDocGenCases.INVOICE_INPUTS, "unread": {"concept": "Text", "content": "Read by no template"}},
                 concept_provider=get_concept_library(),
                 read_scope=None,
             )
@@ -121,7 +121,7 @@ class TestPipeDocGenRenderContext:
     async def test_libraries_no_print_uses_are_torn_down_beyond_the_capacity_and_one_torn_down_elsewhere_is_loaded_again(self) -> None:
         library_manager = get_library_manager()
         cache = ConceptsLibraryCache(capacity=1)
-        invoice_concepts = _concepts_crate(mthds_content=PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate = "<h1></h1>"'))
+        invoice_concepts = _concepts_crate(mthds_content=PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate = "<h1></h1>"'))
         receipt_concepts = _concepts_crate(mthds_content=_OTHER_CONCEPTS_MTHDS)
         try:
             with cache.library_for(concepts_crate=invoice_concepts) as invoice_library_id:

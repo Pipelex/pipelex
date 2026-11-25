@@ -59,7 +59,7 @@ from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from pipelex_api.routes.pipelex.tools import router as tools_router
 from pipelex_api.security import RequestUser
 from tests.unit._problems import assert_problem, problem_items_fields
-from tests.unit.cases import ProblemTestData, rate_limited_failure
+from tests.unit.cases import ProblemCases, rate_limited_failure
 
 # Crockford Base32, 26 chars — the ULID alphabet RequestIdMiddleware mints.
 _ULID_RE = re.compile(r"\A[0-9A-HJKMNP-TV-Z]{26}\Z")
@@ -251,7 +251,7 @@ async def unexpected_error_route() -> None:
 
 @_router.get("/crafted-retry/{case}")
 async def crafted_retry_route(case: str) -> None:
-    code, retry_after, _, _, _ = ProblemTestData.RETRY_CASES[case]
+    code, retry_after, _, _, _ = ProblemCases.RETRY_CASES[case]
     raise _CraftedRetryError(retry_after=retry_after).with_error_code(code)
 
 
@@ -519,27 +519,27 @@ class TestExceptionHandlers:
         body = response.json()
         assert body["code"] == CoreCode.PROVIDER_RATE_LIMITED
         assert body["retry"] == "yes"
-        assert body["retry_after"] == ProblemTestData.RATE_LIMIT_RETRY_AFTER_SECONDS
+        assert body["retry_after"] == ProblemCases.RATE_LIMIT_RETRY_AFTER_SECONDS
         assert body["next_step"]["kind"] == "wait"
-        assert body["params"] == {"model": ProblemTestData.RATE_LIMIT_MODEL, "provider": ProblemTestData.RATE_LIMIT_BACKEND}
-        assert body["detail"] == ProblemTestData.RATE_LIMIT_DETAIL
+        assert body["params"] == {"model": ProblemCases.RATE_LIMIT_MODEL, "provider": ProblemCases.RATE_LIMIT_BACKEND}
+        assert body["detail"] == ProblemCases.RATE_LIMIT_DETAIL
         # What the provider said rides the operator's diagnostics, never the caller's view.
         assert body["diagnostics"]["error_class"] == "LLMCompletionError"
-        assert body["diagnostics"]["message"] == ProblemTestData.RATE_LIMIT_MESSAGE
-        assert body["diagnostics"]["model"] == ProblemTestData.RATE_LIMIT_MODEL
+        assert body["diagnostics"]["message"] == ProblemCases.RATE_LIMIT_MESSAGE
+        assert body["diagnostics"]["model"] == ProblemCases.RATE_LIMIT_MODEL
         assert body["diagnostics"]["provider"] == {
-            "name": ProblemTestData.RATE_LIMIT_BACKEND,
+            "name": ProblemCases.RATE_LIMIT_BACKEND,
             "status": 429,
-            "request_id": ProblemTestData.RATE_LIMIT_PROVIDER_REQUEST_ID,
+            "request_id": ProblemCases.RATE_LIMIT_PROVIDER_REQUEST_ID,
         }
 
-    @pytest.mark.parametrize("case", list(ProblemTestData.RETRY_CASES))
+    @pytest.mark.parametrize("case", list(ProblemCases.RETRY_CASES))
     @pytest.mark.builds_problems_without_required_params(
         reason="a crafted retryable failure checks the Retry-After header, which no parameter decides"
     )
     def test_retry_after_header_is_guarded(self, case: str):
         """`Retry-After` rides a 429 alone, and only when the delay is a finite, non-negative number, rounded up."""
-        _, _, expected_status, expected_header, expected_retry_after = ProblemTestData.RETRY_CASES[case]
+        _, _, expected_status, expected_header, expected_retry_after = ProblemCases.RETRY_CASES[case]
 
         response = _build_client().get(f"/crafted-retry/{case}")
 
@@ -548,7 +548,7 @@ class TestExceptionHandlers:
         assert response.headers.get("Retry-After") == expected_header
         assert response.json().get("retry_after") == expected_retry_after
 
-    @pytest.mark.parametrize(("code", "expected_status"), ProblemTestData.CODE_STATUSES)
+    @pytest.mark.parametrize(("code", "expected_status"), ProblemCases.CODE_STATUSES)
     @pytest.mark.builds_problems_without_required_params(reason="checks the status each code declares, which no parameter decides")
     def test_the_status_is_the_one_the_code_declares(self, mocker: MockerFixture, code: ErrorCode, expected_status: int):
         """The response's status, the body's `status` member and the record's are the registry's, one value for all three."""
@@ -878,10 +878,10 @@ class TestExceptionHandlers:
         assert fields["error.type"] == "LLMCompletionError"
         assert fields["error_category"] == InferenceErrorCategory.TRANSIENT
         assert fields["retryable"] is True
-        assert fields["backend_name"] == ProblemTestData.RATE_LIMIT_BACKEND
-        assert fields["model_handle"] == ProblemTestData.RATE_LIMIT_MODEL
+        assert fields["backend_name"] == ProblemCases.RATE_LIMIT_BACKEND
+        assert fields["model_handle"] == ProblemCases.RATE_LIMIT_MODEL
         assert fields["provider_status_code"] == 429
-        assert fields["provider_request_id"] == ProblemTestData.RATE_LIMIT_PROVIDER_REQUEST_ID
+        assert fields["provider_request_id"] == ProblemCases.RATE_LIMIT_PROVIDER_REQUEST_ID
 
     def test_unexpected_error_record_names_the_class_that_escaped(self, mocker: MockerFixture):
         # The catch-all's record is the operator's only handle on a failure nothing classified, so it names the class

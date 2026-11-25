@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 
-class DryRunConditionTestData:
+class DryRunConditionCases:
     """Bundles whose dry runs run a condition's every outcome, one per shape an outcome can take."""
 
     REPORT_SHAPE_MTHDS: ClassVar[str] = """

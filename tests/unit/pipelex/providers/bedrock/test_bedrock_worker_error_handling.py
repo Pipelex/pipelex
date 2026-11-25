@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, find_inference_error_category_in_chain
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker
-from tests.unit.pipelex.providers.bedrock.cases import BedrockLLMErrorHandlingTestData
+from tests.unit.pipelex.providers.bedrock.cases import BedrockLLMErrorHandlingCases
 
 
 def _make_bedrock_client_error(error_code: str, error_message: str) -> ClientError:
@@ -71,7 +71,7 @@ class TestBedrockWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "error_code", "error_message", "expected_category", "expected_action_substring"),
-        BedrockLLMErrorHandlingTestData.CLIENT_ERROR_CASES,
+        BedrockLLMErrorHandlingCases.CLIENT_ERROR_CASES,
     )
     async def test_client_error_classification(
         self,

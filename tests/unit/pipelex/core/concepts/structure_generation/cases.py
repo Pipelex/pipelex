@@ -23,7 +23,7 @@ class ShadowingFieldCase(NamedTuple):
     expected_values: dict[str, Any]
 
 
-class ShadowingFieldNamesTestData:
+class ShadowingFieldNamesCases:
     # Names a class written as source would read at module level for its annotations and defaults.
     READ_NAME_CASES: ClassVar[list[ShadowingFieldCase]] = [
         ShadowingFieldCase(
@@ -174,7 +174,7 @@ def _concept(description: str, **fields: ConceptStructureBlueprint) -> ConceptBl
     return ConceptBlueprint(description=description, structure=dict(fields))
 
 
-class StructureParityTestData:
+class StructureParityCases:
     """Concepts with a structure, read by the runtime structure generator and by the `python-structures` emitter alike.
 
     Together they cover every resolved type kind, presence both ways, defaults of every kind, choices, native content

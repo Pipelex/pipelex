@@ -31,7 +31,7 @@ from pipelex.errors.problem import (
     problem_metadata,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from tests.unit.pipelex.errors.cases import ProblemViewsTestData
+from tests.unit.pipelex.errors.cases import ProblemViewsCases
 
 
 class _MisconfiguredError(PipelexError):
@@ -117,48 +117,48 @@ def _nulls_in(value: Any, *, path: str = "") -> list[str]:
 
 class TestProblemViews:
     def test_the_caller_view_has_no_diagnostics_and_the_operator_view_has_them(self) -> None:
-        error = _MisconfiguredError(ProblemViewsTestData.OPERATOR_MESSAGE).with_params(component=ProblemViewsTestData.COMPONENT)
+        error = _MisconfiguredError(ProblemViewsCases.OPERATOR_MESSAGE).with_params(component=ProblemViewsCases.COMPONENT)
 
         operator = error.to_problem(view=ProblemView.OPERATOR)
         caller = error.to_problem(view=ProblemView.CALLER)
 
         assert operator.diagnostics is not None
         assert operator.diagnostics.error_class == "_MisconfiguredError"
-        assert operator.diagnostics.message == ProblemViewsTestData.OPERATOR_MESSAGE
+        assert operator.diagnostics.message == ProblemViewsCases.OPERATOR_MESSAGE
         assert caller.diagnostics is None
         assert "diagnostics" not in caller.to_wire()
-        assert ProblemViewsTestData.OPERATOR_MESSAGE not in str(caller.to_wire())
+        assert ProblemViewsCases.OPERATOR_MESSAGE not in str(caller.to_wire())
         # The same code, domain, verdict and sentence in both views.
         assert (caller.code, caller.domain, caller.retry, caller.detail) == (operator.code, operator.domain, operator.retry, operator.detail)
         assert caller.detail == error_code_spec(CoreCode.RUNTIME_MISCONFIGURED).detail
 
     def test_an_operator_code_aims_its_step_at_the_reader(self) -> None:
         """The operator reads the actor's step; the caller, who cannot fix the deployment, reads the other one."""
-        error = _MisconfiguredError(ProblemViewsTestData.OPERATOR_MESSAGE).with_params(component=ProblemViewsTestData.COMPONENT)
+        error = _MisconfiguredError(ProblemViewsCases.OPERATOR_MESSAGE).with_params(component=ProblemViewsCases.COMPONENT)
 
         operator = error.to_problem(view=ProblemView.OPERATOR)
         caller = error.to_problem(view=ProblemView.CALLER)
 
         assert operator.next_step.kind == StepKind.FIX_CONFIGURATION
-        assert operator.next_step.detail == f"Set or correct the configuration of '{ProblemViewsTestData.COMPONENT}', then restart the runtime."
+        assert operator.next_step.detail == f"Set or correct the configuration of '{ProblemViewsCases.COMPONENT}', then restart the runtime."
         assert caller.next_step.kind == StepKind.REPORT
         assert caller.next_step.detail == "Report this to whoever runs the runtime."
 
     def test_an_operator_only_parameter_rides_the_operator_diagnostics_alone(self) -> None:
-        error = _MisconfiguredError(ProblemViewsTestData.OPERATOR_MESSAGE).with_params(component=ProblemViewsTestData.COMPONENT)
+        error = _MisconfiguredError(ProblemViewsCases.OPERATOR_MESSAGE).with_params(component=ProblemViewsCases.COMPONENT)
 
         operator = error.to_problem(view=ProblemView.OPERATOR)
         caller = error.to_problem(view=ProblemView.CALLER)
 
         assert operator.params is None
         assert operator.diagnostics is not None
-        assert operator.diagnostics.params == {"component": ProblemViewsTestData.COMPONENT}
+        assert operator.diagnostics.params == {"component": ProblemViewsCases.COMPONENT}
         assert caller.params is None
-        assert ProblemViewsTestData.COMPONENT not in str(caller.to_wire())
+        assert ProblemViewsCases.COMPONENT not in str(caller.to_wire())
 
     def test_the_caller_view_of_the_operator_view_is_the_caller_view(self) -> None:
         for error in (
-            _MisconfiguredError(ProblemViewsTestData.OPERATOR_MESSAGE).with_params(component=ProblemViewsTestData.COMPONENT),
+            _MisconfiguredError(ProblemViewsCases.OPERATOR_MESSAGE).with_params(component=ProblemViewsCases.COMPONENT),
             _TemplateRefusalError("the template does not parse").with_params(pipe="summarize", template="prompt", finding="unexpected '}'"),
         ):
             projected = caller_view_of(problem=error.to_problem(view=ProblemView.OPERATOR))
@@ -245,7 +245,7 @@ class TestProblemViews:
     @pytest.mark.parametrize("view", list(ProblemView))
     def test_a_problem_built_from_a_rich_error_holds_no_null_member(self, view: ProblemView) -> None:
         error = LLMCompletionError(
-            ProblemViewsTestData.OPERATOR_MESSAGE,
+            ProblemViewsCases.OPERATOR_MESSAGE,
             error_category=InferenceErrorCategory.CONFIGURATION,
             provider_metadata=ProviderErrorMetadata(
                 provider=ProviderName.OPENAI, sdk_exception_type="AuthenticationError", status_code=401, message="invalid key"
@@ -313,19 +313,19 @@ class TestProblemViews:
         for code in _all_codes():
             for view in ProblemView:
                 step_detail = make_problem(code=code, view=view).next_step.detail.lower()
-                for phrase in ProblemViewsTestData.HIDDEN_TEXT_PHRASES:
+                for phrase in ProblemViewsCases.HIDDEN_TEXT_PHRASES:
                     assert phrase not in step_detail, (code, view, step_detail)
 
     def test_a_gateway_refusal_reads_without_the_provider_text(self) -> None:
         """The provider's specifics stay the operator's, and the caller's step and detail still read in full."""
         error = LLMCompletionError(
-            ProblemViewsTestData.GATEWAY_MESSAGE,
+            ProblemViewsCases.GATEWAY_MESSAGE,
             error_category=InferenceErrorCategory.CONFIGURATION,
             provider_metadata=ProviderErrorMetadata(
                 provider=ProviderName.GATEWAY,
                 sdk_exception_type="BadRequestError",
                 status_code=400,
-                message=ProblemViewsTestData.GATEWAY_PROVIDER_TEXT,
+                message=ProblemViewsCases.GATEWAY_PROVIDER_TEXT,
             ),
         )
         error.model_handle = "acme/large"
@@ -333,12 +333,12 @@ class TestProblemViews:
         caller = error.to_problem(view=ProblemView.CALLER)
         operator = error.to_problem(view=ProblemView.OPERATOR)
 
-        assert ProblemViewsTestData.GATEWAY_PROVIDER_TEXT not in str(caller.to_wire())
+        assert ProblemViewsCases.GATEWAY_PROVIDER_TEXT not in str(caller.to_wire())
         assert caller.detail
         assert caller.next_step.detail
         assert operator.diagnostics is not None
         assert operator.diagnostics.provider is not None
-        assert operator.diagnostics.provider.message == ProblemViewsTestData.GATEWAY_PROVIDER_TEXT
+        assert operator.diagnostics.provider.message == ProblemViewsCases.GATEWAY_PROVIDER_TEXT
 
     @pytest.mark.builds_problems_without_required_params(reason="builds problems with a retry delay alone, to check which delays are kept")
     def test_an_unusable_retry_delay_is_left_out(self) -> None:
@@ -385,9 +385,9 @@ class TestProblemViews:
     @pytest.mark.parametrize(
         ("wire", "expected_kind", "expected_detail"),
         [
-            (ProblemViewsTestData.UNKNOWN_OPERATOR_PROBLEM, StepKind.REPORT, "Report this problem with its request id."),
+            (ProblemViewsCases.UNKNOWN_OPERATOR_PROBLEM, StepKind.REPORT, "Report this problem with its request id."),
             (
-                ProblemViewsTestData.UNKNOWN_METHOD_PROBLEM,
+                ProblemViewsCases.UNKNOWN_METHOD_PROBLEM,
                 StepKind.CHANGE_METHOD,
                 "Correct the method as the problem describes, then validate it again.",
             ),
@@ -405,7 +405,7 @@ class TestProblemViews:
             assert caller.code == wire["code"]
             assert caller.next_step.kind == expected_kind
             assert caller.next_step.detail == expected_detail
-            assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(caller.to_wire())
+            assert ProblemViewsCases.PRIVATE_HOST_FILE not in str(caller.to_wire())
             assert caller.diagnostics is None
 
     def test_the_metadata_view_holds_no_sentence(self) -> None:
@@ -443,7 +443,7 @@ class TestProblemViews:
     @pytest.mark.parametrize("view", list(ProblemView))
     def test_an_item_never_carries_an_operator_only_parameter(self, view: ProblemView) -> None:
         """An item built by hand is the same in every view: its operator-only parameter and the sentence quoting it are gone."""
-        hand_built = ProblemItem.model_validate(ProblemViewsTestData.HAND_BUILT_OPERATOR_ITEM)
+        hand_built = ProblemItem.model_validate(ProblemViewsCases.HAND_BUILT_OPERATOR_ITEM)
         expected_detail = error_code_spec(CoreCode.RUNTIME_MISCONFIGURED).detail
 
         built = make_problem(code=CoreCode.METHOD_INVALID, view=view, errors=[hand_built])
@@ -453,17 +453,17 @@ class TestProblemViews:
         for problem in (built, caller_view_of(problem=stored)):
             assert problem.errors is not None
             assert problem.errors[0].as_wire() == {"code": "runtime.misconfigured", "detail": expected_detail, "location": {"pipe": "summarize"}}
-            assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(problem.to_wire())
+            assert ProblemViewsCases.PRIVATE_HOST_FILE not in str(problem.to_wire())
 
     def test_a_null_an_extension_member_holds_is_written_as_read(self) -> None:
         """Only a member a model declares is left out when null: an extension member's null survives every write and the caller view."""
         operator_wire = make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR).to_wire()
-        item_wire = {**ProblemViewsTestData.HAND_BUILT_OPERATOR_ITEM, **ProblemViewsTestData.NULL_HOLDING_ITEM_EXTENSIONS}
+        item_wire = {**ProblemViewsCases.HAND_BUILT_OPERATOR_ITEM, **ProblemViewsCases.NULL_HOLDING_ITEM_EXTENSIONS}
         body = {
             **operator_wire,
-            **ProblemViewsTestData.NULL_HOLDING_EXTENSIONS,
+            **ProblemViewsCases.NULL_HOLDING_EXTENSIONS,
             "errors": [item_wire],
-            "run_error": {**operator_wire, **ProblemViewsTestData.NULL_HOLDING_EXTENSIONS},
+            "run_error": {**operator_wire, **ProblemViewsCases.NULL_HOLDING_EXTENSIONS},
         }
         problem = PipelexProblem.model_validate(body)
 
@@ -477,7 +477,7 @@ class TestProblemViews:
             "round_trip": PipelexProblem.model_validate(json.loads(json.dumps(problem.to_wire()))).to_wire(),
         }
         for write_name, wire in writes.items():
-            for name, value in ProblemViewsTestData.NULL_HOLDING_EXTENSIONS.items():
+            for name, value in ProblemViewsCases.NULL_HOLDING_EXTENSIONS.items():
                 assert wire[name] == value, write_name
                 assert wire["run_error"][name] == value, write_name
             assert wire["errors"][0]["vendor"] == {"hint": None}, write_name
@@ -489,7 +489,7 @@ class TestProblemViews:
     @pytest.mark.parametrize("view", list(ProblemView))
     def test_an_item_whose_code_is_unknown_fails_closed_for_the_caller(self, view: ProblemView) -> None:
         """The caller reads no parameter of an item whose code this process does not know, and a sentence quoting none."""
-        unknown_item = ProblemItem.model_validate(ProblemViewsTestData.UNKNOWN_CODE_ITEM)
+        unknown_item = ProblemItem.model_validate(ProblemViewsCases.UNKNOWN_CODE_ITEM)
         built = make_problem(code=CoreCode.METHOD_INVALID, view=view, errors=[unknown_item])
         stored = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR).model_copy(update={"errors": [unknown_item]})
 
@@ -502,10 +502,10 @@ class TestProblemViews:
                         "detail": UNKNOWN_CODE_ITEM_DETAIL,
                         "location": {"pipe": "summarize"},
                     }
-                    assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(problem.to_wire())
+                    assert ProblemViewsCases.PRIVATE_HOST_FILE not in str(problem.to_wire())
             case ProblemView.OPERATOR:
                 assert built.errors is not None
-                assert built.errors[0].as_wire() == ProblemViewsTestData.UNKNOWN_CODE_ITEM
+                assert built.errors[0].as_wire() == ProblemViewsCases.UNKNOWN_CODE_ITEM
 
     @pytest.mark.builds_problems_without_required_params(
         reason="gives a required parameter a value the wire refuses, which is dropped, to check that it is"
@@ -577,7 +577,7 @@ class TestProblemViews:
             params={"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5"]},
             location=make_location(pipe="write", field="model"),
             suggestions=["gpt-5"],
-            suggested_fix=ProblemViewsTestData.RENAME_MODEL_FIX,
+            suggested_fix=ProblemViewsCases.RENAME_MODEL_FIX,
         )
 
         wire = make_problem(code=CoreCode.MODEL_UNKNOWN, view=ProblemView.CALLER, errors=[item]).to_wire()
@@ -586,4 +586,4 @@ class TestProblemViews:
         assert wire["location"] == {"pipe": "write", "field": "model"}
         (listed,) = wire["errors"]
         assert listed["suggestions"] == ["gpt-5"]
-        assert listed["suggested_fix"] == ProblemViewsTestData.RENAME_MODEL_FIX
+        assert listed["suggested_fix"] == ProblemViewsCases.RENAME_MODEL_FIX

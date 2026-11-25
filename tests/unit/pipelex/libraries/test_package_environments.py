@@ -15,7 +15,7 @@ from pipelex.plugins.pipe_func_package_offer_registry import (
     PipeFuncPackageRefusal,
 )
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
-from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsCases
 
 _MODULE = "pipelex.libraries.package_environments"
 
@@ -37,7 +37,7 @@ class TestPackageEnvironments:
     def test_in_a_sandbox_mode_the_factory_is_given_the_requirements_and_its_offer_is_the_environment(
         self, mocker: MockerFixture, sandbox_offering: Callable[..., PipeFuncConfig]
     ) -> None:
-        factory = mocker.Mock(return_value=MethodRequirementsTestData.sandbox_offer())
+        factory = mocker.Mock(return_value=MethodRequirementsCases.sandbox_offer())
         pipe_func_config = sandbox_offering(offers={"daytona": factory})
         requirements = _requirements("pandas>=2\n# spreadsheets\nopenpyxl; sys_platform == 'linux'\n")
 
@@ -47,7 +47,7 @@ class TestPackageEnvironments:
         factory.assert_called_once_with(PipeFuncPackageOfferRequest(pipe_func_config=pipe_func_config, requirements=tuple(requirements)))
         (request,) = factory.call_args.args
         assert [(line.line_number, line.text) for line in request.requirements] == [(1, "pandas>=2"), (3, "openpyxl; sys_platform == 'linux'")]
-        assert environment.description == MethodRequirementsTestData.SANDBOX_ENVIRONMENT
+        assert environment.description == MethodRequirementsCases.SANDBOX_ENVIRONMENT
         assert environment.version_of(distribution_name="zope-interface") == "7.0"
         assert environment.version_of(distribution_name="polars") is None
         assert environment.dependencies_of(distribution_name="pandas") is None

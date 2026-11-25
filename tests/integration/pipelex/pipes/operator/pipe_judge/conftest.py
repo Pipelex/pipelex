@@ -4,19 +4,19 @@ import pytest
 
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.runtime_hub import get_class_registry, get_model_deck
-from tests.integration.pipelex.pipes.operator.pipe_judge.cases import ClassBackedOpenTriage, ClassBackedTriage, PipeJudgeLoadTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import ClassBackedOpenTriage, ClassBackedTriage, PipeJudgeLoadCases
 
 
 @pytest.fixture
 def judgment_model_reading_files() -> Iterator[None]:
     """The judgment model, for one test, as a backend that reads images and PDFs would declare it."""
     judgment_specs = get_model_deck().inference_models.root[ModelType.JUDGMENT]
-    booted_spec = judgment_specs[PipeJudgeLoadTestData.JUDGMENT_MODEL]
-    judgment_specs[PipeJudgeLoadTestData.JUDGMENT_MODEL] = booted_spec.model_copy(update={"inputs": ["text", "images", "pdf"]})
+    booted_spec = judgment_specs[PipeJudgeLoadCases.JUDGMENT_MODEL]
+    judgment_specs[PipeJudgeLoadCases.JUDGMENT_MODEL] = booted_spec.model_copy(update={"inputs": ["text", "images", "pdf"]})
     try:
         yield
     finally:
-        judgment_specs[PipeJudgeLoadTestData.JUDGMENT_MODEL] = booted_spec
+        judgment_specs[PipeJudgeLoadCases.JUDGMENT_MODEL] = booted_spec
 
 
 @pytest.fixture

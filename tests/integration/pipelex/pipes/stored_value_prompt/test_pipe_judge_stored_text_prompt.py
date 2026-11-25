@@ -11,7 +11,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipe_operators.judge.pipe_judge_blueprint import JudgeQuestionBlueprint, PipeJudgeBlueprint
 from pipelex.system.job_metadata import JobMetadata
-from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadCases
 from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, STORED_TEXT_URL
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import (
     RecordingContentGenerator,
@@ -109,7 +109,7 @@ class TestPipeJudgeStoredTextPrompt:
                 prompt=prompt,
                 question=question,
                 questions=questions,
-                model=PipeJudgeLoadTestData.JUDGMENT_MODEL,
+                model=PipeJudgeLoadCases.JUDGMENT_MODEL,
             ),
             concept_codes_from_the_same_domain=["PagesVerdicts"],
         )

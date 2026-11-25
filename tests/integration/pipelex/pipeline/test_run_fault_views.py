@@ -18,7 +18,7 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipeline.cases import LocatedRunFailureTestData, RunFaultViewsTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureCases, RunFaultViewsCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -33,7 +33,7 @@ class RunFaultViewsValidatedReview(StructuredContent):
 
     @model_validator(mode="after")
     def refuse_by_deployment_rule(self) -> Self:
-        msg = RunFaultViewsTestData.DEPLOYMENT_VALIDATOR_TEXT
+        msg = RunFaultViewsCases.DEPLOYMENT_VALIDATOR_TEXT
         raise ValueError(msg)
 
 
@@ -65,7 +65,7 @@ class TestRunFaultViews:
         """A branch declared `Idea[]` feeding a single field: the method's fault, located at `analyze`, with its remedy."""
         error = await _run_failing(
             pipe_code="flow",
-            mthds_content=LocatedRunFailureTestData.PARALLEL_MTHDS,
+            mthds_content=LocatedRunFailureCases.PARALLEL_MTHDS,
             inputs={},
             pipe_run_mode=PipeRunMode.DRY,
         )
@@ -90,7 +90,7 @@ class TestRunFaultViews:
         """A single `Idea` branch feeding a list of plain texts: no multiplicity to change, the combine's refusal of the field."""
         error = await _run_failing(
             pipe_code="flow",
-            mthds_content=RunFaultViewsTestData.PARALLEL_NO_MULTIPLICITY_MTHDS,
+            mthds_content=RunFaultViewsCases.PARALLEL_NO_MULTIPLICITY_MTHDS,
             inputs={},
             pipe_run_mode=PipeRunMode.DRY,
         )
@@ -117,14 +117,14 @@ class TestRunFaultViews:
         try:
             error = await _run_failing(
                 pipe_code="flow",
-                mthds_content=RunFaultViewsTestData.DEPLOYMENT_VALIDATOR_MTHDS,
+                mthds_content=RunFaultViewsCases.DEPLOYMENT_VALIDATOR_MTHDS,
                 inputs={"topic": "cats"},
             )
         finally:
             registry.unregister_class(RunFaultViewsValidatedReview)
 
         caller, operator = _views(error)
-        validator_text = RunFaultViewsTestData.DEPLOYMENT_VALIDATOR_TEXT
+        validator_text = RunFaultViewsCases.DEPLOYMENT_VALIDATOR_TEXT
         assert validator_text not in str(caller.to_wire())
         assert "DR-7" not in str(caller.to_wire())
         # The caller still reads which pipe, which concept and which fields, in the code's own sentences.
@@ -142,7 +142,7 @@ class TestRunFaultViews:
 
     async def test_missing_required_input_is_the_callers_fault(self) -> None:
         """A run missing a required input: the input domain, a sentence and a next step naming the input."""
-        error = await _run_failing(pipe_code="greet_flow", mthds_content=RunFaultViewsTestData.MISSING_INPUT_MTHDS, inputs={})
+        error = await _run_failing(pipe_code="greet_flow", mthds_content=RunFaultViewsCases.MISSING_INPUT_MTHDS, inputs={})
 
         caller, operator = _views(error)
         assert caller.code == CoreCode.INPUT_MISSING
@@ -160,12 +160,12 @@ class TestRunFaultViews:
         """A step naming, in an inline setting, a model no entry of the deck names: the method's fault, naming the model."""
         error = await _run_failing(
             pipe_code="two_steps",
-            mthds_content=LocatedRunFailureTestData.MODEL_MTHDS,
+            mthds_content=LocatedRunFailureCases.MODEL_MTHDS,
             inputs={"topic": "cats"},
         )
 
         caller, _ = _views(error)
-        unserved_handle = LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
+        unserved_handle = LocatedRunFailureCases.UNSERVED_MODEL_HANDLE
         assert caller.code == CoreCode.MODEL_UNKNOWN
         assert caller.domain == ProblemDomain.METHOD
         assert caller.detail == f"The method names the llm model '{unserved_handle}', which no catalog knows."
@@ -178,17 +178,17 @@ class TestRunFaultViews:
     @pytest.mark.parametrize(
         ("_topic", "model_reference"),
         [
-            ("preset", f"${RunFaultViewsTestData.DECK_PRESET}"),
-            ("alias", f"@{RunFaultViewsTestData.DECK_ALIAS}"),
+            ("preset", f"${RunFaultViewsCases.DECK_PRESET}"),
+            ("alias", f"@{RunFaultViewsCases.DECK_ALIAS}"),
         ],
     )
     async def test_model_the_deck_names_but_does_not_serve_is_the_operators(self, mocker: MockerFixture, _topic: str, model_reference: str) -> None:
         """A model a preset or an alias of the deck names, which the deployment does not serve, is the operator's to fix."""
         model_deck = get_model_deck()
-        unserved_handle = RunFaultViewsTestData.DECK_NAMED_UNSERVED_HANDLE
-        mocker.patch.dict(model_deck.llm_presets, {RunFaultViewsTestData.DECK_PRESET: LLMSetting(model=unserved_handle, temperature=0.2)})
-        mocker.patch.dict(model_deck.llm_aliases, {RunFaultViewsTestData.DECK_ALIAS: unserved_handle})
-        mthds_content = RunFaultViewsTestData.DECK_NAMED_MODEL_MTHDS.replace(RunFaultViewsTestData.MODEL_REFERENCE_SLOT, model_reference)
+        unserved_handle = RunFaultViewsCases.DECK_NAMED_UNSERVED_HANDLE
+        mocker.patch.dict(model_deck.llm_presets, {RunFaultViewsCases.DECK_PRESET: LLMSetting(model=unserved_handle, temperature=0.2)})
+        mocker.patch.dict(model_deck.llm_aliases, {RunFaultViewsCases.DECK_ALIAS: unserved_handle})
+        mthds_content = RunFaultViewsCases.DECK_NAMED_MODEL_MTHDS.replace(RunFaultViewsCases.MODEL_REFERENCE_SLOT, model_reference)
 
         error = await _run_failing(pipe_code="summarize_flow", mthds_content=mthds_content, inputs={"topic": "cats"})
 
@@ -216,7 +216,7 @@ class TestRunFaultViews:
 
         error = await _run_failing(
             pipe_code="judge_flow",
-            mthds_content=RunFaultViewsTestData.STRUCTURED_OUTPUT_MTHDS,
+            mthds_content=RunFaultViewsCases.STRUCTURED_OUTPUT_MTHDS,
             inputs={"claim": "The sky is green."},
         )
 

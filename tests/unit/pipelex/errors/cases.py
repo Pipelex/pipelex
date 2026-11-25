@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class ProblemViewsTestData:
+class ProblemViewsCases:
     OPERATOR_MESSAGE: ClassVar[str] = "The backend 'acme' has no api_key in /etc/pipelex/backends.toml"
     COMPONENT: ClassVar[str] = "inference backend acme"
     GATEWAY_MESSAGE: ClassVar[str] = "The gateway refused the call; see its message for the integration"

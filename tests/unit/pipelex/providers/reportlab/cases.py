@@ -31,7 +31,7 @@ def line_items_table(*, row_count: int) -> TableBlock:
     )
 
 
-class ReportlabRendererTestData:
+class ReportlabRendererCases:
     """Each markup case: (topic, blocks holding MARKUP_VALUE somewhere). Each script case: (language, sample)."""
 
     MARKUP_CASES: ClassVar[list[tuple[str, list[LayoutBlock]]]] = [
@@ -63,7 +63,7 @@ class ReportlabRendererTestData:
     ]
 
 
-class MarkdownFlowablesTestData:
+class MarkdownFlowablesCases:
     """Each link case: (href, whether it becomes a link)."""
 
     NESTED_LISTS = "1. alpha\n2. beta\n   1. gamma\n   2. delta\n      - epsilon\n3. zeta\n4. eta\n"

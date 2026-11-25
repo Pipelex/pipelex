@@ -16,7 +16,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, StoredValuePromptTestData
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, StoredValuePromptCases
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import RecordingContentGenerator
 
 # Tells a long text from a short one by its real length: the stored text is far past the bound, its preview is not.
@@ -44,9 +44,9 @@ class TestPipeConditionStoredText:
         ("verdict_content", "pages_content", "expected_outcome", "expected_nb_loads"),
         [
             # The expression reads a stored text: it is loaded through the leaf, once, and the route follows its real length.
-            (TextContent.model_validate(StoredValuePromptTestData.TEXT_REFERENCE), None, "long", 1),
+            (TextContent.model_validate(StoredValuePromptCases.TEXT_REFERENCE), None, "long", 1),
             # The expression reads an inline value only: nothing is dispatched, even with a stored text elsewhere in memory.
-            (TextContent(text="approved"), TextContent.model_validate(StoredValuePromptTestData.TEXT_REFERENCE), "short", 0),
+            (TextContent(text="approved"), TextContent.model_validate(StoredValuePromptCases.TEXT_REFERENCE), "short", 0),
             (TextContent(text=STORED_TEXT), None, "long", 0),
         ],
     )
@@ -79,9 +79,9 @@ class TestPipeConditionStoredText:
         assert load_spy.call_count == expected_nb_loads
         if expected_nb_loads:
             uri_references = load_spy.call_args.kwargs["uri_references"]
-            assert [uri_reference.uri for uri_reference in uri_references] == [StoredValuePromptTestData.TEXT_REFERENCE["url"]]
+            assert [uri_reference.uri for uri_reference in uri_references] == [StoredValuePromptCases.TEXT_REFERENCE["url"]]
             # The loaded text is kept on the content, never written onto the model: its dump is still the reference.
             assert verdict_content.require_text() == STORED_TEXT
-            assert verdict_content.smart_dump() == StoredValuePromptTestData.TEXT_REFERENCE
+            assert verdict_content.smart_dump() == StoredValuePromptCases.TEXT_REFERENCE
         if pages_content is not None:
             assert not pages_content.is_loaded

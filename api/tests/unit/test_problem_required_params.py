@@ -15,7 +15,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, UNKNOWN_MODEL_MTHDS
 from tests.unit._problems import assert_problem
-from tests.unit.cases import RequiredParamsTestData as Data
+from tests.unit.cases import RequiredParamsCases as Data
 
 
 def _build_client() -> TestClient:

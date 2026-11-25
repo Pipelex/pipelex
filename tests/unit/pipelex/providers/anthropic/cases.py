@@ -3,10 +3,10 @@
 from typing import Any, ClassVar
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
 
 
-class AnthropicErrorHandlingTestData:
+class AnthropicErrorHandlingCases:
     """Test cases for Anthropic worker SDK exception handling.
 
     Each tuple: (topic, error_message, expected_category, expected_user_action_substring_or_none), the rate-limit
@@ -19,7 +19,7 @@ class AnthropicErrorHandlingTestData:
         (
             "generic_rate_limit",
             "rate_limit_error: Number of request tokens has exceeded your per-minute limit",
-            DirectProviderQuotaTestData.ANTHROPIC_RATE_LIMIT_BODY,
+            DirectProviderQuotaCases.ANTHROPIC_RATE_LIMIT_BODY,
             InferenceErrorCategory.TRANSIENT,
             "run it again",
         ),
@@ -33,7 +33,7 @@ class AnthropicErrorHandlingTestData:
         (
             "monthly_spend_cap",
             "You have reached your API usage limits",
-            DirectProviderQuotaTestData.ANTHROPIC_SPEND_CAP_BODY,
+            DirectProviderQuotaCases.ANTHROPIC_SPEND_CAP_BODY,
             InferenceErrorCategory.CAPACITY,
             "billing",
         ),

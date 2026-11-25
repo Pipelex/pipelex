@@ -23,7 +23,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 from pipelex.providers.google.google_llm_worker import GoogleLLMWorker
-from tests.unit.pipelex.providers.google.cases import GoogleErrorHandlingTestData
+from tests.unit.pipelex.providers.google.cases import GoogleErrorHandlingCases
 
 
 def _make_google_client_error(code: int, message: str) -> genai_errors.ClientError:
@@ -130,7 +130,7 @@ class TestGoogleWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "status_code", "error_message", "expected_category", "expected_action_substring"),
-        GoogleErrorHandlingTestData.CLIENT_ERROR_CASES,
+        GoogleErrorHandlingCases.CLIENT_ERROR_CASES,
     )
     async def test_llm_client_error(
         self,
@@ -189,7 +189,7 @@ class TestGoogleWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "status_code", "error_message", "expected_category", "expected_action_substring"),
-        GoogleErrorHandlingTestData.CLIENT_ERROR_CASES,
+        GoogleErrorHandlingCases.CLIENT_ERROR_CASES,
     )
     async def test_img_gen_client_error(
         self,

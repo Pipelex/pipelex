@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 
 
-class DoclingErrorHandlingTestData:
+class DoclingErrorHandlingCases:
     """Test cases for Docling extract worker exception handling.
 
     Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)

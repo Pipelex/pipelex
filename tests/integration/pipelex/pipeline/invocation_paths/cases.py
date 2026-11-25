@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class InvocationPathsTestData:
+class InvocationPathsCases:
     """The worked example of the hosted progress contract, with leaves that run without a model.
 
     `filings.review_filings` is a sequence of four steps: a condition whose `detailed` outcome runs a parallel of two

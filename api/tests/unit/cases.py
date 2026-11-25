@@ -10,7 +10,7 @@ from pipelex.errors.error_codes import ErrorCode
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
-class ProblemTestData:
+class ProblemCases:
     """A provider's rate limit, the failure whose problem carries the most members, and the synthetic credentials of each identity."""
 
     RATE_LIMIT_MESSAGE = "OpenAI returned 429 (rate_limit_exceeded)"
@@ -75,21 +75,21 @@ class ProblemTestData:
 def rate_limited_failure() -> LLMCompletionError:
     """A provider's 429 as the inference layer raises it, attributed to the backend and the model it addressed."""
     failure = LLMCompletionError(
-        ProblemTestData.RATE_LIMIT_MESSAGE,
+        ProblemCases.RATE_LIMIT_MESSAGE,
         error_category=InferenceErrorCategory.TRANSIENT,
         provider_metadata=ProviderErrorMetadata(
             provider=ProviderName.OPENAI,
             sdk_exception_type="RateLimitError",
             status_code=429,
-            retry_after_seconds=ProblemTestData.RATE_LIMIT_RETRY_AFTER_SECONDS,
-            request_id=ProblemTestData.RATE_LIMIT_PROVIDER_REQUEST_ID,
+            retry_after_seconds=ProblemCases.RATE_LIMIT_RETRY_AFTER_SECONDS,
+            request_id=ProblemCases.RATE_LIMIT_PROVIDER_REQUEST_ID,
         ),
     ).with_error_code(CoreCode.PROVIDER_RATE_LIMITED)
-    failure.fill_model_and_provider(ProblemTestData.RATE_LIMIT_MODEL, backend_name=ProblemTestData.RATE_LIMIT_BACKEND)
+    failure.fill_model_and_provider(ProblemCases.RATE_LIMIT_MODEL, backend_name=ProblemCases.RATE_LIMIT_BACKEND)
     return failure
 
 
-class RequiredParamsTestData:
+class RequiredParamsCases:
     """The methods and trees whose refusals the acceptance of the error contract found without a required parameter."""
 
     BUNDLE_PATH = "bundle.mthds"

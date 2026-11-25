@@ -31,7 +31,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
-from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsCases
 
 _MODULE = "pipelex.libraries.method_requirements"
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"
@@ -168,7 +168,7 @@ class TestMethodRequirementsCheck:
     def test_where_host_paths_may_not_be_named_the_refusal_names_none(self, mocker: MockerFixture, tmp_path: Path) -> None:
         mocker.patch(
             f"{_MODULE}.resolve_pipe_func_package_environment",
-            return_value=OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer()),
+            return_value=OfferedPackageEnvironment(offer=MethodRequirementsCases.sandbox_offer()),
         )
         _method(directory=tmp_path, requirements="pandas>=2.2\npandas>=3\npolars\n")
 
@@ -177,14 +177,14 @@ class TestMethodRequirementsCheck:
 
         message = exc_info.value.message
         assert str(tmp_path) not in message
-        assert message.startswith(f"The method needs Python packages that {MethodRequirementsTestData.SANDBOX_ENVIRONMENT} does not have")
+        assert message.startswith(f"The method needs Python packages that {MethodRequirementsCases.SANDBOX_ENVIRONMENT} does not have")
         assert "line 2 'pandas>=3' (pandas 2.2.3 is there); line 3 'polars' (polars is missing)" in message
         assert [(item.source, item.line) for item in exc_info.value.blueprint_validation_errors] == [("requirements.txt", 2), ("requirements.txt", 3)]
 
     def test_each_tree_is_judged_once_against_the_environment_resolved_for_its_own_requirements(self, mocker: MockerFixture, tmp_path: Path) -> None:
         resolve = mocker.patch(
             f"{_MODULE}.resolve_pipe_func_package_environment",
-            return_value=OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer()),
+            return_value=OfferedPackageEnvironment(offer=MethodRequirementsCases.sandbox_offer()),
         )
         first = list_method_tree(_method(directory=tmp_path / "first", requirements="pandas\n"))
         second = list_method_tree(_method(directory=tmp_path / "second", requirements="# spreadsheets\nopenpyxl\n"))
@@ -202,9 +202,9 @@ class TestMethodRequirementsCheck:
     ) -> None:
         """A sandbox mode building an environment per method states one for each tree, and each tree is judged against its own."""
         offers_by_requirements: dict[tuple[str, ...], PipeFuncPackageOffer] = {
-            ("polars>=1",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-polars", distributions={"polars": "1.2.0"}),
-            ("pandas>=3",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-pandas", distributions={"pandas": "3.0.1"}),
-            ("pandas>=4",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-stale", distributions={"pandas": "3.0.1"}),
+            ("polars>=1",): MethodRequirementsCases.environment_offer(snapshot_name="pipelex-env-polars", distributions={"polars": "1.2.0"}),
+            ("pandas>=3",): MethodRequirementsCases.environment_offer(snapshot_name="pipelex-env-pandas", distributions={"pandas": "3.0.1"}),
+            ("pandas>=4",): MethodRequirementsCases.environment_offer(snapshot_name="pipelex-env-stale", distributions={"pandas": "3.0.1"}),
         }
         asked: list[tuple[str, ...]] = []
 
@@ -235,8 +235,8 @@ class TestMethodRequirementsCheck:
     ) -> None:
         """The listing keeps the trees a check of the run found met, however the check names them, and never a refused one."""
         offers_by_requirements: dict[tuple[str, ...], PipeFuncPackageOffer] = {
-            ("polars>=1",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-polars", distributions={"polars": "1.2.0"}),
-            ("pandas>=4",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-stale", distributions={"pandas": "3.0.1"}),
+            ("polars>=1",): MethodRequirementsCases.environment_offer(snapshot_name="pipelex-env-polars", distributions={"polars": "1.2.0"}),
+            ("pandas>=4",): MethodRequirementsCases.environment_offer(snapshot_name="pipelex-env-stale", distributions={"pandas": "3.0.1"}),
         }
         asked: list[tuple[str, ...]] = []
 
@@ -268,7 +268,7 @@ class TestMethodRequirementsCheck:
         self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]
     ) -> None:
         """The factory sees every requirement, markers unevaluated, and rests a refusal only on those its sandbox needs."""
-        base = MethodRequirementsTestData.sandbox_offer()
+        base = MethodRequirementsCases.sandbox_offer()
         asked: list[list[str]] = []
 
         def offer_or_refuse(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:

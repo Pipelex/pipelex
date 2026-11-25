@@ -11,7 +11,7 @@ from pipelex.interpreter_hub import get_pipe_run
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.exceptions import RunParameterError
-from tests.integration.pipelex.pipeline.cases import ExecuteRequestIdTestData
+from tests.integration.pipelex.pipeline.cases import ExecuteRequestIdCases
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -40,19 +40,19 @@ class TestExecuteRequestId:
 
         await runner.execute(
             pipe_code="restate",
-            mthds_contents=[ExecuteRequestIdTestData.COMPOSE_MTHDS],
+            mthds_contents=[ExecuteRequestIdCases.COMPOSE_MTHDS],
             inputs={"topic": "cats"},
-            request_id=ExecuteRequestIdTestData.REQUEST_ID,
+            request_id=ExecuteRequestIdCases.REQUEST_ID,
         )
 
         assert len(pipe_run.pipe_jobs) == 1
-        assert pipe_run.pipe_jobs[0].job_metadata.run_metadata.request_id == ExecuteRequestIdTestData.REQUEST_ID
+        assert pipe_run.pipe_jobs[0].job_metadata.run_metadata.request_id == ExecuteRequestIdCases.REQUEST_ID
 
     async def test_omitted_request_id_leaves_none(self) -> None:
         pipe_run = _RecordingPipeRun()
         runner = PipelexMTHDSProtocol(pipe_run=pipe_run)
 
-        await runner.execute(pipe_code="restate", mthds_contents=[ExecuteRequestIdTestData.COMPOSE_MTHDS], inputs={"topic": "cats"})
+        await runner.execute(pipe_code="restate", mthds_contents=[ExecuteRequestIdCases.COMPOSE_MTHDS], inputs={"topic": "cats"})
 
         assert len(pipe_run.pipe_jobs) == 1
         assert pipe_run.pipe_jobs[0].job_metadata.run_metadata.request_id is None
@@ -66,7 +66,7 @@ class TestExecuteRequestId:
         with pytest.raises(RunParameterError, match="Invalid request_id") as exc_info:
             await runner.execute(
                 pipe_code="restate",
-                mthds_contents=[ExecuteRequestIdTestData.COMPOSE_MTHDS],
+                mthds_contents=[ExecuteRequestIdCases.COMPOSE_MTHDS],
                 inputs={"topic": "cats"},
                 request_id=bad_request_id,
             )

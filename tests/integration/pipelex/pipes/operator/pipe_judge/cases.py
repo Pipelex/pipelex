@@ -9,7 +9,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
-class PipeJudgeLoadTestData:
+class PipeJudgeLoadCases:
     """A bundle with one PipeJudge step, built from the step's own fields."""
 
     JUDGMENT_MODEL = "jev-1.13.0"
@@ -62,7 +62,7 @@ output = "{output}"
 """
 
 
-class PipeJudgeSeveralQuestionsTestData:
+class PipeJudgeSeveralQuestionsCases:
     """A bundle with one PipeJudge step asking several questions, built from its output's structure and its question tables."""
 
     PIPE_CODE = "judge_it"
@@ -117,7 +117,7 @@ type = "PipeJudge"
 description = "Judge the evidence"
 inputs = {inputs}
 output = "{output}"
-model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"
+model = "{PipeJudgeLoadCases.JUDGMENT_MODEL}"
 prompt = {json.dumps(prompt)}
 
 {question_tables}
@@ -140,13 +140,13 @@ class ClassBackedOpenTriage(StructuredContent):
     severity: RatingContent | None = Field(default=None, description="How severe the reported issue is")
 
 
-class PipeJudgeClassBackedTestData:
+class PipeJudgeClassBackedCases:
     """A PipeJudge asking several questions into a concept whose structure is a registered Python class."""
 
     @classmethod
     def bundle(cls, *, structure_class_name: str) -> str:
         question_tables = "\n\n".join(
-            f"[pipe.judge_it.questions.{name}]\n{table}" for name, table in PipeJudgeSeveralQuestionsTestData.QUESTIONS.items()
+            f"[pipe.judge_it.questions.{name}]\n{table}" for name, table in PipeJudgeSeveralQuestionsCases.QUESTIONS.items()
         )
         return f"""
 domain = "judge_class_backed"
@@ -161,14 +161,14 @@ type = "PipeJudge"
 description = "Judge the evidence"
 inputs = {{ message = "Text" }}
 output = "Triage"
-model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"
+model = "{PipeJudgeLoadCases.JUDGMENT_MODEL}"
 prompt = "@message"
 
 {question_tables}
 """
 
 
-class PipeJudgeOptionalFileTestData:
+class PipeJudgeOptionalFileCases:
     """A PipeJudge whose evidence prompt reads an optional file, run with that file absent or present."""
 
     PIPE_CODE = "judge_damage"
@@ -199,7 +199,7 @@ type = "PipeJudge"
 description = "Judge whether a parcel's damage is serious"
 inputs = {{ note = "Text", {optional_input} }}
 output = "YesNo"
-model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"
+model = "{PipeJudgeLoadCases.JUDGMENT_MODEL}"
 prompt = {json.dumps(prompt)}
 question = "Is the damage serious?"
 """

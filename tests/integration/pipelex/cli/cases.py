@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 
-class TruncatedCompletionRunTestData:
+class TruncatedCompletionRunCases:
     """A method whose text step the model cannot finish: its completion stops at the output limit."""
 
     PIPE_CODE: ClassVar[str] = "write_summary"

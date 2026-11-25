@@ -6,7 +6,7 @@ Contains construct blueprint dictionaries used across multiple test modules.
 from typing import Any, ClassVar
 
 
-class ComposeStructuredTestData:
+class ComposeStructuredCases:
     """Test data for PipeCompose construct integration tests."""
 
     # Test case: all fixed values
@@ -35,7 +35,7 @@ class ComposeStructuredTestData:
     }
 
 
-class ContentConversionTestData:
+class ContentConversionCases:
     """Test data for content type conversion tests."""
 
     # Test case: TextContent to str field
@@ -69,7 +69,7 @@ class ContentConversionTestData:
     }
 
 
-class NativeScalarConversionTestData:
+class NativeScalarConversionCases:
     """Test data for native scalar conversion tests (whole-stuff copy into native fields)."""
 
     # Test case: TextContent to Optional[str] field
@@ -108,7 +108,7 @@ class NativeScalarConversionTestData:
     }
 
 
-class ClassCompatibilityTestData:
+class ClassCompatibilityCases:
     """Test data for class compatibility tests."""
 
     # Subclass to base class: RichTextContent -> TextContent field
@@ -144,7 +144,7 @@ class ClassCompatibilityTestData:
     }
 
 
-class StructuredCompatibilityTestData:
+class StructuredCompatibilityCases:
     """Test data for direct StructuredContent class compatibility tests."""
 
     # Exact type match: Person -> PersonHolder.person field
@@ -179,7 +179,7 @@ class StructuredCompatibilityTestData:
     }
 
 
-class StuffContentSubclassTestData:
+class StuffContentSubclassCases:
     """Test data for StuffContent subclass composition tests (ImageContent, DocumentContent, etc.)."""
 
     # ImageContent composition

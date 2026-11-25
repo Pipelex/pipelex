@@ -3,7 +3,7 @@
 from typing import ClassVar
 
 
-class GraphTestData:
+class GraphCases:
     """Graph test data constants."""
 
     # Directory paths

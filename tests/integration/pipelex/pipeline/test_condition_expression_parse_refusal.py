@@ -23,17 +23,15 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipeline.cases import ConditionExpressionParseTestData, ConditionMethodFaultsTestData
+from tests.integration.pipelex.pipeline.cases import ConditionExpressionParseCases, ConditionMethodFaultsCases
 
 
 def _routing_bundle(*, expression: str) -> str:
     return (
-        ConditionMethodFaultsTestData.ROUTING_MTHDS.replace(
-            ConditionMethodFaultsTestData.INPUTS_SLOT, ConditionMethodFaultsTestData.PARCEL_AND_LANE_INPUTS
-        )
-        .replace(ConditionMethodFaultsTestData.EXPRESSION_SLOT, expression)
-        .replace(ConditionMethodFaultsTestData.OUTCOMES_SLOT, ConditionMethodFaultsTestData.LANE_OUTCOMES)
-        .replace(ConditionMethodFaultsTestData.DEFAULT_OUTCOME_SLOT, "send_standard")
+        ConditionMethodFaultsCases.ROUTING_MTHDS.replace(ConditionMethodFaultsCases.INPUTS_SLOT, ConditionMethodFaultsCases.PARCEL_AND_LANE_INPUTS)
+        .replace(ConditionMethodFaultsCases.EXPRESSION_SLOT, expression)
+        .replace(ConditionMethodFaultsCases.OUTCOMES_SLOT, ConditionMethodFaultsCases.LANE_OUTCOMES)
+        .replace(ConditionMethodFaultsCases.DEFAULT_OUTCOME_SLOT, "send_standard")
     )
 
 
@@ -61,7 +59,7 @@ _CASES = pytest.mark.parametrize(
     [
         (_DANGLING_OPERATOR_BUNDLE, _EXPRESSION_REASON, "lane =="),
         (_TAG_INSIDE_EXPRESSION_BUNDLE, _EXPRESSION_REASON, "{% if %}"),
-        (ConditionExpressionParseTestData.UNKNOWN_TAG_TEMPLATE_MTHDS, _TEMPLATE_REASON, "frobnicate_the_parcel"),
+        (ConditionExpressionParseCases.UNKNOWN_TAG_TEMPLATE_MTHDS, _TEMPLATE_REASON, "frobnicate_the_parcel"),
         (_UNKNOWN_FILTER_BUNDLE, _COMPILE_REASON, "lenght_of_lane"),
     ],
     ids=["dangling_operator", "tag_inside_expression", "unknown_tag_on_line_2", "unknown_filter"],
@@ -132,10 +130,10 @@ class TestConditionExpressionParseRefusal:
         """Beside a host's library directory, the refusal of its condition is the host's fault, naming neither its expression nor its file."""
         host_library_dir = tmp_path / "host" / "library"
         host_library_dir.mkdir(parents=True)
-        (host_library_dir / "routing.mthds").write_text(ConditionExpressionParseTestData.UNKNOWN_TAG_TEMPLATE_MTHDS, encoding="utf-8")
+        (host_library_dir / "routing.mthds").write_text(ConditionExpressionParseCases.UNKNOWN_TAG_TEMPLATE_MTHDS, encoding="utf-8")
 
         with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
-            await validate_bundle(mthds_contents=[ConditionExpressionParseTestData.VALID_CALLER_MTHDS], library_dirs=[host_library_dir])
+            await validate_bundle(mthds_contents=[ConditionExpressionParseCases.VALID_CALLER_MTHDS], library_dirs=[host_library_dir])
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert caller.errors is None

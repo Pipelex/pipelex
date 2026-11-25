@@ -7,7 +7,7 @@ import pytest
 from typing_extensions import override
 
 from pipelex.tools.document_conversion.gotenberg_converter import CONVERTER_VERSION_HEADER, GotenbergConverter
-from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionTestData
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionCases
 
 
 class _AnswerRecordingTransport(httpx.AsyncBaseTransport):
@@ -38,14 +38,14 @@ class TestGotenbergVersionStamp:
 
         `GET /version` is compared because it is the one oracle independent of the code under test, which never calls it.
         """
-        gotenberg_url = os.environ.get(DocumentConversionTestData.GOTENBERG_URL_ENV_VAR)
+        gotenberg_url = os.environ.get(DocumentConversionCases.GOTENBERG_URL_ENV_VAR)
         if not gotenberg_url:
-            pytest.skip(f"no Gotenberg container: set {DocumentConversionTestData.GOTENBERG_URL_ENV_VAR}")
+            pytest.skip(f"no Gotenberg container: set {DocumentConversionCases.GOTENBERG_URL_ENV_VAR}")
         transport = _AnswerRecordingTransport()
         converter = GotenbergConverter(
             base_url=gotenberg_url, timeout_seconds=360, budget_seconds=120, max_source_bytes=50_000_000, transport=transport
         )
-        source_bytes = (Path(DocumentConversionTestData.DOCUMENTS_DIR) / "Office-Budget.xlsx").read_bytes()
+        source_bytes = (Path(DocumentConversionCases.DOCUMENTS_DIR) / "Office-Budget.xlsx").read_bytes()
 
         converted = await converter.convert_to_pdf(data=source_bytes, format_key="xlsx")
 

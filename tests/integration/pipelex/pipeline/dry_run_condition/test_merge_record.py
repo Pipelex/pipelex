@@ -18,7 +18,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.condition.pipe_condition import DryRunOutcomeSlot, PipeCondition
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionTestData
+from tests.integration.pipelex.pipeline.dry_run_condition.cases import DryRunConditionCases
 from tests.unit.pipelex.graph.conftest import make_trace_context
 
 _CONDITION_NODE_ID = "graph:node_route"
@@ -48,7 +48,7 @@ class TestDryRunConditionMergeRecord:
     @pytest.fixture
     def route(self, load_empty_library: Callable[[], str]) -> PipeCondition:
         library_id = load_empty_library()
-        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=DryRunConditionTestData.REPORT_SHAPE_MTHDS)
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=DryRunConditionCases.REPORT_SHAPE_MTHDS)
         get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
         condition = get_required_pipe(pipe_code="dry_condition_report_shape.route")
         assert isinstance(condition, PipeCondition)

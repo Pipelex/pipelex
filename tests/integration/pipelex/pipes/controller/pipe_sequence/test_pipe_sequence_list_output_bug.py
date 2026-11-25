@@ -142,7 +142,7 @@ class TestPipeSequenceListOutputBug:
             assert dry_run_output.status.name == "SUCCESS", f"Dry run of generate_items failed: {dry_run_output.error_message}"
 
 
-class TestDataNested:
+class NestedPipeSequenceListOutputCases:
     """Test data for nested pipe_sequence list output bug."""
 
     MTHDS_BUNDLE: ClassVar[str] = """
@@ -255,7 +255,7 @@ class TestNestedPipeSequenceListOutputBug:
 
             # Create the .mthds file
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestDataNested.MTHDS_BUNDLE)
+            mthds_file.write_text(NestedPipeSequenceListOutputCases.MTHDS_BUNDLE)
 
             # Load the bundle
             result = await validate_bundle(
@@ -283,7 +283,7 @@ class TestNestedPipeSequenceListOutputBug:
 
             # Create the .mthds file
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestDataNested.MTHDS_BUNDLE)
+            mthds_file.write_text(NestedPipeSequenceListOutputCases.MTHDS_BUNDLE)
 
             # Load the bundle
             await validate_bundle(

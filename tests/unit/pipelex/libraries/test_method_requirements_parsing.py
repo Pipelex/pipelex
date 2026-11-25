@@ -1,11 +1,11 @@
 import pytest
 
 from pipelex.core.method_trees.requirements_file import parse_requirements_text
-from tests.unit.pipelex.libraries.cases import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsCases
 
 
 class TestMethodRequirementsParsing:
-    @pytest.mark.parametrize(("topic", "line", "name"), MethodRequirementsTestData.ACCEPTED_LINES)
+    @pytest.mark.parametrize(("topic", "line", "name"), MethodRequirementsCases.ACCEPTED_LINES)
     def test_a_pep_508_requirement_is_declared(self, topic: str, line: str, name: str) -> None:
         """A line holding exactly one PEP 508 requirement, markers and extras included, declares it, stripped."""
         parsed = parse_requirements_text(text=f"{line}\n")
@@ -16,7 +16,7 @@ class TestMethodRequirementsParsing:
         assert requirement_line.text == line.strip()
         assert requirement_line.requirement.name == name
 
-    @pytest.mark.parametrize(("topic", "line", "reason_fragment"), MethodRequirementsTestData.REFUSED_LINES)
+    @pytest.mark.parametrize(("topic", "line", "reason_fragment"), MethodRequirementsCases.REFUSED_LINES)
     def test_a_line_the_standard_refuses_is_named_with_why(self, topic: str, line: str, reason_fragment: str) -> None:
         """A URL, an option, a comment after a requirement, a continued line and anything else not PEP 508 are refused."""
         parsed = parse_requirements_text(text=f"pandas>=2\n{line}\n")

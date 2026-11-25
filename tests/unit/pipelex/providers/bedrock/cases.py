@@ -5,7 +5,7 @@ from typing import ClassVar
 from pipelex.cogt.exceptions import InferenceErrorCategory
 
 
-class BedrockLLMErrorHandlingTestData:
+class BedrockLLMErrorHandlingCases:
     """Test cases for Bedrock LLM worker ClientError exception handling.
 
     Each tuple: (topic, error_code, error_message, expected_category, expected_user_action_substring_or_none)

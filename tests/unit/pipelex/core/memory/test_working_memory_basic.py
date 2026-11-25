@@ -8,7 +8,7 @@ from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.memory.conftest import TestWorkingMemoryData
+from tests.unit.pipelex.core.memory.conftest import WorkingMemoryCases
 
 
 class TestWorkingMemoryBasic:
@@ -24,7 +24,7 @@ class TestWorkingMemoryBasic:
         stuff = single_text_memory.get_stuff("sample_text")
         assert stuff.concept.code == NativeConceptCode.TEXT
         assert isinstance(stuff.content, TextContent)
-        assert stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert stuff.content.text == WorkingMemoryCases.SAMPLE_TEXT
 
     def test_working_memory_aliases(self, memory_with_aliases: WorkingMemory):
         """Test WorkingMemory with aliases."""

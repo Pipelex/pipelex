@@ -19,7 +19,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 
 
-class LinkupExtractErrorHandlingTestData:
+class LinkupExtractErrorHandlingCases:
     """Test cases for Linkup extract worker exception handling.
 
     Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)
@@ -99,7 +99,7 @@ class LinkupExtractErrorHandlingTestData:
     ]
 
 
-class LinkupSearchErrorHandlingTestData:
+class LinkupSearchErrorHandlingCases:
     """Test cases for Linkup search worker exception handling.
 
     Each tuple: (topic, exception_class, exception_message, expected_category, expected_user_action_kind)

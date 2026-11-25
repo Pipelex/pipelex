@@ -12,7 +12,7 @@ from pipelex.providers.reportlab.markdown_flowables import inline_markup, markdo
 from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles, data_table
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
 from pipelex.tools.markdown.markdown_rules import is_linked_href, plain_text
-from tests.unit.pipelex.providers.reportlab.cases import MarkdownFlowablesTestData
+from tests.unit.pipelex.providers.reportlab.cases import MarkdownFlowablesCases
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     StubRenderResources,
     document_text,
@@ -22,7 +22,7 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     render_layout,
     render_markdown,
 )
-from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingCases
 
 
 def _list_lines(*, text: str) -> list[str]:
@@ -37,11 +37,11 @@ def _inline_nodes(*, markdown_text: str) -> list[SyntaxTreeNode]:
 
 class TestMarkdownFlowables:
     def test_a_nested_list_numbers_itself_and_keeps_the_outer_numbering(self) -> None:
-        text = document_text(pdf_data=render_markdown(markdown_text=MarkdownFlowablesTestData.NESTED_LISTS))
+        text = document_text(pdf_data=render_markdown(markdown_text=MarkdownFlowablesCases.NESTED_LISTS))
         assert _list_lines(text=text) == ["1. alpha", "2. beta", "1. gamma", "2. delta", "• epsilon", "3. zeta", "4. eta"]
 
     def test_an_ordered_list_starts_at_its_own_start(self) -> None:
-        text = document_text(pdf_data=render_markdown(markdown_text=MarkdownFlowablesTestData.STARTED_LISTS))
+        text = document_text(pdf_data=render_markdown(markdown_text=MarkdownFlowablesCases.STARTED_LISTS))
         assert _list_lines(text=text) == ["7. seven", "8. eight", "3. three", "4. four", "9. nine"]
 
     def test_nested_bullets_alternate(self) -> None:
@@ -91,8 +91,8 @@ class TestMarkdownFlowables:
     @pytest.mark.parametrize(
         ("markdown_text", "expected_text"),
         [
-            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
-            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_EMPHASIS, MarkdownFormattingCases.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_MIXED_EMPHASIS, MarkdownFormattingCases.DEEP_MIXED_EMPHASIS_TEXT),
         ],
     )
     def test_emphasis_nested_hundreds_deep_prints_its_text(self, markdown_text: str, expected_text: str) -> None:
@@ -112,7 +112,7 @@ class TestMarkdownFlowables:
         assert sorted(link_targets(pdf_data=pdf_data)) == ["https://example.com/auto", "https://pipelex.com", "mailto:team@pipelex.com"]
         assert "See the site, write, [evil](javascript:alert(1)), files and https://example.com/auto." in document_text(pdf_data=pdf_data)
 
-    @pytest.mark.parametrize(("href", "is_linked"), MarkdownFlowablesTestData.LINK_CASES)
+    @pytest.mark.parametrize(("href", "is_linked"), MarkdownFlowablesCases.LINK_CASES)
     def test_a_link_target_is_linked_only_for_web_and_mail(self, href: str, is_linked: bool) -> None:
         assert is_linked_href(href=href) is is_linked
 

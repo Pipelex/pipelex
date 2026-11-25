@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from mthds.protocol.pipeline_inputs import PipelineInputs
 
 
-class LocatedRunFailureTestData:
+class LocatedRunFailureCases:
     """Bundles whose runs fail at a nested pipe, one per way a run failure is located."""
 
     UNSERVED_MODEL_HANDLE: ClassVar[str] = "located-failure-unserved-model"
@@ -121,7 +121,7 @@ template = "Clause: {{ clause }}"
 """
 
 
-class RunFaultViewsTestData:
+class RunFaultViewsCases:
     """Bundles whose runs fail on a fault in the caller's own method, and on faults that are not the caller's."""
 
     # A sequence whose first step needs an input the caller may leave out of the request.
@@ -297,7 +297,7 @@ prompt = "Judge this claim: $claim"
 """
 
 
-class ConditionMethodFaultsTestData:
+class ConditionMethodFaultsCases:
     """Bundles whose `PipeCondition` refuses the run on a fault in the caller's own method."""
 
     # Replaced by the inputs, the expression, the outcomes and the default outcome each case gives the condition.
@@ -392,7 +392,7 @@ template    = "Stamped: $routed"
 """
 
 
-class ConditionExpressionParseTestData:
+class ConditionExpressionParseCases:
     """Bundles whose `PipeCondition` declares an expression that does not parse."""
 
     # A template whose second line opens a tag Jinja2 does not know.
@@ -444,7 +444,7 @@ prompt      = "Write a short notice for the harbour board from these tide times:
 """
 
 
-class ExecuteRequestIdTestData:
+class ExecuteRequestIdCases:
     """A bundle that runs without inference, to see which job `execute` hands its `PipeRunProtocol`."""
 
     REQUEST_ID: ClassVar[str] = "req-execute-7f3a"
@@ -462,7 +462,7 @@ template = "About {{ topic }}"
 """
 
 
-class LogMarkupTestData:
+class LogMarkupCases:
     """A nested method run live, every model call answered by a stand-in worker, to read what its log messages say."""
 
     MAIN_PIPE: ClassVar[str] = "profile_company"
@@ -560,7 +560,7 @@ template = "{{ company.name }} works in {{ company.sector }}: {{ short_summary.t
 """
 
 
-class SummaryEventsTestData:
+class SummaryEventsCases:
     """A small method run live on two models, every model call answered by a stand-in worker, to read the events it ends with."""
 
     MAIN_PIPE: ClassVar[str] = "brief_company"
@@ -616,7 +616,7 @@ prompt = "Pitch this company in one sentence: $description"
 """
 
 
-class RenderTimeTemplateTestData:
+class RenderTimeTemplateCases:
     """Bundles whose template names a filter its environment lacks inside a branch, which only rendering that branch finds."""
 
     UNKNOWN_FILTER: ClassVar[str] = "frob_the_lane"
@@ -707,7 +707,7 @@ prompt      = "Read the label from $note"
 """
 
 
-class SecurityRefusalTestData:
+class SecurityRefusalCases:
     """Runs a security rule refuses, mid-run, before the run and at a template's render, and what none of their events may quote."""
 
     READ_SCOPE: ClassVar[str] = "org_abc"
@@ -809,7 +809,7 @@ template = "TEMPLATE_SLOT"
 """
 
 
-class RunContentMarkerTestData:
+class RunContentMarkerCases:
     """Steps that each fail on the run's own data, which carries a marker no log line and no view may hold."""
 
     # A value no secret pattern matches, so no redaction hides it: only the raise sites' own rule can keep it out.
@@ -879,7 +879,7 @@ prompt = "Count the items in $note"
 """
 
 
-class ResolveBundleTestData:
+class ResolveBundleCases:
     """Bundles the host-facing resolve core is pinned with."""
 
     MAIN_MTHDS: ClassVar[str] = """\
@@ -941,7 +941,7 @@ steps = [{ pipe = "github.com/org/pkg->remote.process", result = "result" }]
 """
 
 
-class ShadowingFieldNamesTestData:
+class ShadowingFieldNamesCases:
     """Bundles whose concept structures name a field like a name the generated structure class relies on."""
 
     # The bundle that got an internal error from the hosted `/v1/validate`: a field named `date`, typed `date`, whose
@@ -1019,7 +1019,7 @@ prompt = "Read the visit from: $text"
     )
 
 
-class LargeTextsStoredTestData:
+class LargeTextsStoredCases:
     """A bundle whose steps produce texts, markdown, HTML and JSON, each past the tests' inline threshold of 0 bytes."""
 
     READ_SCOPE: ClassVar[str] = "org_large_texts"

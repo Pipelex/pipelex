@@ -5,7 +5,7 @@ from typing import ClassVar
 from pipelex.cogt.exceptions import InferenceErrorCategory
 
 
-class GoogleErrorHandlingTestData:
+class GoogleErrorHandlingCases:
     """Test cases for Google worker SDK exception handling.
 
     Each tuple: (topic, status_code, error_message, expected_category, expected_user_action_substring_or_none)

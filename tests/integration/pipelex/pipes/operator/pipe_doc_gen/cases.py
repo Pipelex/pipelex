@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 
-class PipeDocGenTestData:
+class PipeDocGenCases:
     """An invoice bundle whose PipeDocGen step each test sets: its format, its template and its filename."""
 
     STEP_SLOT: ClassVar[str] = "#STEP_FIELDS#"

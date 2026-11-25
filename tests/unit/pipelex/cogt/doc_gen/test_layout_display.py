@@ -2,15 +2,15 @@ import pytest
 
 from pipelex.cogt.doc_gen.layout_display import display_scalar, is_numeric_column, markdown_as_html
 from pipelex.cogt.doc_gen.layout_tree import LayoutScalar
-from tests.unit.pipelex.cogt.doc_gen.cases import LayoutDisplayTestData
+from tests.unit.pipelex.cogt.doc_gen.cases import LayoutDisplayCases
 
 
 class TestLayoutDisplay:
-    @pytest.mark.parametrize(("value", "expected"), LayoutDisplayTestData.SCALAR_CASES)
+    @pytest.mark.parametrize(("value", "expected"), LayoutDisplayCases.SCALAR_CASES)
     def test_a_scalar_prints_plainly(self, value: LayoutScalar, expected: str) -> None:
         assert display_scalar(value=value) == expected
 
-    @pytest.mark.parametrize(("topic", "values", "expected"), LayoutDisplayTestData.NUMERIC_COLUMN_CASES)
+    @pytest.mark.parametrize(("topic", "values", "expected"), LayoutDisplayCases.NUMERIC_COLUMN_CASES)
     def test_a_column_is_numeric_when_it_holds_numbers_only(self, topic: str, values: list[LayoutScalar], expected: bool) -> None:
         assert is_numeric_column(values=values) is expected, topic
 

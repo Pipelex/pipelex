@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.pypdfium2.pypdfium2_worker import Pypdfium2Worker
-from tests.unit.pipelex.providers.pypdfium2.cases import Pypdfium2ErrorHandlingTestData
+from tests.unit.pipelex.providers.pypdfium2.cases import Pypdfium2ErrorHandlingCases
 
 
 def _make_pypdfium2_worker(mocker: MockerFixture) -> Pypdfium2Worker:
@@ -51,7 +51,7 @@ class TestPypdfium2WorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
-        Pypdfium2ErrorHandlingTestData.EXTRACTION_ERROR_CASES,
+        Pypdfium2ErrorHandlingCases.EXTRACTION_ERROR_CASES,
     )
     async def test_extraction_error_categorization(
         self,

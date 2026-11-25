@@ -36,7 +36,7 @@ from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_inference_backend_registry, get_models_manager, get_runtime_hub, get_secrets_provider
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 
 if TYPE_CHECKING:
     from mthds.protocol.problem.models import ProblemItem
@@ -206,7 +206,7 @@ async def engine_unavailable_report(*, step_fields: str) -> str:
     message, which names the remedy, rides the operator's diagnostics; the caller reads the code's sentence over the format.
     """
     with pytest.raises(DocGenEngineMissingError) as exc_info:
-        await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
+        await validate_bundle(mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)])
     caller_problem = exc_info.value.to_problem(view=ProblemView.CALLER)
     assert caller_problem.code == PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
     assert caller_problem.diagnostics is None
@@ -257,7 +257,7 @@ def only_problem_item(error: ValidateBundleError) -> "ProblemItem":
 async def refusal_report(*, step_fields: str) -> ValidateBundleError:
     """The invalid verdict of validating the test bundle with the given PipeDocGen step, which must be refused."""
     with pytest.raises(ValidateBundleError) as exc_info:
-        await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
+        await validate_bundle(mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)])
     return exc_info.value
 
 
@@ -299,7 +299,7 @@ def write_bundle(*, directory: Path, step_fields: str, as_method: bool = True) -
     one-file tree of that file, from which a reference to any other file is refused.
     """
     bundle_path = directory / "invoice.mthds"
-    bundle_path.write_text(PipeDocGenTestData.bundle(step_fields=step_fields), encoding="utf-8")
+    bundle_path.write_text(PipeDocGenCases.bundle(step_fields=step_fields), encoding="utf-8")
     if as_method:
         (directory / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
     return bundle_path

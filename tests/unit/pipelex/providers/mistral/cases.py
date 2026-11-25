@@ -5,7 +5,7 @@ from typing import ClassVar
 from pipelex.cogt.exceptions import InferenceErrorCategory
 
 
-class MistralLLMErrorHandlingTestData:
+class MistralLLMErrorHandlingCases:
     """Test cases for Mistral LLM worker SDK exception handling.
 
     Each tuple: (topic, status_code, error_message, expected_category, expected_user_action_substring_or_none)
@@ -74,7 +74,7 @@ class MistralLLMErrorHandlingTestData:
     ]
 
 
-class MistralExtractErrorHandlingTestData:
+class MistralExtractErrorHandlingCases:
     """Test cases for Mistral Extract worker SDK exception handling.
 
     Each tuple: (topic, status_code, error_message, expected_category, expected_user_action_substring_or_none)

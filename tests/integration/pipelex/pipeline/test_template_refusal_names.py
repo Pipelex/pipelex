@@ -9,7 +9,7 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.errors.problem import ProblemView, problem_metadata
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from tests.integration.pipelex.pipeline.cases import SecurityRefusalTestData
+from tests.integration.pipelex.pipeline.cases import SecurityRefusalCases
 
 # A construct whose fields render templates, one at its root and one inside a nested field.
 _CONSTRUCT_MTHDS = """
@@ -79,7 +79,7 @@ template = "$topic"
 
 
 def _compose_bundle(*, template: str) -> str:
-    return SecurityRefusalTestData.COMPOSE_MTHDS.replace(SecurityRefusalTestData.COMPOSE_MTHDS_SLOT, template)
+    return SecurityRefusalCases.COMPOSE_MTHDS.replace(SecurityRefusalCases.COMPOSE_MTHDS_SLOT, template)
 
 
 async def _refused_run(*, template: str, topic: str) -> PipelineExecutionError:
@@ -105,7 +105,7 @@ def _agent_markdown(*, error: PipelineExecutionError, capsys: pytest.CaptureFixt
 class TestTemplateRefusalNames:
     @pytest.mark.parametrize(
         "template",
-        [SecurityRefusalTestData.PRIVATE_READ_TEMPLATE, SecurityRefusalTestData.FORMAT_LITERAL_TEMPLATE],
+        [SecurityRefusalCases.PRIVATE_READ_TEMPLATE, SecurityRefusalCases.FORMAT_LITERAL_TEMPLATE],
         ids=["read_by_key", "read_through_a_format_string_literal"],
     )
     async def test_a_name_the_template_spells_reaches_the_caller_located_on_the_template_field(self, template: str) -> None:
@@ -114,7 +114,7 @@ class TestTemplateRefusalNames:
         A name written inside a string literal, which a format string reads, is the template's own text too: naming it
         leaks nothing of the run's data.
         """
-        error = await _refused_run(template=template, topic=SecurityRefusalTestData.TOPIC)
+        error = await _refused_run(template=template, topic=SecurityRefusalCases.TOPIC)
 
         caller = error.to_problem(view=ProblemView.CALLER)
 
@@ -132,8 +132,8 @@ class TestTemplateRefusalNames:
         The problem carries no `name`, its sentences say that the template looked a name up from the run's data, and it
         is located on the pipe and its template field.
         """
-        marker = SecurityRefusalTestData.DATA_NAMED_TOPIC
-        error = await _refused_run(template=SecurityRefusalTestData.DATA_NAMED_TEMPLATE, topic=marker)
+        marker = SecurityRefusalCases.DATA_NAMED_TOPIC
+        error = await _refused_run(template=SecurityRefusalCases.DATA_NAMED_TEMPLATE, topic=marker)
 
         operator = error.to_problem(view=ProblemView.OPERATOR)
         caller = error.to_problem(view=ProblemView.CALLER)
@@ -161,8 +161,8 @@ class TestTemplateRefusalNames:
         In `{% if topic.text == 'debug _token' %}…{{ topic[topic.text] }}`, the key `_token` is the run's data, which the
         refusal withholds even though the template's condition writes the same word.
         """
-        marker = SecurityRefusalTestData.DATA_NAMED_BESIDE_LITERAL_TOPIC
-        error = await _refused_run(template=SecurityRefusalTestData.DATA_NAMED_BESIDE_LITERAL_TEMPLATE, topic=marker)
+        marker = SecurityRefusalCases.DATA_NAMED_BESIDE_LITERAL_TOPIC
+        error = await _refused_run(template=SecurityRefusalCases.DATA_NAMED_BESIDE_LITERAL_TEMPLATE, topic=marker)
 
         caller = error.to_problem(view=ProblemView.CALLER)
 
@@ -176,7 +176,7 @@ class TestTemplateRefusalNames:
     async def test_a_template_written_as_a_table_is_located_on_the_key_holding_its_source(self) -> None:
         """A compose template written as a table of its own holds its source under the table's `template` key."""
         with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol().execute(mthds_contents=[_TEMPLATE_TABLE_MTHDS], inputs={"topic": SecurityRefusalTestData.TOPIC})
+            await PipelexMTHDSProtocol().execute(mthds_contents=[_TEMPLATE_TABLE_MTHDS], inputs={"topic": SecurityRefusalCases.TOPIC})
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
 
@@ -195,7 +195,7 @@ class TestTemplateRefusalNames:
         """A construct's template is located by its path from the construct's root, through a nested field too."""
         bundle = _CONSTRUCT_MTHDS.replace("CAPTION_SLOT", caption_template).replace("URL_SLOT", url_template)
         with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol().execute(mthds_contents=[bundle], inputs={"topic": SecurityRefusalTestData.TOPIC})
+            await PipelexMTHDSProtocol().execute(mthds_contents=[bundle], inputs={"topic": SecurityRefusalCases.TOPIC})
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
 
@@ -214,7 +214,7 @@ class TestTemplateRefusalNames:
         """A condition writes its expression as a template or as an expression: its refusal names the field it wrote."""
         bundle = _CONDITION_MTHDS.replace("EXPRESSION_LINE", expression_line)
         with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol().execute(mthds_contents=[bundle], inputs={"topic": SecurityRefusalTestData.TOPIC})
+            await PipelexMTHDSProtocol().execute(mthds_contents=[bundle], inputs={"topic": SecurityRefusalCases.TOPIC})
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
 

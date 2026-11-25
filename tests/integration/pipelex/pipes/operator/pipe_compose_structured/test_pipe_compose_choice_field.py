@@ -8,7 +8,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
-from tests.integration.pipelex.pipeline.cases import RunContentMarkerTestData
+from tests.integration.pipelex.pipeline.cases import RunContentMarkerCases
 
 READ_SCOPE = "org_choices"
 
@@ -25,7 +25,7 @@ async def _level_input(*, level: str, is_stored: bool) -> dict[str, Any]:
 
 async def _make_ticket(*, inputs: dict[str, Any]) -> dict[str, Any]:
     result = await PipelexMTHDSProtocol(storage_scope=f"{READ_SCOPE}/mt_ticket/run_{uuid4().hex}", read_scope=READ_SCOPE).execute(
-        pipe_code="make_ticket", mthds_contents=[RunContentMarkerTestData.MTHDS], inputs=inputs
+        pipe_code="make_ticket", mthds_contents=[RunContentMarkerCases.MTHDS], inputs=inputs
     )
     return result.pipe_output.main_stuff.content.model_dump()
 

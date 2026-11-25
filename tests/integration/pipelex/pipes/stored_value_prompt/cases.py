@@ -11,7 +11,7 @@ STORED_TEXT_KEY = f"{STORAGE_SCOPE}/generated/0123abcd/pages.txt"
 STORED_TEXT_URL = f"pipelex-storage://{STORED_TEXT_KEY}"
 
 
-class StoredValuePromptTestData:
+class StoredValuePromptCases:
     """The referenced form of the stored text, as a dict of its fields."""
 
     TEXT_REFERENCE: ClassVar[dict[str, Any]] = {

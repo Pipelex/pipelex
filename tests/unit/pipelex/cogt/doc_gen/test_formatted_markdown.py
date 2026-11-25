@@ -20,7 +20,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
 )
 from pipelex.tools.markdown import markdown_formatting, markdown_rules
 from pipelex.tools.markdown.markdown_parser import markdown_syntax_tree, table_cells_bound
-from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingCases
 
 # What a conversion refused for its tables may hold before the refusal: its source and the scan of its lines, never the
 # tokens of its cells, which take tens of megabytes here.
@@ -52,8 +52,8 @@ class TestFormattedMarkdown:
     @pytest.mark.parametrize(
         ("markdown", "expected_text"),
         [
-            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
-            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_EMPHASIS, MarkdownFormattingCases.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_MIXED_EMPHASIS, MarkdownFormattingCases.DEEP_MIXED_EMPHASIS_TEXT),
         ],
     )
     def test_emphasis_nested_hundreds_deep_formats_rather_than_overflowing_the_stack(self, markdown: str, expected_text: str) -> None:
@@ -67,7 +67,7 @@ class TestFormattedMarkdown:
         tracemalloc.start()
         try:
             with pytest.raises(MarkdownFormattingBudgetError, match="outside a template render"):
-                format_markdown(markdown=MarkdownFormattingTestData.PADDED_TABLE)
+                format_markdown(markdown=MarkdownFormattingCases.PADDED_TABLE)
             _, peak_bytes = tracemalloc.get_traced_memory()
         finally:
             tracemalloc.stop()
@@ -76,20 +76,20 @@ class TestFormattedMarkdown:
 
     def test_a_reference_used_thousands_of_times_is_refused_before_it_is_built(self) -> None:
         with pytest.raises(MarkdownFormattingBudgetError):
-            format_markdown(markdown=MarkdownFormattingTestData.REUSED_REFERENCE)
+            format_markdown(markdown=MarkdownFormattingCases.REUSED_REFERENCE)
 
     def test_a_long_address_around_many_spans_is_refused_before_the_tree_is_built(self, mocker: MockerFixture) -> None:
         """Outside a render and inside one: each span carries the address, so the bound counts it once per span."""
         tree_builder = mocker.patch("pipelex.tools.markdown.markdown_formatting.markdown_syntax_tree", wraps=markdown_syntax_tree)
         with pytest.raises(MarkdownFormattingBudgetError):
-            format_markdown(markdown=MarkdownFormattingTestData.LINK_AROUND_MANY_SPANS)
+            format_markdown(markdown=MarkdownFormattingCases.LINK_AROUND_MANY_SPANS)
         budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
         with spending_from(budget=budget), pytest.raises(RenderBudgetExceededError, match="formatting Markdown"):
-            format_markdown(markdown=MarkdownFormattingTestData.LINK_AROUND_MANY_SPANS)
+            format_markdown(markdown=MarkdownFormattingCases.LINK_AROUND_MANY_SPANS)
         tree_builder.assert_not_called()
 
     def test_inside_a_render_a_link_s_address_is_charged_with_every_span_that_carries_it(self) -> None:
-        markdown = MarkdownFormattingTestData.LINK_AROUND_FEW_SPANS
+        markdown = MarkdownFormattingCases.LINK_AROUND_FEW_SPANS
         budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
         with spending_from(budget=budget):
             blocks = format_markdown(markdown=markdown).blocks
@@ -102,7 +102,7 @@ class TestFormattedMarkdown:
         assert spent >= MARKDOWN_UNITS_PER_CHARACTER * len(markdown) + sum(len(span.link or "") for span in linked_spans)
 
     def test_outside_a_render_an_ordinary_long_text_formats(self) -> None:
-        formatted = format_markdown(markdown=MarkdownFormattingTestData.LONG_REPORT)
+        formatted = format_markdown(markdown=MarkdownFormattingCases.LONG_REPORT)
         assert sum(isinstance(block, FormattedHeading) for block in formatted.blocks) == 300
 
     @pytest.mark.builds_problems_without_required_params(
@@ -111,7 +111,7 @@ class TestFormattedMarkdown:
     )
     def test_the_budget_error_is_the_caller_s(self) -> None:
         with pytest.raises(MarkdownFormattingBudgetError) as caught:
-            format_markdown(markdown=MarkdownFormattingTestData.PADDED_TABLE)
+            format_markdown(markdown=MarkdownFormattingCases.PADDED_TABLE)
         caller = caught.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.INPUT_TOO_LARGE
         assert caller.domain == ProblemDomain.INPUT
@@ -121,7 +121,7 @@ class TestFormattedMarkdown:
 
     def test_inside_a_render_the_render_s_budget_is_charged_for_the_source_the_tables_and_the_result(self) -> None:
         """A table of padded cells costs more to parse than its result takes: dropping either charge spends less."""
-        markdown = MarkdownFormattingTestData.WIDE_SHORT_TABLE
+        markdown = MarkdownFormattingCases.WIDE_SHORT_TABLE
         source_and_tables = MARKDOWN_UNITS_PER_CHARACTER * (len(markdown) + table_cells_bound(markdown_text=markdown))
         budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
         with spending_from(budget=budget):
@@ -132,8 +132,8 @@ class TestFormattedMarkdown:
     def test_inside_a_render_an_overdraft_is_the_render_s_own_template_error(self) -> None:
         # A budget that affords the text alone, not the conversion: the refusal is the render's, which a template fill
         # catches with every other template error.
-        budget = RenderBudget(total=len(MarkdownFormattingTestData.NOTES) * 4)
+        budget = RenderBudget(total=len(MarkdownFormattingCases.NOTES) * 4)
         with spending_from(budget=budget), pytest.raises(RenderBudgetExceededError, match="formatting Markdown") as caught:
-            format_markdown(markdown=MarkdownFormattingTestData.NOTES)
+            format_markdown(markdown=MarkdownFormattingCases.NOTES)
         assert isinstance(caught.value, TemplateError)
         assert not isinstance(caught.value, MarkdownFormattingBudgetError)

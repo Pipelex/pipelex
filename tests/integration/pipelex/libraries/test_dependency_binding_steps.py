@@ -18,13 +18,13 @@ from pipelex.libraries.library import Library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.libraries.cases import LedgerPackageTestData
+from tests.integration.pipelex.libraries.cases import LedgerPackageCases
 from tests.integration.pipelex.libraries.installed_packages import install_package, isolate_installed_methods, write_consumer
 
 if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
 
-LEDGER_ALIAS = LedgerPackageTestData.DEP_ALIAS
+LEDGER_ALIAS = LedgerPackageCases.DEP_ALIAS
 
 
 def _derived_concept_refs(*, library: Library, pipe_key: str) -> list[str]:
@@ -38,9 +38,9 @@ def _derived_concept_refs(*, library: Library, pipe_key: str) -> list[str]:
 def _install_ledger(*, root: Path) -> None:
     install_package(
         root=root,
-        method_name=LedgerPackageTestData.METHOD_NAME,
-        manifest=LedgerPackageTestData.DEP_MANIFEST,
-        bundles={"invented_ledger.mthds": LedgerPackageTestData.DEP_BUNDLE},
+        method_name=LedgerPackageCases.METHOD_NAME,
+        manifest=LedgerPackageCases.DEP_MANIFEST,
+        bundles={"invented_ledger.mthds": LedgerPackageCases.DEP_BUNDLE},
     )
 
 
@@ -48,9 +48,9 @@ class TestDependencyBindingSteps:
     @pytest.mark.parametrize(
         "consumer_bundles",
         [
-            pytest.param({"books.mthds": LedgerPackageTestData.CONSUMER_BUNDLE}, id="the-package-s-concepts-alone"),
+            pytest.param({"books.mthds": LedgerPackageCases.CONSUMER_BUNDLE}, id="the-package-s-concepts-alone"),
             pytest.param(
-                {"books.mthds": LedgerPackageTestData.CONSUMER_BUNDLE, "own_ledger.mthds": LedgerPackageTestData.CONSUMER_NAMESAKE_BUNDLE},
+                {"books.mthds": LedgerPackageCases.CONSUMER_BUNDLE, "own_ledger.mthds": LedgerPackageCases.CONSUMER_NAMESAKE_BUNDLE},
                 id="beside-consumer-concepts-of-the-same-spelling",
             ),
         ],
@@ -84,7 +84,7 @@ class TestDependencyBindingSteps:
         _install_ledger(root=tmp_path)
         consumer_files = write_consumer(
             root=tmp_path,
-            bundles={"books.mthds": LedgerPackageTestData.CONSUMER_BUNDLE, "own_ledger.mthds": LedgerPackageTestData.CONSUMER_NAMESAKE_BUNDLE},
+            bundles={"books.mthds": LedgerPackageCases.CONSUMER_BUNDLE, "own_ledger.mthds": LedgerPackageCases.CONSUMER_NAMESAKE_BUNDLE},
         )
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
@@ -110,7 +110,7 @@ class TestDependencyBindingSteps:
         # installed under `.mthds/methods/` above it, never loaded as one of the consumer's bundles.
         consumer_dir = tmp_path / "books"
         consumer_dir.mkdir()
-        write_consumer(root=consumer_dir, bundles={"books.mthds": LedgerPackageTestData.CONSUMER_BUNDLE})
+        write_consumer(root=consumer_dir, bundles={"books.mthds": LedgerPackageCases.CONSUMER_BUNDLE})
         # What the run's library held when it was torn down: the packages it loaded, and whether it held the package's
         # `Invoice` under its plain spelling, which only a consumer bundle would put there.
         library_states: list[tuple[set[str], bool]] = []

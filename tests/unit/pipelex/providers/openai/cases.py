@@ -3,10 +3,10 @@
 from typing import Any, ClassVar
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
 
 
-class OpenAIErrorHandlingTestData:
+class OpenAIErrorHandlingCases:
     """Test cases for OpenAI worker SDK exception handling.
 
     Each tuple: (topic, error_message, expected_category, expected_user_action_substring_or_none), the rate-limit
@@ -19,21 +19,21 @@ class OpenAIErrorHandlingTestData:
         (
             "generic_rate_limit",
             "Rate limit exceeded. Please retry after 20s",
-            DirectProviderQuotaTestData.OPENAI_RATE_LIMIT_BODY["error"],
+            DirectProviderQuotaCases.OPENAI_RATE_LIMIT_BODY["error"],
             InferenceErrorCategory.TRANSIENT,
             "run it again",
         ),
         (
             "quota_insufficient",
             "Error: insufficient_quota - you have exceeded your billing limit",
-            DirectProviderQuotaTestData.OPENAI_INSUFFICIENT_QUOTA_BODY["error"],
+            DirectProviderQuotaCases.OPENAI_INSUFFICIENT_QUOTA_BODY["error"],
             InferenceErrorCategory.CAPACITY,
             "billing",
         ),
         (
             "billing_code_beside_the_broad_type",
             "Your organization has no prepaid credits remaining.",
-            DirectProviderQuotaTestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_BODY["error"],
+            DirectProviderQuotaCases.OPENAI_CREDIT_BALANCE_EXHAUSTED_BODY["error"],
             InferenceErrorCategory.CAPACITY,
             "billing",
         ),
@@ -76,7 +76,7 @@ class OpenAIErrorHandlingTestData:
     ]
 
 
-class GatewayStopTestData:
+class GatewayStopCases:
     """Stop values a gateway in non-strict mode passes through the chat-completions shape in each provider's vocabulary.
 
     Each tuple: (topic, finish_reason, content); the content is partial or empty, as the gateway sets it.

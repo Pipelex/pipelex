@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 
-class MethodLockTestData:
+class MethodLockCases:
     """An invented locked dependency, and the `methods.lock` files a calling method could carry for it; nothing here is real."""
 
     ADDRESS: ClassVar[str] = "github.com/invented/locked-lib/scoring"

@@ -15,7 +15,7 @@ from tests.unit.pipelex.core.stuffs.stored_value.cases import (
     STORED_JSON_OBJ,
     STORED_TEXT,
     TEXT_URL,
-    StoredValueTestData,
+    StoredValueCases,
 )
 
 
@@ -28,11 +28,11 @@ class TestStoredValueValidation:
             (HtmlContent, {"inner_html": STORED_HTML}),
             (HtmlContent, {"inner_html": STORED_HTML, "css_class": "page"}),
             (JSONContent, {"json_obj": STORED_JSON_OBJ}),
-            (TextContent, StoredValueTestData.TEXT_REFERENCE),
-            (MarkdownContent, StoredValueTestData.MARKDOWN_REFERENCE),
-            (HtmlContent, StoredValueTestData.HTML_REFERENCE),
-            (HtmlContent, {**StoredValueTestData.HTML_REFERENCE, "css_class": "page"}),
-            (JSONContent, StoredValueTestData.JSON_REFERENCE),
+            (TextContent, StoredValueCases.TEXT_REFERENCE),
+            (MarkdownContent, StoredValueCases.MARKDOWN_REFERENCE),
+            (HtmlContent, StoredValueCases.HTML_REFERENCE),
+            (HtmlContent, {**StoredValueCases.HTML_REFERENCE, "css_class": "page"}),
+            (JSONContent, StoredValueCases.JSON_REFERENCE),
             # A caller may send a text input as a bare URL: the metadata is the storing code's, never required.
             (TextContent, {"url": TEXT_URL}),
             (HtmlContent, {"url": HTML_URL}),
@@ -47,7 +47,7 @@ class TestStoredValueValidation:
         ("content_class", "fields", "expected_fragment"),
         [
             (TextContent, {"text": STORED_TEXT, "url": TEXT_URL}, "both"),
-            (MarkdownContent, {"text": STORED_TEXT, **StoredValueTestData.MARKDOWN_REFERENCE}, "both"),
+            (MarkdownContent, {"text": STORED_TEXT, **StoredValueCases.MARKDOWN_REFERENCE}, "both"),
             (HtmlContent, {"inner_html": STORED_HTML, "url": HTML_URL}, "both"),
             (JSONContent, {"json_obj": STORED_JSON_OBJ, "url": JSON_URL}, "both"),
             (TextContent, {}, "neither"),

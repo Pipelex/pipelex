@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 
 
-class HuggingFaceErrorHandlingTestData:
+class HuggingFaceErrorHandlingCases:
     """Test cases for HuggingFace ImgGen worker SDK exception handling.
 
     Each tuple: (topic, status_code_or_none, message, expected_category, expected_user_action_kind)

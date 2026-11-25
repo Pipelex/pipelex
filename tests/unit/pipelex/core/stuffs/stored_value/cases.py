@@ -19,7 +19,7 @@ JSON_URL = f"pipelex-storage://{JSON_KEY}"
 FOREIGN_URL = f"pipelex-storage://{FOREIGN_KEY}"
 
 
-class StoredValueTestData:
+class StoredValueCases:
     """The referenced form of each class, as a dict of its fields, with the value its storage holds."""
 
     TEXT_REFERENCE: ClassVar[dict[str, Any]] = {

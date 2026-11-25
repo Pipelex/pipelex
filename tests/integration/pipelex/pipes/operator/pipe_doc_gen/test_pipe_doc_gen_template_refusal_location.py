@@ -6,7 +6,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenTestData
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 
 # A template that reads a private name its own source spells, which the sandbox refuses whatever the run's data.
 _REFUSED_TEMPLATE = "<p>{{ invoice['_owner'] }}</p>"
@@ -33,7 +33,7 @@ class TestPipeDocGenTemplateRefusalLocation:
     ) -> None:
         with pytest.raises(PipelexError) as exc_info:
             await PipelexMTHDSProtocol(submitted_files=submitted_files).execute(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)], inputs=PipeDocGenTestData.INVOICE_INPUTS
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)], inputs=PipeDocGenCases.INVOICE_INPUTS
             )
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)

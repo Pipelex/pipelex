@@ -7,13 +7,13 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_TEXT, StoredValueTestData
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_TEXT, StoredValueCases
 
 
 class TestStoredValueAssignment:
     def test_assigning_the_text_of_a_loaded_reference_makes_it_inline(self):
         """The PipeFunc pattern `note.text = note.require_text().upper()` leaves a content in one valid form."""
-        note = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        note = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
         note.accept_loaded_text(text=STORED_TEXT)
 
         note.text = note.require_text().upper()
@@ -30,10 +30,10 @@ class TestStoredValueAssignment:
     @pytest.mark.parametrize(
         ("content_class", "reference", "value_field_name", "new_value"),
         [
-            (TextContent, StoredValueTestData.TEXT_REFERENCE, "text", "rewritten"),
-            (MarkdownContent, StoredValueTestData.MARKDOWN_REFERENCE, "text", "# Rewritten"),
-            (HtmlContent, StoredValueTestData.HTML_REFERENCE, "inner_html", "<p>Rewritten</p>"),
-            (JSONContent, StoredValueTestData.JSON_REFERENCE, "json_obj", {"rewritten": True}),
+            (TextContent, StoredValueCases.TEXT_REFERENCE, "text", "rewritten"),
+            (MarkdownContent, StoredValueCases.MARKDOWN_REFERENCE, "text", "# Rewritten"),
+            (HtmlContent, StoredValueCases.HTML_REFERENCE, "inner_html", "<p>Rewritten</p>"),
+            (JSONContent, StoredValueCases.JSON_REFERENCE, "json_obj", {"rewritten": True}),
         ],
     )
     def test_assigning_the_value_of_a_reference_never_loaded_makes_it_inline(
@@ -61,7 +61,7 @@ class TestStoredValueAssignment:
         assert note.smart_dump() == {"text": "longer"}
 
     def test_assigning_a_value_drops_the_value_loaded_before(self):
-        note = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        note = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
         note.accept_loaded_text(text=STORED_TEXT)
         note.text = "replaced"
 

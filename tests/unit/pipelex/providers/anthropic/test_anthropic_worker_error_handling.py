@@ -15,8 +15,8 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, 
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
-from tests.unit.pipelex.cogt.cases import DirectProviderQuotaTestData
-from tests.unit.pipelex.providers.anthropic.cases import AnthropicErrorHandlingTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
+from tests.unit.pipelex.providers.anthropic.cases import AnthropicErrorHandlingCases
 
 
 def _mock_httpx_response(status_code: int = 429) -> httpx.Response:
@@ -108,7 +108,7 @@ class TestAnthropicWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "body", "expected_category", "expected_action_substring"),
-        AnthropicErrorHandlingTestData.RATE_LIMIT_CASES,
+        AnthropicErrorHandlingCases.RATE_LIMIT_CASES,
     )
     async def test_rate_limit(
         self,
@@ -151,7 +151,7 @@ class TestAnthropicWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected_category", "expected_action_substring"),
-        AnthropicErrorHandlingTestData.BAD_REQUEST_CASES,
+        AnthropicErrorHandlingCases.BAD_REQUEST_CASES,
     )
     async def test_bad_request(
         self,
@@ -208,7 +208,7 @@ class TestAnthropicWorkerErrorHandling:
     async def test_credit_balance_bad_request_is_capacity(self, mocker: MockerFixture) -> None:
         """Anthropic's 400 for a spent credit balance, whose sentence is its only signal, is CAPACITY."""
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_bad_request_error("Error code: 400", body=DirectProviderQuotaTestData.ANTHROPIC_CREDIT_BALANCE_BODY)
+        sdk_exc = _make_anthropic_bad_request_error("Error code: 400", body=DirectProviderQuotaCases.ANTHROPIC_CREDIT_BALANCE_BODY)
         worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:

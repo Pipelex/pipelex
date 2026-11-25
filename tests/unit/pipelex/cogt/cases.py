@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.errors.error_codes import ErrorCode
 
 
-class ExceptionTestData:
+class ExceptionCases:
     # (topic, category, expected_is_retryable)
     CATEGORY_RETRYABLE_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, bool]]] = [
         ("transient_is_retryable", InferenceErrorCategory.TRANSIENT, True),
@@ -30,7 +30,7 @@ class ExceptionTestData:
     ]
 
 
-class GatewayThrottleTestData:
+class GatewayThrottleCases:
     # Azure OpenAI's refusal of a `gpt-image-2` call over its deployment's call rate, verbatim as a run on the hosted API
     # received it through the gateway, which prefixes the provider's message with the provider's name. Its code is
     # Azure's rate-limit code, and its last sentence links to Azure's quota-increase page, whose address holds the word
@@ -67,7 +67,7 @@ class GatewayThrottleTestData:
     OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE: ClassVar[str] = "credit_balance_exhausted"
 
 
-class DirectProviderQuotaTestData:
+class DirectProviderQuotaCases:
     """Error bodies of the providers Pipelex calls directly, each as the provider sends it over the wire.
 
     Each one is a real answer a user posted or a body the provider documents, with its source named; where neither

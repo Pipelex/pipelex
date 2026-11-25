@@ -50,7 +50,7 @@ from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, Webh
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from tests.helpers.pipe_io_artifacts import make_pipe_io_artifacts
-from tests.unit.pipelex.errors.cases import ProblemViewsTestData
+from tests.unit.pipelex.errors.cases import ProblemViewsCases
 
 
 def _records_with_message(*, caplog: pytest.LogCaptureFixture, message: str) -> list[logging.LogRecord]:
@@ -970,7 +970,7 @@ class TestDeliveryExecutor:
         mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
         projection_spy = mocker.spy(delivery_executor_module, "caller_view_of")
 
-        problem = PipelexProblem.model_validate(ProblemViewsTestData.UNKNOWN_OPERATOR_PROBLEM)
+        problem = PipelexProblem.model_validate(ProblemViewsCases.UNKNOWN_OPERATOR_PROBLEM)
         assignment = DeliveryAssignment(
             webhooks=[
                 WebhookTarget(url="https://example.com/first", problem_view=ProblemView.CALLER),
@@ -995,7 +995,7 @@ class TestDeliveryExecutor:
             caller_error = errors_by_url[caller_url]
             assert caller_error["next_step"] == {"kind": "report", "detail": "Report this problem with its request id."}
             assert "diagnostics" not in caller_error
-            assert ProblemViewsTestData.PRIVATE_HOST_FILE not in json.dumps(caller_error)
+            assert ProblemViewsCases.PRIVATE_HOST_FILE not in json.dumps(caller_error)
         assert errors_by_url["https://example.com/operator"] == problem.to_wire()
 
     async def test_webhook_omits_error_when_problem_is_none(self, mocker: MockerFixture) -> None:

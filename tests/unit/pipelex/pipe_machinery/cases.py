@@ -3,7 +3,7 @@ from typing import ClassVar
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
 
 
-class InputNameRefusalTestData:
+class InputNameRefusalCases:
     """Pipe tables for the input-name refusal: one per pipe kind, valid on its own, each declaring `inputs` on one line."""
 
     PIPE_TABLES: ClassVar[dict[PipeType, str]] = {

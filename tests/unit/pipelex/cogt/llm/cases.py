@@ -3,7 +3,7 @@ from typing import ClassVar
 from pipelex.cogt.llm.completion_stop import CompletionStopOutcome
 
 
-class CompletionStopTestData:
+class CompletionStopCases:
     # (topic, stop value, outcome): a normal, a truncated and a refused value from each vocabulary
     STOP_REASON_CASES: ClassVar[list[tuple[str, str, CompletionStopOutcome]]] = [
         ("openai normal", "stop", CompletionStopOutcome.NORMAL),

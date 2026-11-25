@@ -21,7 +21,7 @@ from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_t
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.pipeline.cases import ResolveBundleTestData
+from tests.integration.pipelex.pipeline.cases import ResolveBundleCases
 
 
 @contextmanager
@@ -39,8 +39,8 @@ class TestResolveCrateFromMethodDir:
         load_empty_library()
         library_manager = get_library_manager()
         files = {
-            "main.mthds": ResolveBundleTestData.MAIN_MTHDS,
-            "steps/scoring.mthds": ResolveBundleTestData.STEPS_MTHDS,
+            "main.mthds": ResolveBundleCases.MAIN_MTHDS,
+            "steps/scoring.mthds": ResolveBundleCases.STEPS_MTHDS,
             "README.md": "# Not a bundle\n",
         }
         with _written_tree(destination=tmp_path / "method", files=files) as method_dir:
@@ -65,7 +65,7 @@ class TestResolveCrateFromMethodDir:
     @pytest.mark.parametrize(
         ("files", "expects_items"),
         [
-            pytest.param({"broken.mthds": ResolveBundleTestData.INVALID_MTHDS}, True, id="invalid-bundle"),
+            pytest.param({"broken.mthds": ResolveBundleCases.INVALID_MTHDS}, True, id="invalid-bundle"),
             pytest.param({"notes.txt": "no bundle here"}, False, id="no-bundle"),
         ],
     )
@@ -105,7 +105,7 @@ class TestResolveCrateFromMethodDir:
     def test_a_merge_error_names_the_bundles_by_their_tree_paths(self, load_empty_library: Callable[[], str], tmp_path: Path):
         """An error raised once the bundles parsed, such as one concept declared twice, names no directory of the host."""
         load_empty_library()
-        files = {"first.mthds": ResolveBundleTestData.MAIN_MTHDS, "second.mthds": ResolveBundleTestData.MAIN_MTHDS}
+        files = {"first.mthds": ResolveBundleCases.MAIN_MTHDS, "second.mthds": ResolveBundleCases.MAIN_MTHDS}
         with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
             resolve_crate_from_method_dir(method_dir=method_dir)
 
@@ -131,7 +131,7 @@ class TestResolveCrateFromMethodDir:
             "pipelex.libraries.library_manager.resolve_address_based_method",
             side_effect=AssertionError("a static resolution must not look up installed methods or fetch by address"),
         )
-        files = {"host.mthds": ResolveBundleTestData.ADDRESS_DEPENDENCY_MTHDS}
+        files = {"host.mthds": ResolveBundleCases.ADDRESS_DEPENDENCY_MTHDS}
         with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
             resolve_crate_from_method_dir(method_dir=method_dir)
 

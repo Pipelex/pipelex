@@ -13,7 +13,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer
 
 
-class CrateQualificationTestData:
+class CrateQualificationCases:
     """A crate for the qualification pass, built fresh on each call since a test may change it."""
 
     @classmethod
@@ -68,7 +68,7 @@ class CrateQualificationTestData:
         )
 
 
-class MethodRequirementsTestData:
+class MethodRequirementsCases:
     """Lines of a method's requirements.txt, as the MTHDS standard reads them, and a package set to judge them against."""
 
     # (topic, line, the requirement's name when the line declares one)
@@ -132,7 +132,7 @@ class MethodRequirementsTestData:
         )
 
 
-class PackageVisibilityTestData:
+class PackageVisibilityCases:
     """Bundles of one package whose `legal` domain calls a pipe its `scoring` domain does not export."""
 
     PACKAGE_ADDRESS = "github.com/harbour-board/legal-tools"
