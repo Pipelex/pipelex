@@ -11,6 +11,10 @@ templating) mint synthetic outputs without reporting usage. For img-gen and
 extract, the DRY branch lives at the ``*_and_store`` layer — one step above the
 raw provider leaf — so a dry run performs **no storage IO** (eng review D10).
 
+Every helper here that mints an output adds what it mints to the dry run's budget of mock items before it builds it
+(:func:`~pipelex.core.pipes.declared_item_count.spend_dry_run_mock_items`), one item per mock: a text, a rendered
+text, a document, an image, a page, an answer or an object.
+
 Usage reporting is keyed on the internal ``CogtRunParams.is_mock_usage``
 sub-flag (DRY-only; the only CLI access is the hidden ``--mock-usage`` test
 trigger, which requires ``--dry-run`` and is not shown in --help):
@@ -287,7 +291,8 @@ def _dry_text_gen_truncate_length() -> int:
 
 
 def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    """Dry leaf for ``llm_gen_text``: synthetic job report + a ``DRY RUN:`` marker string."""
+    """Dry leaf for ``llm_gen_text``: synthetic job report + a ``DRY RUN:`` marker string, one mock item of the budget."""
+    spend_dry_run_mock_items(count=1, slot="a dry run's mock generated text")
     job_metadata = llm_assignment.job_metadata
     report_func = _dry_report_func(llm_assignment.cogt_run_params)
     report_func(job_metadata, llm_setting=llm_assignment.llm_setting, llm_prompt=llm_assignment.llm_prompt)
@@ -311,8 +316,9 @@ def dry_llm_gen_object_list(object_assignment: ObjectAssignment, *, object_class
 
 def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:
     """Dry leaf for ``templating_gen_text``: parse-check the template (a bad jinja2 template must
-    still fail under DRY), then return a marker string instead of rendering.
+    still fail under DRY), then return a marker string instead of rendering, one mock item of the budget.
     """
+    spend_dry_run_mock_items(count=1, slot="a dry run's mock rendered text")
     check_jinja2_parsing(
         template_source=templating_assignment.template,
         template_category=templating_assignment.category,
@@ -398,8 +404,10 @@ def dry_render_page_views() -> list[ImageContent]:
 def dry_render_document(render_assignment: RenderDocumentAssignment) -> DocumentContent:
     """Dry leaf for document printing: a mock Document named as the live one would be, no engine, no storage IO.
 
-    Its URL is the blank one-page PDF every mocked document carries, whatever the format asked for.
+    Its URL is the blank one-page PDF every mocked document carries, whatever the format asked for. It is one mock
+    item of the budget.
     """
+    spend_dry_run_mock_items(count=1, slot="a dry run's mock printed document")
     composition = render_assignment.composition
     return DocumentContent(url=DryRunFactory.generate_mock_document_url(), mime_type=composition.format.mime_type, filename=composition.filename)
 
@@ -420,8 +428,9 @@ def dry_judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[st
     members are left absent for the same reason: the contract makes them optional precisely so a
     producer that measured nothing can say so, and a mock probability would be the one number in the
     whole family that nobody could tell apart from a real one. A level's label is not an answer's: the
-    operator copies it from the declared scale, dry or live.
+    operator copies it from the declared scale, dry or live. Each answer is one mock item of the budget.
     """
+    spend_dry_run_mock_items(count=len(judgment_assignment.questions), slot="a dry run's mock judgment answers")
     answers: dict[str, JudgmentOutcome] = {}
     for question_key, question in judgment_assignment.questions.items():
         match question:

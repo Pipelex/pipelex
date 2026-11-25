@@ -372,6 +372,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeComposeOutput:
+        # A dry run's compose builds its output from mock inputs, a rendered text or a constructed object, or a mock of
+        # it when the construction fails: one item of the dry run's budget of mock items, spent before it is built.
+        spend_dry_run_mock_items(count=1, slot=f"the output of the pipe '{self.code}'")
         if self.is_construct_mode:
             try:
                 return await self._live_run_operator_pipe(
@@ -416,7 +419,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        spend_dry_run_mock_items(count=1, slot=f"the mock output of the pipe '{self.code}'")
+        # Its one item of the budget was spent when the dry run began (`_dry_run_operator_pipe`).
         factory = DryRunFactory.make_dry_run_factory(output_class)
         the_content = factory.build()
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)

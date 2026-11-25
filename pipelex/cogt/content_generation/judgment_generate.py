@@ -20,6 +20,7 @@ from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.judgment.judgment_worker_factory import JudgmentWorkerFactory
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.core.pipes.declared_item_count import dry_leaf_limits
 from pipelex.runtime_hub import get_model_deck, get_report_delegate
 
 
@@ -44,7 +45,9 @@ def _make_judgment_job(judgment_assignment: JudgmentAssignment) -> JudgmentJob:
 async def judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentOutcome]:
     authorize_assignment_reads(job_metadata=judgment_assignment.job_metadata, uri_references=judgment_assignment.referenced_uris())
     if judgment_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_judgment_gen_answers(judgment_assignment)
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=judgment_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_judgment_gen_answers(judgment_assignment)
     worker = _make_judgment_worker(judgment_assignment)
     judgment_job = _make_judgment_job(judgment_assignment)
     return await worker.judge(judgment_job)

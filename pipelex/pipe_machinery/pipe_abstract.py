@@ -794,8 +794,9 @@ class PipeAbstract(ABC, BaseModel):
                 # The run's maximum declared item count, when its host stated one, bounds the dry-run mock builders of
                 # this pipe and of every pipe below it, in this process or a worker's; None keeps the one in force.
                 scoped_max_declared_item_count(maximum=job_metadata.run_metadata.max_declared_item_count),
-                # One budget of mock items for the whole dry run: the outermost pipe run opens it, unless a validation
-                # or a run setup already did, and every pipe below it, a batch's concurrent branches included, adds to it.
+                # One budget of mock items for this process's share of the dry run: the outermost pipe run opens it,
+                # unless a validation or the run's own router already did with the tally its setup opened, and every
+                # pipe below it, a batch's concurrent branches included, adds to it. A worker's activity opens its own.
                 scoped_dry_run_mock_budget(),
             ):
                 return await self._run_pipe_traced(

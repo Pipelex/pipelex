@@ -6,9 +6,10 @@ deployment's configuration outside any scope:
 - **The maximum declared item count**, the most items one slot may hold. A host opens
   :func:`scoped_max_declared_item_count` from a request's own maximum, such as a hosted plane from the caller's plan, and
   everything run in that context, the library load and the dry run's mock builders included, reads it.
-- **The dry run's mock budget**, the most mock items one dry run or one validation builds in all, whatever the slots.
-  :func:`scoped_dry_run_mock_budget` opens one tally for the block, or joins the one already open, so a validation's
-  sweep, a run's pipes and the concurrent branches of a batch all add to the same tally.
+- **The dry run's mock budget**, the most mock items one in-process dry run or one validation builds in all, whatever
+  the slots. :func:`scoped_dry_run_mock_budget` opens one tally for the block, or joins the one already open, so a
+  validation's sweep, a run's mock inputs and pipes, and the concurrent branches of a batch all add to the same tally.
+  The tally lives in one process: each worker activity of a distributed dry run counts against a budget of its own.
 
 This module reads no configuration, so the pipe machinery can open the scopes without importing the configuration
 singleton: the budget's size is the configuration's, read when an item is added (`spend_dry_run_mock_items`).
@@ -94,17 +95,21 @@ _scoped_dry_run_mock_tally: ContextVar[DryRunMockTally | None] = ContextVar("sco
 
 
 @contextmanager
-def scoped_dry_run_mock_budget() -> Generator[DryRunMockTally, None, None]:
-    """Count the mock items the block builds against one budget: a new tally, or the one a scope around it opened.
+def scoped_dry_run_mock_budget(*, tally: DryRunMockTally | None = None) -> Generator[DryRunMockTally, None, None]:
+    """Count the mock items the block builds against one budget: the one a scope around it opened, else `tally`, else a new one.
 
     A nested scope joins the open tally rather than starting a fresh one, so a validation's sweep and every pipe run in
     it, or a run's pipes and the branches of its batches, spend one budget between them.
+
+    Args:
+        tally: A tally opened before the block, outside any scope around it, such as the one a run's setup opened for
+            its mock inputs and carried on the run's job (`PipeJob`), so the run's pipes spend the same budget.
     """
     open_tally = _scoped_dry_run_mock_tally.get()
     if open_tally is not None:
         yield open_tally
         return
-    tally = DryRunMockTally()
+    tally = tally or DryRunMockTally()
     token = _scoped_dry_run_mock_tally.set(tally)
     try:
         yield tally

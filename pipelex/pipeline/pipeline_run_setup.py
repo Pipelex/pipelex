@@ -498,8 +498,9 @@ async def pipeline_run_setup(
             )
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
-        # The mock inputs a run asks for are built under the run's maximum too, and within the dry run's budget of mock items.
-        with scoped_max_declared_item_count(maximum=max_declared_item_count), scoped_dry_run_mock_budget():
+        # The mock inputs a run asks for are built under the run's maximum too, and within the dry run's budget of mock
+        # items, which the job carries to the run: its pipes spend the same budget, not a fresh one.
+        with scoped_max_declared_item_count(maximum=max_declared_item_count), scoped_dry_run_mock_budget() as run_mock_tally:
             pipe_job = await prepare_pipe_job(
                 pipe=pipe,
                 library_id=library_id,
@@ -525,6 +526,7 @@ async def pipeline_run_setup(
                 request_id=request_id,
                 inputs_base_dir=inputs_base_dir,
             )
+        pipe_job.carry_dry_run_mock_tally(tally=run_mock_tally)
 
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,

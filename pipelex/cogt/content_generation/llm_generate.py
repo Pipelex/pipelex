@@ -20,7 +20,9 @@ from pipelex.runtime_hub import get_llm_worker
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
     authorize_assignment_reads(job_metadata=llm_assignment.job_metadata, uri_references=llm_assignment.referenced_uris())
     if llm_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_llm_gen_text(llm_assignment)
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=llm_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_llm_gen_text(llm_assignment)
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,

@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Protocol
 
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.pipes.declared_item_count_scope import scoped_dry_run_mock_budget
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
@@ -55,7 +56,10 @@ class PipeRouterProtocol(Protocol):
         await self._before_run(pipe_job)
 
         try:
-            pipe_output = await self._run_pipe_job(pipe_job)
+            # The run spends the budget of mock items its setup opened for the mock inputs, carried on its job, unless a
+            # scope around it already counts, such as a validation's: a run's setup and its pipes build within one budget.
+            with scoped_dry_run_mock_budget(tally=pipe_job.dry_run_mock_tally):
+                pipe_output = await self._run_pipe_job(pipe_job)
         except Exception as exc:
             # Case (2), unbounded code: a pipe's run reaches user functions, plugin routers and
             # provider SDKs. Nothing is swallowed: every failure is re-raised, located.
