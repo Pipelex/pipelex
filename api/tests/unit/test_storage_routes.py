@@ -34,16 +34,16 @@ from pipelex_api.routes.storage import MAX_BULK_RESOLVE_URIS, STORAGE_URI_MAX_CH
 from pipelex_api.security import AUTH_MODE_ENV_VAR, TRUST_FORWARDED_IDENTITY_HEADERS_ENV, AuthMode, get_auth_dependency
 from pipelex_api.signed_links import LinkPurpose, link_signature
 from tests.unit._problems import ClientResponse, assert_problem
-from tests.unit.test_data import StorageRouteTestData
+from tests.unit.cases import StorageRouteCases
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 # What the local provider stores in its test: the key, the bytes and the content type stored with them. Every answer but
 # the PDF's is sandboxed, an HTML page's and an SVG image's above all, since either could run a script.
 _STORED_FILES = {
-    "text": (StorageRouteTestData.TEXT_KEY, StorageRouteTestData.LONG_TEXT.encode(), "text/plain"),
-    "image": (StorageRouteTestData.IMAGE_KEY, (_REPO_ROOT / "tests" / "data" / "images" / "logo-tiny.png").read_bytes(), "image/png"),
+    "text": (StorageRouteCases.TEXT_KEY, StorageRouteCases.LONG_TEXT.encode(), "text/plain"),
+    "image": (StorageRouteCases.IMAGE_KEY, (_REPO_ROOT / "tests" / "data" / "images" / "logo-tiny.png").read_bytes(), "image/png"),
     "document": (
-        StorageRouteTestData.DOCUMENT_KEY,
+        StorageRouteCases.DOCUMENT_KEY,
         (_REPO_ROOT / "tests" / "data" / "documents" / "solar_system.pdf").read_bytes(),
         "application/pdf",
     ),
@@ -64,8 +64,8 @@ def _uri(key: str) -> str:
 def _build_client(*, monkeypatch: pytest.MonkeyPatch, auth_mode: AuthMode = AuthMode.NONE, trusts_forwarding: bool = False) -> TestClient:
     """A runner app holding only the storage routes, mounted as `pipelex_api.main` mounts them, under one auth mode."""
     monkeypatch.setenv(AUTH_MODE_ENV_VAR, auth_mode)
-    monkeypatch.setenv("API_KEY", StorageRouteTestData.SYNTHETIC_API_KEY)
-    monkeypatch.setenv("JWT_SECRET_KEY", StorageRouteTestData.SYNTHETIC_JWT_SECRET)
+    monkeypatch.setenv("API_KEY", StorageRouteCases.SYNTHETIC_API_KEY)
+    monkeypatch.setenv("JWT_SECRET_KEY", StorageRouteCases.SYNTHETIC_JWT_SECRET)
     if trusts_forwarding:
         monkeypatch.setenv(TRUST_FORWARDED_IDENTITY_HEADERS_ENV, "true")
     else:
@@ -76,14 +76,14 @@ def _build_client(*, monkeypatch: pytest.MonkeyPatch, auth_mode: AuthMode = Auth
     return TestClient(app)
 
 
-def _headers(*, auth_mode: AuthMode, user_id: str = StorageRouteTestData.JWT_USER_ID) -> dict[str, str]:
+def _headers(*, auth_mode: AuthMode, user_id: str = StorageRouteCases.JWT_USER_ID) -> dict[str, str]:
     match auth_mode:
         case AuthMode.NONE:
             return {}
         case AuthMode.API_KEY:
-            return {"Authorization": f"Bearer {StorageRouteTestData.SYNTHETIC_API_KEY}"}
+            return {"Authorization": f"Bearer {StorageRouteCases.SYNTHETIC_API_KEY}"}
         case AuthMode.JWT:
-            token = jwt.encode({"user_id": user_id}, StorageRouteTestData.SYNTHETIC_JWT_SECRET, algorithm="HS256")
+            token = jwt.encode({"user_id": user_id}, StorageRouteCases.SYNTHETIC_JWT_SECRET, algorithm="HS256")
             return {"Authorization": f"Bearer {token}"}
 
 
@@ -116,24 +116,24 @@ class TestStorageRoutes:
     def test_a_reference_under_the_single_tenant_scope_resolves_to_a_link_that_downloads_it(
         self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider
     ) -> None:
-        storage.root[StorageRouteTestData.TEXT_KEY] = StorageRouteTestData.LONG_TEXT.encode()
+        storage.root[StorageRouteCases.TEXT_KEY] = StorageRouteCases.LONG_TEXT.encode()
         client = _build_client(monkeypatch=monkeypatch)
         before = datetime.now(tz=UTC)
 
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
 
-        assert item["uri"] == _uri(StorageRouteTestData.TEXT_KEY)
+        assert item["uri"] == _uri(StorageRouteCases.TEXT_KEY)
         assert item["error"] is None
         assert item["content_type"] == "text/plain"
         url_text: str = item["url"]
         url = urlsplit(url_text)
-        assert (url.scheme, url.netloc, url.path) == ("http", "testserver", f"/v1/storage/{StorageRouteTestData.TEXT_KEY}")
+        assert (url.scheme, url.netloc, url.path) == ("http", "testserver", f"/v1/storage/{StorageRouteCases.TEXT_KEY}")
         assert set(parse_qs(url.query)) == {"expires", "signature"}
         expires_at = datetime.fromisoformat(item["expires_at"])
         assert 0 < (expires_at - before).total_seconds() <= DEFAULT_STORAGE_LINK_TTL_SECONDS + 1
         downloaded = _download(client, item["url"])
         assert downloaded.status_code == 200, downloaded.text
-        assert downloaded.text == StorageRouteTestData.LONG_TEXT
+        assert downloaded.text == StorageRouteCases.LONG_TEXT
         assert downloaded.headers["content-type"].startswith("text/plain")
         assert downloaded.headers["x-content-type-options"] == "nosniff"
         assert downloaded.headers["content-security-policy"] == "sandbox"
@@ -141,29 +141,29 @@ class TestStorageRoutes:
     def test_the_answer_has_the_platform_s_shape_field_for_field(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         client = _build_client(monkeypatch=monkeypatch)
 
-        response = client.post(_RESOLVE_PATH, json={"uris": [_uri(StorageRouteTestData.TEXT_KEY), "s3://elsewhere/value.txt"]})
+        response = client.post(_RESOLVE_PATH, json={"uris": [_uri(StorageRouteCases.TEXT_KEY), "s3://elsewhere/value.txt"]})
 
         assert response.status_code == 200, response.text
         body = response.json()
-        assert set(body) == StorageRouteTestData.PLATFORM_RESPONSE_FIELDS
+        assert set(body) == StorageRouteCases.PLATFORM_RESPONSE_FIELDS
         resolved, refused = body["items"]
-        assert set(resolved) == StorageRouteTestData.PLATFORM_ITEM_FIELDS
-        assert set(refused) == StorageRouteTestData.PLATFORM_ITEM_FIELDS
+        assert set(resolved) == StorageRouteCases.PLATFORM_ITEM_FIELDS
+        assert set(refused) == StorageRouteCases.PLATFORM_ITEM_FIELDS
         assert (refused["url"], refused["expires_at"], refused["content_type"]) == (None, None, None)
-        assert set(refused["error"]) == StorageRouteTestData.PLATFORM_REFUSAL_FIELDS
+        assert set(refused["error"]) == StorageRouteCases.PLATFORM_REFUSAL_FIELDS
         assert (MAX_BULK_RESOLVE_URIS, STORAGE_URI_MAX_CHARS) == (
-            StorageRouteTestData.PLATFORM_MAX_BULK_RESOLVE_URIS,
-            StorageRouteTestData.PLATFORM_STORAGE_URI_MAX_CHARS,
+            StorageRouteCases.PLATFORM_MAX_BULK_RESOLVE_URIS,
+            StorageRouteCases.PLATFORM_STORAGE_URI_MAX_CHARS,
         )
         assert not storage.root
 
     def test_each_reference_gets_its_verdict_in_request_order(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         client = _build_client(monkeypatch=monkeypatch, auth_mode=AuthMode.JWT)
-        own_key = f"{StorageRouteTestData.JWT_USER_ID}/generated/0123456789abcdef.png"
+        own_key = f"{StorageRouteCases.JWT_USER_ID}/generated/0123456789abcdef.png"
         uris = [
             _uri(own_key),
-            _uri(f"{StorageRouteTestData.OTHER_USER_ID}/generated/0123456789abcdef.png"),
-            *StorageRouteTestData.MALFORMED_URIS,
+            _uri(f"{StorageRouteCases.OTHER_USER_ID}/generated/0123456789abcdef.png"),
+            *StorageRouteCases.MALFORMED_URIS,
             _uri(own_key),
         ]
 
@@ -183,12 +183,12 @@ class TestStorageRoutes:
             assert item["error"]["detail"] == "A storage address in the request cannot be parsed.", item
         assert not storage.root
 
-    @pytest.mark.parametrize("foreign_scope", ["single-tenant", StorageRouteTestData.OTHER_USER_ID, f"{StorageRouteTestData.JWT_USER_ID}x"])
+    @pytest.mark.parametrize("foreign_scope", ["single-tenant", StorageRouteCases.OTHER_USER_ID, f"{StorageRouteCases.JWT_USER_ID}x"])
     def test_a_jwt_caller_resolves_only_under_its_own_id(
         self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider, foreign_scope: str
     ) -> None:
         """The reserved single-tenant scope, another caller's, and an id the caller's is a prefix of are all another scope."""
-        own_key = f"{StorageRouteTestData.JWT_USER_ID}/generated/value.txt"
+        own_key = f"{StorageRouteCases.JWT_USER_ID}/generated/value.txt"
         storage.root[own_key] = b"mine"
         storage.root[f"{foreign_scope}/generated/value.txt"] = b"theirs"
         client = _build_client(monkeypatch=monkeypatch, auth_mode=AuthMode.JWT)
@@ -204,7 +204,7 @@ class TestStorageRoutes:
             "detail": "The request's identity lacks 'read_scope_under_caller', which this operation needs.",
             "params": {"requirement": "read_scope_under_caller"},
         }
-        (bare_scope,) = _resolve(client, _uri(StorageRouteTestData.JWT_USER_ID), headers=headers)
+        (bare_scope,) = _resolve(client, _uri(StorageRouteCases.JWT_USER_ID), headers=headers)
         assert bare_scope["error"]["code"] == "pipelex.storage.uri_invalid"
 
     @pytest.mark.parametrize("auth_mode", [AuthMode.NONE, AuthMode.API_KEY])
@@ -215,7 +215,7 @@ class TestStorageRoutes:
         keys = [
             "single-tenant/generated/value.txt",
             "a-run-s-own-storage-scope/generated/value.txt",
-            f"{StorageRouteTestData.OTHER_USER_ID}/assets/value.txt",
+            f"{StorageRouteCases.OTHER_USER_ID}/assets/value.txt",
         ]
         for key in keys:
             storage.root[key] = key.encode()
@@ -230,18 +230,18 @@ class TestStorageRoutes:
     def test_resolving_needs_the_deployment_s_credential(self, monkeypatch: pytest.MonkeyPatch, auth_mode: AuthMode) -> None:
         client = _build_client(monkeypatch=monkeypatch, auth_mode=auth_mode)
 
-        response = client.post(_RESOLVE_PATH, json={"uris": [_uri(StorageRouteTestData.TEXT_KEY)]})
+        response = client.post(_RESOLVE_PATH, json={"uris": [_uri(StorageRouteCases.TEXT_KEY)]})
 
         assert_problem(response, status=401, code="auth.missing_credential")
 
     def test_neither_route_is_served_when_the_runner_trusts_forwarded_identity(
         self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider
     ) -> None:
-        storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"
-        (item,) = _resolve(_build_client(monkeypatch=monkeypatch), _uri(StorageRouteTestData.TEXT_KEY))
+        storage.root[StorageRouteCases.TEXT_KEY] = b"a text"
+        (item,) = _resolve(_build_client(monkeypatch=monkeypatch), _uri(StorageRouteCases.TEXT_KEY))
         client = _build_client(monkeypatch=monkeypatch, trusts_forwarding=True)
 
-        resolved = client.post(_RESOLVE_PATH, json={"uris": [_uri(StorageRouteTestData.TEXT_KEY)]}, headers={"X-User-Id": "single-tenant"})
+        resolved = client.post(_RESOLVE_PATH, json={"uris": [_uri(StorageRouteCases.TEXT_KEY)]}, headers={"X-User-Id": "single-tenant"})
         downloaded = _download(client, item["url"])
 
         assert_problem(resolved, status=404, code="request.not_found")
@@ -281,12 +281,12 @@ class TestStorageRoutes:
     def test_a_download_without_a_valid_link_is_refused(
         self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider, mocker: MockerFixture, tampering: str
     ) -> None:
-        storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"
-        storage.root[StorageRouteTestData.MISSING_KEY] = b"another text"
+        storage.root[StorageRouteCases.TEXT_KEY] = b"a text"
+        storage.root[StorageRouteCases.MISSING_KEY] = b"another text"
         client = _build_client(monkeypatch=monkeypatch)
         if tampering == "expired":
             mocker.patch("pipelex_api.storage_links.STORAGE_LINK_TTL_SECONDS", -60)
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
         url_text: str = item["url"]
         url = urlsplit(url_text)
         query: dict[str, str] = {name: values[0] for name, values in parse_qs(url.query).items()}
@@ -297,7 +297,7 @@ class TestStorageRoutes:
             case "forged_signature":
                 query["signature"] = "0" * 64
             case "another_key":
-                path = f"/v1/storage/{StorageRouteTestData.MISSING_KEY}"
+                path = f"/v1/storage/{StorageRouteCases.MISSING_KEY}"
             case "not_a_number":
                 query["expires"] = "１２３４５６７８９０"
             case "too_many_digits":
@@ -307,7 +307,7 @@ class TestStorageRoutes:
                 pass
             case "upload_signature":
                 # A signature made for an upload target never holds for a download, even over the very message it binds.
-                message = f"{StorageRouteTestData.TEXT_KEY}\n{query['expires']}"
+                message = f"{StorageRouteCases.TEXT_KEY}\n{query['expires']}"
                 query["signature"] = link_signature(purpose=LinkPurpose.BLOB_UPLOAD, message=message)
             case _:
                 pytest.fail(f"unknown tampering {tampering}")
@@ -316,7 +316,7 @@ class TestStorageRoutes:
 
     def test_a_link_to_an_address_holding_no_file_is_a_404(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
         client = _build_client(monkeypatch=monkeypatch)
-        (item,) = _resolve(client, _uri(StorageRouteTestData.MISSING_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.MISSING_KEY))
 
         assert item["error"] is None
         problem = assert_problem(_download(client, item["url"]), status=404, code="pipelex.storage.object_missing")
@@ -375,7 +375,7 @@ class TestStorageRoutes:
         mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
         client = _build_client(monkeypatch=monkeypatch)
 
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
 
         assert_problem(_download(client, item["url"]), status=404, code="pipelex.storage.object_missing")
 
@@ -385,7 +385,7 @@ class TestStorageRoutes:
         mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
         client = _build_client(monkeypatch=monkeypatch)
 
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
 
         problem = assert_problem(_download(client, item["url"]), status=503, code="pipelex.storage.unavailable")
         assert problem["params"] == {"scheme": "s3"}
@@ -407,22 +407,22 @@ class TestStorageRoutes:
     def test_a_link_at_the_longest_lifetime_still_downloads(
         self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, storage: InMemoryStorageProvider
     ) -> None:
-        storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"
+        storage.root[StorageRouteCases.TEXT_KEY] = b"a text"
         mocker.patch("pipelex_api.storage_links.STORAGE_LINK_TTL_SECONDS", MAX_SIGNED_LINK_TTL_SECONDS)
         client = _build_client(monkeypatch=monkeypatch)
 
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
 
         assert _download(client, item["url"]).content == b"a text"
 
     def test_links_start_with_the_configured_public_base_url(self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider) -> None:
-        storage.root[StorageRouteTestData.TEXT_KEY] = b"a text"
-        monkeypatch.setenv("PUBLIC_BASE_URL", StorageRouteTestData.PUBLIC_BASE_URL)
+        storage.root[StorageRouteCases.TEXT_KEY] = b"a text"
+        monkeypatch.setenv("PUBLIC_BASE_URL", StorageRouteCases.PUBLIC_BASE_URL)
         client = _build_client(monkeypatch=monkeypatch)
 
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
 
-        assert str(item["url"]).startswith(f"https://runner.example.com/api/v1/storage/{StorageRouteTestData.TEXT_KEY}?")
+        assert str(item["url"]).startswith(f"https://runner.example.com/api/v1/storage/{StorageRouteCases.TEXT_KEY}?")
         url_text: str = item["url"]
         url = urlsplit(url_text)
         downloaded = client.get(f"{url.path.removeprefix('/api')}?{url.query}")
@@ -524,10 +524,10 @@ class TestStorageRoutes:
                 pytest.fail(f"unknown provider kind {provider_kind}")
         mocker.patch("pipelex_api.routes.storage.get_storage_provider", return_value=provider)
         data = head + b" is how this stored text starts"
-        await provider.store(data, key=StorageRouteTestData.TEXT_KEY, content_type="text/plain")
+        await provider.store(data, key=StorageRouteCases.TEXT_KEY, content_type="text/plain")
         client = _build_client(monkeypatch=monkeypatch)
 
-        (item,) = _resolve(client, _uri(StorageRouteTestData.TEXT_KEY))
+        (item,) = _resolve(client, _uri(StorageRouteCases.TEXT_KEY))
         downloaded = _download(client, item["url"])
 
         assert item["content_type"] == "text/plain"
@@ -557,13 +557,13 @@ class TestStorageRoutes:
         self, monkeypatch: pytest.MonkeyPatch, storage: InMemoryStorageProvider
     ) -> None:
         """The composition every template's blocking path runs: resolve through the bulk route, fetch the link."""
-        storage.root[StorageRouteTestData.TEXT_KEY] = StorageRouteTestData.LONG_TEXT.encode()
+        storage.root[StorageRouteCases.TEXT_KEY] = StorageRouteCases.LONG_TEXT.encode()
         client = _build_client(monkeypatch=monkeypatch)
         reference = {
-            "url": _uri(StorageRouteTestData.TEXT_KEY),
-            "size": len(StorageRouteTestData.LONG_TEXT),
+            "url": _uri(StorageRouteCases.TEXT_KEY),
+            "size": len(StorageRouteCases.LONG_TEXT),
             "mime_type": "text/plain",
-            "preview": StorageRouteTestData.LONG_TEXT[:40],
+            "preview": StorageRouteCases.LONG_TEXT[:40],
         }
         results = RunResults.model_validate(
             {
@@ -588,4 +588,4 @@ class TestStorageRoutes:
 
         loaded = await load_stored_texts(_RunnerBulkResolveClient(), results, LoadStoredTextsOptions(allow_http=True))
 
-        assert loaded.main_stuff == {"text": StorageRouteTestData.LONG_TEXT}
+        assert loaded.main_stuff == {"text": StorageRouteCases.LONG_TEXT}

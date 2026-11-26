@@ -14,7 +14,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.exceptions import RunParameterError
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.libraries.test_data import DeclaredItemCountCases
+from tests.integration.pipelex.libraries.cases import DeclaredItemCountCases
 
 _INPUTS: PipelineInputs = {"topic": {"concept": "Text", "content": "rivers"}}
 

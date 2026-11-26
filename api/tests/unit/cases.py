@@ -220,7 +220,7 @@ steps = [{{ pipe = "{DEPENDENCY_ADDRESS}->probe_dep.entry", result = "out" }}]
 """
 
 
-class StorageRouteTestData:
+class StorageRouteCases:
     """The values the storage routes' tests use: synthetic credentials, references and the platform's wire fields."""
 
     SYNTHETIC_API_KEY = "test-api-key-storage-routes-only"

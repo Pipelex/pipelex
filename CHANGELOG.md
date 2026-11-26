@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The pytest agent rule puts test data in `cases.py`**: the kit's pytest standards told agents to keep test data in `test_data.py`, a name pytest collects as a test module, inside classes such as `TestData`, which it collects as test classes. The rule now names `cases.py` and data classes ending in `Cases`, and no data module or data class in this repository's tests carries a `test_` or `Test` prefix any more.
+- **The parity fixtures in `pipelex.test_extras.problem_parity` end in `Cases` (Breaking)**: `ProblemParityTestData`, `SearchProblemParityTestData` and `JudgeProblemParityTestData` are now `ProblemParityCases`, `SearchProblemParityCases` and `JudgeProblemParityCases`, so a distributed executor's tests import them under the new names.
+
 ## [v0.118.0] - 2026-11-25
 
 ### Added
@@ -11,11 +18,6 @@
 
 - **A signed link of the API server stays valid for at most seven days (Breaking)**: `BLOB_UPLOAD_URL_TTL_SECONDS` and `STORAGE_LINK_TTL_SECONDS` are capped at 604800 seconds, as an S3 presigned URL is, and the server refuses to start when either is set above the cap, naming the variable, where a larger upload lifetime used to be accepted and could make every link fail.
 - **`LINK_SIGNING_KEY` replaces `BLOB_UPLOAD_SIGNING_KEY` (Breaking)**: the API server signs its upload targets and its download links with one key, each kind of link under a purpose of its own, so a deployment of several instances or several worker processes (`uvicorn --workers N`, or a host that sets `WEB_CONCURRENCY`) that set `BLOB_UPLOAD_SIGNING_KEY` sets `LINK_SIGNING_KEY` instead; unset, each process still draws its own key.
-
-### Changed
-
-- **The pytest agent rule puts test data in `cases.py`**: the kit's pytest standards told agents to keep test data in `test_data.py`, a name pytest collects as a test module, inside classes such as `TestData`, which it collects as test classes. The rule now names `cases.py` and data classes ending in `Cases`, and no data module or data class in this repository's tests carries a `test_` or `Test` prefix any more.
-- **The parity fixtures in `pipelex.test_extras.problem_parity` end in `Cases` (Breaking)**: `ProblemParityTestData`, `SearchProblemParityTestData` and `JudgeProblemParityTestData` are now `ProblemParityCases`, `SearchProblemParityCases` and `JudgeProblemParityCases`, so a distributed executor's tests import them under the new names.
 
 ### Fixed
 
