@@ -36,10 +36,10 @@ _OPERATION_KEYS = frozenset({"get", "put", "post", "delete", "options", "head", 
 # rejections (422), and the server-fault floor (500).
 COMMON_STATUSES = (401, 413, 422, 500)
 
-# `GET /v1/version` is the public protocol handshake, and `PUT /v1/blobs/{sha256}` the upload target a signed
-# query authorizes: `pipelex_api.main` mounts both OUTSIDE the composite router (and outside the auth
-# dependency), so they inherit none of the shared responses.
-PUBLIC_PATHS = ("/v1/version", "/v1/blobs/{sha256}")
+# `GET /v1/version` is the public protocol handshake, and `PUT /v1/blobs/{sha256}` and `GET /v1/storage/{key}` the
+# upload target and the download link a signed query authorizes: `pipelex_api.main` mounts them OUTSIDE the composite
+# router (and outside the auth dependency), so they inherit none of the shared responses.
+PUBLIC_PATHS = ("/v1/version", "/v1/blobs/{sha256}", "/v1/storage/{key}")
 
 # The MTHDS Protocol operations — and nothing else — carry `x-mthds-protocol: true`. This is the
 # standard's surface (`execute`, `start`, `validate`, `models`, `version`, and the blob routes a runner
@@ -66,6 +66,7 @@ ROUTE_EXTRA_STATUSES = {
     ("/v1/resolve", "post"): (403, 404, 501),
     ("/v1/pipe-io", "post"): (403, 404, 501),
     ("/v1/codegen", "post"): (403, 404, 501),
+    ("/v1/storage/{key}", "get"): (403, 404, 422, 500, 503),
 }
 
 

@@ -155,6 +155,18 @@ async def run_batch_branch(self, pipe_job: PipeJob) -> PipeOutput:
 
 The default body IS the behavior for in-process routers — a branch is just a run, so `PipeRouter` deliberately does not override it and nothing about direct execution changed. A **distributed** router may override it to give each branch its own isolation (own retry, own history partition) while every other dispatch it receives runs inline. Because the default delegates to `run` and not to `_run_pipe_job`, batch branches still pass through the observer hooks.
 
+### The batch-fits hook
+
+A distributed router sees a batch's branches one at a time, through `run_batch_branch`, and never the batch's width; `PipeBatch` knows the width but not what a branch costs in a durable history. So `PipeRouterProtocol` carries a second batch entry point, synchronous, whose default body does nothing:
+
+```python
+def check_batch_fits(self, *, pipe_code: str, input_list_label: str, item_count: int, first_branch_job: PipeJob) -> None: ...
+```
+
+`PipeBatch` calls it once per batch, after it knows its item count and before it records its fan-out or starts any branch, and never for an empty list. `first_branch_job` is the very job the first branch then dispatches through `run_batch_branch`, built by the same function that builds every branch's job, so a router that measures it measures what it will send; it reads the job and never changes it. `input_list_label` names the list as its author wrote it (`BatchParams.input_list_label`). The hook is called in a dry run too, whose job's `run_mode` says so.
+
+In-process routers keep the default: every batch fits. A durable router may estimate what the whole batch would write into its run's history and refuse by raising `PipeBatchTooWideError` (`pipelex/pipe_controllers/exceptions.py`), which fails the `PipeBatch` located at it, with no fan-out recorded and no branch started. The error takes the batch's figures as keyword arguments (the pipe code, the list's label, the item count, the estimated bytes and events, the bytes and events left, the largest item count that fits, and, for a batch stopped during its fan-out rather than refused before it, the number of items started) and builds its message from them, so the wording is Pipelex's whichever backend raises it. Its problem is `input.too_large`, whose `input` is the list's label, `size` the item count and `limit` the largest count that fits. When that count is zero, no shorter list would run: the problem withholds `limit`, so the code's sentence for a withheld limit applies, and the message and the advice ask for smaller items.
+
 ---
 
 ## Pipe Controllers
@@ -327,5 +339,6 @@ flowchart TB
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |
 | PipeBatch | `pipelex/pipe_controllers/batch/pipe_batch.py` |
+| PipeBatchTooWideError | `pipelex/pipe_controllers/exceptions.py` |
 | PipeParallel | `pipelex/pipe_controllers/parallel/pipe_parallel.py` |
 | Router selection | `pipelex/pipelex.py` (in `Pipelex.setup()`) |

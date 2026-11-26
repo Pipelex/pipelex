@@ -394,6 +394,7 @@ async def prepare_pipe_job(
     method_id: str | None = None,
     method_address: str | None = None,
     capture_pipe_codes: bool | None = None,
+    max_declared_item_count: int | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_scope: str | None = None,
     trace_context: "TraceContext | None" = None,
@@ -578,6 +579,8 @@ async def prepare_pipe_job(
             method_id=method_id,
             method_address=method_address,
             capture_pipe_codes=capture_pipe_codes,
+            # The maximum declared item count the host stated for this run, which every pipe run holds in force.
+            max_declared_item_count=max_declared_item_count,
             method_tree_digest=tree_bundle_ref.tree_digest if tree_bundle_ref is not None else None,
             crate_fingerprint=library_crate.fingerprint if library_crate is not None else None,
         ),

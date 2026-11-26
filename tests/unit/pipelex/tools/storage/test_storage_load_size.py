@@ -12,7 +12,7 @@ from typing_extensions import override
 
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageLocalError
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract, StoredData
@@ -77,9 +77,9 @@ class TestStorageLoadSize:
         assert await provider.load_size(uri=uri) == len(PAYLOAD)
         opened.assert_not_called()
 
-    async def test_a_local_key_naming_a_directory_is_a_local_storage_error(self, tmp_path: Path) -> None:
+    async def test_a_local_key_naming_a_directory_is_not_found(self, tmp_path: Path) -> None:
         provider = LocalStorageProvider(root_path=tmp_path)
         (tmp_path / "a_directory").mkdir()
 
-        with pytest.raises(StorageLocalError, match="a_directory"):
+        with pytest.raises(StorageFileNotFoundError, match="a_directory"):
             await provider.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}a_directory")

@@ -114,6 +114,19 @@ class BundleValidatorProtocol(Protocol):
     on the payload it dispatches, and the worker binds it there. It is required for the same reason as
     ``caller_identity``, ``None`` meaning the host serves no request: a validator that dropped it would
     leave its worker's lines with no request id.
+
+    ``max_declared_item_count`` raises, for this validation, the most items the method may declare for one
+    slot, an input or an output written ``Concept[N]`` or a controller step's ``nb_output``, as the host
+    states it, such as a hosted plane from the caller's plan: the larger of it and the deployment's
+    ``[interpreter.method_limits] max_declared_item_count`` of the process that validates is in force, and
+    ``None`` keeps the deployment's. A validation's dry run builds one mock item per declared item, so the
+    validation loads the method under that maximum, and a method declaring more is the invalid verdict
+    ``pipelex.deployment.declared_count_over_limit``. The in-process
+    arm hands it to ``validate_bundles_in_process``; a worker-dispatched arm puts it on the payload it
+    dispatches, and the worker hands it to ``validate_bundles_in_process`` there, so the worker's own
+    configuration never stands in for the request's maximum. It is required for the same reason as
+    ``caller_identity``: a validator that dropped it would validate under the worker's default, refusing a
+    method the caller's plan allows, or building more mock items than it allows.
     """
 
     async def validate_bundles(
@@ -130,6 +143,7 @@ class BundleValidatorProtocol(Protocol):
         methods_dirs: "Sequence[Path] | None",
         read_scope: str | None,
         request_id: str | None,
+        max_declared_item_count: int | None,
     ) -> BundleValidationVerdict: ...
 
 

@@ -30,6 +30,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode
+from pipelex.core.pipes.declared_item_count_scope import scoped_max_declared_item_count
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
@@ -184,12 +185,15 @@ async def project_resolved_method(
     selected = await select_request_method(
         request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=request_data.read_scope
     )
-    return await run_method_load(
-        _project_written_method,
-        request_method=selected.request_method,
-        method_label=selected.method_label,
-        project=project,
-    )
+    # The load holds every count the method declares to the request's maximum, else the deployment's, as a validation
+    # or a run of the same request would: the worker thread reads it from its copy of this context.
+    with scoped_max_declared_item_count(maximum=request_data.max_declared_item_count):
+        return await run_method_load(
+            _project_written_method,
+            request_method=selected.request_method,
+            method_label=selected.method_label,
+            project=project,
+        )
 
 
 class RequestedPipe(NamedTuple):

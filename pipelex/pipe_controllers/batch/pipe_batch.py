@@ -15,6 +15,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.system.invocation_path import item_segment
@@ -166,20 +167,15 @@ class PipeBatch(PipeController):
         batch_output_stuff_code = StuffFactory.make_stuff_code()
 
         item_count = len(input_content.items)
-        # The batch records its width the moment it knows it, before it starts any item.
-        self._register_fan_out(job_metadata=job_metadata, item_count=item_count, branch_pipe=sub_pipe)
-        # Read off the payload, never off live config: the bound was frozen into the run params at
-        # submit time precisely so the fan-out shape stays a pure function of the run. See
-        # `PipeRunParams.batch_max_concurrency`.
-        max_concurrency = pipe_run_params.batch_max_concurrency
-        if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
-            warn_of_large_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
-
         item_concept = self.inputs.get_required_stuff_spec(input_list_stuff_name).concept
         # Worked out once for the whole batch: every branch runs the same pipe, so every branch reads the same names.
         branch_read_names = names_read_by_branch(branch_pipe=sub_pipe, input_item_stuff_name=input_item_stuff_name)
 
-        async def _run_branch(*, branch_index: int, branch_input_item_code: str, branch_output_item_code: str) -> PipeOutput:
+        def _branch_input_item_code(*, branch_index: int) -> str:
+            return f"{input_stuff.stuff_code}-branch-{branch_index}"
+
+        def _make_branch_job(*, branch_index: int) -> PipeJob:
+            """The job branch ``branch_index`` dispatches: its own memory, its item, its run params and its place in the run."""
             # A branch starts with its own copy of what its pipe reads and of its item, never with a copy of the whole
             # working memory: copying the batched list once per branch made a batch's start cost its width times its
             # list's size, which on a durable backend held the workflow thread past its deadline. The copy keeps every
@@ -187,7 +183,7 @@ class PipeBatch(PipeController):
             # leaves the batched list, the batch's memory and every sibling branch as they were.
             branch_memory = working_memory.make_deep_copy_of(names=branch_read_names)
             item_input_stuff = StuffFactory.make_stuff(
-                code=branch_input_item_code,
+                code=_branch_input_item_code(branch_index=branch_index),
                 concept=item_concept,
                 content=input_content.items[branch_index].model_copy(deep=True),
                 name=input_item_stuff_name,
@@ -202,34 +198,57 @@ class PipeBatch(PipeController):
             branch_pipe_run_params = pipe_run_params.model_copy(
                 deep=True,
                 update={
-                    "final_stuff_code": branch_output_item_code,
+                    "final_stuff_code": f"{batch_output_stuff_code}-branch-{branch_index}",
                     "output_multiplicity": None,
                 },
             )
-            # `run_batch_branch`, not `run`: this is the one dispatch in the pipe tree whose
-            # semantics are "a per-item fan-out branch". In-process routers treat it as a plain
-            # run (the protocol's default body); a distributed router may isolate it.
             # The item's pipe is named by its invocation path, whose `item_<n>` segment numbers the items from 1: the
             # item at index 0 of the list is `item_1`. A router that runs the item as an execution of its own hands it
             # this metadata, so every path that execution stamps continues the item's.
-            return await get_pipe_router().run_batch_branch(
-                pipe_job=PipeJobFactory.make_pipe_job(
-                    pipe=sub_pipe,
-                    job_metadata=job_metadata.for_child_at(segment=item_segment(item_number=branch_index + 1)),
-                    working_memory=branch_memory,
-                    pipe_run_params=branch_pipe_run_params,
-                    output_name=None,
-                    library_crate=library_crate,
-                ),
+            return PipeJobFactory.make_pipe_job(
+                pipe=sub_pipe,
+                job_metadata=job_metadata.for_child_at(segment=item_segment(item_number=branch_index + 1)),
+                working_memory=branch_memory,
+                pipe_run_params=branch_pipe_run_params,
+                output_name=None,
+                library_crate=library_crate,
             )
 
-        # Build one factory per branch. Each factory defers its working-memory deep copy until it
+        # The first branch's job is built before the batch starts, so the router judges whether the batch fits from the
+        # very job the first branch then dispatches. An empty list starts nothing, so it has nothing to judge.
+        first_branch_job: PipeJob | None = None
+        if item_count > 0:
+            first_branch_job = _make_branch_job(branch_index=0)
+            # Before the fan-out is recorded and before any branch starts: a batch the router refuses records no width and
+            # bills no item. In-process routers answer yes without looking; a durable router may refuse a batch whose
+            # branches would pass what its run's history can hold.
+            get_pipe_router().check_batch_fits(
+                pipe_code=self.code,
+                input_list_label=batch_params.input_list_label,
+                item_count=item_count,
+                first_branch_job=first_branch_job,
+            )
+
+        # The batch records its width the moment it knows it fits, before it starts any item.
+        self._register_fan_out(job_metadata=job_metadata, item_count=item_count, branch_pipe=sub_pipe)
+        # Read off the payload, never off live config: the bound was frozen into the run params at
+        # submit time precisely so the fan-out shape stays a pure function of the run. See
+        # `PipeRunParams.batch_max_concurrency`.
+        max_concurrency = pipe_run_params.batch_max_concurrency
+        if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
+            warn_of_large_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
+
+        async def _run_branch(*, branch_index: int) -> PipeOutput:
+            pipe_job = first_branch_job if branch_index == 0 and first_branch_job is not None else _make_branch_job(branch_index=branch_index)
+            # `run_batch_branch`, not `run`: this is the one dispatch in the pipe tree whose
+            # semantics are "a per-item fan-out branch". In-process routers treat it as a plain
+            # run (the protocol's default body); a distributed router may isolate it.
+            return await get_pipe_router().run_batch_branch(pipe_job=pipe_job)
+
+        # Build one factory per branch. Each factory but the first defers its working-memory deep copy until it
         # actually runs, so gather_bounded materializes at most `max_concurrency` of them at once.
         branch_factories: list[Callable[[], Awaitable[PipeOutput]]] = []
         for branch_index in range(item_count):
-            branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
-            branch_input_item_code = f"{input_stuff.stuff_code}-branch-{branch_index}"
-
             # Register batch item extraction with graph tracer
             if job_metadata.trace_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
@@ -239,19 +258,12 @@ class PipeBatch(PipeController):
                     tracer_manager.register_batch_item_extraction(
                         lookup_key=job_metadata.trace_context.lookup_key,
                         list_stuff_code=input_stuff.stuff_code,
-                        item_stuff_code=branch_input_item_code,
+                        item_stuff_code=_branch_input_item_code(branch_index=branch_index),
                         item_index=branch_index,
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_factories.append(
-                functools.partial(
-                    _run_branch,
-                    branch_index=branch_index,
-                    branch_input_item_code=branch_input_item_code,
-                    branch_output_item_code=branch_output_item_code,
-                )
-            )
+            branch_factories.append(functools.partial(_run_branch, branch_index=branch_index))
 
         pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 

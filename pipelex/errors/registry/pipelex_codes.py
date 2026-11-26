@@ -39,6 +39,7 @@ class PipelexErrorCode(StrEnum):
     REQUEST_DEPENDENCY_KEY_MISMATCH = "pipelex.request.dependency_key_mismatch"
     STORAGE_URI_INVALID = "pipelex.storage.uri_invalid"
     STORAGE_NOT_FOUND = "pipelex.storage.not_found"
+    STORAGE_OBJECT_MISSING = "pipelex.storage.object_missing"
     STORAGE_DAMAGED = "pipelex.storage.damaged"
     STORAGE_UNAVAILABLE = "pipelex.storage.unavailable"
     STORAGE_NOT_CONFIGURED = "pipelex.storage.not_configured"
@@ -61,6 +62,8 @@ class PipelexErrorCode(StrEnum):
     DEPLOYMENT_ORCHESTRATION_OVERRIDE_FORBIDDEN = "pipelex.deployment.orchestration_override_forbidden"
     DEPLOYMENT_CUSTOM_CODE_REQUIRES_SANDBOX = "pipelex.deployment.custom_code_requires_sandbox"
     DEPLOYMENT_PYTHON_STRUCTURES_REFUSED = "pipelex.deployment.python_structures_refused"
+    DEPLOYMENT_DECLARED_COUNT_OVER_LIMIT = "pipelex.deployment.declared_count_over_limit"
+    DEPLOYMENT_DRY_RUN_MOCK_BUDGET_EXCEEDED = "pipelex.deployment.dry_run_mock_budget_exceeded"
     DEPLOYMENT_TOKEN_CLAIMS_INVALID = "pipelex.deployment.token_claims_invalid"
     DOCGEN_ENGINE_UNAVAILABLE = "pipelex.docgen.engine_unavailable"
     DOCGEN_TEMPLATE_INVALID = "pipelex.docgen.template_invalid"
@@ -426,6 +429,15 @@ class StorageNotFoundParams(PipelexErrorParams):
     scheme: Literal["local", "s3", "gcs", "memory", "plugin"]
 
 
+class StorageObjectMissingParams(PipelexErrorParams):
+    """The parameters of `pipelex.storage.object_missing`.
+
+    No file is stored at this link.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_OBJECT_MISSING
+
+
 class StorageDamagedParams(PipelexErrorParams):
     """The parameters of `pipelex.storage.damaged`.
 
@@ -767,6 +779,40 @@ class DeploymentPythonStructuresRefusedParams(PipelexErrorParams):
     files: list[str]
 
 
+class DeploymentDeclaredCountOverLimitParams(PipelexErrorParams):
+    """The parameters of `pipelex.deployment.declared_count_over_limit`.
+
+    More items are asked for one slot than this runtime allows.
+
+    Attributes:
+        slot: Where the count is asked for, such as the input 'items' of the pipe 'summarize'.
+        count: The number of items asked for there.
+        limit: The most items this runtime allows for one slot.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.DEPLOYMENT_DECLARED_COUNT_OVER_LIMIT
+
+    slot: str
+    count: int
+    limit: int
+
+
+class DeploymentDryRunMockBudgetExceededParams(PipelexErrorParams):
+    """The parameters of `pipelex.deployment.dry_run_mock_budget_exceeded`.
+
+    A dry run of the method would build more mock items than this runtime allows.
+
+    Attributes:
+        slot: What the dry run was about to build when it passed the budget, such as the mock input 'items'.
+        budget: The most mock items this runtime builds for one dry run.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.DEPLOYMENT_DRY_RUN_MOCK_BUDGET_EXCEEDED
+
+    slot: str
+    budget: int
+
+
 class DeploymentTokenClaimsInvalidParams(PipelexErrorParams):
     """The parameters of `pipelex.deployment.token_claims_invalid`.
 
@@ -1074,6 +1120,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH: RequestDependencyKeyMismatchParams,
     PipelexErrorCode.STORAGE_URI_INVALID: StorageUriInvalidParams,
     PipelexErrorCode.STORAGE_NOT_FOUND: StorageNotFoundParams,
+    PipelexErrorCode.STORAGE_OBJECT_MISSING: StorageObjectMissingParams,
     PipelexErrorCode.STORAGE_DAMAGED: StorageDamagedParams,
     PipelexErrorCode.STORAGE_UNAVAILABLE: StorageUnavailableParams,
     PipelexErrorCode.STORAGE_NOT_CONFIGURED: StorageNotConfiguredParams,
@@ -1096,6 +1143,8 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.DEPLOYMENT_ORCHESTRATION_OVERRIDE_FORBIDDEN: DeploymentOrchestrationOverrideForbiddenParams,
     PipelexErrorCode.DEPLOYMENT_CUSTOM_CODE_REQUIRES_SANDBOX: DeploymentCustomCodeRequiresSandboxParams,
     PipelexErrorCode.DEPLOYMENT_PYTHON_STRUCTURES_REFUSED: DeploymentPythonStructuresRefusedParams,
+    PipelexErrorCode.DEPLOYMENT_DECLARED_COUNT_OVER_LIMIT: DeploymentDeclaredCountOverLimitParams,
+    PipelexErrorCode.DEPLOYMENT_DRY_RUN_MOCK_BUDGET_EXCEEDED: DeploymentDryRunMockBudgetExceededParams,
     PipelexErrorCode.DEPLOYMENT_TOKEN_CLAIMS_INVALID: DeploymentTokenClaimsInvalidParams,
     PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE: DocgenEngineUnavailableParams,
     PipelexErrorCode.DOCGEN_TEMPLATE_INVALID: DocgenTemplateInvalidParams,
@@ -1406,6 +1455,17 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         other_step="report",
         other_step_detail="Report this to whoever runs the runtime.",
     ),
+    PipelexErrorCode.STORAGE_OBJECT_MISSING: PipelexErrorEntry(
+        title="No file is stored at this link",
+        domain="input",
+        retry="no",
+        status=404,
+        detail="No file is stored at the storage address this link names.",
+        actor_step="change_input",
+        actor_step_detail="Resolve a storage address that a run or an upload returned, then fetch the link the answer gives.",
+        other_step="change_input",
+        other_step_detail="Pass this to the caller, whose link names a storage address where no file is stored.",
+    ),
     PipelexErrorCode.STORAGE_DAMAGED: PipelexErrorEntry(
         title="A stored file is damaged",
         domain="runtime",
@@ -1651,6 +1711,39 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         actor_step_detail="Declare the structures as concepts in the method in place of Python classes, then run it again.",
         other_step="contact_owner",
         other_step_detail="Ask the method's owner to declare its structures as concepts in the method.",
+    ),
+    PipelexErrorCode.DEPLOYMENT_DECLARED_COUNT_OVER_LIMIT: PipelexErrorEntry(
+        title="More items are asked for one slot than this runtime allows",
+        domain="method",
+        retry="no",
+        status=422,
+        detail="{count} items are asked for {slot}, more than the {limit} this runtime allows for one slot.",
+        actor_step="change_method",
+        actor_step_detail=(
+            "Ask for at most {limit} items for {slot}, in the method or in the request, or run it under a plan or a configuration that allows "
+            "more, then run it again."
+        ),
+        other_step="contact_owner",
+        other_step_detail=(
+            "Ask the method's owner to ask for at most {limit} items for {slot}, or the account's owner to move to a plan that allows more."
+        ),
+    ),
+    PipelexErrorCode.DEPLOYMENT_DRY_RUN_MOCK_BUDGET_EXCEEDED: PipelexErrorEntry(
+        title="A dry run of the method would build more mock items than this runtime allows",
+        domain="method",
+        retry="no",
+        status=422,
+        detail=(
+            "A dry run of the method would build more than {budget} mock items in all, the most this runtime builds for one dry run, when it "
+            "reached {slot}."
+        ),
+        actor_step="change_method",
+        actor_step_detail=(
+            "Declare fewer items across the method, such as smaller fixed counts or fewer lists nested in batches, so that a dry run builds at "
+            "most {budget} mock items, then run it again."
+        ),
+        other_step="contact_owner",
+        other_step_detail="Ask the method's owner to declare fewer items across the method, so that a dry run builds at most {budget} mock items.",
     ),
     PipelexErrorCode.DEPLOYMENT_TOKEN_CLAIMS_INVALID: PipelexErrorEntry(
         title="The token's claims cannot be used",

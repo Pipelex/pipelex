@@ -27,6 +27,7 @@ from pipelex_api.exceptions import InvalidAuthModeError, RunnerAuthError, Runner
 from pipelex_api.problem_view import mark_operator_request
 
 AUTH_MODE_ENV_VAR = "AUTH_MODE"
+TRUST_FORWARDED_IDENTITY_HEADERS_ENV = "TRUST_FORWARDED_IDENTITY_HEADERS"
 
 # JWT Configuration (only used when AUTH_MODE=jwt)
 JWT_ALGORITHM = "HS256"
@@ -301,7 +302,7 @@ async def no_auth(request: Request) -> None:
     forwards reads the operator view of its failures (`pipelex_api.problem_view`), and the proxy owes its own callers
     their caller view. Without it, a request reads the caller view: nothing authenticated who sent it.
     """
-    if get_optional_env("TRUST_FORWARDED_IDENTITY_HEADERS") != "true":
+    if not _is_forwarded_identity_flag_set():
         return
 
     user_id = request.headers.get(ForwardedIdentityHeader.USER_ID)
@@ -333,6 +334,24 @@ async def no_auth(request: Request) -> None:
 
     _set_request_user(request, user_id=user_id)
     mark_operator_request(request)
+
+
+def _is_forwarded_identity_flag_set() -> bool:
+    return get_optional_env(TRUST_FORWARDED_IDENTITY_HEADERS_ENV) == "true"
+
+
+def trusts_forwarded_identity() -> bool:
+    """Whether this deployment takes its callers' identity from a trusted proxy's `X-User-Id`.
+
+    Only `AUTH_MODE=none` reads the header, and only with `TRUST_FORWARDED_IDENTITY_HEADERS=true`: such a runner sits
+    behind a host that owns tenancy, the hosted plane, and the forwarded id is a user, not the tenant that owns what
+    the runner stores. Raises `InvalidAuthModeError` when `AUTH_MODE` names no mode (see `get_auth_mode`).
+    """
+    match get_auth_mode():
+        case AuthMode.NONE:
+            return _is_forwarded_identity_flag_set()
+        case AuthMode.JWT | AuthMode.API_KEY:
+            return False
 
 
 async def get_request_user(request: Request) -> RequestUser | None:

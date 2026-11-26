@@ -4,6 +4,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, field_validator, model_validator
 
 from pipelex.cogt.config_cogt import InferenceConfig
+from pipelex.core.pipes.declared_count_bounds import DECLARED_ITEM_COUNT_CEILING
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.hosted.run_config import RunConfig
 from pipelex.language.mthds_config import MthdsConfig
@@ -116,6 +117,44 @@ class MethodTreeLimitsConfig(ConfigModel):
     max_files: int | None = Field(default=None, ge=1)
     max_total_bytes: int | None = Field(default=None, ge=0)
     max_file_bytes: int | None = Field(default=None, ge=0)
+
+
+class MethodLimitsConfig(ConfigModel):
+    """`[interpreter.method_limits]`: what this runtime accepts of a method it loads for a validation or a run.
+
+    `max_declared_item_count` is the most items a method may declare for one slot: an input or an output written
+    `Concept[N]`, or a controller step's `nb_output = N`, and the most a run may ask for with `output_multiplicity`. A
+    dry run builds one mock item per declared item, so the limit bounds what a few lines of a method can make a
+    validation build. It is a runtime limit, not a rule of the language: a request may carry its own maximum, which a
+    hosted plane derives from the caller's plan, and which only ever raises this one, the larger of the two being in
+    force (`pipelex.core.pipes.declared_item_count`).
+
+    `max_declared_item_count_ceiling` is the most a request's own maximum may state. A request's maximum comes from
+    public JSON, so without a ceiling any caller could raise its own limit; a deployment behind a trusted front that
+    sets the maximum from the caller's plan, such as the hosted plane, raises the ceiling to the highest plan's maximum.
+    The deployment's own `max_declared_item_count` may not pass it either. Neither can pass `DECLARED_ITEM_COUNT_CEILING`,
+    the most digits the parser reads in a count.
+
+    `max_dry_run_mock_items` is the most mock items one in-process validation or dry run builds in all, whatever the
+    slots: the per-slot maximum leaves their sum and their products unbounded, such as many inputs each declaring the
+    maximum, or a batch over a list whose every branch builds another list. A distributed dry run counts each of its
+    worker activities against a budget of its own. A request cannot change it.
+    """
+
+    max_declared_item_count: int = Field(ge=1, le=DECLARED_ITEM_COUNT_CEILING)
+    max_declared_item_count_ceiling: int = Field(ge=1, le=DECLARED_ITEM_COUNT_CEILING)
+    max_dry_run_mock_items: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def validate_max_declared_item_count_within_ceiling(self) -> Self:
+        """Refuse a deployment maximum past the deployment's own ceiling, which every maximum in force stays under."""
+        if self.max_declared_item_count > self.max_declared_item_count_ceiling:
+            msg = (
+                f"max_declared_item_count ({self.max_declared_item_count}) passes max_declared_item_count_ceiling "
+                f"({self.max_declared_item_count_ceiling}) under [interpreter.method_limits]: raise the ceiling with it."
+            )
+            raise ValueError(msg)
+        return self
 
 
 class CrateClassCacheConfig(ConfigModel):
@@ -236,6 +275,7 @@ class InterpreterConfig(ConfigModel):
     pipeline_execution: PipelineExecutionConfig
     scan: ScanConfig
     method_tree_limits: MethodTreeLimitsConfig
+    method_limits: MethodLimitsConfig
     crate_class_cache: CrateClassCacheConfig
     builder: BuilderConfig
 

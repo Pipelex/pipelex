@@ -30,6 +30,14 @@ Results always preserve input order regardless of the concurrency bound. If a br
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
 
+## Very wide batches on a durable runtime
+
+On a durable runtime, a run keeps a history of what it did, and its engine bounds that history in bytes and in events. Every item of a batch writes into its run's history what its branch starts with and what it hands back, so the number of items a batch can run depends on how large each item and its branch's inputs are, not on a fixed item count.
+
+Before its first item starts, a `PipeBatch` asks the runtime's router whether the whole batch fits. A runtime that runs in one process keeps no such history and always answers yes. A durable runtime may estimate what the batch would write from its first item and its item count, and refuse a batch that would not fit, before any item is billed, rather than let its engine end the run halfway; a runtime that does not check lets the batch run. A refused batch fails at the `PipeBatch` with `input.too_large`, whose `input` is the batched list as you named it, whose `size` is its item count and whose `limit` is the largest item count that fits, left out when not even one item fits; its message, for the operator, also names the bytes and the events the batch would write and those the run had left. When items later in the list turn out much larger than the first, the runtime may also stop the batch during its fan-out, with the same code and a message saying how many items had started.
+
+To run a list that is refused, split it into shorter lists, each batched by a run of its own, or make each item, and what its branch pipe reads besides it, smaller. When not even one item fits, only smaller items help, and the refusal says so.
+
 ## Compaction Under Absence
 
 When a branch's result resolves as a recorded absence — typically because the branch pipe is a `PipeCondition` whose outcome was `continue`, or the branch was skipped (lifted) on an absent optional value — that branch contributes **no item** to the aggregated output list. The list is compacted: a list cannot hold a hole, and absent results are dropped rather than replaced by placeholders. Order is preserved among the results that did produce a value, and each dropped branch is logged at `DEBUG`, with its index among the inputs and its absence reason as the fields `branch_index` and `absence_reason`, which is how a log explains an output list shorter than its input.

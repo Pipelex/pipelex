@@ -190,6 +190,17 @@ def _resolve_read_scope(request: Request, *, requested: str | None) -> str | Non
     """
     if requested is not None:
         return bound_read_scope(request, requested=requested)
+    return caller_read_scope(request)
+
+
+def caller_read_scope(request: Request) -> str | None:
+    """What a request that names no read scope may read: the caller's own id, or everything when no caller is known.
+
+    A deployment that identifies its callers (`AUTH_MODE=jwt`, or a trusted proxy's forwarded id) scopes the caller to
+    its own id, where its writes land by default. A single-tenant deployment (`AUTH_MODE=none` without forwarded
+    identity, or the shared `api_key`) has one tenant, whose runs may already write and read any key through
+    `storage_scope` and `read_scope`, so it reads unscoped.
+    """
     user: RequestUser | None = getattr(request.state, "user", None)
     return user.user_id if user else None
 
@@ -539,6 +550,9 @@ class ApiRunner(PipelexMTHDSProtocol):
             method_id=self.method_id,
             method_address=self.method_address,
             capture_pipe_codes=self.capture_pipe_codes,
+            # The request's maximum declared item count, which the base `execute` threads too: left out of this call, the
+            # method would load under the deployment's maximum and its job would carry none to the worker.
+            max_declared_item_count=self.max_declared_item_count,
             # The packages the request ships, which the base `execute` threads too.
             methods_dirs=self.methods_dirs,
             # The files submitted with the contents, such as a template file, which the base `execute` threads too.
@@ -709,6 +723,8 @@ class ApiRunner(PipelexMTHDSProtocol):
                 read_scope=self.read_scope,
                 # The request's id, which a dispatched validator carries to its worker for the lines written there.
                 request_id=request_id,
+                # The request's maximum declared item count, which a dispatched validator carries to its worker.
+                max_declared_item_count=self.max_declared_item_count,
             )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
@@ -1040,6 +1056,7 @@ async def execute(request: Request) -> JSONResponse:
             method_id=extras.method_key,
             method_address=source.method_provenance.address if source.method_provenance is not None else None,
             capture_pipe_codes=extras.capture_pipe_codes,
+            max_declared_item_count=extras.max_declared_item_count,
             library_dirs=source.library_dirs,
             library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,
@@ -1152,6 +1169,7 @@ async def start(
             method_id=extras.method_key,
             method_address=source.method_provenance.address if source.method_provenance is not None else None,
             capture_pipe_codes=extras.capture_pipe_codes,
+            max_declared_item_count=extras.max_declared_item_count,
             library_dirs=source.library_dirs,
             library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,

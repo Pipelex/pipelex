@@ -63,6 +63,7 @@ from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFi
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_span import InferenceSpanScope, start_inference_span
 from pipelex.core.method_trees.method_files import TreeListing, read_listed_file, read_method_file, read_tree_listing
+from pipelex.core.pipes.declared_item_count import dry_leaf_limits
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.runtime_hub import get_report_delegate, get_template_file_stage
@@ -209,7 +210,9 @@ async def render_document_and_store(
     if render_assignment.cogt_run_params.run_mode.is_dry:
         authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
         await _check_template_file(render_assignment=render_assignment, storage_provider=generated_content_factory.storage_provider)
-        return dry_render_document(render_assignment)
+        # A worker's activity runs this leaf with no scope open: its run's limits come from its job's metadata.
+        with dry_leaf_limits(run_max_declared_item_count=render_assignment.job_metadata.run_metadata.max_declared_item_count):
+            return dry_render_document(render_assignment)
     rendered = await _print_document(render_assignment=render_assignment, storage_provider=generated_content_factory.storage_provider)
     composition = render_assignment.composition
     return await generated_content_factory.make_document_content(

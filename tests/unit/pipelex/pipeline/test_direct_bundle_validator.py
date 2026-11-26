@@ -51,6 +51,7 @@ class TestDirectBundleValidator:
             methods_dirs=None,
             read_scope="org_acme",
             request_id="01HNJZ4XR7K3Q9D8MWAQ7FY2E5",
+            max_declared_item_count=5000,
         )
 
         assert verdict is report
@@ -66,6 +67,7 @@ class TestDirectBundleValidator:
             method_dir=None,
             methods_dirs=None,
             request_id="01HNJZ4XR7K3Q9D8MWAQ7FY2E5",
+            max_declared_item_count=5000,
         )
 
     @pytest.mark.builds_problems_without_required_params(
@@ -91,6 +93,7 @@ class TestDirectBundleValidator:
             methods_dirs=None,
             read_scope=None,
             request_id=None,
+            max_declared_item_count=None,
         )
 
         assert isinstance(verdict, BundleValidationFailure)
@@ -120,4 +123,5 @@ class TestDirectBundleValidator:
                 methods_dirs=None,
                 read_scope=None,
                 request_id=None,
+                max_declared_item_count=None,
             )

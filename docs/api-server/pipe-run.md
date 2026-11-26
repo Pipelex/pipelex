@@ -37,7 +37,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `pipe_code` (string, optional): The code identifying the pipe to execute. Beside a method sent in `files`, it names the pipe to start at in place of the method's entry pipe; beside `method_ref`, it overrides the package's `main_pipe`; sent alone, it must name a pipe already registered on the server.
 - `inputs` (PipelineInputs, optional): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
-- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
+- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number). A specific number is held to the maximum declared item count in force, and one above it is a `422` `pipelex.deployment.declared_count_over_limit` — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address — see [Sending the method packages the method calls](#sending-the-method-packages-the-method-calls). Accompanies `files`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method sent as a tree; `pipe_code` may accompany it to override the package's `main_pipe`.
@@ -49,6 +49,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
 - `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
+- `max_declared_item_count` (integer, optional): **Pipelex-API extension.** The most items the method may declare for one slot, for this run alone, overriding the deployment's maximum — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one. It must be one to 128 ASCII letters, digits, `_` or `-`, and neither `untitled` nor `dry_run_untitled`, which are reserved: any other value is a `422` `request.invalid` naming `pipeline_run_id`, before the run is registered.
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends, before the response is sent; their delivery never changes the response, but a receiver that never answers delays it by about 51 seconds at most, the delivery's three attempts of 15 seconds and its waits between them. See [Webhooks](webhooks.md).
 
@@ -157,7 +158,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `pipe_code` (string, optional): The code identifying the pipe to execute. Beside a method sent in `files`, it names the pipe to start at in place of the method's entry pipe; beside `method_ref`, it overrides the package's `main_pipe`; sent alone, it must name a pipe already registered on the server.
 - `inputs` (PipelineInputs, optional): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
-- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
+- `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number). A specific number is held to the maximum declared item count in force, and one above it is a `422` `pipelex.deployment.declared_count_over_limit` — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address — see [Sending the method packages the method calls](#sending-the-method-packages-the-method-calls). Accompanies `files`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method sent as a tree; `pipe_code` may accompany it to override the package's `main_pipe`.
@@ -169,6 +170,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `method_key` (string, optional): **Pipelex-API extension.** Your own key of the stored method this run belongs to, sent beside the run's source — see [Run telemetry fields](#run-telemetry-fields).
 - `capture_pipe_codes` (boolean, optional): **Pipelex-API extension.** Whether this run's telemetry may carry its pipe codes, overriding the deployment's setting — see [Run telemetry fields](#run-telemetry-fields).
+- `max_declared_item_count` (integer, optional): **Pipelex-API extension.** The most items the method may declare for one slot, for this run alone, overriding the deployment's maximum — see [Declared item count](#declared-item-count-max_declared_item_count).
 - `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
@@ -303,7 +305,7 @@ The answer is `{"missing": [{"sha256": "…", "size": n, "upload": {"method": "P
 
 **Scopes.** Blobs live in the deployment's configured storage, under `<scope>/blobs/<sha256>`, and recorded listings under `<scope>/trees/<digest>`. The scope is the request's `read_scope`, which a multi-tenant host sends for the organization it serves (a query parameter on `POST /v1/blobs/missing`, a body field on the run and validate routes), else the caller's own id, so a hash entry resolves only in the caller's own blobs and asking whether a hash is held tells a caller nothing of another's files. On a `jwt` deployment a sent scope must lie under the caller's own id, else a `403` `auth.forbidden` whose `requirement` is `read_scope_under_caller` (see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups)). A hash entry the runner does not hold, at the size it states, is a `422` `request.blobs_missing` whose `missing_blobs` parameter lists the hashes to upload before sending the request again.
 
-**Signing key.** Each process draws its own signing key unless `BLOB_UPLOAD_SIGNING_KEY` is set. A deployment serving one API through several instances must set it, the same on every instance, since an upload may reach another instance than the one that named its target.
+**Signing key.** Each process draws its own signing key unless `LINK_SIGNING_KEY` is set, the key that signs the download links of the [storage transport](storage-transport.md) too, each kind of link under a purpose of its own. A deployment serving one API through several instances or several worker processes (`uvicorn --workers N`, or a host that sets `WEB_CONCURRENCY`) must set it, the same on every instance and every worker, since an upload may reach another process than the one that named its target.
 
 ### Sending the method packages the method calls
 
@@ -420,6 +422,21 @@ Both `/execute` and `/start` also accept optional **Pipelex-API extensions** tha
 **`capture_pipe_codes`** says whether this run's telemetry may carry its pipe codes and output class names, overriding the deployment's `custom_posthog.tracing.capture.pipe_codes` for this run alone. `true` sends the real values in the span and trace names and in the `pipe_code` and `output_class_name` properties; `false` sends the redaction marker. The value travels with the run to every process that runs a part of it, so a worker's activities honour it too. Omit it, or send `null`, to keep the deployment's setting.
 
 ---
+
+## Declared item count: `max_declared_item_count`
+
+A method declares a fixed number of items for one slot with `Concept[N]` on an input or an output, or with a controller step's `nb_output = N`. The server holds each of those counts to a maximum when it loads the method, because a dry run builds one mock item per declared item. Without the field, the maximum is the deployment's `[interpreter.method_limits] max_declared_item_count`, 1,000 by default (see [Library Configuration](../configuration/config-technical/library-config.md#how-many-items-a-method-may-declare)). With it, the request states its own:
+
+```json
+{
+  "pipe_code": "summarize_reviews",
+  "max_declared_item_count": 500
+}
+```
+
+A method declaring more items for one slot than the maximum in force is refused with a `422` [`pipelex.deployment.declared_count_over_limit`](../errors/pipelex/deployment/declared_count_over_limit.md), whose parameters name the `slot`, the `count` and the `limit`, before the run starts. The run's own `output_multiplicity` is held to the same maximum: an integer above it is refused with the same `422`, its `slot` naming the run's output, before the run starts, since a live run would ask a model for that many items. The maximum travels with the run to every process that runs a part of it, so a worker's dry-run mock builders hold the request's maximum rather than their own deployment's. Whatever the maximum, an in-process dry run builds at most the deployment's `max_dry_run_mock_items` mock items in all, its mock inputs and its pipes together, past which it is refused with [`pipelex.deployment.dry_run_mock_budget_exceeded`](../errors/pipelex/deployment/dry_run_mock_budget_exceeded.md).
+
+The value must be a JSON integer, never a boolean or a string such as `"500"`, from 1 to the deployment's `[interpreter.method_limits] max_declared_item_count_ceiling`, 1,000 by default; any other is a `422` `request.invalid` naming the field. The field only raises the maximum, never lowers it: the maximum in force is the larger of the request's and the deployment's `max_declared_item_count`, so a value below the deployment's is accepted and changes nothing, and a method from the host's own library directories is never refused for what a request states. It raises the maximum only as far as the ceiling allows: the field arrives in the request's JSON, so by default no caller can raise its own limit. A deployment behind a trusted front that sets each request's maximum itself, such as a multi-tenant host sending the maximum of the caller's plan, raises the ceiling to the highest maximum that front sends. Omit the field, or send `null`, to keep the deployment's maximum. The same field is taken by [`/v1/validate`](pipe-validate.md) and by the method routes `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io`.
 
 ## Input Format: PipelineInputs
 

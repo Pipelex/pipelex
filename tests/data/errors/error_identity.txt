@@ -62,6 +62,7 @@ CsvError | one of input.invalid, request.invalid, runtime.unexpected, input.file
 CsvFlatnessError | input.invalid
 CsvReadError | input.file_unreadable
 DateContentError | pipe.function_raised
+DeclaredItemCountLimitError | pipelex.deployment.declared_count_over_limit
 DeliveryError | abstract
 DocGenChoiceKeyError | pipelex.config.invalid
 DocGenEngineMissingError | pipelex.docgen.engine_unavailable
@@ -86,6 +87,7 @@ DriftGitError | runtime.unexpected
 DriftManifestError | pipelex.config.invalid
 DryRunError | inherits cause, else runtime.unexpected
 DryRunGraphNotProducedError | runtime.unexpected
+DryRunMockBudgetError | pipelex.deployment.dry_run_mock_budget_exceeded
 DryRunMockBuildError | method.mock_unsatisfiable
 DryRunObjectFidelityError | method.mock_unsatisfiable
 DuplicateBundleValidatorError | pipelex.plugin.conflict
@@ -268,6 +270,7 @@ OptionalValueAbsentError | pipe.forced_input_absent
 OutputShapeUnavailableError | request.unsupported
 OutputStructureSchemaError | method.concept_invalid
 PdfDocumentUnreadableError | input.file_unreadable
+PipeBatchTooWideError | input.too_large
 PipeComposeError | inherits cause, else pipe.output_invalid
 PipeComposeFactoryError | one of method.template_invalid, method.schema_violation
 PipeComposeTemplateError | method.template_invalid
