@@ -5,7 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.test_tweet import OptimizedTweet
+from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
 Local high school basketball star Maria Rodriguez was the talk of Division I scouts - 6'2",

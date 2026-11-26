@@ -6,7 +6,7 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
+from tests.unit.pipelex.libraries.library_crate_cases import BlueprintSamples
 
 
 class TestConceptReferenceValidation:

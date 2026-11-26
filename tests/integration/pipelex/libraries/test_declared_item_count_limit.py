@@ -10,7 +10,7 @@ from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.system.exceptions import RunParameterError
-from tests.integration.pipelex.libraries.test_data import DeclaredItemCountCases
+from tests.integration.pipelex.libraries.cases import DeclaredItemCountCases
 
 
 def _refusal_params(*, exc: ValidateBundleError) -> list[dict[str, Any]]:

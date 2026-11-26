@@ -10,17 +10,17 @@ from pathlib import Path
 from pytest_mock import MockerFixture
 
 from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
-from tests.integration.pipelex.libraries.test_data import InstalledNotesPackageTestData
+from tests.integration.pipelex.libraries.cases import InstalledNotesPackageCases
 
 
-def _write_consumer_and_its_dependency(*, root: Path, dep_bundle: str = InstalledNotesPackageTestData.DEP_BUNDLE) -> Path:
+def _write_consumer_and_its_dependency(*, root: Path, dep_bundle: str = InstalledNotesPackageCases.DEP_BUNDLE) -> Path:
     """Install the notes package under `.mthds/methods/` beside the consumer's bundle, and return the consumer's bundle file."""
-    dep_dir = root / ".mthds" / "methods" / InstalledNotesPackageTestData.METHOD_NAME
+    dep_dir = root / ".mthds" / "methods" / InstalledNotesPackageCases.METHOD_NAME
     dep_dir.mkdir(parents=True)
-    (dep_dir / "METHODS.toml").write_text(InstalledNotesPackageTestData.DEP_MANIFEST, encoding="utf-8")
+    (dep_dir / "METHODS.toml").write_text(InstalledNotesPackageCases.DEP_MANIFEST, encoding="utf-8")
     (dep_dir / "invented_notes.mthds").write_text(dep_bundle, encoding="utf-8")
     consumer_bundle_file = root / "invented_consumer.mthds"
-    consumer_bundle_file.write_text(InstalledNotesPackageTestData.CONSUMER_BUNDLE, encoding="utf-8")
+    consumer_bundle_file.write_text(InstalledNotesPackageCases.CONSUMER_BUNDLE, encoding="utf-8")
     return consumer_bundle_file
 
 
@@ -36,12 +36,12 @@ class TestDependencyConceptFieldRefs:
         try:
             library_manager.load_libraries(library_id=library_id, library_file_paths=[consumer_bundle_file])
 
-            assert InstalledNotesPackageTestData.DEP_ALIAS in library.dependency_libraries
+            assert InstalledNotesPackageCases.DEP_ALIAS in library.dependency_libraries
             with scoped_current_library(library_id=library_id):
                 concept_library = get_concept_library()
                 digest_class = concept_library.get_structure_class(concept=concept_library.get_required_concept("invented_consumer.Digest"))
                 note_search_class = concept_library.get_structure_class(
-                    concept=concept_library.get_required_concept(f"{InstalledNotesPackageTestData.DEP_ALIAS}->invented_notes.NoteSearch")
+                    concept=concept_library.get_required_concept(f"{InstalledNotesPackageCases.DEP_ALIAS}->invented_notes.NoteSearch")
                 )
 
                 digest = digest_class.model_validate({"note": {"title": "Invented note one"}, "summary": "It says one thing"})
@@ -60,7 +60,7 @@ class TestDependencyConceptFieldRefs:
         mocker.patch("pipelex.cli.installed_methods.PROJECT_METHODS_DIR", tmp_path / "project-methods")
         mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
         consumer_bundle_file = _write_consumer_and_its_dependency(
-            root=tmp_path, dep_bundle=InstalledNotesPackageTestData.DEP_BUNDLE_NAMING_ITS_OWN_DEPENDENCY
+            root=tmp_path, dep_bundle=InstalledNotesPackageCases.DEP_BUNDLE_NAMING_ITS_OWN_DEPENDENCY
         )
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()

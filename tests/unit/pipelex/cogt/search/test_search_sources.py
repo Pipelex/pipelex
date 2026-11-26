@@ -3,7 +3,7 @@ import pytest
 from pipelex.cogt.search.search_sources import deduplicate_search_sources
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from tests.unit.pipelex.cogt.search.test_data import SearchSourcesTestData
+from tests.unit.pipelex.cogt.search.cases import SearchSourcesCases
 
 
 def _search_result(*, sources: list[tuple[str, str]], answer: str) -> SearchResultContent:
@@ -16,7 +16,7 @@ def _search_result(*, sources: list[tuple[str, str]], answer: str) -> SearchResu
 class TestSearchSources:
     @pytest.mark.parametrize(
         ("topic", "sources", "answer", "renumber_citations"),
-        SearchSourcesTestData.NO_DUPLICATE_CASES,
+        SearchSourcesCases.NO_DUPLICATE_CASES,
     )
     def test_a_result_without_a_repeated_page_comes_back_unchanged(
         self,
@@ -36,7 +36,7 @@ class TestSearchSources:
 
     @pytest.mark.parametrize(
         ("topic", "sources", "answer", "renumber_citations", "expected_positions", "expected_answer"),
-        SearchSourcesTestData.DEDUP_CASES,
+        SearchSourcesCases.DEDUP_CASES,
     )
     def test_each_page_is_listed_once_and_citations_follow_their_source(
         self,

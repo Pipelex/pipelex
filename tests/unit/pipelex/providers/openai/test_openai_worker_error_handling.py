@@ -23,8 +23,8 @@ from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemVi
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker
 from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
-from tests.unit.pipelex.providers.openai.test_data import OpenAIErrorHandlingTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
+from tests.unit.pipelex.providers.openai.cases import OpenAIErrorHandlingCases
 
 
 def _mock_httpx_response(status_code: int = 429) -> httpx.Response:
@@ -177,7 +177,7 @@ class TestOpenAIWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "body", "expected_category", "expected_action_substring"),
-        OpenAIErrorHandlingTestData.RATE_LIMIT_CASES,
+        OpenAIErrorHandlingCases.RATE_LIMIT_CASES,
     )
     async def test_completions_llm_rate_limit(
         self,
@@ -206,7 +206,7 @@ class TestOpenAIWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "_error_message", "expected_category"),
-        OpenAIErrorHandlingTestData.TIMEOUT_CASES,
+        OpenAIErrorHandlingCases.TIMEOUT_CASES,
     )
     async def test_completions_llm_timeout(
         self,
@@ -230,7 +230,7 @@ class TestOpenAIWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected_category", "expected_action_substring"),
-        OpenAIErrorHandlingTestData.BAD_REQUEST_CASES,
+        OpenAIErrorHandlingCases.BAD_REQUEST_CASES,
     )
     async def test_completions_llm_bad_request(
         self,
@@ -354,7 +354,7 @@ class TestOpenAIWorkerErrorHandling:
     async def test_responses_llm_rate_limit_quota(self, mocker: MockerFixture) -> None:
         """Responses worker: a 429 carrying OpenAI's quota code is CAPACITY."""
         worker = _make_responses_llm_worker(mocker)
-        sdk_exc = _make_openai_rate_limit_error("insufficient_quota", body=DirectProviderQuotaTestData.OPENAI_INSUFFICIENT_QUOTA_BODY["error"])
+        sdk_exc = _make_openai_rate_limit_error("insufficient_quota", body=DirectProviderQuotaCases.OPENAI_INSUFFICIENT_QUOTA_BODY["error"])
         worker.openai_client_for_responses.responses.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
@@ -414,7 +414,7 @@ class TestOpenAIWorkerErrorHandling:
     async def test_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
         """The problem of a CAPACITY error invites no retry."""
         worker = _make_completions_llm_worker(mocker)
-        sdk_exc = _make_openai_rate_limit_error("insufficient_quota", body=DirectProviderQuotaTestData.OPENAI_INSUFFICIENT_QUOTA_BODY["error"])
+        sdk_exc = _make_openai_rate_limit_error("insufficient_quota", body=DirectProviderQuotaCases.OPENAI_INSUFFICIENT_QUOTA_BODY["error"])
         worker.openai_client_for_text.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:

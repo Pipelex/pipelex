@@ -28,12 +28,12 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.helpers.run_ids import run_id_for_test
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import (
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import (
     READ_SCOPE,
     STORAGE_SCOPE,
     STORED_TEXT,
     STORED_TEXT_KEY,
-    StoredValuePromptTestData,
+    StoredValuePromptCases,
 )
 
 
@@ -167,7 +167,7 @@ def scoped_job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
 
 def stored_pages() -> TextContent:
     """A fresh referenced form of the stored text: a load keeps the text on the instance, so each test builds its own."""
-    return TextContent.model_validate(StoredValuePromptTestData.TEXT_REFERENCE)
+    return TextContent.model_validate(StoredValuePromptCases.TEXT_REFERENCE)
 
 
 def make_text_memory(*, texts: dict[str, TextContent]) -> WorkingMemory:

@@ -13,7 +13,7 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.test_extras.recording_error_tracker import recording_error_tracker
-from tests.unit.pipelex.tracing.test_data import IncompleteGraphRun
+from tests.unit.pipelex.tracing.cases import IncompleteGraphRun
 
 
 def _router_and_job(*, mocker: MockerFixture, run_mode: PipeRunMode) -> tuple[Any, Any]:

@@ -13,8 +13,8 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import refusal_messages
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _PACKAGE_ADDRESS = "github.com/acme/invoicing"
 _TEMPLATE = "<h1>{{ invoice.number }}</h1>"
@@ -29,7 +29,7 @@ class TestPipeDocGenDependencyTemplateFile:
         if template is not None:
             (bundle_dir / "invoice.html").write_text(template, encoding="utf-8")
         mthds_file = bundle_dir / "invoice.mthds"
-        mthds_file.write_text(PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"'), encoding="utf-8")
+        mthds_file.write_text(PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"'), encoding="utf-8")
         resolved_dep = ResolvedDependency(
             alias="invoicing",
             address=_PACKAGE_ADDRESS,

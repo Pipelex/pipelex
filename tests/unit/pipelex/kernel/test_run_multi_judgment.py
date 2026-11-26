@@ -30,7 +30,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from tests.unit.pipelex.cogt.judgment.fake_judgment_worker import FakeJudgmentWorker, make_fake_judgment_model
-from tests.unit.pipelex.kernel.test_data import (
+from tests.unit.pipelex.kernel.cases import (
     AliasedDefaultedTriage,
     AliasedOptionalTriage,
     AliasedRequiredTriage,

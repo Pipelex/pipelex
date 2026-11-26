@@ -22,7 +22,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGen
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView, ProviderDiagnostics
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
 
 
 def _make_google_client_error(code: int, message: str, status: str = "ERROR") -> genai_errors.ClientError:
@@ -126,7 +126,7 @@ class TestGoogleImgGenWorkerErrorHandling:
     async def test_per_minute_throttle_whose_words_name_a_quota_waits_its_delay(self, mocker: MockerFixture) -> None:
         """Gemini's throttle says "quota" and "billing" and is a rate limit, carrying the wait its `RetryInfo` asks for."""
         worker = _make_worker(mocker)
-        sdk_exc = genai_errors.ClientError(429, DirectProviderQuotaTestData.GOOGLE_PER_MINUTE_THROTTLE_BODY, None)
+        sdk_exc = genai_errors.ClientError(429, DirectProviderQuotaCases.GOOGLE_PER_MINUTE_THROTTLE_BODY, None)
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
@@ -136,12 +136,12 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
-        assert exc_info.value.provider_metadata.retry_after_seconds == DirectProviderQuotaTestData.GOOGLE_RETRY_DELAY_SECONDS
+        assert exc_info.value.provider_metadata.retry_after_seconds == DirectProviderQuotaCases.GOOGLE_RETRY_DELAY_SECONDS
 
     async def test_prepay_depleted_402_is_check_billing(self, mocker: MockerFixture) -> None:
         """Gemini answers a Prepay balance at zero with a 402, a spent quota by its status."""
         worker = _make_worker(mocker)
-        sdk_exc = genai_errors.ClientError(402, DirectProviderQuotaTestData.GOOGLE_PREPAY_DEPLETED_BODY, None)
+        sdk_exc = genai_errors.ClientError(402, DirectProviderQuotaCases.GOOGLE_PREPAY_DEPLETED_BODY, None)
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(ImgGenGenerationError) as exc_info:

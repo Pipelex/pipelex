@@ -20,7 +20,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases import ImageTestCases
-from tests.integration.pipelex.pipes.pipelines.test_structures import Article
+from tests.integration.pipelex.pipes.pipelines.structures import Article
 
 
 @pytest.mark.dry_runnable

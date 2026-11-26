@@ -20,7 +20,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipeline.test_data import ConditionMethodFaultsTestData
+from tests.integration.pipelex.pipeline.cases import ConditionMethodFaultsCases
 
 _EMPTY_EXPRESSION_REASON = "PipeCondition 'route_parcel': Conditional expression returned no result"
 # The sentences the condition's refusals render for a caller, naming the pipe and no text of the expression.
@@ -30,29 +30,29 @@ _ALL_FAIL_SENTENCE = "The declaration at 'pipe.route_parcel.outcomes' breaks a r
 
 def _routing_bundle(*, inputs: str, expression: str, outcomes: str, default_outcome: str) -> str:
     return (
-        ConditionMethodFaultsTestData.ROUTING_MTHDS.replace(ConditionMethodFaultsTestData.INPUTS_SLOT, inputs)
-        .replace(ConditionMethodFaultsTestData.EXPRESSION_SLOT, expression)
-        .replace(ConditionMethodFaultsTestData.OUTCOMES_SLOT, outcomes)
-        .replace(ConditionMethodFaultsTestData.DEFAULT_OUTCOME_SLOT, default_outcome)
+        ConditionMethodFaultsCases.ROUTING_MTHDS.replace(ConditionMethodFaultsCases.INPUTS_SLOT, inputs)
+        .replace(ConditionMethodFaultsCases.EXPRESSION_SLOT, expression)
+        .replace(ConditionMethodFaultsCases.OUTCOMES_SLOT, outcomes)
+        .replace(ConditionMethodFaultsCases.DEFAULT_OUTCOME_SLOT, default_outcome)
     )
 
 
 _EMPTY_EXPRESSION_BUNDLE = _routing_bundle(
-    inputs=ConditionMethodFaultsTestData.PARCEL_INPUT,
+    inputs=ConditionMethodFaultsCases.PARCEL_INPUT,
     expression="''",
-    outcomes=ConditionMethodFaultsTestData.LANE_OUTCOMES,
+    outcomes=ConditionMethodFaultsCases.LANE_OUTCOMES,
     default_outcome="send_standard",
 )
 _ALL_FAIL_BUNDLE = _routing_bundle(
-    inputs=ConditionMethodFaultsTestData.LANE_INPUT,
+    inputs=ConditionMethodFaultsCases.LANE_INPUT,
     expression="lane",
-    outcomes=ConditionMethodFaultsTestData.ALL_FAIL_OUTCOMES,
+    outcomes=ConditionMethodFaultsCases.ALL_FAIL_OUTCOMES,
     default_outcome="fail",
 )
 _LANE_BUNDLE = _routing_bundle(
-    inputs=ConditionMethodFaultsTestData.PARCEL_AND_LANE_INPUTS,
+    inputs=ConditionMethodFaultsCases.PARCEL_AND_LANE_INPUTS,
     expression="lane",
-    outcomes=ConditionMethodFaultsTestData.LANE_OUTCOMES,
+    outcomes=ConditionMethodFaultsCases.LANE_OUTCOMES,
     default_outcome="send_standard",
 )
 
@@ -138,7 +138,7 @@ class TestConditionMethodFaults:
         with pytest.raises(PipelineExecutionError) as exc_info:
             await PipelexMTHDSProtocol().execute(
                 pipe_code="route_and_stamp",
-                mthds_contents=[ConditionMethodFaultsTestData.CONTINUE_THEN_FORCE_MTHDS],
+                mthds_contents=[ConditionMethodFaultsCases.CONTINUE_THEN_FORCE_MTHDS],
                 inputs={"parcel": "a box of books", "lane": "hold"},
             )
         error = exc_info.value
@@ -154,4 +154,4 @@ class TestConditionMethodFaults:
         assert caller.code == CoreCode.PIPE_FORCED_INPUT_ABSENT
         # Neither reader's text quotes the expression's rendered value.
         for text in (error.message, json.dumps(caller.to_wire()), json.dumps(operator.to_wire())):
-            assert ConditionMethodFaultsTestData.HELD_LANE_LITERAL not in text
+            assert ConditionMethodFaultsCases.HELD_LANE_LITERAL not in text

@@ -15,7 +15,7 @@ from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.errors.error_codes import ErrorCode
 from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.located_failure import find_root_fault
-from tests.unit.pipelex.cogt.test_data import ExceptionTestData
+from tests.unit.pipelex.cogt.cases import ExceptionCases
 
 
 class _CodedCauseError(PipelexError):
@@ -36,7 +36,7 @@ class TestInferenceErrorDomain:
     )
     @pytest.mark.parametrize(
         ("_topic", "category", "expected_code", "expected_domain", "expected_retryable"),
-        ExceptionTestData.CATEGORY_CODE_CASES,
+        ExceptionCases.CATEGORY_CODE_CASES,
     )
     def test_a_category_alone_reports_its_code(
         self,
@@ -57,7 +57,7 @@ class TestInferenceErrorDomain:
 
     def test_category_code_cases_cover_every_category(self) -> None:
         """The parametrized table is exhaustive — a new category cannot slip in undecided."""
-        covered = {category for _topic, category, _code, _domain, _retryable in ExceptionTestData.CATEGORY_CODE_CASES}
+        covered = {category for _topic, category, _code, _domain, _retryable in ExceptionCases.CATEGORY_CODE_CASES}
         assert covered == set(InferenceErrorCategory)
 
     @pytest.mark.builds_problems_without_required_params(

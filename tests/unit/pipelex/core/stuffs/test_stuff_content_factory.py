@@ -16,7 +16,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
-class TestCases:
+class StuffContentFactoryCases:
     # Test cases for TextContent with string content
     TEXT_STRING_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_ref": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
@@ -224,7 +224,7 @@ class TestStuffContentFactory:
 
     @pytest.mark.parametrize(
         ("test_name", "blueprint"),
-        TestCases.TEST_BLUEPRINTS,
+        StuffContentFactoryCases.TEST_BLUEPRINTS,
     )
     def test_blueprint_scenarios(self, test_name: str, blueprint: dict[str, Any], load_test_library: Callable[[list[Path]], None]):
         """Test various blueprint scenarios with parametrized test cases."""

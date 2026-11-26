@@ -3,6 +3,7 @@ from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     caller_text,
     engine_unavailable_report,
@@ -10,7 +11,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     refusal_report,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -40,7 +40,7 @@ class TestPipeDocGenLoadRefusals:
     @pytest.mark.usefixtures("stale_internal_backend")
     @pytest.mark.parametrize(
         "step_fields",
-        [PipeDocGenTestData.PDF_LAYOUT_STEP, 'format = "pdf"\nmodel = "reportlab-pdf"'],
+        [PipeDocGenCases.PDF_LAYOUT_STEP, 'format = "pdf"\nmodel = "reportlab-pdf"'],
         ids=["through_the_default", "named_by_the_step"],
     )
     async def test_a_pdf_layout_step_is_refused_where_internal_toml_predates_the_built_in_engine(self, step_fields: str) -> None:
@@ -60,7 +60,7 @@ class TestPipeDocGenLoadRefusals:
     async def test_an_engine_the_deck_does_not_define_is_an_unknown_model(self) -> None:
         """A misspelled engine is refused at load like any unknown model, located on the step's `model` field."""
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\nmodel = "reportlab-pfd"')])
+            await validate_bundle(mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "pdf"\nmodel = "reportlab-pfd"')])
         item = only_problem_item(exc_info.value)
         assert item.code == CoreCode.MODEL_UNKNOWN
         assert "'reportlab-pfd'" in item.detail
@@ -70,7 +70,7 @@ class TestPipeDocGenLoadRefusals:
     @pytest.mark.usefixtures("no_engines")
     async def test_a_pdf_layout_step_is_refused_where_the_built_in_engine_is_disabled(self) -> None:
         """A host that disables the built-in engine and installs no plugin refuses even a pdf without a template."""
-        report = await engine_unavailable_report(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)
+        report = await engine_unavailable_report(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP)
         assert "built into Pipelex and disabled" in report
 
     @pytest.mark.usefixtures("stub_engines")
@@ -101,7 +101,7 @@ class TestPipeDocGenLoadRefusals:
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_field_read_on_an_anything_input_is_left_to_the_dry_run(self) -> None:
         """An `Anything` input declares no fields for the load check to follow, so a field read on it is checked when the template renders."""
-        bundle = PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate = "<h1>{{ invoice.number }} {{ thing.title }}</h1>"').replace(
+        bundle = PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate = "<h1>{{ invoice.number }} {{ thing.title }}</h1>"').replace(
             'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", thing = "Anything" }'
         )
         with pytest.raises(ValidateBundleError) as exc_info:
@@ -126,7 +126,7 @@ class TestPipeDocGenLoadRefusals:
     )
     async def test_a_filename_reading_an_optional_input_unguarded_is_refused(self, filename: str) -> None:
         """The filename renders strictly, so an optional input it reads without a guard would fail every run that leaves it out."""
-        bundle = PipeDocGenTestData.bundle(step_fields=f'format = "pdf"\nfilename = "{filename}"').replace(
+        bundle = PipeDocGenCases.bundle(step_fields=f'format = "pdf"\nfilename = "{filename}"').replace(
             'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", reference = "Text?" }'
         )
         with pytest.raises(ValidateBundleError) as exc_info:

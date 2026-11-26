@@ -16,7 +16,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.exceptions import UnsupportedSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory, _SchemaModelBuilder  # pyright: ignore[reportPrivateUsage]
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.unit.pipelex.cogt.content_generation.test_data import (
+from tests.unit.pipelex.cogt.content_generation.cases import (
     MODEL_CHAIN_LENGTH,
     MODEL_CHAIN_VALUES,
     AliasedProperties,
@@ -31,7 +31,7 @@ from tests.unit.pipelex.cogt.content_generation.test_data import (
     Pets,
     PlainDefaults,
     RingEnd,
-    SchemaRebuildTestData,
+    SchemaRebuildCases,
     SetDefaults,
     SharedTitles,
     TitledTypes,
@@ -604,7 +604,7 @@ class TestSchemaToModel:
             SchemaToModelFactory._schema_cache.clear()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             SchemaToModelFactory._schema_cache.update(saved_cache)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-    @pytest.mark.parametrize(("topic", "schema", "expected_fragment"), SchemaRebuildTestData.REFUSED_SCHEMAS)
+    @pytest.mark.parametrize(("topic", "schema", "expected_fragment"), SchemaRebuildCases.REFUSED_SCHEMAS)
     def test_a_schema_outside_the_subset_is_refused(self, topic: str, schema: dict[str, Any], expected_fragment: str) -> None:
         """Each shape outside the supported subset, and each field name no class can hold, is refused by name."""
         with pytest.raises(UnsupportedSchemaError) as exc_info:

@@ -7,7 +7,7 @@ from pipelex.system.usage_stats.usage_stats_core import UsageStatsState, is_loop
 from pipelex.system.usage_stats.usage_stats_environment import declared_host, is_ci, is_debug, release_version, resolve_endpoint, tool_switch_says_off
 from pipelex.system.usage_stats.usage_stats_switches import packaged_default_says_off, project_setting_says_off, read_switches, setting_says_off
 from tests.helpers.usage_stats_process import CAN_LOCK_DIRECTORIES, locked_directory, make_project_dir
-from tests.unit.pipelex.system.usage_stats.test_data import UsageStatsSwitchCases
+from tests.unit.pipelex.system.usage_stats.cases import UsageStatsSwitchCases
 
 
 class TestUsageStatsSwitches:

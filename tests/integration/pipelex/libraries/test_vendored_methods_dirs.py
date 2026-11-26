@@ -20,13 +20,13 @@ from pipelex.libraries.library import Library
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.libraries.cases import ProbePackageCases
 from tests.integration.pipelex.libraries.installed_packages import install_probe_globally, isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
-PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
+PROBE_ALIAS = ProbePackageCases.DEP_ALIAS
 VENDORED_HELPER = "DEPENDENCY helper"
 INSTALLED_HELPER = "INSTALLED helper"
-INSTALLED_BUNDLE = ProbePackageTestData.DEP_BUNDLE.replace(VENDORED_HELPER, INSTALLED_HELPER)
+INSTALLED_BUNDLE = ProbePackageCases.DEP_BUNDLE.replace(VENDORED_HELPER, INSTALLED_HELPER)
 
 
 def _load_consumer(*, consumer: str, methods_dirs: list[Path] | None) -> tuple[str, Library]:
@@ -48,7 +48,7 @@ class TestVendoredMethodsDirs:
         resolve_mock = mocker.patch("pipelex.libraries.library_manager.resolve_address_based_method")
         methods_dir = vendor_probe(methods_dir=tmp_path / "request-methods")
 
-        library_id, library = _load_consumer(consumer=ProbePackageTestData.CONSUMER_BUNDLE, methods_dirs=[methods_dir])
+        library_id, library = _load_consumer(consumer=ProbePackageCases.CONSUMER_BUNDLE, methods_dirs=[methods_dir])
         try:
             assert _helper_description(library=library) == VENDORED_HELPER
         finally:
@@ -62,7 +62,7 @@ class TestVendoredMethodsDirs:
         install_probe_globally(root=tmp_path, bundle=INSTALLED_BUNDLE)
         methods_dir = vendor_probe(methods_dir=tmp_path / "request-methods")
 
-        library_id, library = _load_consumer(consumer=ProbePackageTestData.CONSUMER_BUNDLE, methods_dirs=[methods_dir])
+        library_id, library = _load_consumer(consumer=ProbePackageCases.CONSUMER_BUNDLE, methods_dirs=[methods_dir])
         try:
             assert _helper_description(library=library) == VENDORED_HELPER
         finally:
@@ -74,7 +74,7 @@ class TestVendoredMethodsDirs:
         empty_methods_dir = tmp_path / "request-methods"
         empty_methods_dir.mkdir()
 
-        library_id, library = _load_consumer(consumer=ProbePackageTestData.CONSUMER_BUNDLE, methods_dirs=[empty_methods_dir])
+        library_id, library = _load_consumer(consumer=ProbePackageCases.CONSUMER_BUNDLE, methods_dirs=[empty_methods_dir])
         try:
             assert _helper_description(library=library) == INSTALLED_HELPER
         finally:
@@ -89,7 +89,7 @@ class TestVendoredMethodsDirs:
 
         with caplog.at_level(logging.WARNING):
             library_id, library = _load_consumer(
-                consumer=ProbePackageTestData.consumer_calling(pipe_ref=f"{pinned_alias}->probe_dep.entry"), methods_dirs=[methods_dir]
+                consumer=ProbePackageCases.consumer_calling(pipe_ref=f"{pinned_alias}->probe_dep.entry"), methods_dirs=[methods_dir]
             )
         try:
             assert _helper_description(library=library, alias=pinned_alias) == VENDORED_HELPER
@@ -110,7 +110,7 @@ class TestVendoredMethodsDirs:
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config, methods_dirs=[methods_dir])
 
-        response = await runner.execute(pipe_code="go", mthds_contents=[ProbePackageTestData.CONSUMER_BUNDLE], inputs={"data": "hello"})
+        response = await runner.execute(pipe_code="go", mthds_contents=[ProbePackageCases.CONSUMER_BUNDLE], inputs={"data": "hello"})
 
         graph_spec = response.pipe_output.graph_spec
         assert graph_spec is not None

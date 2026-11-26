@@ -24,14 +24,14 @@ from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_
 from pipelex.hosted.error_rendering import HOSTED_MISSING_KEY_NEXT_STEP, HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS, HOSTED_UNREACHABLE_NEXT_STEP
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
-from tests.unit.pipelex.cli.agent_cli.test_data import (
+from tests.unit.pipelex.cli.agent_cli.cases import (
     GatewayAnswers,
     OperatorViewAnswers,
     RetiredEnvelope,
     RunnerProblems,
     UndeclaredMembers,
 )
-from tests.unit.pipelex.hosted.test_data import HostedRefusals, HostedVersions
+from tests.unit.pipelex.hosted.cases import HostedRefusals, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path

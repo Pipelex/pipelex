@@ -14,7 +14,7 @@ from pipelex.kernel.prompt_assembly import AssembledUserPrompt
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeOptionalFileTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeOptionalFileCases
 
 
 def _answer_yes(*, judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentOutcome]:
@@ -25,7 +25,7 @@ def _answer_yes(*, judgment_assignment: JudgmentAssignment) -> dict[str, Judgmen
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeJudgeOptionalFiles:
     @pytest.mark.parametrize("pipe_run_mode", [PipeRunMode.DRY, PipeRunMode.LIVE])
-    @pytest.mark.parametrize(("topic", "optional_input", "prompt"), PipeJudgeOptionalFileTestData.ABSENT_CASES)
+    @pytest.mark.parametrize(("topic", "optional_input", "prompt"), PipeJudgeOptionalFileCases.ABSENT_CASES)
     async def test_an_absent_optional_file_is_left_out_of_the_evidence(
         self,
         mocker: MockerFixture,
@@ -41,14 +41,14 @@ class TestPipeJudgeOptionalFiles:
             mocker.patch.object(ContentGenerator, "make_judgment_answers", side_effect=_answer_yes)
 
         response = await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode).execute(
-            mthds_contents=[PipeJudgeOptionalFileTestData.bundle(optional_input=optional_input, prompt=prompt)],
-            pipe_code=PipeJudgeOptionalFileTestData.PIPE_CODE,
-            inputs={"note": TextContent(text=PipeJudgeOptionalFileTestData.NOTE)},
+            mthds_contents=[PipeJudgeOptionalFileCases.bundle(optional_input=optional_input, prompt=prompt)],
+            pipe_code=PipeJudgeOptionalFileCases.PIPE_CODE,
+            inputs={"note": TextContent(text=PipeJudgeOptionalFileCases.NOTE)},
         )
 
         evidence = assembly_spy.spy_return
         assert isinstance(evidence, AssembledUserPrompt)
-        assert evidence.text.strip() == f"A claim note: {PipeJudgeOptionalFileTestData.NOTE}"
+        assert evidence.text.strip() == f"A claim note: {PipeJudgeOptionalFileCases.NOTE}"
         assert evidence.images == []
         assert evidence.documents == []
         assert response.pipe_output is not None
@@ -58,15 +58,15 @@ class TestPipeJudgeOptionalFiles:
 
     async def test_a_present_optional_file_is_attached_and_numbered(self, mocker: MockerFixture) -> None:
         assembly_spy = mocker.spy(judgment_ops, "assemble_user_prompt")
-        _topic, optional_input, prompt = PipeJudgeOptionalFileTestData.ABSENT_CASES[0]
+        _topic, optional_input, prompt = PipeJudgeOptionalFileCases.ABSENT_CASES[0]
         inputs: dict[str, Any] = {
-            "note": TextContent(text=PipeJudgeOptionalFileTestData.NOTE),
-            "photo": {"concept": "native.Image", "content": {"url": PipeJudgeOptionalFileTestData.PHOTO_URL}},
+            "note": TextContent(text=PipeJudgeOptionalFileCases.NOTE),
+            "photo": {"concept": "native.Image", "content": {"url": PipeJudgeOptionalFileCases.PHOTO_URL}},
         }
 
         await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY).execute(
-            mthds_contents=[PipeJudgeOptionalFileTestData.bundle(optional_input=optional_input, prompt=prompt)],
-            pipe_code=PipeJudgeOptionalFileTestData.PIPE_CODE,
+            mthds_contents=[PipeJudgeOptionalFileCases.bundle(optional_input=optional_input, prompt=prompt)],
+            pipe_code=PipeJudgeOptionalFileCases.PIPE_CODE,
             inputs=inputs,
         )
 
@@ -80,9 +80,9 @@ class TestPipeJudgeOptionalFiles:
         judge_spy = mocker.patch.object(ContentGenerator, "make_judgment_answers", side_effect=_answer_yes)
         with pytest.raises(PipelineExecutionError) as exc_info:
             await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode).execute(
-                mthds_contents=[PipeJudgeOptionalFileTestData.bundle(optional_input='photo = "Image"', prompt="A claim note: $note\n@photo\n")],
-                pipe_code=PipeJudgeOptionalFileTestData.PIPE_CODE,
-                inputs={"note": TextContent(text=PipeJudgeOptionalFileTestData.NOTE)},
+                mthds_contents=[PipeJudgeOptionalFileCases.bundle(optional_input='photo = "Image"', prompt="A claim note: $note\n@photo\n")],
+                pipe_code=PipeJudgeOptionalFileCases.PIPE_CODE,
+                inputs={"note": TextContent(text=PipeJudgeOptionalFileCases.NOTE)},
             )
         assert "missing required inputs: photo" in str(exc_info.value)
         judge_spy.assert_not_called()

@@ -14,7 +14,7 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
-class TestData:
+class TemplatePipelineCases:
     """Test data for template pipeline integration tests."""
 
     # (topic, raw_template, expected_jinja2, expected_variables)
@@ -304,7 +304,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "expected_jinja2", "expected_variables"),
-        TestData.AT_VARIABLE_PIPELINE,
+        TemplatePipelineCases.AT_VARIABLE_PIPELINE,
     )
     def test_at_variable_pipeline(
         self,
@@ -327,7 +327,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "root_identifier"),
-        TestData.AT_VARIABLE_PIPELINE_ERRORS,
+        TemplatePipelineCases.AT_VARIABLE_PIPELINE_ERRORS,
     )
     def test_at_variable_pipeline_raises_when_inline(self, topic: str, raw_template: str, root_identifier: str):
         """Inline @-sigils whose root identifier is a declared input violate the strict
@@ -340,7 +340,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "expected_jinja2", "expected_variables"),
-        TestData.DOLLAR_VARIABLE_PIPELINE,
+        TemplatePipelineCases.DOLLAR_VARIABLE_PIPELINE,
     )
     def test_dollar_variable_pipeline(
         self,
@@ -363,7 +363,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "expected_jinja2", "expected_variables"),
-        TestData.OPTIONAL_VARIABLE_PIPELINE,
+        TemplatePipelineCases.OPTIONAL_VARIABLE_PIPELINE,
     )
     def test_optional_variable_pipeline(
         self,
@@ -386,7 +386,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "expected_jinja2", "expected_variables"),
-        TestData.MIXED_PATTERNS_PIPELINE,
+        TemplatePipelineCases.MIXED_PATTERNS_PIPELINE,
     )
     def test_mixed_patterns_pipeline(
         self,
@@ -409,7 +409,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "expected_variables"),
-        TestData.REAL_WORLD_TEMPLATES,
+        TemplatePipelineCases.REAL_WORLD_TEMPLATES,
     )
     def test_real_world_templates(
         self,
@@ -430,7 +430,7 @@ class TestTemplatePipelineIntegration:
 
     @pytest.mark.parametrize(
         ("topic", "raw_template", "expected_jinja2", "expected_variables"),
-        TestData.NUMBER_EDGE_CASES,
+        TemplatePipelineCases.NUMBER_EDGE_CASES,
     )
     def test_number_edge_cases(
         self,

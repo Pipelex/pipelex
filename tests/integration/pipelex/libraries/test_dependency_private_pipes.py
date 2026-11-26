@@ -16,6 +16,7 @@ from pipelex.interpreter_hub import get_library_manager, scoped_current_library
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.integration.pipelex.libraries.cases import ProbePackageCases, TwoDomainPackageCases
 from tests.integration.pipelex.libraries.installed_packages import (
     install_package,
     install_probe,
@@ -23,17 +24,16 @@ from tests.integration.pipelex.libraries.installed_packages import (
     refusal_types,
     write_consumer,
 )
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData, TwoDomainPackageTestData
 
-PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
+PROBE_ALIAS = ProbePackageCases.DEP_ALIAS
 
 
 class TestDependencyPrivatePipes:
     @pytest.mark.asyncio(loop_scope="class")
     async def test_an_exported_controller_runs_its_private_helper(self, tmp_path: Path, mocker: MockerFixture) -> None:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        install_probe(root=tmp_path, manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:
@@ -52,13 +52,13 @@ class TestDependencyPrivatePipes:
 
     def test_a_consumer_cannot_reference_a_private_helper(self, tmp_path: Path, mocker: MockerFixture) -> None:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        install_probe(root=tmp_path, manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
         private_ref = f"{PROBE_ALIAS}->probe_dep.helper"
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
-                "sneaky.mthds": ProbePackageTestData.consumer_calling(pipe_ref=private_ref).replace("probe_consumer", "probe_sneaky"),
+                "consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE,
+                "sneaky.mthds": ProbePackageCases.consumer_calling(pipe_ref=private_ref).replace("probe_consumer", "probe_sneaky"),
             },
         )
         library_manager = get_library_manager()
@@ -77,13 +77,13 @@ class TestDependencyPrivatePipes:
     def test_a_consumer_s_unresolved_reference_is_offered_no_private_pipe(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """The private `helper` is nearest the typo, but the consumer cannot name it: the refusal offers only exported pipes."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        install_probe(root=tmp_path, manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
         typo_ref = f"{PROBE_ALIAS}->probe_dep.helpr"
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
-                "typo.mthds": ProbePackageTestData.consumer_calling(pipe_ref=typo_ref).replace("probe_consumer", "probe_typo"),
+                "consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE,
+                "typo.mthds": ProbePackageCases.consumer_calling(pipe_ref=typo_ref).replace("probe_consumer", "probe_typo"),
             },
         )
         library_manager = get_library_manager()
@@ -103,12 +103,12 @@ class TestDependencyPrivatePipes:
     def test_a_reference_to_a_withheld_private_pipe_is_refused_as_unexported(self, tmp_path: Path, mocker: MockerFixture, orphan_ref: str) -> None:
         """`orphan` is never built, but the package declares it: a reference to it is unexported, not missing."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        install_probe(root=tmp_path, manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
-                "sneaky.mthds": ProbePackageTestData.consumer_calling(pipe_ref=orphan_ref).replace("probe_consumer", "probe_sneaky"),
+                "consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE,
+                "sneaky.mthds": ProbePackageCases.consumer_calling(pipe_ref=orphan_ref).replace("probe_consumer", "probe_sneaky"),
             },
         )
         library_manager = get_library_manager()
@@ -125,8 +125,8 @@ class TestDependencyPrivatePipes:
     def test_a_private_pipe_nothing_public_reaches_is_not_loaded(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """`orphan` names a model no deck defines: it is never built, so it cannot refuse the consumer's load."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        install_probe(root=tmp_path, manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:
@@ -142,16 +142,16 @@ class TestDependencyPrivatePipes:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_package(
             root=tmp_path,
-            method_name=TwoDomainPackageTestData.METHOD_NAME,
-            manifest=TwoDomainPackageTestData.MANIFEST,
-            bundles={"dom_a.mthds": TwoDomainPackageTestData.BUNDLE_A, "dom_b.mthds": TwoDomainPackageTestData.BUNDLE_B},
+            method_name=TwoDomainPackageCases.METHOD_NAME,
+            manifest=TwoDomainPackageCases.MANIFEST,
+            bundles={"dom_a.mthds": TwoDomainPackageCases.BUNDLE_A, "dom_b.mthds": TwoDomainPackageCases.BUNDLE_B},
         )
-        private_ref = f"{TwoDomainPackageTestData.DEP_ALIAS}->dom_b.x"
+        private_ref = f"{TwoDomainPackageCases.DEP_ALIAS}->dom_b.x"
         consumer_files = write_consumer(
             root=tmp_path,
             bundles={
-                "public.mthds": ProbePackageTestData.consumer_calling(pipe_ref=f"{TwoDomainPackageTestData.DEP_ALIAS}->dom_a.x"),
-                "sneaky.mthds": ProbePackageTestData.consumer_calling(pipe_ref=private_ref).replace("probe_consumer", "probe_sneaky"),
+                "public.mthds": ProbePackageCases.consumer_calling(pipe_ref=f"{TwoDomainPackageCases.DEP_ALIAS}->dom_a.x"),
+                "sneaky.mthds": ProbePackageCases.consumer_calling(pipe_ref=private_ref).replace("probe_consumer", "probe_sneaky"),
             },
         )
         library_manager = get_library_manager()
@@ -167,8 +167,8 @@ class TestDependencyPrivatePipes:
     def test_the_entry_door_reaches_a_private_helper_by_hand(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """`[exports]` governs references from inside a method, not a pipe a person names at a CLI argument or an API field."""
         isolate_installed_methods(mocker=mocker, root=tmp_path)
-        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        install_probe(root=tmp_path, manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:
@@ -184,10 +184,10 @@ class TestDependencyPrivatePipes:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_probe(
             root=tmp_path,
-            manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY,
-            bundle=ProbePackageTestData.DEP_BUNDLE_CALLING_ITS_HELPER_BY_ALIAS,
+            manifest=ProbePackageCases.MANIFEST_EXPORTING_ONLY_THE_ENTRY,
+            bundle=ProbePackageCases.DEP_BUNDLE_CALLING_ITS_HELPER_BY_ALIAS,
         )
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.CONSUMER_BUNDLE})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:
@@ -205,12 +205,12 @@ class TestDependencyPrivatePipes:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         install_package(
             root=tmp_path,
-            method_name=TwoDomainPackageTestData.METHOD_NAME,
-            manifest=TwoDomainPackageTestData.MANIFEST,
-            bundles={"dom_a.mthds": TwoDomainPackageTestData.BUNDLE_A, "dom_b.mthds": TwoDomainPackageTestData.BUNDLE_B},
+            method_name=TwoDomainPackageCases.METHOD_NAME,
+            manifest=TwoDomainPackageCases.MANIFEST,
+            bundles={"dom_a.mthds": TwoDomainPackageCases.BUNDLE_A, "dom_b.mthds": TwoDomainPackageCases.BUNDLE_B},
         )
-        bare_ref = f"{TwoDomainPackageTestData.DEP_ALIAS}->x"
-        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageTestData.consumer_calling(pipe_ref=bare_ref)})
+        bare_ref = f"{TwoDomainPackageCases.DEP_ALIAS}->x"
+        consumer_files = write_consumer(root=tmp_path, bundles={"consumer.mthds": ProbePackageCases.consumer_calling(pipe_ref=bare_ref)})
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
         try:

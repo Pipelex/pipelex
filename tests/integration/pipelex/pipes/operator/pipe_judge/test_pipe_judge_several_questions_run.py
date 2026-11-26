@@ -27,7 +27,7 @@ from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeSeveralQuestionsTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeSeveralQuestionsCases
 
 _ANSWERS: dict[str, JudgmentOutcome] = {
     "urgent": YesNoAnswer(probability=0.6),
@@ -38,9 +38,9 @@ _ANSWERS: dict[str, JudgmentOutcome] = {
 
 async def _run(*, pipe_run_mode: PipeRunMode) -> Any:
     response = await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode).execute(
-        mthds_contents=[PipeJudgeSeveralQuestionsTestData.bundle()],
-        pipe_code=PipeJudgeSeveralQuestionsTestData.PIPE_CODE,
-        inputs={"message": TextContent(text=PipeJudgeSeveralQuestionsTestData.MESSAGE)},
+        mthds_contents=[PipeJudgeSeveralQuestionsCases.bundle()],
+        pipe_code=PipeJudgeSeveralQuestionsCases.PIPE_CODE,
+        inputs={"message": TextContent(text=PipeJudgeSeveralQuestionsCases.MESSAGE)},
     )
     assert response.pipe_output is not None
     return response.pipe_output.main_stuff.content
@@ -72,7 +72,7 @@ class TestPipeJudgeSeveralQuestionsRun:
         assert job.questions["severity"] == RatingQuestion(
             instructions="How severe is the reported issue?", levels=[RatingLevel(label="Minor"), RatingLevel(label="Major")]
         )
-        assert job.prompt.text == f"<message>\n{PipeJudgeSeveralQuestionsTestData.MESSAGE}\n</message>"
+        assert job.prompt.text == f"<message>\n{PipeJudgeSeveralQuestionsCases.MESSAGE}\n</message>"
         # The threshold of 0.7 turns the model's 0.6 into a no, and `Team` refines `Choice`, so its field holds a choice.
         assert triage.urgent == YesNoContent(yes_no=False, probability=0.6)
         assert isinstance(triage.team, ChoiceContent)

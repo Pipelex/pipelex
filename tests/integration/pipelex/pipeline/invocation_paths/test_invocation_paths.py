@@ -17,8 +17,8 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeEndErrorEvent, PipeStartEvent, TraceEvent
+from tests.integration.pipelex.pipeline.invocation_paths.cases import InvocationPathsCases
 from tests.integration.pipelex.pipeline.invocation_paths.invocation_paths_helpers import ItemExecutionRouter
-from tests.integration.pipelex.pipeline.invocation_paths.test_data import InvocationPathsTestData
 
 _BINDING_PIPE_TYPE = "BindingStep"
 
@@ -74,9 +74,9 @@ async def _run(*, depth: str, run_mode: PipeRunMode, traces_dir: Path) -> PipeOu
     runner = PipelexMTHDSProtocol(pipe_run_mode=run_mode, execution_config=execution_config)
     inputs: dict[str, Any] | None = None
     if not run_mode.is_dry:
-        inputs = {"depth": depth, "dossier": {"concept": f"{InvocationPathsTestData.DOMAIN}.Dossier", "content": InvocationPathsTestData.DOSSIER}}
+        inputs = {"depth": depth, "dossier": {"concept": f"{InvocationPathsCases.DOMAIN}.Dossier", "content": InvocationPathsCases.DOSSIER}}
     with scoped_event_log(NdjsonEventLog(traces_dir=str(traces_dir))):
-        response = await runner.execute(mthds_contents=[InvocationPathsTestData.BUNDLE], inputs=inputs)
+        response = await runner.execute(mthds_contents=[InvocationPathsCases.BUNDLE], inputs=inputs)
     return response.pipe_output
 
 
@@ -86,7 +86,7 @@ class TestInvocationPaths:
         pipe_output = await _run(depth="detailed", run_mode=PipeRunMode.LIVE, traces_dir=tmp_path)
 
         lines = _read_trace_lines(tmp_path)
-        assert _invocation_paths(lines) == InvocationPathsTestData.LIVE_DETAILED_PATHS
+        assert _invocation_paths(lines) == InvocationPathsCases.LIVE_DETAILED_PATHS
         # One execution in its first attempt wrote them all.
         assert {(line["workflow_id"], line["attempt"], json.dumps(line["lineage"])) for line in lines} == {("direct", 1, "[]")}
 
@@ -100,26 +100,25 @@ class TestInvocationPaths:
         for line in lines:
             assert line["path"] == path_by_node_id[_concerned_node_id(line)], line
             if line["event_kind"] == "pipe_start" and line["path"] is not None:
-                assert line["pipe_ref"] == f"{InvocationPathsTestData.DOMAIN}.{line['pipe_code']}"
+                assert line["pipe_ref"] == f"{InvocationPathsCases.DOMAIN}.{line['pipe_code']}"
             if line["event_kind"] == "pipe_end_success":
                 ended_path: str | None = line["path"]
                 expected_pipe = (
-                    (line["pipe_code"], _BINDING_PIPE_TYPE) if ended_path is None else InvocationPathsTestData.LIVE_DETAILED_PATHS[ended_path]
+                    (line["pipe_code"], _BINDING_PIPE_TYPE) if ended_path is None else InvocationPathsCases.LIVE_DETAILED_PATHS[ended_path]
                 )
                 assert (line["pipe_code"], line["pipe_type"]) == expected_pipe
 
         # Item `n` of the batch is the filing at index `n - 1`.
-        for item_number, filing in enumerate(InvocationPathsTestData.DOSSIER["filings"], start=1):
+        for item_number, filing in enumerate(InvocationPathsCases.DOSSIER["filings"], start=1):
             read_end = next(
                 line
                 for line in lines
-                if line["event_kind"] == "pipe_end_success"
-                and line["path"] == f"{InvocationPathsTestData.ENTRY_PATH}/step_3/item_{item_number}/step_1"
+                if line["event_kind"] == "pipe_end_success" and line["path"] == f"{InvocationPathsCases.ENTRY_PATH}/step_3/item_{item_number}/step_1"
             )
             assert filing["title"] in json.dumps(read_end), read_end
 
         # The graph names each invocation by the same path.
-        assert _graph_paths(pipe_output.graph_spec) == sorted(InvocationPathsTestData.LIVE_DETAILED_PATHS)
+        assert _graph_paths(pipe_output.graph_spec) == sorted(InvocationPathsCases.LIVE_DETAILED_PATHS)
 
     @pytest.mark.parametrize(
         ("depth", "chosen_pipe_code"),
@@ -139,9 +138,9 @@ class TestInvocationPaths:
         outcome_starts = [
             (path, pipe_code)
             for path, (pipe_code, _) in _invocation_paths(_read_trace_lines(tmp_path)).items()
-            if path.startswith(f"{InvocationPathsTestData.ENTRY_PATH}/step_2/") and path.count("/") == 2
+            if path.startswith(f"{InvocationPathsCases.ENTRY_PATH}/step_2/") and path.count("/") == 2
         ]
-        assert outcome_starts == [(InvocationPathsTestData.OUTCOME_GROUP_PATHS[chosen_pipe_code], chosen_pipe_code)]
+        assert outcome_starts == [(InvocationPathsCases.OUTCOME_GROUP_PATHS[chosen_pipe_code], chosen_pipe_code)]
 
     async def test_a_dry_run_names_each_pipe_by_the_path_a_live_run_gives_it(self, tmp_path: Path) -> None:
         """A dry run runs every outcome group of the condition, each at the path a live run taking it gives."""
@@ -150,15 +149,15 @@ class TestInvocationPaths:
         lines = _read_trace_lines(tmp_path)
         assert {line["mode"] for line in lines} == {"dry"}
         dry_paths = _invocation_paths(lines)
-        for pipe_code, group_path in InvocationPathsTestData.OUTCOME_GROUP_PATHS.items():
+        for pipe_code, group_path in InvocationPathsCases.OUTCOME_GROUP_PATHS.items():
             assert dry_paths[group_path][0] == pipe_code
-        live_paths_outside_the_items = {path: pipe for path, pipe in InvocationPathsTestData.LIVE_DETAILED_PATHS.items() if "/item_" not in path}
+        live_paths_outside_the_items = {path: pipe for path, pipe in InvocationPathsCases.LIVE_DETAILED_PATHS.items() if "/item_" not in path}
         assert live_paths_outside_the_items.items() <= dry_paths.items()
         # The dry batch's items are numbered from 1 as the live batch's are, each running the same pipes.
         item_numbers = sorted(int(path.split("/item_")[1]) for path in dry_paths if path.count("/") == 2 and "/item_" in path)
         assert item_numbers == list(range(1, len(item_numbers) + 1))
         assert item_numbers
-        assert dry_paths[f"{InvocationPathsTestData.ENTRY_PATH}/step_3/item_1/step_2"] == ("condense_filing", "PipeFunc")
+        assert dry_paths[f"{InvocationPathsCases.ENTRY_PATH}/step_3/item_1/step_2"] == ("condense_filing", "PipeFunc")
         assert _graph_paths(pipe_output.graph_spec) == sorted(dry_paths)
 
     async def test_an_item_run_as_an_execution_of_its_own_continues_the_path_it_received(self, tmp_path: Path) -> None:
@@ -170,7 +169,7 @@ class TestInvocationPaths:
         with scoped_pipe_router(router):
             pipe_output = await _run(depth="detailed", run_mode=PipeRunMode.LIVE, traces_dir=tmp_path)
 
-        batch_path = f"{InvocationPathsTestData.ENTRY_PATH}/step_3"
+        batch_path = f"{InvocationPathsCases.ENTRY_PATH}/step_3"
         run_attempt = ExecutionAttempt(execution="direct", attempt=1)
         # The job each item's execution read back carries the item's place and the attempt that dispatched it.
         assert sorted(router.received_contexts) == ["item_1", "item_2", "item_3"]
@@ -228,7 +227,7 @@ class TestInvocationPaths:
 
         # The graph holds every invocation once, from the current attempts, and nothing of the lost attempt failed in it.
         graph_spec = pipe_output.graph_spec
-        assert _graph_paths(graph_spec) == sorted(InvocationPathsTestData.LIVE_DETAILED_PATHS)
+        assert _graph_paths(graph_spec) == sorted(InvocationPathsCases.LIVE_DETAILED_PATHS)
         assert graph_spec is not None
         assert [node.path for node in graph_spec.nodes if node.status == NodeStatus.FAILED] == []
         # The parent references across the dispatch still resolve: the batch node contains each item's current node.
@@ -237,11 +236,11 @@ class TestInvocationPaths:
             for node in graph_spec.nodes
             if node.path is not None and node.path.startswith(f"{batch_path}/item_") and node.path.count("/") == 2
         }
-        assert len(item_node_ids) == len(InvocationPathsTestData.DOSSIER["filings"])
+        assert len(item_node_ids) == len(InvocationPathsCases.DOSSIER["filings"])
         contained_by_batch = {edge.target for edge in graph_spec.edges if edge.kind.is_contains and edge.source == batch_node_id}
         assert item_node_ids <= contained_by_batch
         main_text = pipe_output.main_stuff.as_text.require_text()
-        for filing in InvocationPathsTestData.DOSSIER["filings"]:
+        for filing in InvocationPathsCases.DOSSIER["filings"]:
             assert f"Condensed: Read {filing['title']}" in main_text
 
     async def test_a_binding_step_the_author_wrote_takes_its_number(self, tmp_path: Path) -> None:
@@ -249,7 +248,7 @@ class TestInvocationPaths:
         runner = PipelexMTHDSProtocol(execution_config=execution_config)
         with scoped_event_log(NdjsonEventLog(traces_dir=str(tmp_path))):
             await runner.execute(
-                mthds_contents=[InvocationPathsTestData.BOUND_STEP_BUNDLE],
+                mthds_contents=[InvocationPathsCases.BOUND_STEP_BUNDLE],
                 inputs={"filing": {"concept": "bound_steps.Filing", "content": {"title": "Annual accounts"}}},
             )
 
@@ -276,7 +275,7 @@ class TestInvocationPaths:
         runner = PipelexMTHDSProtocol(execution_config=execution_config)
         with scoped_event_log(NdjsonEventLog(traces_dir=str(tmp_path))):
             response = await runner.execute(
-                mthds_contents=[InvocationPathsTestData.BOUND_STEP_BUNDLE],
+                mthds_contents=[InvocationPathsCases.BOUND_STEP_BUNDLE],
                 inputs={"filing": {"concept": "bound_steps.Filing", "content": {"title": "Annual accounts"}}},
             )
 

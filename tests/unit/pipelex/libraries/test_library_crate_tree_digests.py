@@ -5,7 +5,7 @@ from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
+from tests.unit.pipelex.libraries.library_crate_cases import BlueprintSamples
 
 
 def _placed_blueprint(*, files: dict[str, bytes], tree_path: str | None) -> PipelexBundleBlueprint:

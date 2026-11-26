@@ -21,7 +21,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
 
 
 def _mock_httpx_response(status_code: int) -> httpx.Response:
@@ -132,9 +132,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         """The spend cap's 429, recovered from instructor's wrapper with its body, is a spent quota by its code."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_rate_limit_error(
-            "You have reached your API usage limits", body=DirectProviderQuotaTestData.ANTHROPIC_SPEND_CAP_BODY
-        )
+        sdk_exc = _make_anthropic_rate_limit_error("You have reached your API usage limits", body=DirectProviderQuotaCases.ANTHROPIC_SPEND_CAP_BODY)
         wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -209,7 +207,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
         wrapped = wrap_in_instructor_retry(
-            _make_anthropic_bad_request_error("Error code: 400", body=DirectProviderQuotaTestData.ANTHROPIC_CREDIT_BALANCE_BODY)
+            _make_anthropic_bad_request_error("Error code: 400", body=DirectProviderQuotaCases.ANTHROPIC_CREDIT_BALANCE_BODY)
         )
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -311,7 +309,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         """The operator's problem carries what the provider answered, and the error advises its local reader what to do."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded", body=DirectProviderQuotaTestData.ANTHROPIC_SPEND_CAP_BODY)
+        sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded", body=DirectProviderQuotaCases.ANTHROPIC_SPEND_CAP_BODY)
         wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from pipelex import pretty_print
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from tests.integration.pipelex.cogt.test_data import SerDeTestLLMCases
+from tests.integration.pipelex.cogt.cases import SerDeTestLLMCases
 
 
 class TestSerDeLLMClasses:

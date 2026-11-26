@@ -46,8 +46,8 @@ from pipelex.hosted.exceptions import (
     HostedRunOutcomeUnknownError,
     HostedRunPollingError,
 )
-from tests.unit.pipelex.cli.agent_cli.test_data import StoredRunReports
-from tests.unit.pipelex.hosted.test_data import HostedRefusals
+from tests.unit.pipelex.cli.agent_cli.cases import StoredRunReports
+from tests.unit.pipelex.hosted.cases import HostedRefusals
 
 API_URL = "https://api.test"
 #: The request id the hosted edge names in its `X-Request-ID` header.

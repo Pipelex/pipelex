@@ -10,14 +10,14 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
-from tests.unit.pipelex.libraries.test_data import PackageVisibilityTestData
+from tests.unit.pipelex.libraries.cases import PackageVisibilityCases
 
 
 def _refused_items(
     *, mocker: MockerFixture, tmp_path: Path, bundles: dict[str, str]
 ) -> list[tuple[str, dict[str, object] | None, dict[str, object] | None]]:
     """The code, location and parameters of each item refusing the bundles of a package whose METHODS.toml exports nothing."""
-    manifest = MethodsManifest(address=PackageVisibilityTestData.PACKAGE_ADDRESS, version="1.0.0", description="A package exporting nothing")
+    manifest = MethodsManifest(address=PackageVisibilityCases.PACKAGE_ADDRESS, version="1.0.0", description="A package exporting nothing")
     mocker.patch("pipelex.libraries.library_manager.find_package_manifest", return_value=manifest)
     blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source) for source, content in bundles.items()]
     first_path = tmp_path / next(iter(bundles))
@@ -38,14 +38,14 @@ class TestPackageVisibilityRefusals:
         items = _refused_items(
             mocker=mocker,
             tmp_path=tmp_path,
-            bundles={"scoring.mthds": PackageVisibilityTestData.SCORING_MTHDS, "legal.mthds": PackageVisibilityTestData.LEGAL_MTHDS},
+            bundles={"scoring.mthds": PackageVisibilityCases.SCORING_MTHDS, "legal.mthds": PackageVisibilityCases.LEGAL_MTHDS},
         )
 
         assert items == [
             (
                 CoreCode.METHOD_PIPE_NOT_EXPORTED,
                 {"pipe": "review", "field": "pipe.review.steps[0].pipe", "file": "legal.mthds"},
-                {"pipe": PackageVisibilityTestData.UNEXPORTED_PIPE_REF, "package": PackageVisibilityTestData.PACKAGE_ADDRESS},
+                {"pipe": PackageVisibilityCases.UNEXPORTED_PIPE_REF, "package": PackageVisibilityCases.PACKAGE_ADDRESS},
             )
         ]
 
@@ -54,9 +54,9 @@ class TestPackageVisibilityRefusals:
             mocker=mocker,
             tmp_path=tmp_path,
             bundles={
-                "native.mthds": PackageVisibilityTestData.RESERVED_DOMAIN_MTHDS,
-                "scoring.mthds": PackageVisibilityTestData.SCORING_MTHDS,
-                "legal.mthds": PackageVisibilityTestData.LEGAL_MTHDS,
+                "native.mthds": PackageVisibilityCases.RESERVED_DOMAIN_MTHDS,
+                "scoring.mthds": PackageVisibilityCases.SCORING_MTHDS,
+                "legal.mthds": PackageVisibilityCases.LEGAL_MTHDS,
             },
         )
 

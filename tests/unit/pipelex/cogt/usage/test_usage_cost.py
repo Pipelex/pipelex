@@ -4,7 +4,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost, compute_total_cost
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from tests.unit.pipelex.cogt.usage.test_data import RATED_EXPECTED_COST, UsageFixtures
+from tests.unit.pipelex.cogt.usage.cases import RATED_EXPECTED_COST, UsageFixtures
 
 
 class TestComputeTokensUsageCost:

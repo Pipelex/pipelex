@@ -8,7 +8,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData, PipeJudgeSeveralQuestionsTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadCases, PipeJudgeSeveralQuestionsCases
 
 _ANSWERS: dict[str, JudgmentOutcome] = {
     "urgent": YesNoAnswer(probability=0.9),
@@ -29,13 +29,13 @@ class TestPipeJudgeExecutionData:
         [
             pytest.param(
                 "one question",
-                PipeJudgeLoadTestData.bundle(step_fields=f'model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"'),
+                PipeJudgeLoadCases.bundle(step_fields=f'model = "{PipeJudgeLoadCases.JUDGMENT_MODEL}"'),
                 {"": "yes_no"},
                 id="one_question",
             ),
             pytest.param(
                 "several questions",
-                PipeJudgeSeveralQuestionsTestData.bundle(),
+                PipeJudgeSeveralQuestionsCases.bundle(),
                 {"urgent": "yes_no", "team": "choice", "severity": "rating"},
                 id="several_questions",
             ),
@@ -55,7 +55,7 @@ class TestPipeJudgeExecutionData:
         await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(
             mthds_contents=[bundle],
             pipe_code="judge_it",
-            inputs={"message": TextContent(text=PipeJudgeSeveralQuestionsTestData.MESSAGE)},
+            inputs={"message": TextContent(text=PipeJudgeSeveralQuestionsCases.MESSAGE)},
         )
 
         execution_data = execution_data_spy.call_args.kwargs["execution_data"]

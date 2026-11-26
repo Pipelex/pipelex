@@ -174,7 +174,7 @@ except SomeSpecificError as exc:
 - **pytest-mock** only (never `unittest.mock`)
 - One `TestClass` per test module
 - Test files: `test_*.py` prefix
-- Test data in `test_data.py` files
+- Test data in `cases.py` files, in classes named `…Cases`
 - Fixtures in `conftest.py` at appropriate hierarchy levels
 - Use `@pytest.mark.asyncio(loop_scope="class")` for async test classes
 - Use `@pytest.mark.parametrize` for multiple test cases

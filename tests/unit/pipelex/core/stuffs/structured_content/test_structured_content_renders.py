@@ -2,12 +2,12 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.stuffs.structured_content import StructuredContent
-from tests.unit.pipelex.core.stuffs.structured_content.test_data import (
+from tests.unit.pipelex.core.stuffs.structured_content.cases import (
     AddressContent,
     CompanyContent,
     PersonContent,
     SampleStructuredContent,
-    TestData,
+    StructuredContentCases,
 )
 
 
@@ -16,97 +16,97 @@ class TestStructuredContentRenders:
 
     def test_rendered_markdown_minimal(self):
         """Verify rendered_markdown returns markdown-formatted content."""
-        content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
+        content = SampleStructuredContent(name=StructuredContentCases.SAMPLE_NAME, value=StructuredContentCases.SAMPLE_VALUE)
         result = content.rendered_markdown()
-        assert result == TestData.EXPECTED_RENDERED_MARKDOWN_MINIMAL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_MARKDOWN_MINIMAL
 
     def test_rendered_markdown_full(self):
         """Verify rendered_markdown includes all populated fields."""
         content = SampleStructuredContent(
-            name=TestData.SAMPLE_NAME,
-            value=TestData.SAMPLE_VALUE,
-            description=TestData.SAMPLE_DESCRIPTION,
+            name=StructuredContentCases.SAMPLE_NAME,
+            value=StructuredContentCases.SAMPLE_VALUE,
+            description=StructuredContentCases.SAMPLE_DESCRIPTION,
         )
         result = content.rendered_markdown()
-        assert result == TestData.EXPECTED_RENDERED_MARKDOWN_FULL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_MARKDOWN_FULL
 
     def test_rendered_for_prompt(self):
         """Verify rendered_for_prompt returns markdown format."""
-        content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
+        content = SampleStructuredContent(name=StructuredContentCases.SAMPLE_NAME, value=StructuredContentCases.SAMPLE_VALUE)
         result = content.rendered_for_prompt()
         # rendered_for_prompt calls rendered_markdown
-        assert result == TestData.EXPECTED_RENDERED_MARKDOWN_MINIMAL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_MARKDOWN_MINIMAL
 
     def test_rendered_html_minimal(self):
         """Verify rendered_html returns HTML table format."""
-        content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
+        content = SampleStructuredContent(name=StructuredContentCases.SAMPLE_NAME, value=StructuredContentCases.SAMPLE_VALUE)
         result = content.rendered_html()
-        assert result == TestData.EXPECTED_RENDERED_HTML_MINIMAL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_HTML_MINIMAL
 
     def test_rendered_html_full(self):
         """Verify rendered_html includes all populated fields."""
         content = SampleStructuredContent(
-            name=TestData.SAMPLE_NAME,
-            value=TestData.SAMPLE_VALUE,
-            description=TestData.SAMPLE_DESCRIPTION,
+            name=StructuredContentCases.SAMPLE_NAME,
+            value=StructuredContentCases.SAMPLE_VALUE,
+            description=StructuredContentCases.SAMPLE_DESCRIPTION,
         )
         result = content.rendered_html()
-        assert result == TestData.EXPECTED_RENDERED_HTML_FULL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_HTML_FULL
 
     @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
-        content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
+        content = SampleStructuredContent(name=StructuredContentCases.SAMPLE_NAME, value=StructuredContentCases.SAMPLE_VALUE)
         result = await content.rendered_markdown_async()
-        assert result == TestData.EXPECTED_RENDERED_MARKDOWN_MINIMAL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_MARKDOWN_MINIMAL
 
     @pytest.mark.asyncio
     async def test_rendered_html_async(self):
         """Verify async rendered_html returns the same as sync version."""
-        content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
+        content = SampleStructuredContent(name=StructuredContentCases.SAMPLE_NAME, value=StructuredContentCases.SAMPLE_VALUE)
         result = await content.rendered_html_async()
-        assert result == TestData.EXPECTED_RENDERED_HTML_MINIMAL
+        assert result == StructuredContentCases.EXPECTED_RENDERED_HTML_MINIMAL
 
     def test_rendered_html_nested_address(self):
         """Verify rendered_html works for a simple nested StructuredContent."""
         address = AddressContent(
-            street=TestData.NESTED_ADDRESS_STREET,
-            city=TestData.NESTED_ADDRESS_CITY,
+            street=StructuredContentCases.NESTED_ADDRESS_STREET,
+            city=StructuredContentCases.NESTED_ADDRESS_CITY,
         )
         result = address.rendered_html()
-        assert result == TestData.EXPECTED_ADDRESS_HTML
+        assert result == StructuredContentCases.EXPECTED_ADDRESS_HTML
 
     def test_rendered_html_nested_person_with_address(self):
         """Verify rendered_html recursively renders nested StructuredContent fields."""
         address = AddressContent(
-            street=TestData.NESTED_ADDRESS_STREET,
-            city=TestData.NESTED_ADDRESS_CITY,
+            street=StructuredContentCases.NESTED_ADDRESS_STREET,
+            city=StructuredContentCases.NESTED_ADDRESS_CITY,
         )
         person = PersonContent(
-            name=TestData.NESTED_PERSON_NAME,
-            age=TestData.NESTED_PERSON_AGE,
+            name=StructuredContentCases.NESTED_PERSON_NAME,
+            age=StructuredContentCases.NESTED_PERSON_AGE,
             address=address,
         )
         result = person.rendered_html()
-        assert result == TestData.EXPECTED_PERSON_HTML
+        assert result == StructuredContentCases.EXPECTED_PERSON_HTML
 
     def test_rendered_html_nested_company_with_employees(self):
         """Verify rendered_html recursively renders list of nested StructuredContent."""
         address = AddressContent(
-            street=TestData.NESTED_ADDRESS_STREET,
-            city=TestData.NESTED_ADDRESS_CITY,
+            street=StructuredContentCases.NESTED_ADDRESS_STREET,
+            city=StructuredContentCases.NESTED_ADDRESS_CITY,
         )
         person = PersonContent(
-            name=TestData.NESTED_PERSON_NAME,
-            age=TestData.NESTED_PERSON_AGE,
+            name=StructuredContentCases.NESTED_PERSON_NAME,
+            age=StructuredContentCases.NESTED_PERSON_AGE,
             address=address,
         )
         company = CompanyContent(
-            company_name=TestData.NESTED_COMPANY_NAME,
+            company_name=StructuredContentCases.NESTED_COMPANY_NAME,
             employees=[person],
         )
         result = company.rendered_html()
-        assert result == TestData.EXPECTED_COMPANY_ONE_EMPLOYEE_HTML
+        assert result == StructuredContentCases.EXPECTED_COMPANY_ONE_EMPLOYEE_HTML
 
     def test_rendered_html_calls_count_for_nested_person(self, mocker: MockerFixture):
         """Verify rendered_html is called recursively for nested StructuredContent.
@@ -117,12 +117,12 @@ class TestStructuredContentRenders:
         Total: 2 calls
         """
         address = AddressContent(
-            street=TestData.NESTED_ADDRESS_STREET,
-            city=TestData.NESTED_ADDRESS_CITY,
+            street=StructuredContentCases.NESTED_ADDRESS_STREET,
+            city=StructuredContentCases.NESTED_ADDRESS_CITY,
         )
         person = PersonContent(
-            name=TestData.NESTED_PERSON_NAME,
-            age=TestData.NESTED_PERSON_AGE,
+            name=StructuredContentCases.NESTED_PERSON_NAME,
+            age=StructuredContentCases.NESTED_PERSON_AGE,
             address=address,
         )
 
@@ -151,16 +151,16 @@ class TestStructuredContentRenders:
         Total: 3 calls
         """
         address = AddressContent(
-            street=TestData.NESTED_ADDRESS_STREET,
-            city=TestData.NESTED_ADDRESS_CITY,
+            street=StructuredContentCases.NESTED_ADDRESS_STREET,
+            city=StructuredContentCases.NESTED_ADDRESS_CITY,
         )
         person = PersonContent(
-            name=TestData.NESTED_PERSON_NAME,
-            age=TestData.NESTED_PERSON_AGE,
+            name=StructuredContentCases.NESTED_PERSON_NAME,
+            age=StructuredContentCases.NESTED_PERSON_AGE,
             address=address,
         )
         company = CompanyContent(
-            company_name=TestData.NESTED_COMPANY_NAME,
+            company_name=StructuredContentCases.NESTED_COMPANY_NAME,
             employees=[person],
         )
 

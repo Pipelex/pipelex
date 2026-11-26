@@ -14,7 +14,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.uri.exceptions import UriReadRefusedError
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
+from tests.unit.pipelex.core.stuffs.stored_value.cases import (
     FOREIGN_URL,
     HTML_KEY,
     JSON_KEY,
@@ -23,7 +23,7 @@ from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
     STORED_JSON_OBJ,
     STORED_TEXT,
     TEXT_KEY,
-    StoredValueTestData,
+    StoredValueCases,
 )
 
 
@@ -49,9 +49,9 @@ def _storage() -> InMemoryStorageProvider:
 class TestStoredValueWalker:
     async def test_every_stored_value_is_found_wherever_it_sits_and_loaded(self) -> None:
         """A stuff's content, list items, a structure's fields and a TextAndImages' text are all walked."""
-        page_text = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
-        listed_html = HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE)
-        direct_json = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+        page_text = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
+        listed_html = HtmlContent.model_validate(StoredValueCases.HTML_REFERENCE)
+        direct_json = JSONContent.model_validate(StoredValueCases.JSON_REFERENCE)
         inline_text = TextContent(text="short")
         pages = ListContent[PageContent](
             items=[
@@ -79,7 +79,7 @@ class TestStoredValueWalker:
         assert find_unloaded_stored_values(roots=roots) == []
 
     async def test_inline_and_loaded_values_are_not_listed(self) -> None:
-        loaded_text = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        loaded_text = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
         await load_stored_value(loaded_text, read_scope=READ_SCOPE, position="a value", storage_provider=_storage())
 
         assert find_unloaded_stored_values(roots={"inline": TextContent(text="short"), "loaded": loaded_text}) == []
@@ -96,9 +96,9 @@ class TestStoredValueWalker:
 
     async def test_only_the_values_a_reader_reads_are_listed(self) -> None:
         """A read path lists the value at it, above it and below it, compared by segment, and nothing beside it."""
-        body = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        body = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
         notes = TextContent(url=FOREIGN_URL)
-        keyed = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        keyed = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
         report = _Report(section=_Section(body=body, notes=notes), by_name={"intro": keyed})
 
         def listed(*, read_paths: list[str]) -> list[str]:
@@ -116,7 +116,7 @@ class TestStoredValueWalker:
 
     async def test_a_value_read_through_an_alias_is_listed_under_the_alias(self) -> None:
         """The first root reaching a value is skipped when no read path reads through it, so the alias still lists it."""
-        stored_text = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        stored_text = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
 
         found = find_unloaded_stored_values(roots={"main_stuff": stored_text, "note": stored_text}, read_paths=["note"])
 

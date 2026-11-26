@@ -1,4 +1,4 @@
-from tests.unit.pipelex.core.stuffs.dynamic_content.test_data import SampleDynamicContent, TestData
+from tests.unit.pipelex.core.stuffs.dynamic_content.cases import DynamicContentCases, SampleDynamicContent
 
 
 class TestDynamicContentSmartDump:
@@ -6,9 +6,9 @@ class TestDynamicContentSmartDump:
 
     def test_smart_dump_returns_dict(self):
         """Verify smart_dump returns a dict with all fields."""
-        content = SampleDynamicContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
+        content = SampleDynamicContent(name=DynamicContentCases.SAMPLE_NAME, value=DynamicContentCases.SAMPLE_VALUE)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP
+        assert result == DynamicContentCases.EXPECTED_SMART_DUMP
         assert isinstance(result, dict)
 
     def test_smart_dump_different_values(self):

@@ -25,7 +25,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.errors.problem import PipelexProblem, ProblemView
-from tests.unit.pipelex.cogt.test_data import ExceptionTestData
+from tests.unit.pipelex.cogt.cases import ExceptionCases
 
 
 class TestErrorCategoryInfrastructure:
@@ -35,7 +35,7 @@ class TestErrorCategoryInfrastructure:
 
     @pytest.mark.parametrize(
         ("_topic", "category", "expected_retryable"),
-        ExceptionTestData.CATEGORY_RETRYABLE_CASES,
+        ExceptionCases.CATEGORY_RETRYABLE_CASES,
     )
     def test_is_retryable(
         self,

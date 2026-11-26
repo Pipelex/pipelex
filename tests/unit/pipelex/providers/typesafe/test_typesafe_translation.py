@@ -21,8 +21,8 @@ from pipelex.providers.typesafe.typesafe_translation import (
     from_typesafe_response,
     to_typesafe_question,
 )
-from tests.unit.pipelex.cogt.judgment.test_data import described_levels
-from tests.unit.pipelex.providers.typesafe.test_data import TestData, load_recorded, load_recorded_response
+from tests.unit.pipelex.cogt.judgment.cases import described_levels
+from tests.unit.pipelex.providers.typesafe.cases import TypesafeCases, load_recorded, load_recorded_response
 
 SEVERITY_DESCRIPTIONS = [
     "Cosmetic; no impact on functionality",
@@ -104,14 +104,14 @@ class TestTypesafeTranslation:
     def test_the_three_kinds_read_back_from_one_recorded_response(self) -> None:
         """The recorded three-question response maps back to the family's three answer kinds, value for value."""
         questions: dict[str, JudgmentQuestion] = {
-            "is_urgent": YesNoQuestion(instructions=TestData.THREE_SHAPES_INSTRUCTIONS["is_urgent"]),
+            "is_urgent": YesNoQuestion(instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["is_urgent"]),
             "team": ChoiceQuestion(
-                instructions=TestData.THREE_SHAPES_INSTRUCTIONS["team"],
+                instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["team"],
                 options={"payments": None, "shipping": None, "accounts": None, "other": None},
             ),
-            "severity": RatingQuestion(instructions=TestData.THREE_SHAPES_INSTRUCTIONS["severity"], levels=SEVERITY_LEVELS),
+            "severity": RatingQuestion(instructions=TypesafeCases.THREE_SHAPES_INSTRUCTIONS["severity"], levels=SEVERITY_LEVELS),
         }
-        answers = from_typesafe_response(questions=questions, response=load_recorded_response(TestData.THREE_SHAPES))
+        answers = from_typesafe_response(questions=questions, response=load_recorded_response(TypesafeCases.THREE_SHAPES))
 
         assert answers["is_urgent"] == YesNoAnswer(probability=0.98)
         assert answers["team"] == ChoiceAnswer(
@@ -125,7 +125,7 @@ class TestTypesafeTranslation:
         """The backend measured a probability; the side of the threshold is the caller's decision, so ``yes_no`` stays absent."""
         answers = from_typesafe_response(
             questions={"is_urgent": YesNoQuestion(instructions="Is the message urgent?")},
-            response=load_recorded_response(TestData.USAGE_ONE_QUESTION),
+            response=load_recorded_response(TypesafeCases.USAGE_ONE_QUESTION),
         )
         answer = answers["is_urgent"]
         assert isinstance(answer, YesNoAnswer)
@@ -140,7 +140,7 @@ class TestTypesafeTranslation:
                     instructions="How severe?", levels=described_levels(*(f"Severity level {index_level}" for index_level in range(10)))
                 )
             },
-            response=load_recorded_response(TestData.SCORE_TEN_LEVELS),
+            response=load_recorded_response(TypesafeCases.SCORE_TEN_LEVELS),
         )
         answer = answers["q"]
         assert isinstance(answer, RatingAnswer)
@@ -176,7 +176,7 @@ class TestTypesafeTranslation:
 
     def test_rating_keys_are_strings_on_the_wire_and_integers_once_read(self) -> None:
         """The replay fixture holds the wire form; the family's answer holds integer levels."""
-        wire_probabilities = load_recorded(TestData.SCORE_TEN_LEVELS)["answers"]["q"]["probabilities"]
+        wire_probabilities = load_recorded(TypesafeCases.SCORE_TEN_LEVELS)["answers"]["q"]["probabilities"]
         assert all(isinstance(level, str) for level in wire_probabilities)
 
         answers = from_typesafe_response(
@@ -185,7 +185,7 @@ class TestTypesafeTranslation:
                     instructions="How severe?", levels=described_levels(*(f"Severity level {index_level}" for index_level in range(10)))
                 )
             },
-            response=load_recorded_response(TestData.SCORE_TEN_LEVELS),
+            response=load_recorded_response(TypesafeCases.SCORE_TEN_LEVELS),
         )
         answer = answers["q"]
         assert isinstance(answer, RatingAnswer)
@@ -197,7 +197,7 @@ class TestTypesafeTranslation:
         with pytest.raises(TypesafeJudgmentResponseError) as exc_info:
             from_typesafe_response(
                 questions={"q": RatingQuestion(instructions="How severe?", levels=SEVERITY_LEVELS)},
-                response=load_recorded_response(TestData.CHOICE_NULL_DESCRIPTIONS),
+                response=load_recorded_response(TypesafeCases.CHOICE_NULL_DESCRIPTIONS),
             )
         assert "'q'" in str(exc_info.value)
         assert "'choice'" in str(exc_info.value)
@@ -207,7 +207,7 @@ class TestTypesafeTranslation:
         with pytest.raises(TypesafeJudgmentResponseError) as exc_info:
             from_typesafe_response(
                 questions={"never_answered": YesNoQuestion(instructions="Is it urgent?")},
-                response=load_recorded_response(TestData.USAGE_ONE_QUESTION),
+                response=load_recorded_response(TypesafeCases.USAGE_ONE_QUESTION),
             )
         assert "'never_answered'" in str(exc_info.value)
         assert "without an answer" in str(exc_info.value)

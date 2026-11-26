@@ -11,8 +11,8 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngine, StubEngines
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 
 class _ThreadRecordingEngine(StubEngine):
@@ -42,8 +42,8 @@ class TestPipeDocGenRun:
     async def test_a_run_hands_the_engine_the_layout_and_stores_the_file_under_its_name(self, stub_engines: StubEngines) -> None:
         """The engine gets the layout tree, and the stored file's key ends in the rendered filename."""
         result = await PipelexMTHDSProtocol().execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP)],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
@@ -61,8 +61,8 @@ class TestPipeDocGenRun:
     async def test_a_step_that_names_its_engine_prints_on_it(self, stub_engines: StubEngines) -> None:
         """`model` chooses the engine: a pdf without a template prints on the plugin's `pipelex-pdf` when the step names it."""
         await PipelexMTHDSProtocol().execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\nmodel = "pipelex-pdf"')],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "pdf"\nmodel = "pipelex-pdf"')],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         assert stub_engines.models == ["pipelex-pdf"]
@@ -72,12 +72,12 @@ class TestPipeDocGenRun:
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_sigil_in_the_filename_prints_the_input(self) -> None:
         """`$reference` in the filename prints a Text input's text, as it does in a template."""
-        bundle = PipeDocGenTestData.bundle(step_fields='format = "pdf"\nfilename = "invoice-$reference"').replace(
+        bundle = PipeDocGenCases.bundle(step_fields='format = "pdf"\nfilename = "invoice-$reference"').replace(
             'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", reference = "Text" }'
         )
         result = await PipelexMTHDSProtocol().execute(
             mthds_contents=[bundle],
-            inputs={**PipeDocGenTestData.INVOICE_INPUTS, "reference": "INV-7"},
+            inputs={**PipeDocGenCases.INVOICE_INPUTS, "reference": "INV-7"},
         )
 
         document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
@@ -88,8 +88,8 @@ class TestPipeDocGenRun:
         engine = _ThreadRecordingEngine()
         stub_engines.engine = engine
         await PipelexMTHDSProtocol().execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP)],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         (thread_name,) = engine.thread_names
@@ -100,8 +100,8 @@ class TestPipeDocGenRun:
         stub_engines.engine = _BrokenEngine()
         with pytest.raises(PipelineExecutionError) as exc_info:
             await PipelexMTHDSProtocol().execute(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)],
-                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP)],
+                inputs=PipeDocGenCases.INVOICE_INPUTS,
             )
 
         message = str(exc_info.value)
@@ -112,8 +112,8 @@ class TestPipeDocGenRun:
         """Sigils and the `markdown` filter work in the template, and the engine gets the composed HTML."""
         template = "<h1>$invoice.number</h1><div>{{ invoice.notes | markdown }}</div>"
         await PipelexMTHDSProtocol().execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=f'format = "pdf"\ntemplate = "{template}"')],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=f'format = "pdf"\ntemplate = "{template}"')],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         assert stub_engines.models == ["pipelex-pdf"]
@@ -127,8 +127,8 @@ class TestPipeDocGenRun:
     async def test_a_dry_run_outputs_a_mock_document_and_builds_no_engine(self, stub_engines: StubEngines) -> None:
         """The dry run composes for real, then the leaf returns a mock Document without printing."""
         result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY).execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP)],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
@@ -142,8 +142,8 @@ class TestPipeDocGenRun:
         """An optional field absent from this run's data fails the strict render, naming the step and the template."""
         with pytest.raises(PipelineExecutionError) as exc_info:
             await PipelexMTHDSProtocol().execute(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate = "<p>{{ invoice.notes.upper() }}</p>"')],
-                inputs=PipeDocGenTestData.INVOICE_INPUTS_WITHOUT_NOTES,
+                mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate = "<p>{{ invoice.notes.upper() }}</p>"')],
+                inputs=PipeDocGenCases.INVOICE_INPUTS_WITHOUT_NOTES,
             )
 
         message = str(exc_info.value)

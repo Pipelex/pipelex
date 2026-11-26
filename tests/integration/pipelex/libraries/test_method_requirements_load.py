@@ -17,8 +17,8 @@ from pipelex.plugins.pipe_func_package_offer_registry import (
     PipeFuncPackageOfferRequest,
     PipeFuncPackageRefusal,
 )
+from tests.integration.pipelex.libraries.cases import ProbePackageCases
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"
 _FUNCTION_NAME = "requirements_test_crunch"
@@ -144,11 +144,11 @@ class TestMethodRequirementsLoad:
     def test_a_dependency_package_whose_requirements_are_not_met_refuses_the_load(self, mocker: MockerFixture, tmp_path: Path) -> None:
         isolate_installed_methods(mocker=mocker, root=tmp_path)
         methods_dir = vendor_probe(methods_dir=tmp_path / "request-methods")
-        package_dir = methods_dir / ProbePackageTestData.METHOD_NAME
+        package_dir = methods_dir / ProbePackageCases.METHOD_NAME
         sentinel = tmp_path / "funcs-module-ran"
         (package_dir / f"{_MODULE_NAME}.py").write_text(_funcs_py(sentinel=sentinel), encoding="utf-8")
         (package_dir / "requirements.txt").write_text(f"pydantic>=2\n{_ABSENT_PACKAGE}>=1\n", encoding="utf-8")
-        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         try:
@@ -158,11 +158,11 @@ class TestMethodRequirementsLoad:
             library_manager.teardown(library_id=library_id)
 
         message = exc_info.value.message
-        assert message.startswith(f"The method package '{ProbePackageTestData.DEP_ALIAS}' needs Python packages")
+        assert message.startswith(f"The method package '{ProbePackageCases.DEP_ALIAS}' needs Python packages")
         assert f"line 2 '{_ABSENT_PACKAGE}>=1' ({_ABSENT_PACKAGE} is missing)" in message
         assert str(tmp_path) not in message
         items = exc_info.value.blueprint_validation_errors
-        assert [(item.source, item.line) for item in items] == [(f"{ProbePackageTestData.DEP_ALIAS}/requirements.txt", 2)]
+        assert [(item.source, item.line) for item in items] == [(f"{ProbePackageCases.DEP_ALIAS}/requirements.txt", 2)]
         assert not sentinel.exists()
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")

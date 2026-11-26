@@ -69,7 +69,7 @@ class SalesSummary(StructuredContent):
     summary_text: str = Field(description="Generated summary text")
 
 
-class ComposerTestData:
+class ComposerCases:
     """Test data for StructuredContentComposer tests."""
 
     # Fixed values only
@@ -113,7 +113,7 @@ class TestStructuredContentComposerFixedValues:
 
     async def test_compose_all_fixed_values(self):
         """Test composing a StructuredContent with all fixed values."""
-        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.FIXED_ONLY_CONSTRUCT)
+        blueprint = ConstructBlueprint.make_from_raw(ComposerCases.FIXED_ONLY_CONSTRUCT)
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
@@ -150,7 +150,7 @@ class TestStructuredContentComposerVariableRefs:
 
     async def test_compose_with_variable_refs(self, working_memory_with_deal: WorkingMemory):
         """Test composing with variable references from working memory."""
-        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.VAR_REF_CONSTRUCT)
+        blueprint = ConstructBlueprint.make_from_raw(ComposerCases.VAR_REF_CONSTRUCT)
 
         composer = StructuredContentComposer(
             templating_style=_TEMPLATING_STYLE,
@@ -184,7 +184,7 @@ class TestStructuredContentComposerTemplates:
 
     async def test_compose_with_template(self, working_memory_with_deal: WorkingMemory):
         """Test composing with a template field."""
-        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
+        blueprint = ConstructBlueprint.make_from_raw(ComposerCases.MIXED_CONSTRUCT)
 
         composer = StructuredContentComposer(
             templating_style=_TEMPLATING_STYLE,
@@ -230,7 +230,7 @@ class TestStructuredContentComposerNested:
 
     async def test_compose_nested_structure(self, working_memory_with_address: WorkingMemory):
         """Test composing a StructuredContent with nested structure."""
-        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.NESTED_CONSTRUCT)
+        blueprint = ConstructBlueprint.make_from_raw(ComposerCases.NESTED_CONSTRUCT)
 
         composer = StructuredContentComposer(
             templating_style=_TEMPLATING_STYLE,
@@ -429,7 +429,7 @@ class TestStructuredContentComposerWithTemplates:
 
     async def test_compose_with_templates(self, working_memory_with_deal: WorkingMemory):
         """Test async composition when templates are involved."""
-        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
+        blueprint = ConstructBlueprint.make_from_raw(ComposerCases.MIXED_CONSTRUCT)
 
         composer = StructuredContentComposer(
             templating_style=_TEMPLATING_STYLE,

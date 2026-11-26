@@ -30,7 +30,7 @@ from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.cogt.content_generation.test_data import ConstrainedName, PlainName
+from tests.integration.pipelex.cogt.content_generation.cases import ConstrainedName, PlainName
 
 
 def _boundary_assignment(job_metadata: JobMetadata) -> ObjectAssignment:

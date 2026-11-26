@@ -18,7 +18,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, PipeTestCases
+from tests.integration.pipelex.cases import BasicStructuredDataTestCases, PipeTestCases
 
 
 @pytest.mark.dry_runnable

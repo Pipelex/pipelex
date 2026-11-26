@@ -34,7 +34,7 @@ from pipelex.hosted.exceptions import (
     HostedRunPollingError,
 )
 from pipelex.hosted.hosted_run import HostedRunRequest, run_hosted
-from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoRefusals, HostedPipeIoVerdicts, HostedStoredTexts, HostedVersions
+from tests.unit.pipelex.hosted.cases import HostedDescriptors, HostedPipeIoRefusals, HostedPipeIoVerdicts, HostedStoredTexts, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -7,7 +7,7 @@ from pipelex.cogt.judgment.judgment_worker_factory import JudgmentWorkerFactory
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
-from tests.integration.pipelex.cogt.test_data import JudgmentTestCases
+from tests.integration.pipelex.cogt.cases import JudgmentTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

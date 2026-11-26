@@ -12,7 +12,7 @@ from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
-from tests.unit.pipelex.cli.agent_cli.test_data import RefusedBundles, RetiredEnvelope
+from tests.unit.pipelex.cli.agent_cli.cases import RefusedBundles, RetiredEnvelope
 
 if TYPE_CHECKING:
     from pathlib import Path

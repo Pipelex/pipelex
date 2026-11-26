@@ -17,7 +17,7 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
+from tests.integration.pipelex.cogt.cases import LLMTestConstants, Person
 
 EXTERNAL_MODEL_NAME = "mock_external_llm"
 

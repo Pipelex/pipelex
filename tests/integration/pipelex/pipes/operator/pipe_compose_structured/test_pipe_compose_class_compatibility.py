@@ -25,6 +25,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import ClassCompatibilityCases
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for_pipe_compose import (
     DiscountedProduct,
     Employee,
@@ -32,7 +33,6 @@ from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for
     Product,
     RichTextContent,
 )
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import ClassCompatibilityTestData
 
 
 @pytest.mark.dry_runnable
@@ -70,7 +70,7 @@ class TestPipeComposeClassCompatibility:
             {
                 "description": "Compose report with base TextContent field from subclass",
                 "inputs": {"rich_text": "Text"},
-                "construct": ClassCompatibilityTestData.SUBCLASS_TO_BASE_CONSTRUCT,
+                "construct": ClassCompatibilityCases.SUBCLASS_TO_BASE_CONSTRUCT,
                 "output": "compose_structured_test.ReportWithBaseTextContent",
             }
         )
@@ -135,7 +135,7 @@ class TestPipeComposeClassCompatibility:
             {
                 "description": "Compose team with list[Person] from structurally equivalent Employee items",
                 "inputs": {"employees": "Text"},
-                "construct": ClassCompatibilityTestData.EQUIVALENT_LIST_ITEMS_CONSTRUCT,
+                "construct": ClassCompatibilityCases.EQUIVALENT_LIST_ITEMS_CONSTRUCT,
                 "output": "compose_structured_test.TeamWithPersons",
             }
         )
@@ -201,7 +201,7 @@ class TestPipeComposeClassCompatibility:
             {
                 "description": "Compose team with list[Person] from Manager subclass items",
                 "inputs": {"managers": "Text"},
-                "construct": ClassCompatibilityTestData.SUBCLASS_LIST_ITEMS_CONSTRUCT,
+                "construct": ClassCompatibilityCases.SUBCLASS_LIST_ITEMS_CONSTRUCT,
                 "output": "compose_structured_test.TeamWithPersons",
             }
         )
@@ -265,7 +265,7 @@ class TestPipeComposeClassCompatibility:
             {
                 "description": "Compose team with ListContent[Person] from Manager subclass items",
                 "inputs": {"managers_list": "Text"},
-                "construct": ClassCompatibilityTestData.SUBCLASS_LIST_CONTENT_ITEMS_CONSTRUCT,
+                "construct": ClassCompatibilityCases.SUBCLASS_LIST_CONTENT_ITEMS_CONSTRUCT,
                 "output": "compose_structured_test.TeamWithListContentPersons",
             }
         )
@@ -330,7 +330,7 @@ class TestPipeComposeClassCompatibility:
             {
                 "description": "Compose catalog with list[Product] from mixed Product and DiscountedProduct items",
                 "inputs": {"mixed_products": "Text"},
-                "construct": ClassCompatibilityTestData.MIXED_SUBCLASS_ITEMS_CONSTRUCT,
+                "construct": ClassCompatibilityCases.MIXED_SUBCLASS_ITEMS_CONSTRUCT,
                 "output": "compose_structured_test.Catalog",
             }
         )

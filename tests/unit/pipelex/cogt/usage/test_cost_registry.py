@@ -17,7 +17,7 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata
-from tests.unit.pipelex.cogt.usage.test_data import UsageFixtures
+from tests.unit.pipelex.cogt.usage.cases import UsageFixtures
 
 
 class TestCostRegistry:

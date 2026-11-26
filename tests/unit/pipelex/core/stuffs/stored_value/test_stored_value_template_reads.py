@@ -14,7 +14,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import STORED_HTML, STORED_TEXT, TEXT_URL, StoredValueTestData
+from tests.unit.pipelex.core.stuffs.stored_value.cases import STORED_HTML, STORED_TEXT, TEXT_URL, StoredValueCases
 
 
 class StoredValueReport(StructuredContent):
@@ -26,8 +26,8 @@ class StoredValueReport(StructuredContent):
 
 
 def _report_artefact(*, loaded: bool) -> StuffArtefact:
-    body = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
-    page = HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE)
+    body = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
+    page = HtmlContent.model_validate(StoredValueCases.HTML_REFERENCE)
     if loaded:
         body.accept_loaded_text(text=STORED_TEXT)
         page.accept_loaded_text(text=STORED_HTML)

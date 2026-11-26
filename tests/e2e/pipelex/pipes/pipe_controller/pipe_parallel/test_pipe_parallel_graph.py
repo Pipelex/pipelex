@@ -14,7 +14,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.conftest import TEST_OUTPUTS_DIR
-from tests.e2e.pipelex.pipes.pipe_controller.pipe_parallel.test_data import (
+from tests.e2e.pipelex.pipes.pipe_controller.pipe_parallel.cases import (
     Parallel3BranchGraphExpectations,
     ParallelAddEachGraphExpectations,
     ParallelCombinedGraphExpectations,

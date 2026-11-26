@@ -8,7 +8,7 @@ from pipelex.cogt.doc_gen.formatted_markdown import FormattedMarkdown
 from pipelex.cogt.doc_gen.template_environment import make_plain_data_template_environment
 from pipelex.tools.jinja2.jinja2_filters import markdown_to_formatted
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, MARKDOWN_UNITS_PER_CHARACTER, RenderBudgetExceededError
-from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
+from tests.unit.pipelex.tools.markdown.cases import MarkdownFormattingCases
 
 
 def _kinds_of_formatted(value: object) -> object:
@@ -65,21 +65,21 @@ class TestPlainDataTemplateEnvironment:
     def test_markdown_prints_through_the_engine_s_finalize(self) -> None:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
         rendered = environment.from_string("{{ notes | markdown }}|{{ count }}|{{ title }}").render(
-            notes=MarkdownFormattingTestData.NOTES, count=3, title="Invoice"
+            notes=MarkdownFormattingCases.NOTES, count=3, title="Invoice"
         )
         assert rendered == "<paragraph,list_item,list_item>|3|Invoice"
 
     def test_a_markdown_filter_block_prints_through_the_engine_s_finalize(self) -> None:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
         over_a_value = environment.from_string("{% filter markdown %}{{ notes }}{% endfilter %}|{{ count }}").render(
-            notes=MarkdownFormattingTestData.NOTES, count=3
+            notes=MarkdownFormattingCases.NOTES, count=3
         )
         assert over_a_value == "<paragraph,list_item,list_item>|3"
         assert environment.from_string("{% filter markdown %}Due in **30** days.{% endfilter %}").render() == "<paragraph>"
 
     def test_a_markdown_filter_block_prints_its_plain_text_without_a_finalize(self) -> None:
         template = make_plain_data_template_environment().from_string("{% filter markdown %}{{ notes }}{% endfilter %}")
-        assert template.render(notes=MarkdownFormattingTestData.NOTES) == MarkdownFormattingTestData.NOTES_PLAIN_TEXT
+        assert template.render(notes=MarkdownFormattingCases.NOTES) == MarkdownFormattingCases.NOTES_PLAIN_TEXT
 
     @pytest.mark.parametrize(
         ("block_source", "printed_source"),
@@ -109,7 +109,7 @@ class TestPlainDataTemplateEnvironment:
     @pytest.mark.parametrize("with_finalize", [True, False])
     def test_a_markdown_filter_block_prints_as_the_printed_form_does(self, block_source: str, printed_source: str, with_finalize: bool) -> None:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted if with_finalize else None)
-        notes = MarkdownFormattingTestData.NOTES
+        notes = MarkdownFormattingCases.NOTES
         assert environment.from_string(block_source).render(notes=notes) == environment.from_string(printed_source).render(notes=notes)
 
     def test_a_markdown_filter_block_reads_none_printed_in_its_body_as_text(self) -> None:
@@ -122,7 +122,7 @@ class TestPlainDataTemplateEnvironment:
     def test_a_filter_after_markdown_in_a_block_prints_what_it_returns(self) -> None:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
         template = environment.from_string("{% filter markdown | upper %}{{ notes }}{% endfilter %}")
-        assert template.render(notes=MarkdownFormattingTestData.NOTES) == MarkdownFormattingTestData.NOTES_PLAIN_TEXT.upper()
+        assert template.render(notes=MarkdownFormattingCases.NOTES) == MarkdownFormattingCases.NOTES_PLAIN_TEXT.upper()
 
     def test_a_markdown_filter_block_under_autoescape_prints_as_the_printed_form_does(self) -> None:
         environment = make_plain_data_template_environment(finalize=_marker_for_formatted)
@@ -136,9 +136,9 @@ class TestPlainDataTemplateEnvironment:
         rendered = (
             make_plain_data_template_environment()
             .from_string("{{ invoice.notes | markdown }}")
-            .render(invoice={"notes": MarkdownFormattingTestData.NOTES})
+            .render(invoice={"notes": MarkdownFormattingCases.NOTES})
         )
-        assert rendered == MarkdownFormattingTestData.NOTES_PLAIN_TEXT
+        assert rendered == MarkdownFormattingCases.NOTES_PLAIN_TEXT
 
     def test_markdown_reads_any_other_value_as_its_text(self) -> None:
         assert make_plain_data_template_environment().from_string("{{ total | markdown }}").render(total=12.5) == "12.5"
@@ -156,8 +156,8 @@ class TestPlainDataTemplateEnvironment:
     @pytest.mark.parametrize(
         ("notes", "expected_text"),
         [
-            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
-            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_EMPHASIS, MarkdownFormattingCases.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingCases.DEEP_MIXED_EMPHASIS, MarkdownFormattingCases.DEEP_MIXED_EMPHASIS_TEXT),
         ],
     )
     def test_markdown_of_emphasis_nested_hundreds_deep_prints_its_text(self, notes: str, expected_text: str) -> None:
@@ -177,7 +177,7 @@ class TestPlainDataTemplateEnvironment:
     def test_markdown_of_a_long_address_around_many_spans_is_refused(self) -> None:
         template = make_plain_data_template_environment().from_string("{% set formatted = notes | markdown %}{{ formatted.blocks }}")
         with pytest.raises(RenderBudgetExceededError, match="formatting Markdown"):
-            template.render(notes=MarkdownFormattingTestData.LINK_AROUND_MANY_SPANS)
+            template.render(notes=MarkdownFormattingCases.LINK_AROUND_MANY_SPANS)
 
     def test_markdown_of_a_missing_value_fails_the_render(self) -> None:
         template = make_plain_data_template_environment().from_string("{{ invoice.notes | markdown }}")

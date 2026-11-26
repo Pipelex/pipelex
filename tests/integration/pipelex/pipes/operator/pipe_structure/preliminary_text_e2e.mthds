@@ -1,7 +1,7 @@
 domain      = "test_preliminary_text_e2e"
 description = "Real-LLM end-to-end test of preliminary_text elaboration (single + multiplicity variants)"
 
-# The RestaurantReview Python structure class is declared in test_structures_basic.py
+# The RestaurantReview Python structure class is declared in structures_basic.py
 # in this same directory. Auto-registered via StructuredContent discovery on library load.
 [concept]
 RestaurantReview = "A structured review of a restaurant"

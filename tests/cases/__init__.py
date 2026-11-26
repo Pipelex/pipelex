@@ -8,7 +8,7 @@ from tests.cases.documents import DocumentTestCases
 from tests.cases.images import ImageTestCases
 from tests.cases.jinja2_templates import JINJA2TestCases
 from tests.cases.registry import ClassRegistryTestCases, FileHelperTestCases, Fruit
-from tests.cases.urls import TestURLs
+from tests.cases.urls import URLCases
 
 __all__ = [
     "ClassRegistryTestCases",
@@ -17,5 +17,5 @@ __all__ = [
     "ImageTestCases",
     "JINJA2TestCases",
     "DocumentTestCases",
-    "TestURLs",
+    "URLCases",
 ]

@@ -7,7 +7,7 @@ import pytest
 from mthds.protocol.input_form import PipeInputFormDescriptor
 
 from pipelex.hosted.hosted_inputs import anchor_local_file_sources, inputs_name_a_local_file
-from tests.unit.pipelex.hosted.test_data import HostedDescriptors
+from tests.unit.pipelex.hosted.cases import HostedDescriptors
 
 BASE_DIR = Path("/work/inputs")
 

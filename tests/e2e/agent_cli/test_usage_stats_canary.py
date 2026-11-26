@@ -7,7 +7,7 @@ from pipelex.system.usage_stats.usage_stats_contract import UsageStatsEnvVar
 from tests.e2e.agent_cli.conftest import PIPELEX_AGENT_BIN, REPO_ROOT, write_active_routing_profile
 from tests.helpers.usage_stats_capture import capture_server
 from tests.helpers.usage_stats_schema import assert_envelope_is_valid
-from tests.unit.pipelex.system.usage_stats.test_data import UsageStatsCanary
+from tests.unit.pipelex.system.usage_stats.cases import UsageStatsCanary
 
 PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
 _CANARY = UsageStatsCanary.MARKER

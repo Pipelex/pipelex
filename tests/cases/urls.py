@@ -3,7 +3,7 @@
 from typing import ClassVar
 
 
-class TestURLs:
+class URLCases:
     """Test URL constants."""
 
     GCP_PUBLIC = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"

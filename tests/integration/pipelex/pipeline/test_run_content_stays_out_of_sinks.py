@@ -25,10 +25,10 @@ from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.log.json_log_sink import JsonLogSink
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from tests.integration.pipelex.pipeline.test_data import RunContentMarkerTestData
+from tests.integration.pipelex.pipeline.cases import RunContentMarkerCases
 
 # No `from __future__ import annotations`: the function a `PipeFunc` calls has its annotations read when it is bound.
-MARKER = RunContentMarkerTestData.MARKER
+MARKER = RunContentMarkerCases.MARKER
 
 
 @pipe_func()
@@ -133,7 +133,7 @@ class TestRunContentStaysOutOfSinks:
         buffer = io.StringIO()
 
         with _json_sink_on_root(buffer=buffer), pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol().execute(pipe_code=pipe_code, mthds_contents=[RunContentMarkerTestData.MTHDS], inputs=inputs)
+            await PipelexMTHDSProtocol().execute(pipe_code=pipe_code, mthds_contents=[RunContentMarkerCases.MTHDS], inputs=inputs)
 
         error = exc_info.value
         operator = error.to_problem(view=ProblemView.OPERATOR)
