@@ -28,7 +28,8 @@ from pipelex.tools.tabular.csv_codec import is_tabular_path
 from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.tabular.table_reader import list_content_from_table_file
 from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input, validation_error_locations
-from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
+from pipelex.tools.uri.data_url_exceptions import DataUrlError
+from pipelex.tools.uri.resolved_uri import ResolvedLocalPath, ResolvedUri
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
@@ -309,10 +310,15 @@ class StuffFactory:
                 .with_params(concept=concept.concept_ref, finding="it has no structure class to read rows into")
             ) from exc
 
-        resolved = resolve_uri(url)
         # Accept only genuine local paths. `file://` resolves to a scheme-free local path; an http(s)/
         # base64/pipelex-storage url is a non-local ResolvedUri; an `s3://`/`gs://`-style scheme slips
-        # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too.
+        # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too. A `data:` URL
+        # in a form the resolver does not read is no local path either, and is refused the same way.
+        resolved: ResolvedUri | None
+        try:
+            resolved = resolve_uri(url)
+        except DataUrlError:
+            resolved = None
         if not isinstance(resolved, ResolvedLocalPath) or "://" in resolved.path:
             # The url is the input's value, which no message carries: it can be a signed link whose query holds a
             # credential, and its host and path are the caller's data. The input's name identifies it, and so does its

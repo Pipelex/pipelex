@@ -42,6 +42,7 @@ from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.json_content import JSON_FILE_TYPE, JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stored_value_storer import store_value_if_large
@@ -73,6 +74,7 @@ from pipelex.tools.storage.storage_file_name import path_safe_extension
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.data_url import ACCEPTED_DATA_URL_FORM, is_data_url, parse_base64_data_url
 from pipelex.tools.uri.data_url_exceptions import DataUrlError
+from pipelex.tools.uri.exceptions import STORED_TEXT_FILE_TYPE
 from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath, ResolvedPipelexStorage, UriKind
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -412,10 +414,6 @@ async def _prepare_url_content(
     - A `data:` URL is decoded and identified from its bytes. Only a base64 one is read, its header
       ending at its first comma (`pipelex.tools.uri.data_url`). When relocating, it is stored, its
       url becomes the storage reference, signed as its `public_url`.
-
-    Every type a caller declares, the data URL's header and the content's `mime_type` field, is
-    reduced to its bare `type/subtype` before anything identifies, stores or links the file
-    (`declared_media_type`), and a declaration that is not one media type is refused.
     - A local path is identified from its bytes. When relocating with local uploads enabled, it is
       stored the same way; otherwise it is kept, and identified from a head read of the file.
     - A `pipelex-storage://` reference is identified from a head read of the stored object. When
@@ -423,6 +421,10 @@ async def _prepare_url_content(
       expired; a provider that cannot link one leaves the carried link.
     - An `http(s)` URL is never fetched and keeps its declared type. When relocating, its syntax is
       checked and it becomes its own `public_url` unless the input names one.
+
+    Every type a caller declares, the data URL's header and the content's `mime_type` field, is
+    reduced to its bare `type/subtype` before anything identifies, stores or links the file
+    (`declared_media_type`), and a declaration that is not one media type is refused.
 
     Raises:
         PipelineInputUrlMissingError: If the url is blank.
@@ -480,11 +482,15 @@ async def _prepare_stored_value_content(*, content: StoredValueContent, path: Fi
     reference, with the value kept loaded. The caller's own content is never changed: a library caller passing one
     content to several runs keeps reading its value, and each run stores it under its own scope.
 
+    A `data:` URL is checked here too, since the run reads it later: one that is not a base64 data URL, the only form the
+    runtime reads, is refused naming the input's `url`, whatever the run's read scope.
+
     Returns:
         The content the run reads: the caller's own when nothing was stored, else the stored copy.
 
     Raises:
         PipelineInputUrlMissingError: The URL the caller gave is blank.
+        PipelineInputContentError: The URL is a `data:` URL that is not a base64 one.
         UriReadRefusedError: The URL is a local path, or a storage reference outside the read scope, on a run with a
             read scope.
     """
@@ -492,6 +498,8 @@ async def _prepare_stored_value_content(*, content: StoredValueContent, path: Fi
         if not content.url.strip():
             msg = f"{type(content).__name__} input has a blank url — provide its value inline, or a https://, data: or pipelex-storage:// URL."
             raise PipelineInputUrlMissingError(msg, **_refused_file_input(path=path, field_suffix=_URL_FIELD))
+        if is_data_url(uri=content.url):
+            _check_stored_value_data_url(content=content, path=path)
         authorize_uri_read(
             uri=content.url,
             read_scope=context.read_scope,
@@ -507,6 +515,27 @@ async def _prepare_stored_value_content(*, content: StoredValueContent, path: Fi
             stored_copy, storage_provider=context.storage, storage_scope=context.storage_scope, leaf=INPUT_ASSETS_LEAF
         )
     return stored_copy if is_stored else content
+
+
+def _check_stored_value_data_url(*, content: StoredValueContent, path: FileInputPath) -> None:
+    """Refuse a stored value's `data:` URL unless it is a base64 data URL, the only form the runtime reads.
+
+    Raises:
+        PipelineInputContentError: The URL is not a base64 data URL, naming the input's `url`.
+    """
+    if content.url is None:
+        return
+    try:
+        parse_base64_data_url(uri=content.url)
+    except DataUrlError as exc:
+        msg = (
+            f"{type(content).__name__} input '{format_file_input_path(path)}': the data URL is not one this runtime reads ({exc}). "
+            f"Give it as {ACCEPTED_DATA_URL_FORM}, or give the value inline."
+        )
+        file_type = JSON_FILE_TYPE if isinstance(content, JSONContent) else STORED_TEXT_FILE_TYPE
+        raise _refused_declaration(
+            file_type=file_type, path=path, field=_URL_FIELD, reason=FileInputUnreadableReason.INVALID_DATA_URL, msg=msg
+        ) from exc
 
 
 def _prepare_http_url(
@@ -572,7 +601,7 @@ async def _prepare_storage_reference(
 
 
 def _refused_declaration(
-    *, content: NormalizableContent, path: FileInputPath, field: str, reason: FileInputUnreadableReason, msg: str
+    *, file_type: str, path: FileInputPath, field: str, reason: FileInputUnreadableReason, msg: str
 ) -> PipelineInputContentError:
     """The refusal of a file input whose declaration is not one this runtime reads, naming the field at fault.
 
@@ -582,7 +611,7 @@ def _refused_declaration(
     return (
         PipelineInputContentError(msg, **_refused_file_input(path=path, field_suffix=field))
         .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
-        .with_params(file_type=_file_type_of(content=content), reason=reason)
+        .with_params(file_type=file_type, reason=reason)
     )
 
 
@@ -600,7 +629,7 @@ def _with_declared_mime_type(*, content: NormalizableContent, path: FileInputPat
             "Give it as <type>/<subtype>, optionally followed by ;parameters."
         )
         raise _refused_declaration(
-            content=content, path=path, field=_MIME_TYPE_FIELD, reason=FileInputUnreadableReason.INVALID_MEDIA_TYPE, msg=msg
+            file_type=_file_type_of(content=content), path=path, field=_MIME_TYPE_FIELD, reason=FileInputUnreadableReason.INVALID_MEDIA_TYPE, msg=msg
         ) from exc
     if mime_type == content.mime_type:
         return content
@@ -621,7 +650,9 @@ def _declared_data_url_media_type(*, content: NormalizableContent, path: FileInp
             f"{type(content).__name__} input '{format_file_input_path(path)}': the data URL is not one this runtime reads ({exc}). "
             f"Give it as {ACCEPTED_DATA_URL_FORM}."
         )
-        raise _refused_declaration(content=content, path=path, field=_URL_FIELD, reason=FileInputUnreadableReason.INVALID_DATA_URL, msg=msg) from exc
+        raise _refused_declaration(
+            file_type=_file_type_of(content=content), path=path, field=_URL_FIELD, reason=FileInputUnreadableReason.INVALID_DATA_URL, msg=msg
+        ) from exc
 
 
 async def _prepare_data_url(

@@ -306,7 +306,9 @@ def declared_media_type(*, media_type: str | None) -> str | None:
 
     The one reading of a type a caller declares for a file, whether a data URL's header declares it or a content's
     `mime_type` field: `text/plain;charset=utf-8` is `text/plain`, `Image/PNG` is `image/png`. Nothing downstream reads
-    a file's parameters, so they are dropped rather than kept.
+    a file's parameters, so they are dropped unread rather than kept: like a browser's reading of a type, which skips a
+    parameter it cannot parse, a parameter that is not `name=value`, such as `name=annual report.pdf`, does not refuse
+    the declaration. Only the comma and control-character check covers them, since a comma would end a type.
 
     Args:
         media_type: The declared type, `None` when nothing was declared.
@@ -331,6 +333,20 @@ def declared_media_type(*, media_type: str | None) -> str | None:
         msg = "The declared media type is not one media type: it must be <type>/<subtype>, optionally followed by ;parameters"
         raise DeclaredMediaTypeError(msg)
     return bare_type.lower()
+
+
+def reported_media_type(*, media_type: str | None) -> str | None:
+    """A type something outside the runtime reported for a file, as its bare `type/subtype`, `None` when it is not one.
+
+    For the types a provider's answer or a fetched response's `Content-Type` gives, which the runtime takes as they come
+    rather than refuses: `image/png;charset=binary` is `image/png`, and a type that is not one media type, such as the
+    `image/png, image/png` of a repeated header or a bare `image/`, reads as no type reported, so the file is typed by
+    what else is known about it rather than stored under that text.
+    """
+    try:
+        return declared_media_type(media_type=media_type)
+    except DeclaredMediaTypeError:
+        return None
 
 
 def format_key_from_mime_type(*, mime_type: str | None) -> str | None:

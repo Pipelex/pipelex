@@ -177,6 +177,9 @@ class TestGeneratedContentFactoryFetchedRemoteImage:
             pytest.param(None, None, "application/octet-stream", "jpg", "image/jpeg", id="non-image-served-type-is-dropped"),
             pytest.param(None, None, "text/html", "jpg", "image/jpeg", id="error-page-dressed-as-a-200-is-dropped"),
             pytest.param(None, None, None, "jpg", "image/jpeg", id="silent-server-falls-back-to-default"),
+            pytest.param(None, None, "image/png, image/png", "jpg", "image/jpeg", id="repeated-header-reads-as-no-type"),
+            pytest.param(None, "png", "image/png, image/png", "png", "image/png", id="repeated-header-leaves-the-requested-format"),
+            pytest.param(None, None, "image/", "jpg", "image/jpeg", id="type-without-subtype-reads-as-no-type"),
             pytest.param("image/webp", None, "image/png", "webp", "image/webp", id="declared-type-beats-served-type"),
         ],
     )

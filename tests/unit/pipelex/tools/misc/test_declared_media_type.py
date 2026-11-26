@@ -11,6 +11,8 @@ class TestDeclaredMediaType:
             ("bare type", "image/png", "image/png"),
             ("header with a charset", "text/plain;charset=utf-8", "text/plain"),
             ("parameters with spaces", "text/plain ; charset=utf-8", "text/plain"),
+            ("a parameter without a value", "text/plain;flowed", "text/plain"),
+            ("a parameter holding a space", "application/pdf;name=annual report.pdf", "application/pdf"),
             ("mixed case", "Image/PNG", "image/png"),
             ("structured suffix", "application/vnd.api+json", "application/vnd.api+json"),
             ("surrounding whitespace", "  application/pdf\n", "application/pdf"),
