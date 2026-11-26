@@ -30,6 +30,12 @@ class TestDataUrl:
                 ParsedDataUrl(media_type="image/png", is_base64=True, payload="aGVsbG8="),
             ),
             ("empty header, base64", "data:;base64,aGVsbG8=", ParsedDataUrl(media_type="", is_base64=True, payload="aGVsbG8=")),
+            (
+                "parameters without a type, base64",
+                "data:;charset=utf-8;base64,aGVsbG8=",
+                ParsedDataUrl(media_type="", is_base64=True, payload="aGVsbG8="),
+            ),
+            ("parameters without a type", "data:;charset=utf-8,hello", ParsedDataUrl(media_type="", is_base64=False, payload="hello")),
             ("empty header", "data:,hello", ParsedDataUrl(media_type="", is_base64=False, payload="hello")),
             ("not base64", "data:text/plain,hello", ParsedDataUrl(media_type="text/plain", is_base64=False, payload="hello")),
             (

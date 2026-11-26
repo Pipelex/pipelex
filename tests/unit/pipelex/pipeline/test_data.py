@@ -105,6 +105,7 @@ class DeclaredMediaTypeTestData:
         ("header_with_a_charset", f"data:text/plain;charset=utf-8;base64,{HELLO_BASE64}", None, "text/plain", "txt"),
         ("header_in_upper_case", f"DATA:Text/Plain;BASE64,{HELLO_BASE64}", None, "text/plain", "txt"),
         ("field_with_parameters", f"data:;base64,{HELLO_BASE64}", "text/plain; charset=utf-8", "text/plain", "txt"),
+        ("header_with_parameters_but_no_type", f"data:;charset=utf-8;base64,{HELLO_BASE64}", "text/plain", "text/plain", "txt"),
         ("header_wins_over_the_field", f"data:text/markdown;base64,{HELLO_BASE64}", "text/plain", "text/markdown", "md"),
     ]
 

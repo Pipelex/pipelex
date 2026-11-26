@@ -47,8 +47,8 @@ class StorageProviderAbstract(ABC):
     ASCII, as S3 requires, which `store` and `store_if_absent` check for every provider before anything is stored.
 
     **Content type.** The `content_type` of `store` and `store_if_absent` is one media type, a bare `type/subtype`
-    optionally followed by `; name=value` parameters, with no comma and no control character, so a reader that serves
-    the stored type, a browser among them, can read no second type out of it. Both check it for every provider before
+    optionally followed by `;` parameters, with no comma and no control character, so a reader that serves the stored
+    type, a browser among them, can read no second type out of it (`is_single_media_type`). Both check it for every provider before
     anything is stored, and refuse another as a fault of their caller: the runtime reduces every type a caller declares
     before it stores a file (`pipelex.tools.misc.filetype_utils.declared_media_type`).
 

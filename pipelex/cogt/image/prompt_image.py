@@ -17,7 +17,7 @@ from pipelex.tools.misc.filetype_utils import (
 )
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
 from pipelex.tools.uri.resolved_uri import ResolvedUri
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.uri_resolver import describe_uri, resolve_uri
 
 
 class PromptImageDetail(StrEnum):
@@ -77,7 +77,7 @@ class PromptImageUri(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the image."""
-        return f"{self.resolved.kind.desc}: {self.uri[:100]}"
+        return f"{describe_uri(self.uri)}: {self.uri[:100]}"
 
     def get_image_type(self) -> str:
         """Get the image type (extension) from stored mime_type.

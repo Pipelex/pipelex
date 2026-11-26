@@ -32,7 +32,8 @@ class ParsedDataUrl(NamedTuple):
 
     Attributes:
         media_type: The header's media type as written, parameters included and the `;base64` marker removed, stripped of
-            ASCII whitespace; an empty string when the header declares none.
+            ASCII whitespace; an empty string when the header declares none, which includes a header that gives
+            parameters without a type, such as `data:;charset=utf-8;base64,`, which RFC 2397 allows.
         is_base64: Whether the header ends with the `;base64` marker.
         payload: Everything after the header's comma, as written.
     """
@@ -71,8 +72,20 @@ def parse_data_url(*, uri: str) -> ParsedDataUrl:
     media_type = header.strip(_ASCII_WHITESPACE)
     base64_marker = _BASE64_HEADER_SUFFIX.search(media_type)
     if base64_marker is None:
-        return ParsedDataUrl(media_type=media_type, is_base64=False, payload=payload)
-    return ParsedDataUrl(media_type=media_type[: base64_marker.start()].strip(_ASCII_WHITESPACE), is_base64=True, payload=payload)
+        return ParsedDataUrl(media_type=_declared_type(header_type=media_type), is_base64=False, payload=payload)
+    return ParsedDataUrl(media_type=_declared_type(header_type=media_type[: base64_marker.start()]), is_base64=True, payload=payload)
+
+
+def _declared_type(*, header_type: str) -> str:
+    """The header's type stripped of ASCII whitespace, or an empty string when nothing stands before its first `;`.
+
+    RFC 2397 lets a header give parameters without a type (`data:;charset=utf-8,`), which declares no type, as a header
+    with nothing at all does.
+    """
+    stripped = header_type.strip(_ASCII_WHITESPACE)
+    if not stripped.split(";", 1)[0].strip(_ASCII_WHITESPACE):
+        return ""
+    return stripped
 
 
 def parse_base64_data_url(*, uri: str) -> ParsedDataUrl:

@@ -16,6 +16,10 @@ class TestStorageContentType:
             "text/html; charset=utf-8",
             "text/markdown; charset=utf-8",
             'text/plain; charset="utf-8"',
+            'multipart/form-data; boundary="a;b"',
+            'text/plain; charset="a\\"b"',
+            "text/plain; charset",
+            "text/plain;",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ],
     )
@@ -35,9 +39,10 @@ class TestStorageContentType:
             ("comma after a parameter", "application/pdf;,text/plain"),
             ("comma between types", "image/png,text/plain"),
             ("missing subtype", "text"),
-            ("parameter with no value", "text/plain; charset"),
-            ("trailing semicolon", "text/plain;"),
             ("control character", "text/plain\n"),
+            ("control character in the parameters", "text/plain; charset=utf-8\r"),
+            ("parameters only", ";charset=utf-8"),
+            ("blank", "   "),
             ("empty", ""),
         ],
     )

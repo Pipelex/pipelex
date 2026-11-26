@@ -283,22 +283,21 @@ def _holds_control_character(*, text: str) -> bool:
     return any(ord(character) < 0x20 or ord(character) == 0x7F for character in text)
 
 
-# One parameter of a media type: a token, `=`, then a token or a quoted string holding no quote, backslash or `;`.
-_MEDIA_TYPE_PARAMETER: Final[re.Pattern[str]] = re.compile(rf'{_MEDIA_TYPE_TOKEN}=(?:{_MEDIA_TYPE_TOKEN}|"[^"\\;]*")')
-
-
 def is_single_media_type(*, media_type: str) -> bool:
-    """Whether `media_type` is one media type: a bare `type/subtype`, optionally followed by `; name=value` parameters.
+    """Whether `media_type` is one media type: a bare `type/subtype`, optionally followed by `;` parameters.
 
-    No comma and no control character anywhere, so no reader of the type, a browser included, can read a second type
-    out of it. `text/html; charset=utf-8` is one; `application/pdf;,text/html` and `image/png,text/html` are not.
+    The same rule `declared_media_type` reads a declaration by, applied to the value whole: no comma and no control
+    character anywhere, ASCII whitespace around the value included, so no reader of the type, a browser included, can
+    read a second type out of it, and a `type/subtype` of two tokens before the first `;`. Parameters are not parsed
+    further, as a browser skips one it cannot parse, so a quoted `boundary="a;b"` passes. `text/html; charset=utf-8` is
+    one; `application/pdf;,text/html` and `image/png,text/html` are not.
     """
-    if "," in media_type or _holds_control_character(text=media_type):
+    if _holds_control_character(text=media_type):
         return False
-    bare_type, *parameters = media_type.split(";")
-    if _BARE_MEDIA_TYPE.fullmatch(bare_type.strip(_ASCII_WHITESPACE)) is None:
+    try:
+        return declared_media_type(media_type=media_type) is not None
+    except DeclaredMediaTypeError:
         return False
-    return all(_MEDIA_TYPE_PARAMETER.fullmatch(parameter.strip(_ASCII_WHITESPACE)) is not None for parameter in parameters)
 
 
 def declared_media_type(*, media_type: str | None) -> str | None:
@@ -308,7 +307,8 @@ def declared_media_type(*, media_type: str | None) -> str | None:
     `mime_type` field: `text/plain;charset=utf-8` is `text/plain`, `Image/PNG` is `image/png`. Nothing downstream reads
     a file's parameters, so they are dropped unread rather than kept: like a browser's reading of a type, which skips a
     parameter it cannot parse, a parameter that is not `name=value`, such as `name=annual report.pdf`, does not refuse
-    the declaration. Only the comma and control-character check covers them, since a comma would end a type.
+    the declaration. Only the comma and control-character check covers them, since a comma would end a type. The
+    storage gate, `is_single_media_type`, reads a type by the same rule.
 
     Args:
         media_type: The declared type, `None` when nothing was declared.
