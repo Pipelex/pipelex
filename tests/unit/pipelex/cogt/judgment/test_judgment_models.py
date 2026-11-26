@@ -30,7 +30,7 @@ from pipelex.cogt.judgment.judgment_models import (
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.unit.pipelex.cogt.judgment.test_data import JudgmentTestCases
+from tests.unit.pipelex.cogt.judgment.cases import JudgmentTestCases
 
 
 class TestJudgmentModels:

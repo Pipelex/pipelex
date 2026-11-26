@@ -10,7 +10,7 @@ from pytest_mock import MockerFixture
 from pipelex.core.method_trees.requirements_file import parse_requirements_text
 from pipelex.libraries.method_requirements import marker_variables_of, requirements_needed_in, unmet_requirements
 from pipelex.libraries.package_environments import InterpreterPackageEnvironment, OfferedPackageEnvironment
-from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
+from tests.unit.pipelex.libraries.cases import MethodRequirementsCases
 
 _DISTRIBUTION_TARGET = "pipelex.libraries.package_environments.distribution"
 
@@ -53,7 +53,7 @@ class TestMethodRequirementsJudgment:
     )
     def test_a_stated_package_set_judges_each_requirement(self, topic: str, line: str, expected_reason: str | None) -> None:
         """The offer is the whole environment: its distributions, its marker values, and nothing it does not state."""
-        environment = OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer())
+        environment = OfferedPackageEnvironment(offer=MethodRequirementsCases.sandbox_offer())
 
         reasons = _unmet_reasons(text=line, environment=environment)
 
@@ -78,12 +78,10 @@ class TestMethodRequirementsJudgment:
         """What a factory may refuse for: the check skips exactly the requirements dropped here, and refuses the ones it cannot judge."""
         parsed = parse_requirements_text(text=f"# first\n{line}\n")
 
-        needed = requirements_needed_in(requirements=parsed.requirements, marker_environment=MethodRequirementsTestData.SANDBOX_MARKER_ENVIRONMENT)
+        needed = requirements_needed_in(requirements=parsed.requirements, marker_environment=MethodRequirementsCases.SANDBOX_MARKER_ENVIRONMENT)
 
         assert needed == (parsed.requirements if is_needed else []), topic
-        environment = OfferedPackageEnvironment(
-            offer=MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-none", distributions={})
-        )
+        environment = OfferedPackageEnvironment(offer=MethodRequirementsCases.environment_offer(snapshot_name="pipelex-env-none", distributions={}))
         assert bool(unmet_requirements(requirements=parsed.requirements, environment=environment)) is is_needed, topic
 
     def test_a_marker_value_spelled_like_a_variable_is_not_read_as_one(self) -> None:
@@ -93,7 +91,7 @@ class TestMethodRequirementsJudgment:
         (requirement_line,) = parsed.requirements
         assert requirement_line.requirement.marker is not None
         assert marker_variables_of(marker=requirement_line.requirement.marker) == {"os_name"}
-        environment = OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer())
+        environment = OfferedPackageEnvironment(offer=MethodRequirementsCases.sandbox_offer())
         assert unmet_requirements(requirements=parsed.requirements, environment=environment) == []
 
     def test_this_interpreter_meets_what_it_holds(self) -> None:
@@ -139,11 +137,11 @@ class TestMethodRequirementsJudgment:
         local_advice = InterpreterPackageEnvironment(names_host_paths=True).advice(
             requirement_texts=["pandas>=2.2", 'tzdata; python_version >= "3.12"']
         )
-        sandbox_advice = OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer()).advice(requirement_texts=["pandas>=3"])
+        sandbox_advice = OfferedPackageEnvironment(offer=MethodRequirementsCases.sandbox_offer()).advice(requirement_texts=["pandas>=3"])
 
         assert f"uv pip install --python {shlex.quote(sys.executable)} 'pandas>=2.2' 'tzdata; python_version >= \"3.12\"'" in local_advice
         assert "never installs" in local_advice
-        assert MethodRequirementsTestData.SANDBOX_ENVIRONMENT in sandbox_advice
+        assert MethodRequirementsCases.SANDBOX_ENVIRONMENT in sandbox_advice
         assert "uv" not in sandbox_advice
 
     def test_this_interpreter_is_named_by_its_path_only_where_host_paths_may_be_named(self) -> None:

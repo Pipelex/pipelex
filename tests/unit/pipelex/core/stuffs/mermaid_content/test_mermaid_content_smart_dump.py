@@ -1,5 +1,5 @@
 from pipelex.core.stuffs.mermaid_content import MermaidContent
-from tests.unit.pipelex.core.stuffs.mermaid_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.mermaid_content.cases import MermaidContentCases
 
 
 class TestMermaidContentSmartDump:
@@ -7,9 +7,9 @@ class TestMermaidContentSmartDump:
 
     def test_smart_dump_returns_dict(self):
         """Verify smart_dump returns a dict with mermaid_code and mermaid_url."""
-        content = MermaidContent(mermaid_code=TestData.SAMPLE_MERMAID_CODE, mermaid_url=TestData.SAMPLE_MERMAID_URL)
+        content = MermaidContent(mermaid_code=MermaidContentCases.SAMPLE_MERMAID_CODE, mermaid_url=MermaidContentCases.SAMPLE_MERMAID_URL)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP
+        assert result == MermaidContentCases.EXPECTED_SMART_DUMP
         assert isinstance(result, dict)
 
     def test_smart_dump_simple_diagram(self):

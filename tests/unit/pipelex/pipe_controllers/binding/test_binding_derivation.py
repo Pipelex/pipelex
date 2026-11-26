@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.pipe_controllers.binding.binding_derivation import BindingRoot, BindingValueKind, derive_binding
-from tests.unit.pipelex.pipe_controllers.binding.test_data import INVOICE, RESOLVER, make_root
+from tests.unit.pipelex.pipe_controllers.binding.cases import INVOICE, RESOLVER, make_root
 
 # The segment a caller of `provenance_path` chooses to stand for any item of a list.
 _ITEM = "[]"

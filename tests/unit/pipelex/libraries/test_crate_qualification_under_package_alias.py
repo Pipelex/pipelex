@@ -6,7 +6,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from tests.unit.pipelex.libraries.test_data import CrateQualificationTestData
+from tests.unit.pipelex.libraries.cases import CrateQualificationCases
 
 
 class TestCrateQualificationUnderAPackageAlias:
@@ -20,7 +20,7 @@ class TestCrateQualificationUnderAPackageAlias:
     ALIAS = "github.com/invented/alpha-lib/alpha"
 
     def _qualified_pipes(self) -> dict[str, object]:
-        crate = CrateQualificationTestData.crate()
+        crate = CrateQualificationCases.crate()
         crate.pipes["alpha.route_special"] = PipeConditionBlueprint(
             description="route to a special outcome",
             inputs={"data": "Category"},
@@ -70,9 +70,9 @@ class TestCrateQualificationUnderAPackageAlias:
         assert other.pipe_steps[0].pipe == "other->beta.helper"
 
     def test_is_idempotent(self):
-        once = qualify_crate(CrateQualificationTestData.crate(), package_alias=self.ALIAS)
+        once = qualify_crate(CrateQualificationCases.crate(), package_alias=self.ALIAS)
         twice = qualify_crate(
-            CrateQualificationTestData.crate().model_copy(update={"concepts": once.concepts, "pipes": once.pipes}), package_alias=self.ALIAS
+            CrateQualificationCases.crate().model_copy(update={"concepts": once.concepts, "pipes": once.pipes}), package_alias=self.ALIAS
         )
         assert twice.pipes == once.pipes
         sequence = twice.pipes["alpha.seq"]

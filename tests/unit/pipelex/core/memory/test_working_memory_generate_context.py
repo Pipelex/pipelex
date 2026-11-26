@@ -11,7 +11,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from tests.cases.documents import DocumentTestCases
 from tests.cases.images import ImageTestCases
-from tests.unit.pipelex.core.memory.conftest import TestWorkingMemoryData
+from tests.unit.pipelex.core.memory.conftest import WorkingMemoryCases
 
 
 class TestWorkingMemoryGenerateContext:
@@ -42,7 +42,7 @@ class TestWorkingMemoryGenerateContext:
         assert isinstance(content, TextContent)
 
         # Verify actual content value
-        assert content.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert content.text == WorkingMemoryCases.SAMPLE_TEXT
 
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["sample_text"]
@@ -115,7 +115,7 @@ class TestWorkingMemoryGenerateContext:
         assert question_content.text == "What are the aerodynamic features?"
         document_content = unwrap_stuff_artefact(artefact=context["document"]).content
         assert isinstance(document_content, TextContent)
-        assert document_content.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert document_content.text == WorkingMemoryCases.SAMPLE_TEXT
         diagram_content = unwrap_stuff_artefact(artefact=context["diagram"]).content
         assert isinstance(diagram_content, ImageContent)
         assert diagram_content.url == ImageTestCases.IMAGE_FILE_PATH_PNG_1

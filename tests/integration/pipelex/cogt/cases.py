@@ -1,0 +1,506 @@
+import datetime
+from enum import StrEnum
+from typing import Any, ClassVar
+
+from pydantic import BaseModel, Field, field_validator
+from pydantic.dataclasses import dataclass
+
+from pipelex.cogt.image.prompt_image import PromptImageUri
+from pipelex.cogt.judgment.judgment_models import (
+    ChoiceQuestion,
+    JudgmentKind,
+    JudgmentPrompt,
+    JudgmentQuestion,
+    RatingLevel,
+    RatingQuestion,
+    YesNoCriteria,
+    YesNoQuestion,
+)
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.core.stuffs.choice_content import ChoiceContent
+from pipelex.core.stuffs.date_content import DateContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
+from tests.cases import ImageTestCases
+from tests.cases.documents import DocumentTestCases
+from tests.integration.pipelex.cases import PipeTestCases
+
+
+class Person(BaseModel):
+    name: str
+    age: int
+
+
+class Employee(Person):
+    job: str = Field(description="Job title, must be lowercase")
+
+    @field_validator("job")
+    @classmethod
+    def validate_lowercase_job(cls, v: str) -> str:
+        if not v.islower():
+            msg = "job title must be lowercase"
+            raise ValueError(msg)
+        return v
+
+
+class PetSpecies(StrEnum):
+    DOG = "dog"
+    CAT = "cat"
+    BIRD = "bird"
+    FISH = "fish"
+    HAMSTER = "hamster"
+
+
+class Pet(BaseModel):
+    species: PetSpecies
+    name: str
+
+
+class ImageDescription(BaseModel):
+    title: str = Field(description="A short title for the image")
+    description: str = Field(description="A detailed description of what is shown in the image")
+    time_period: str = Field(description="An estimated date or time period relevant to the image (e.g., '2024', 'Modern era', 'Unknown')")
+
+
+class LLMVisionTestCases:
+    VISION_USER_TEXT = "Describe the provide image in 1-2 concise sentences."
+    VISION_IMAGES_COMPARE_PROMPT = "Compare these two images in 2-3 concise bullet points."
+
+    URL_CLOUDFRONT_ALAN_TURING_JPG = "https://d2cinlfp2qnig1.cloudfront.net/tests/alan_turing.jpg"
+
+    TEST_IMAGE_DIRECTORY = "tests/data/images"
+
+    PATH_IMG_PNG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png"
+    PATH_IMG_JPEG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.jpg"
+
+    PATH_IMG_PNG_2 = f"{TEST_IMAGE_DIRECTORY}/animal_lympics.png"
+    PATH_IMG_JPEG_2 = f"{TEST_IMAGE_DIRECTORY}/animal_lympics.jpg"
+
+    PATH_IMG_PNG_3 = f"{TEST_IMAGE_DIRECTORY}/eiffel_tower.png"
+    PATH_IMG_JPEG_3 = f"{TEST_IMAGE_DIRECTORY}/eiffel_tower.jpg"
+
+    PATH_IMG_GANTT_1 = f"{TEST_IMAGE_DIRECTORY}/diagram.png"
+
+    IMAGE_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, image_path
+        # ("Gantt Chart", PATH_IMG_GANTT_1),
+        ("AI Lympics PNG", PATH_IMG_PNG_1),
+        # ("Animal Lympics PNG", PATH_IMG_PNG_2),
+        ("AI Lympics JPEG", PATH_IMG_JPEG_1),
+        # ("Eiffel Tower", PATH_IMG_JPEG_3),
+        # ("Eiffel Tower", PATH_IMG_PNG_3),
+    ]
+    IMAGE_PATH_PAIRS: ClassVar[list[tuple[str, tuple[str, str]]]] = [  # topic, image_pair
+        ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
+    ]
+
+    IMAGE_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, image_uri
+        (
+            "Alan Turing",
+            URL_CLOUDFRONT_ALAN_TURING_JPG,
+        ),
+        (
+            "Gantt chart",
+            PipeTestCases.URL_IMG_GANTT_PNG,
+        ),
+    ]
+
+    # Data URLs for vision tests (topic, data_url)
+    IMAGE_DATA_URLS: ClassVar[list[tuple[str, str]]] = [
+        ("Pipelex Logo Tiny", ImageTestCases.LOGO_TINY_PNG_DATA_URL),
+    ]
+
+
+class LLMDocumentTestCases:
+    """Test cases for LLM document understanding."""
+
+    DOCUMENT_USER_TEXT = "Summarize this document in 2-3 concise sentences."
+    DOCUMENT_USER_TEXT_DETAILED = "What are the key points in this document? List them as bullet points."
+
+    # PDF document paths - universally supported across providers
+    PDF_DOCUMENT_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, document_path
+        ("Job Offer PDF", DocumentTestCases.PDF_FILE_PATH_2),
+    ]
+
+    # DOCX document paths - limited support (Anthropic supports, Google doesn't)
+    DOCX_DOCUMENT_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, document_path
+        ("CV DOCX", DocumentTestCases.DOCX_FILE_PATH_1),
+    ]
+
+    # Document URLs - using remote URLs from DocumentTestCases
+    DOCUMENT_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, document_url
+        ("Job Offer URL", DocumentTestCases.PDF_FILE_URL_1),
+    ]
+
+
+class LLMTestConstants:
+    USER_TEXT_SHORT = "In one short sentence, who is Bill Gates?"
+    USER_TEXT_SUPER_SHORT = "In one short sentence (< 5 words), who is Bill Gates?"
+    USER_TEXT_TO_EXTRACT_PERSON = "It's Robert, the nice plumber, he turns 57 next week."
+    USER_TEXT_TO_GEN_PERSON_LIST = "List the following people: Alice is 30, Bob is 25, and Charlie is 35."
+    USER_TEXT_TRICKY_1 = """
+When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
+How tall do you think he was when he was 12? and at 15?
+"""
+    USER_TEXT_TRICKY_2 = """
+Count the Rs in "Strawberry"
+"""
+    # USER_TEXT_SHORT = "What's the biggest football match tonight in Europe?"
+    PROMPT_TEMPLATE_TEXT = "Can you give one example of flower which is {color} in color ?"
+    PROMPT_COLOR_EXAMPLES: ClassVar[list[str]] = [
+        "red",
+        "blue",
+        "green",
+        "yellow",
+        "orange",
+        "purple",
+        "pink",
+        "black",
+        "white",
+    ]
+
+
+class LLMTestCases:
+    USER_TEXT_HAIKU = "Write a sonnet about the sea"
+    USER_TEXT_TRICKY = """
+When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
+How tall do you think he was when he was 12? and at 15?
+"""
+    SINGLE_TEXT: ClassVar[list[tuple[str, str]]] = [  # topic, prompt_text
+        ("Haiku", USER_TEXT_HAIKU),
+        ("Tricky", USER_TEXT_TRICKY),
+    ]
+    SINGLE_OBJECT: ClassVar[list[tuple[str, BaseModel]]] = [
+        ("name: John, age: 30", Person(name="John", age=30)),
+        ("Betty Draper, 51", Person(name="Betty Draper", age=51)),
+        ("Whiskers, the cat", Pet(species=PetSpecies.CAT, name="Whiskers")),
+        ("Whiskers, the dog", Pet(species=PetSpecies.DOG, name="Whiskers")),
+    ]
+    MULTIPLE_OBJECTS: ClassVar[list[list[tuple[str, BaseModel]]]] = [
+        [
+            ("name: John, age: 30", Person(name="John", age=30)),
+            # ("Betty Draper, 51", Person(name="Betty Draper", age=51)),
+            ("Whiskers, a very nice cat", Pet(species=PetSpecies.CAT, name="Whiskers")),
+            ("Whiskers, a cute little dog", Pet(species=PetSpecies.DOG, name="Whiskers")),
+        ],
+        [
+            # ("name: Alice, age: 25", Person(name="Alice", age=25)),
+            ("My sister's plumber, Bob Smith, is 42", Employee(name="Bob Smith", age=42, job="plumber")),
+            ("Fluffy is a funny hamster", Pet(species=PetSpecies.HAMSTER, name="Fluffy")),
+            ("Rex is a big black dog", Pet(species=PetSpecies.DOG, name="Rex")),
+        ],
+    ]
+
+
+class SerDeTestLLMCases:
+    """Constants and example objects used for SerDe unit tests.
+
+    The subject is `LLMPrompt`, which really does cross a process boundary — the interpreter hands one
+    to a worker, and a distributed run serializes it onto the wire. Its `user_images` list is the part
+    that matters: the items are `PromptImage` subclasses, so a round-trip that lost the subclass would
+    hand the model a prompt with no image and nothing downstream would notice.
+    """
+
+    # Base building blocks -------------------------------------------------
+    PLAIN_PROMPT: ClassVar[LLMPrompt] = LLMPrompt(
+        user_text="Some user text in the prompt",
+    )
+
+    PROMPT_WITH_SYSTEM_TEXT: ClassVar[LLMPrompt] = LLMPrompt(
+        system_text="Some system text",
+        user_text="Some user text in the prompt",
+    )
+
+    # Dictionary representation example ------------------------------------
+    DICT_1: ClassVar[dict[str, Any]] = {
+        "system_text": None,
+        "user_text": "Some user text in the prompt",
+        "user_images": [],
+    }
+
+    # Prompt containing an image URI --------------------------------------
+    PROMPT_WITH_IMAGE_URI: ClassVar[LLMPrompt] = LLMPrompt(
+        system_text="Some system text",
+        user_text="Some user text",
+        user_images=[
+            PromptImageUri(uri="some_file_path"),
+        ],
+    )
+
+    # Group constants for parametrization ----------------------------------
+    PYDANTIC_EXAMPLES: ClassVar[list[BaseModel]] = [
+        PLAIN_PROMPT,
+        PROMPT_WITH_SYSTEM_TEXT,
+    ]
+    PYDANTIC_EXAMPLES_USING_SUBCLASS: ClassVar[list[BaseModel]] = [
+        PROMPT_WITH_IMAGE_URI,
+    ]
+    PYDANTIC_EXAMPLES_DICT: ClassVar[list[dict[str, Any]]] = [
+        DICT_1,
+    ]
+
+
+class SearchTestCases:
+    """Test cases for search integration tests."""
+
+    SOURCED_ANSWER_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
+        ("Declarative languages", "What makes declarative languages different from imperative languages?"),
+        # ("Middle East", "Latest events in the middle east"),
+        # ("Capital of France", "What is the capital of France?"),
+        # ("Python creator", "Who created the Python programming language?"),
+    ]
+
+    STRUCTURED_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
+        ("Middle East", "Latest events in the middle east"),
+        # ("Python language", "What is the Python programming language and what are its main features?"),
+    ]
+
+
+class AnswerConfidence(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class WorkingStep(BaseModel):
+    description: str = Field(description="One step of the working, in a short sentence")
+
+
+class ReasonedAnswer(BaseModel):
+    """A structured answer with an enum and a nested list, the shapes a structured output breaks on first."""
+
+    answer: str = Field(description="The final answer, as short as possible")
+    confidence: AnswerConfidence
+    steps: list[WorkingStep] = Field(description="The steps of the working, in order")
+
+
+class LLMReasoningTestCases:
+    """Test cases for LLM reasoning/thinking integration tests."""
+
+    STRUCTURED_PROMPT = "What is 317 * 723? Give the answer, your confidence in it, and the steps of your working."
+
+    PROMPTS: ClassVar[list[tuple[str, str]]] = [  # topic, prompt_text
+        ("Comparison", "Which is larger: 0.9 or 0.11?"),
+        ("Letter counting", "How many Rs are in the word 'Strawberry'?"),
+        ("Multiplication", "What is 317 * 723?"),
+        # ("Huge multiplication", "What is 9738317 * 723837893?"),
+        # (
+        #     "Tricky growth",
+        #     """
+        #     When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
+        #     How tall do you think he was when he was 12? and at 15?
+        #     Conclude with your opinion as a one-sentence answer.
+        # """,
+        # ),
+        # (
+        #     "Tricky river crossing",
+        #     """
+        #     A man, a cabbage, and a goat are trying to cross a river.
+        #     They have a boat that can only carry three things at once. How do they do it?
+        #     Conclude with your opinion as a one-sentence answer.
+        # """,
+        # ),
+    ]
+
+
+class JudgmentTestCases:
+    """Live judgment evidence and questions, and every string in them is pinned on purpose.
+
+    The spike measured what moves an answer: repeating the same request moved a borderline case by
+    0.01, while rewording a single instruction moved it from 0.11 to 0.30. So the wording here is
+    part of the test, and it is the shared wire fixture `checkout_down`'s, recorded against the live
+    API for exactly this evidence and these questions. A failure after an innocent-looking edit to it
+    is telling the truth. Verdicts are asserted exactly; a probability gets ``PROBABILITY_MARGIN``,
+    fifteen times the noise the spike observed.
+    """
+
+    PROBABILITY_MARGIN = 0.05
+
+    PROMPT = JudgmentPrompt(
+        text=(
+            "A message from a customer:\n<message>\n"
+            "Our production checkout has been returning 500s for every card payment since 09:14 UTC. "
+            "Nothing is going through. I have three customers on the phone right now. Please help.\n</message>"
+        )
+    )
+
+    IS_URGENT = YesNoQuestion(
+        instructions="Is the message urgent?",
+        criteria=YesNoCriteria(yes="The customer needs an answer today", no="The message can wait for the normal queue"),
+    )
+    TEAM = ChoiceQuestion(
+        instructions="Which team should handle this message?",
+        options={
+            "payments": "Charges, invoices, payment processing failures",
+            "shipping": "Delivery status, delays, lost packages",
+            "accounts": "Sign-in, passwords, account settings",
+            "other": "None of the above",
+        },
+    )
+    SEVERITY = RatingQuestion(
+        instructions="How severe is the reported issue?",
+        levels=[
+            RatingLevel(label="Cosmetic", description="Appearance only; no lost functionality"),
+            RatingLevel(label="Workaround available", description="A task fails, but another way works"),
+            RatingLevel(label="Fully blocked", description="A task fails with no workaround"),
+        ],
+    )
+
+    THREE_QUESTIONS: ClassVar[dict[str, JudgmentQuestion]] = {
+        "is_urgent": IS_URGENT,
+        "team": TEAM,
+        "severity": SEVERITY,
+    }
+
+    # (topic, question, kind) — each kind alone, as a batch of one, on the unambiguous case.
+    EACH_KIND: ClassVar[list[tuple[str, JudgmentQuestion, JudgmentKind]]] = [
+        ("yes_no", IS_URGENT, JudgmentKind.YES_NO),
+        ("choice", TEAM, JudgmentKind.CHOICE),
+        ("rating", SEVERITY, JudgmentKind.RATING),
+    ]
+
+    # What the recording holds for this material.
+    EXPECTED_IS_URGENT_PROBABILITY = 0.98
+    EXPECTED_TEAM = "payments"
+    EXPECTED_SEVERITY_LEVEL = 2
+
+
+class JudgmentTestCharge(StructuredContent):
+    amount_usd: float
+    status: str
+
+
+class JudgmentTestOrder(StructuredContent):
+    order_id: str
+    charges: list[JudgmentTestCharge]
+    tracking_number: str | None = None
+
+
+@dataclass(frozen=True)
+class JudgmentPromptShapeCase:
+    """One evidence template and one question over two memories that differ only in the value under test."""
+
+    prompt: str
+    question: YesNoQuestion
+    yes_inputs: dict[str, StuffContent]
+    no_inputs: dict[str, StuffContent]
+
+
+def _judgment_order(*, charges: list[JudgmentTestCharge], tracking_number: str | None = None) -> JudgmentTestOrder:
+    return JudgmentTestOrder(order_id="A-104", charges=charges, tracking_number=tracking_number)
+
+
+class JudgmentPromptShapeCases:
+    """Each way an evidence prompt renders an input, as yes/no pairs for the live judging model.
+
+    The evidence is the rendered prompt, so what the model reads is what the template makes of each
+    input: a text block under its name, a number or a date inline, a structure or a list as a block.
+    Like `JudgmentTestCases`, the wording is part of the test: a question that makes the model do
+    arithmetic over the evidence measures its arithmetic, not whether it read what was rendered.
+    """
+
+    # A verdict must clear the middle by this much on its side: evidence the model half-read would hover near 0.5.
+    CLEAR_YES = 0.8
+    CLEAR_NO = 0.2
+
+    CAPTURED = JudgmentTestCharge(amount_usd=49, status="captured")
+
+    SHAPE_CASES: ClassVar[list[tuple[str, JudgmentPromptShapeCase]]] = [  # topic, case
+        (
+            "text_block",
+            JudgmentPromptShapeCase(
+                prompt="A message from a customer:\n@message",
+                question=YesNoQuestion(instructions="Does the customer ask for a refund?"),
+                yes_inputs={"message": TextContent(text="I was charged twice for my order. Please refund the duplicate charge.")},
+                no_inputs={"message": TextContent(text="Thanks, my parcel arrived this morning and everything is fine.")},
+            ),
+        ),
+        (
+            "number_inline",
+            JudgmentPromptShapeCase(
+                prompt="The order total is $order_total_usd USD.",
+                question=YesNoQuestion(instructions="Is the order total above 1000 USD?"),
+                yes_inputs={"order_total_usd": NumberContent(number=1240)},
+                no_inputs={"order_total_usd": NumberContent(number=40)},
+            ),
+        ),
+        (
+            "yes_no_inline",
+            JudgmentPromptShapeCase(
+                prompt="Refund approved: $refund_approved",
+                question=YesNoQuestion(instructions="Has the refund been approved?"),
+                yes_inputs={"refund_approved": YesNoContent(yes_no=True)},
+                no_inputs={"refund_approved": YesNoContent(yes_no=False)},
+            ),
+        ),
+        (
+            "dates_inline",
+            JudgmentPromptShapeCase(
+                prompt="Ordered on $ordered_on, delivered on $delivered_on.",
+                question=YesNoQuestion(instructions="Was the parcel delivered more than a week after the order was placed?"),
+                yes_inputs={
+                    "ordered_on": DateContent(date=datetime.date(2026, 9, 1)),
+                    "delivered_on": DateContent(date=datetime.date(2026, 9, 20)),
+                },
+                no_inputs={
+                    "ordered_on": DateContent(date=datetime.date(2026, 9, 1)),
+                    "delivered_on": DateContent(date=datetime.date(2026, 9, 3)),
+                },
+            ),
+        ),
+        (
+            "structure_block",
+            JudgmentPromptShapeCase(
+                prompt="@order",
+                question=YesNoQuestion(instructions="Was the customer charged more than once for this order?"),
+                yes_inputs={"order": _judgment_order(charges=[CAPTURED, CAPTURED])},
+                no_inputs={"order": _judgment_order(charges=[CAPTURED])},
+            ),
+        ),
+        (
+            # The no side is the point: an unset member renders as nothing the model could read as a value.
+            "absent_member",
+            JudgmentPromptShapeCase(
+                prompt="@order",
+                question=YesNoQuestion(instructions="Has a tracking number been assigned to the order?"),
+                yes_inputs={"order": _judgment_order(charges=[CAPTURED], tracking_number="1Z999AA10123456784")},
+                no_inputs={"order": _judgment_order(charges=[CAPTURED])},
+            ),
+        ),
+        (
+            "list_block",
+            JudgmentPromptShapeCase(
+                prompt="The customer's messages, oldest first:\n@messages",
+                question=YesNoQuestion(instructions="Did the customer threaten to cancel their subscription?"),
+                yes_inputs={
+                    "messages": ListContent(items=[TextContent(text="This is the third time this happens."), TextContent(text="Fix it or I cancel.")])
+                },
+                no_inputs={
+                    "messages": ListContent(
+                        items=[TextContent(text="This is the third time this happens."), TextContent(text="Thanks for the quick fix.")]
+                    )
+                },
+            ),
+        ),
+        (
+            "earlier_verdict_inline",
+            JudgmentPromptShapeCase(
+                prompt="The message was routed to the $routing team.",
+                question=YesNoQuestion(instructions="Was the message routed to the payments team?"),
+                yes_inputs={"routing": ChoiceContent(choice="payments", confidence=0.93)},
+                no_inputs={"routing": ChoiceContent(choice="shipping", confidence=0.93)},
+            ),
+        ),
+        (
+            "several_inputs_related",
+            JudgmentPromptShapeCase(
+                prompt="@order\nThe refund issued: $refund_usd USD",
+                question=YesNoQuestion(instructions="Is the refund amount equal to the amount of one charge on the order?"),
+                yes_inputs={"order": _judgment_order(charges=[CAPTURED, CAPTURED]), "refund_usd": NumberContent(number=49)},
+                no_inputs={"order": _judgment_order(charges=[CAPTURED, CAPTURED]), "refund_usd": NumberContent(number=5)},
+            ),
+        ),
+    ]

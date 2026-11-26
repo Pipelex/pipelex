@@ -16,6 +16,7 @@ from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
     StubEngines,
@@ -24,7 +25,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "invoice.docx"'
 
@@ -38,7 +38,7 @@ async def _validate_with_html_template_file(*, directory: Path, load: str, templ
             return await validate_bundle(mthds_file_path=write_bundle(directory=directory, step_fields=step_fields))
         case _:
             return await validate_bundle(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)],
                 submitted_files={"invoice.html": template_bytes},
             )
 
@@ -234,7 +234,7 @@ class TestPipeDocGenTemplateFiles:
         (tmp_path / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
         bundle_path = tmp_path / "invoice.mthds"
         bundle_path.write_text(
-            PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP).replace(
+            PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP).replace(
                 'inputs      = { invoice = "Invoice" }', 'inputs      = { invoice = "Invoice", thing = "Anything" }'
             ),
             encoding="utf-8",

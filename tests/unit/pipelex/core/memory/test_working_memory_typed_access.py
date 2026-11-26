@@ -15,7 +15,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from tests.cases.images import ImageTestCases
-from tests.unit.pipelex.core.memory.conftest import TestWorkingMemoryData
+from tests.unit.pipelex.core.memory.conftest import WorkingMemoryCases
 
 
 @pytest.fixture
@@ -79,14 +79,14 @@ class TestWorkingMemoryTypedAccess:
         result = single_text_memory.get_typed_object_or_attribute("sample_text")
 
         assert isinstance(result, TextContent)
-        assert result.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert result.text == WorkingMemoryCases.SAMPLE_TEXT
 
     def test_simple_access_with_matching_type(self, single_text_memory: WorkingMemory):
         """Test retrieving content with matching type validation."""
         result = single_text_memory.get_typed_object_or_attribute("sample_text", wanted_type=TextContent)
 
         assert isinstance(result, TextContent)
-        assert result.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert result.text == WorkingMemoryCases.SAMPLE_TEXT
 
     def test_simple_access_with_wrong_type(self, single_text_memory: WorkingMemory):
         """Test that type mismatch raises WorkingMemoryTypeError."""
@@ -206,7 +206,7 @@ class TestWorkingMemoryTypedAccess:
         assert question_result.text == "What are the aerodynamic features?"
 
         assert isinstance(document_result, TextContent)
-        assert document_result.text == TestWorkingMemoryData.SAMPLE_TEXT
+        assert document_result.text == WorkingMemoryCases.SAMPLE_TEXT
 
         assert isinstance(diagram_result, ImageContent)
         assert diagram_result.url == ImageTestCases.IMAGE_FILE_PATH_PNG_1

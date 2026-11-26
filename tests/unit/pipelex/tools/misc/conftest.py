@@ -1,6 +1,6 @@
 import pytest
 
-from tests.unit.pipelex.tools.misc.test_data import Address, ComplexUser, UserPreferences
+from tests.unit.pipelex.tools.misc.cases import Address, ComplexUser, UserPreferences
 
 
 @pytest.fixture

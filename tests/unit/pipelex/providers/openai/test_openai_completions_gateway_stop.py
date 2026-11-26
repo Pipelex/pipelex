@@ -11,7 +11,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from tests.helpers.completion_stop import STOP_TEST_PIPE_CODE, make_text_llm_job
-from tests.unit.pipelex.providers.openai.test_data import GatewayStopTestData
+from tests.unit.pipelex.providers.openai.cases import GatewayStopCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -63,7 +63,7 @@ def _gateway_worker(mocker: MockerFixture, *, finish_reason: str, content: str) 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestOpenAICompletionsGatewayStop:
-    @pytest.mark.parametrize(("_topic", "finish_reason", "content"), GatewayStopTestData.TRUNCATION_CASES)
+    @pytest.mark.parametrize(("_topic", "finish_reason", "content"), GatewayStopCases.TRUNCATION_CASES)
     async def test_a_passed_through_truncation_raises_the_truncation(
         self, mocker: MockerFixture, _topic: str, finish_reason: str, content: str
     ) -> None:
@@ -82,7 +82,7 @@ class TestOpenAICompletionsGatewayStop:
             "Raise the pipe's max_tokens, or shorten its input."
         )
 
-    @pytest.mark.parametrize(("_topic", "finish_reason", "content"), GatewayStopTestData.REFUSAL_CASES)
+    @pytest.mark.parametrize(("_topic", "finish_reason", "content"), GatewayStopCases.REFUSAL_CASES)
     async def test_a_passed_through_refusal_or_filter_raises_the_refusal(
         self, mocker: MockerFixture, _topic: str, finish_reason: str, content: str
     ) -> None:

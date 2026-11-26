@@ -31,12 +31,10 @@ from pipelex.cogt.inference.error_classify import ClassificationResult, Inferenc
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases
 
 if TYPE_CHECKING:
     from pipelex.errors.error_codes import ErrorCode
-
-_TestData = DirectProviderQuotaTestData
 
 # Every error Bedrock's runtime API declares, with its status, from botocore's own model of the service, so a code AWS
 # adds is covered without editing this list
@@ -118,25 +116,46 @@ class TestDirectProviderQuotaClassification:
     @pytest.mark.parametrize(
         ("_topic", "status_code", "body", "headers", "expected_error_code", "expected_retry_after"),
         [
-            ("long_standing_insufficient_quota", 429, _TestData.OPENAI_INSUFFICIENT_QUOTA_BODY, None, CoreCode.PROVIDER_QUOTA_EXHAUSTED, None),
-            # The billing code is in `code` beside the broad `type`, which the Extract step keeps: the rule reads both
             (
-                "billing_code_beside_the_broad_type",
+                "long_standing_insufficient_quota",
                 429,
-                _TestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_BODY,
+                DirectProviderQuotaCases.OPENAI_INSUFFICIENT_QUOTA_BODY,
                 None,
                 CoreCode.PROVIDER_QUOTA_EXHAUSTED,
                 None,
             ),
-            ("billing_code_with_no_type", 429, _TestData.OPENAI_PROJECT_SPEND_LIMIT_NO_TYPE_BODY, None, CoreCode.PROVIDER_QUOTA_EXHAUSTED, None),
-            ("per_minute_rate_limit", 429, _TestData.OPENAI_RATE_LIMIT_BODY, {"retry-after": "2"}, CoreCode.PROVIDER_RATE_LIMITED, 2),
+            # The billing code is in `code` beside the broad `type`, which the Extract step keeps: the rule reads both
+            (
+                "billing_code_beside_the_broad_type",
+                429,
+                DirectProviderQuotaCases.OPENAI_CREDIT_BALANCE_EXHAUSTED_BODY,
+                None,
+                CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+                None,
+            ),
+            (
+                "billing_code_with_no_type",
+                429,
+                DirectProviderQuotaCases.OPENAI_PROJECT_SPEND_LIMIT_NO_TYPE_BODY,
+                None,
+                CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+                None,
+            ),
+            ("per_minute_rate_limit", 429, DirectProviderQuotaCases.OPENAI_RATE_LIMIT_BODY, {"retry-after": "2"}, CoreCode.PROVIDER_RATE_LIMITED, 2),
             # The words say "exceeded your current quota", which the former word list read as a spent quota
-            ("gemini_throttle_wording_with_no_code", 429, _TestData.OPENAI_DIALECT_GEMINI_THROTTLE_BODY, None, CoreCode.PROVIDER_RATE_LIMITED, None),
+            (
+                "gemini_throttle_wording_with_no_code",
+                429,
+                DirectProviderQuotaCases.OPENAI_DIALECT_GEMINI_THROTTLE_BODY,
+                None,
+                CoreCode.PROVIDER_RATE_LIMITED,
+                None,
+            ),
             (
                 "openrouter_in_flight_budget_with_its_wait",
                 402,
-                _TestData.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
-                {"retry-after": _TestData.OPENROUTER_RETRY_AFTER},
+                DirectProviderQuotaCases.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
+                {"retry-after": DirectProviderQuotaCases.OPENROUTER_RETRY_AFTER},
                 CoreCode.PROVIDER_RATE_LIMITED,
                 2,
             ),
@@ -144,7 +163,7 @@ class TestDirectProviderQuotaClassification:
             (
                 "openrouter_in_flight_budget_with_no_wait",
                 402,
-                _TestData.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
+                DirectProviderQuotaCases.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
                 None,
                 CoreCode.PROVIDER_RATE_LIMITED,
                 None,
@@ -152,7 +171,7 @@ class TestDirectProviderQuotaClassification:
             (
                 "openrouter_in_flight_budget_with_an_unreadable_wait",
                 402,
-                _TestData.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
+                DirectProviderQuotaCases.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
                 {"retry-after": "soon"},
                 CoreCode.PROVIDER_RATE_LIMITED,
                 None,
@@ -160,21 +179,21 @@ class TestDirectProviderQuotaClassification:
             (
                 "openrouter_insufficient_credits",
                 402,
-                _TestData.OPENROUTER_INSUFFICIENT_CREDITS_BODY,
-                {"retry-after": _TestData.OPENROUTER_RETRY_AFTER},
+                DirectProviderQuotaCases.OPENROUTER_INSUFFICIENT_CREDITS_BODY,
+                {"retry-after": DirectProviderQuotaCases.OPENROUTER_RETRY_AFTER},
                 CoreCode.PROVIDER_QUOTA_EXHAUSTED,
                 2,
             ),
             # Groq's own status for its flex tier at capacity, which it says to retry with backoff
-            ("groq_flex_capacity_498", 498, _TestData.GROQ_FLEX_CAPACITY_BODY, None, CoreCode.PROVIDER_RATE_LIMITED, None),
+            ("groq_flex_capacity_498", 498, DirectProviderQuotaCases.GROQ_FLEX_CAPACITY_BODY, None, CoreCode.PROVIDER_RATE_LIMITED, None),
             # Azure OpenAI's throttle, its delay read from the milliseconds before the rounded seconds
             (
                 "azure_throttle_with_its_delay_in_milliseconds",
                 429,
-                _TestData.OPENAI_RATE_LIMIT_BODY,
-                _TestData.AZURE_RETRY_AFTER_HEADERS,
+                DirectProviderQuotaCases.OPENAI_RATE_LIMIT_BODY,
+                DirectProviderQuotaCases.AZURE_RETRY_AFTER_HEADERS,
                 CoreCode.PROVIDER_RATE_LIMITED,
-                _TestData.AZURE_RETRY_AFTER_MS_SECONDS,
+                DirectProviderQuotaCases.AZURE_RETRY_AFTER_MS_SECONDS,
             ),
         ],
     )
@@ -196,15 +215,15 @@ class TestDirectProviderQuotaClassification:
     @pytest.mark.parametrize(
         ("_topic", "status_code", "body", "expected_error_code"),
         [
-            ("monthly_spend_cap_429", 429, _TestData.ANTHROPIC_SPEND_CAP_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
-            ("billing_error_402", 402, _TestData.ANTHROPIC_BILLING_ERROR_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
-            ("credit_balance_400", 400, _TestData.ANTHROPIC_CREDIT_BALANCE_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
-            ("self_set_spend_limit_400", 400, _TestData.ANTHROPIC_SELF_SET_LIMIT_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
-            ("workspace_spend_limit_400", 400, _TestData.ANTHROPIC_WORKSPACE_LIMIT_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
-            ("per_minute_rate_limit_429", 429, _TestData.ANTHROPIC_RATE_LIMIT_BODY, CoreCode.PROVIDER_RATE_LIMITED),
-            ("malformed_request_400", 400, _TestData.ANTHROPIC_INVALID_REQUEST_BODY, CoreCode.RUNTIME_UNEXPECTED),
+            ("monthly_spend_cap_429", 429, DirectProviderQuotaCases.ANTHROPIC_SPEND_CAP_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("billing_error_402", 402, DirectProviderQuotaCases.ANTHROPIC_BILLING_ERROR_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("credit_balance_400", 400, DirectProviderQuotaCases.ANTHROPIC_CREDIT_BALANCE_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("self_set_spend_limit_400", 400, DirectProviderQuotaCases.ANTHROPIC_SELF_SET_LIMIT_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("workspace_spend_limit_400", 400, DirectProviderQuotaCases.ANTHROPIC_WORKSPACE_LIMIT_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("per_minute_rate_limit_429", 429, DirectProviderQuotaCases.ANTHROPIC_RATE_LIMIT_BODY, CoreCode.PROVIDER_RATE_LIMITED),
+            ("malformed_request_400", 400, DirectProviderQuotaCases.ANTHROPIC_INVALID_REQUEST_BODY, CoreCode.RUNTIME_UNEXPECTED),
             # The credit sentence decides a 400 `invalid_request_error` alone: on a 403 it is a credential refusal
-            ("credit_sentence_on_a_403", 403, _TestData.ANTHROPIC_CREDIT_BALANCE_BODY, CoreCode.PROVIDER_CREDENTIAL_REFUSED),
+            ("credit_sentence_on_a_403", 403, DirectProviderQuotaCases.ANTHROPIC_CREDIT_BALANCE_BODY, CoreCode.PROVIDER_CREDENTIAL_REFUSED),
         ],
     )
     def test_anthropic(self, _topic: str, status_code: int, body: dict[str, Any], expected_error_code: ErrorCode) -> None:
@@ -215,7 +234,7 @@ class TestDirectProviderQuotaClassification:
 
     def test_anthropic_rate_limit_carries_its_wait(self) -> None:
         """A plain Anthropic 429 is a rate limit, and its `retry-after` reaches the metadata."""
-        exc = _as_anthropic_raises_it(status_code=429, body=_TestData.ANTHROPIC_RATE_LIMIT_BODY, headers={"retry-after": "12"})
+        exc = _as_anthropic_raises_it(status_code=429, body=DirectProviderQuotaCases.ANTHROPIC_RATE_LIMIT_BODY, headers={"retry-after": "12"})
 
         metadata = extract_anthropic_metadata(exc)
 
@@ -224,14 +243,14 @@ class TestDirectProviderQuotaClassification:
 
     def test_google_per_minute_throttle_is_a_rate_limit_waited_for_the_delay_it_asks(self) -> None:
         """Gemini's throttle, verbatim, is a rate limit whatever its words, and its `RetryInfo` wait reaches the problem."""
-        exc = _as_google_raises_it(status_code=429, body=_TestData.GOOGLE_PER_MINUTE_THROTTLE_BODY)
+        exc = _as_google_raises_it(status_code=429, body=DirectProviderQuotaCases.GOOGLE_PER_MINUTE_THROTTLE_BODY)
 
         metadata = extract_google_metadata(exc)
         classification = _assert_classified(metadata=metadata, family=InferenceErrorFamily.LLM, expected_error_code=CoreCode.PROVIDER_RATE_LIMITED)
 
         assert metadata.provider_error_code == "RESOURCE_EXHAUSTED"
         assert "quota" in metadata.message
-        assert metadata.retry_after_seconds == _TestData.GOOGLE_RETRY_DELAY_SECONDS
+        assert metadata.retry_after_seconds == DirectProviderQuotaCases.GOOGLE_RETRY_DELAY_SECONDS
 
         rendered = render_inference_error(
             metadata=metadata,
@@ -246,11 +265,11 @@ class TestDirectProviderQuotaClassification:
 
         assert problem.code == CoreCode.PROVIDER_RATE_LIMITED
         assert problem.is_retryable is True
-        assert problem.retry_after == _TestData.GOOGLE_RETRY_DELAY_SECONDS
+        assert problem.retry_after == DirectProviderQuotaCases.GOOGLE_RETRY_DELAY_SECONDS
 
     def test_google_spent_prepay_balance_is_a_spent_quota(self) -> None:
         """Gemini answers a Prepay balance at zero with a 402, which its status alone makes a spent quota."""
-        metadata = extract_google_metadata(_as_google_raises_it(status_code=402, body=_TestData.GOOGLE_PREPAY_DEPLETED_BODY))
+        metadata = extract_google_metadata(_as_google_raises_it(status_code=402, body=DirectProviderQuotaCases.GOOGLE_PREPAY_DEPLETED_BODY))
 
         _assert_classified(metadata=metadata, family=InferenceErrorFamily.LLM, expected_error_code=CoreCode.PROVIDER_QUOTA_EXHAUSTED)
         assert metadata.retry_after_seconds is None
@@ -259,14 +278,14 @@ class TestDirectProviderQuotaClassification:
         ("_topic", "status_code", "body", "expected_error_code"),
         [
             # Billing disabled on the project, read from the ErrorInfo reason whatever the message says
-            ("billing_disabled_403", 403, _TestData.GOOGLE_BILLING_DISABLED_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("billing_disabled_403", 403, DirectProviderQuotaCases.GOOGLE_BILLING_DISABLED_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
             # Another reason on the same status is a refused credential, as any 403
-            ("service_disabled_403", 403, _TestData.GOOGLE_SERVICE_DISABLED_BODY, CoreCode.PROVIDER_CREDENTIAL_REFUSED),
+            ("service_disabled_403", 403, DirectProviderQuotaCases.GOOGLE_SERVICE_DISABLED_BODY, CoreCode.PROVIDER_CREDENTIAL_REFUSED),
             # A quota whose limit is zero, which no wait cures
-            ("zero_limit_quota_429", 429, _TestData.GOOGLE_ZERO_LIMIT_QUOTA_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
-            ("zero_quota_value_429", 429, _TestData.GOOGLE_ZERO_QUOTA_VALUE_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("zero_limit_quota_429", 429, DirectProviderQuotaCases.GOOGLE_ZERO_LIMIT_QUOTA_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("zero_quota_value_429", 429, DirectProviderQuotaCases.GOOGLE_ZERO_QUOTA_VALUE_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
             # The same quota at a limit above zero, which a wait cures
-            ("nonzero_limit_quota_429", 429, _TestData.GOOGLE_NONZERO_LIMIT_QUOTA_BODY, CoreCode.PROVIDER_RATE_LIMITED),
+            ("nonzero_limit_quota_429", 429, DirectProviderQuotaCases.GOOGLE_NONZERO_LIMIT_QUOTA_BODY, CoreCode.PROVIDER_RATE_LIMITED),
         ],
     )
     def test_google_details(self, _topic: str, status_code: int, body: dict[str, Any], expected_error_code: ErrorCode) -> None:
@@ -278,10 +297,10 @@ class TestDirectProviderQuotaClassification:
     @pytest.mark.parametrize(
         ("_topic", "status_code", "body", "expected_error_code"),
         [
-            ("capacity_429", 429, _TestData.MISTRAL_CAPACITY_BODY, CoreCode.PROVIDER_RATE_LIMITED),
+            ("capacity_429", 429, DirectProviderQuotaCases.MISTRAL_CAPACITY_BODY, CoreCode.PROVIDER_RATE_LIMITED),
             # The words name a quota, which the former word list read as a spent one
-            ("quota_wording_429", 429, _TestData.MISTRAL_QUOTA_WORDING_BODY, CoreCode.PROVIDER_RATE_LIMITED),
-            ("balance_depleted_402", 402, _TestData.MISTRAL_BALANCE_DEPLETED_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("quota_wording_429", 429, DirectProviderQuotaCases.MISTRAL_QUOTA_WORDING_BODY, CoreCode.PROVIDER_RATE_LIMITED),
+            ("balance_depleted_402", 402, DirectProviderQuotaCases.MISTRAL_BALANCE_DEPLETED_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
         ],
     )
     def test_mistral(self, _topic: str, status_code: int, body: str, expected_error_code: ErrorCode) -> None:
@@ -293,17 +312,41 @@ class TestDirectProviderQuotaClassification:
     @pytest.mark.parametrize(
         ("_topic", "status_code", "error_code", "message", "expected_error_code"),
         [
-            ("daily_tokens_throttle", 429, "ThrottlingException", _TestData.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE, CoreCode.PROVIDER_RATE_LIMITED),
+            (
+                "daily_tokens_throttle",
+                429,
+                "ThrottlingException",
+                DirectProviderQuotaCases.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE,
+                CoreCode.PROVIDER_RATE_LIMITED,
+            ),
             # AWS documents it as resubmittable later, so it is a throttle on its 400
-            ("service_quota_exceeded", 400, "ServiceQuotaExceededException", _TestData.BEDROCK_SERVICE_QUOTA_MESSAGE, CoreCode.PROVIDER_RATE_LIMITED),
+            (
+                "service_quota_exceeded",
+                400,
+                "ServiceQuotaExceededException",
+                DirectProviderQuotaCases.BEDROCK_SERVICE_QUOTA_MESSAGE,
+                CoreCode.PROVIDER_RATE_LIMITED,
+            ),
             # An input over the model's window, which Bedrock words per model and signals no other way
-            ("nova_input_overflow", 400, "ValidationException", _TestData.BEDROCK_NOVA_INPUT_OVERFLOW_MESSAGE, CoreCode.MODEL_CONTEXT_EXCEEDED),
-            ("titan_input_overflow", 400, "ValidationException", _TestData.BEDROCK_TITAN_INPUT_OVERFLOW_MESSAGE, CoreCode.MODEL_CONTEXT_EXCEEDED),
+            (
+                "nova_input_overflow",
+                400,
+                "ValidationException",
+                DirectProviderQuotaCases.BEDROCK_NOVA_INPUT_OVERFLOW_MESSAGE,
+                CoreCode.MODEL_CONTEXT_EXCEEDED,
+            ),
+            (
+                "titan_input_overflow",
+                400,
+                "ValidationException",
+                DirectProviderQuotaCases.BEDROCK_TITAN_INPUT_OVERFLOW_MESSAGE,
+                CoreCode.MODEL_CONTEXT_EXCEEDED,
+            ),
             (
                 "openai_engine_input_overflow",
                 400,
                 "ValidationException",
-                _TestData.BEDROCK_OPENAI_ENGINE_INPUT_OVERFLOW_MESSAGE,
+                DirectProviderQuotaCases.BEDROCK_OPENAI_ENGINE_INPUT_OVERFLOW_MESSAGE,
                 CoreCode.MODEL_CONTEXT_EXCEEDED,
             ),
         ],
@@ -321,16 +364,16 @@ class TestDirectProviderQuotaClassification:
             (
                 "service_quota_exceeded",
                 400,
-                _TestData.BEDROCK_SERVICE_QUOTA_ERROR_TYPE_HEADER,
-                _TestData.BEDROCK_SERVICE_QUOTA_MESSAGE,
+                DirectProviderQuotaCases.BEDROCK_SERVICE_QUOTA_ERROR_TYPE_HEADER,
+                DirectProviderQuotaCases.BEDROCK_SERVICE_QUOTA_MESSAGE,
                 CoreCode.PROVIDER_RATE_LIMITED,
                 "ServiceQuotaExceededException",
             ),
             (
                 "throttling",
                 429,
-                _TestData.BEDROCK_THROTTLING_ERROR_TYPE_HEADER,
-                _TestData.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE,
+                DirectProviderQuotaCases.BEDROCK_THROTTLING_ERROR_TYPE_HEADER,
+                DirectProviderQuotaCases.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE,
                 CoreCode.PROVIDER_RATE_LIMITED,
                 "ThrottlingException",
             ),
@@ -366,14 +409,14 @@ class TestDirectProviderQuotaClassification:
             url="https://test.openai.azure.com/openai/deployments/gpt-image-1/images/generations",
             status_code=429,
             content=json.dumps({"error": {"code": "429", "message": "Requests to the deployment have exceeded the rate limit."}}),
-            headers=_TestData.AZURE_RETRY_AFTER_HEADERS,
+            headers=DirectProviderQuotaCases.AZURE_RETRY_AFTER_HEADERS,
         )
         with pytest.raises(httpx.HTTPStatusError) as exc_info:
             response.raise_for_status()
 
         metadata = extract_azure_metadata(exc_info.value)
 
-        assert metadata.retry_after_seconds == _TestData.AZURE_RETRY_AFTER_MS_SECONDS
+        assert metadata.retry_after_seconds == DirectProviderQuotaCases.AZURE_RETRY_AFTER_MS_SECONDS
         _assert_classified(metadata=metadata, family=InferenceErrorFamily.IMG_GEN, expected_error_code=CoreCode.PROVIDER_RATE_LIMITED)
 
     @pytest.mark.parametrize(("aws_error_code", "status_code"), _BEDROCK_RUNTIME_ERRORS)

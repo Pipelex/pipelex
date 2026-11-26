@@ -10,7 +10,7 @@ from pipelex.core.stuffs.stuff_viewer import (
 )
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
-from tests.unit.pipelex.core.stuffs.data import StuffViewerTestData
+from tests.unit.pipelex.core.stuffs.data import StuffViewerCases
 
 
 class TestGetHtmlTabLabel:
@@ -18,7 +18,7 @@ class TestGetHtmlTabLabel:
 
     @pytest.mark.parametrize(
         ("content_type", "expected_label"),
-        StuffViewerTestData.TAB_LABEL_CASES,
+        StuffViewerCases.TAB_LABEL_CASES,
     )
     def test_returns_correct_label(self, content_type: str | None, expected_label: str) -> None:
         """Test that content type maps to correct tab label."""
@@ -171,7 +171,7 @@ class TestRenderStuffViewer:
 
     async def test_renders_text_content(self) -> None:
         """Test rendering TextContent produces valid HTML."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -180,7 +180,7 @@ class TestRenderStuffViewer:
 
     async def test_renders_html_content(self) -> None:
         """Test rendering HtmlContent."""
-        stuff = StuffViewerTestData.make_html_stuff()
+        stuff = StuffViewerCases.make_html_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -189,7 +189,7 @@ class TestRenderStuffViewer:
 
     async def test_renders_image_content_with_image_tab_label(self) -> None:
         """Test that ImageContent has Image tab label."""
-        stuff = StuffViewerTestData.make_image_stuff()
+        stuff = StuffViewerCases.make_image_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -197,7 +197,7 @@ class TestRenderStuffViewer:
 
     async def test_renders_pdf_content_with_pdf_tab_label(self) -> None:
         """Test that DocumentContent has PDF tab label."""
-        stuff = StuffViewerTestData.make_pdf_stuff()
+        stuff = StuffViewerCases.make_pdf_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -205,7 +205,7 @@ class TestRenderStuffViewer:
 
     async def test_renders_mermaid_content(self) -> None:
         """Test rendering MermaidContent."""
-        stuff = StuffViewerTestData.make_mermaid_stuff()
+        stuff = StuffViewerCases.make_mermaid_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -214,7 +214,7 @@ class TestRenderStuffViewer:
 
     async def test_uses_stuff_title_when_no_custom_title(self) -> None:
         """Test that stuff.title is used when no custom title provided."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -223,7 +223,7 @@ class TestRenderStuffViewer:
 
     async def test_uses_concept_code_for_default_subtitle(self) -> None:
         """Test that default subtitle contains concept code."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -231,7 +231,7 @@ class TestRenderStuffViewer:
 
     async def test_custom_title_overrides_stuff_title(self) -> None:
         """Test that custom title overrides stuff title."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
         custom_title = "My Custom Title"
 
         html = await render_stuff_viewer(stuff, title=custom_title)
@@ -240,7 +240,7 @@ class TestRenderStuffViewer:
 
     async def test_custom_subtitle_overrides_default(self) -> None:
         """Test that custom subtitle overrides default."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
         custom_subtitle = "My Custom Subtitle"
 
         html = await render_stuff_viewer(stuff, subtitle=custom_subtitle)
@@ -249,7 +249,7 @@ class TestRenderStuffViewer:
 
     async def test_html_structure_contains_required_elements(self) -> None:
         """Test that generated HTML has all required elements."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -261,7 +261,7 @@ class TestRenderStuffViewer:
 
     async def test_embeds_json_data_in_html(self) -> None:
         """Test that JSON data is embedded in the HTML."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -270,7 +270,7 @@ class TestRenderStuffViewer:
 
     async def test_embeds_pretty_text_in_html(self) -> None:
         """Test that pretty text representation is embedded."""
-        stuff = StuffViewerTestData.make_text_stuff()
+        stuff = StuffViewerCases.make_text_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -279,7 +279,7 @@ class TestRenderStuffViewer:
 
     async def test_embeds_html_content_in_html(self) -> None:
         """Test that HTML content representation is embedded."""
-        stuff = StuffViewerTestData.make_html_stuff()
+        stuff = StuffViewerCases.make_html_stuff()
 
         html = await render_stuff_viewer(stuff)
 
@@ -288,7 +288,7 @@ class TestRenderStuffViewer:
 
     async def test_special_characters_are_escaped(self) -> None:
         """Test that special characters are properly escaped for XSS prevention."""
-        stuff = StuffViewerTestData.make_special_chars_stuff()
+        stuff = StuffViewerCases.make_special_chars_stuff()
 
         html = await render_stuff_viewer(stuff)
 

@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
-from tests.unit.pipelex.core.concepts.concept_factory.data import TestCases
+from tests.unit.pipelex.core.concepts.concept_factory.data import ConceptFactoryCases
 
 
 class TestConceptFactory:
@@ -18,7 +18,7 @@ class TestConceptFactory:
 
     @pytest.mark.parametrize(
         ("test_name", "domain_code", "blueprint", "expected_result"),
-        TestCases.MAKE_REFINES_TEST_CASES,
+        ConceptFactoryCases.MAKE_REFINES_TEST_CASES,
     )
     def test_make_refine(
         self,
@@ -85,7 +85,7 @@ class TestConceptFactory:
 
     @pytest.mark.parametrize(
         ("domain_code", "concept_ref_or_code", "expected_result"),
-        TestCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
+        ConceptFactoryCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
     )
     def test_make_domain_and_concept_code_from_concept_ref_or_code(
         self,
@@ -101,7 +101,7 @@ class TestConceptFactory:
 
     @pytest.mark.parametrize(
         ("test_name", "domain_code", "concept_code", "blueprint", "expected_concept"),
-        TestCases.MAKE_FROM_BLUEPRINT_TEST_CASES,
+        ConceptFactoryCases.MAKE_FROM_BLUEPRINT_TEST_CASES,
     )
     def test_make_from_blueprint(
         self,

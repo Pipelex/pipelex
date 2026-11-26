@@ -18,7 +18,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
-from tests.e2e.pipelex.pipes.pipe_controller.pipe_batch.test_data import JokeBatchGraphExpectations
+from tests.e2e.pipelex.pipes.pipe_controller.pipe_batch.cases import JokeBatchGraphExpectations
 
 
 def _get_next_output_folder() -> Path:

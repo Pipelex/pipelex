@@ -37,8 +37,8 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.uri.uri_bytes import UriBytes
 from pipelex.validation_error_types import TemplateCheckErrorType
 from tests.helpers.office_files import DOCX_MIME_TYPE, XLSX_MIME_TYPE, docx_bytes, xlsx_bytes
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, only_problem_item, refusal_messages
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _APPEND_MTHDS = """
 domain = "doc_gen_append"
@@ -275,7 +275,7 @@ class TestPipeDocGenTemplateInput:
 
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "templates/invoice.docx"')],
+                mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "docx"\ntemplate_file = "templates/invoice.docx"')],
                 submitted_files={"templates/invoice.docx": b"PK docx template bytes"},
             )
 

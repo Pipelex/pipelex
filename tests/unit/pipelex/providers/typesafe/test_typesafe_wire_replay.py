@@ -15,7 +15,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.providers.typesafe.typesafe_judgment_worker import TypesafeJudgmentWorker
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from tests.unit.pipelex.providers.typesafe.test_data import WIRE_ERROR_MAPPINGS, WireCase, load_wire_case, wire_case_names
+from tests.unit.pipelex.providers.typesafe.cases import WIRE_ERROR_MAPPINGS, WireCase, load_wire_case, wire_case_names
 
 # Not a credential: the replay transport never leaves the process, and the SDK refuses to build a client without some key.
 _REPLAY_ONLY_KEY = "wire-replay-sends-nothing"

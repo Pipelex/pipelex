@@ -7,7 +7,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.e2e.pipelex.pipes.pipe_operators.pipe_extract.test_data import PipeExtractTestCases
+from tests.e2e.pipelex.pipes.pipe_operators.pipe_extract.cases import PipeExtractTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_extract"]
 

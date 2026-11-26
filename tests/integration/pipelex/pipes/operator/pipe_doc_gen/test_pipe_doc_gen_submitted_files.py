@@ -22,6 +22,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
     RecordingMethodFileStore,
@@ -33,7 +34,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "templates/invoice.docx"'
 _DOCX_BYTES = b"PK docx template bytes"
@@ -61,7 +61,7 @@ async def _load_from_content(*, load: str, content: str, submitted_files: dict[s
         case "validate":
             await validate_bundle(mthds_contents=[content], submitted_files=submitted_files)
         case _:
-            await PipelexMTHDSProtocol(submitted_files=submitted_files).execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
+            await PipelexMTHDSProtocol(submitted_files=submitted_files).execute(mthds_contents=[content], inputs=PipeDocGenCases.INVOICE_INPUTS)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -69,7 +69,7 @@ class TestPipeDocGenSubmittedFiles:
     async def test_a_bundle_validates_with_its_template_file_and_the_check_runs_on_its_bytes(self, stub_engines: StubEngines) -> None:
         """The dry run hands the engine's checker the bytes submitted with the bundle, found by the path the step names."""
         await validate_bundle(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
             submitted_files=_docx_files(),
         )
 
@@ -82,7 +82,7 @@ class TestPipeDocGenSubmittedFiles:
     ) -> None:
         """Blueprint validation accepts `templates//invoice.docx`, so the step finds the file submitted as `templates/invoice.docx`."""
         await validate_bundle(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "templates//invoice.docx"')],
+            mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "docx"\ntemplate_file = "templates//invoice.docx"')],
             submitted_files={"templates/invoice.docx": _DOCX_BYTES},
         )
 
@@ -94,7 +94,7 @@ class TestPipeDocGenSubmittedFiles:
 
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
                 submitted_files=_docx_files(),
             )
 
@@ -106,7 +106,7 @@ class TestPipeDocGenSubmittedFiles:
     async def test_a_template_file_not_supplied_is_refused_saying_so(self) -> None:
         """The refusal is the bundle's verdict, located on the step, and names the path the file is expected under."""
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)])
+            await validate_bundle(mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)])
 
         item = only_problem_item(exc_info.value)
         assert item.code == CoreCode.METHOD_RESOURCE_MISSING
@@ -127,7 +127,7 @@ class TestPipeDocGenSubmittedFiles:
         Whatever the request sends, the step is the verdict's one item, a blueprint one located at the step, which
         names the field and never repeats the path, rather than a load refusal saying the file was not supplied.
         """
-        content = PipeDocGenTestData.bundle(step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
+        content = PipeDocGenCases.bundle(step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
         submitted_files = {"invoice.docx": _DOCX_BYTES} if sends_a_file else None
 
         with pytest.raises(ValidateBundleError) as exc_info:
@@ -152,7 +152,7 @@ class TestPipeDocGenSubmittedFiles:
 
         await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)], pipe_run_mode=PipeRunMode.DRY).execute(
             mthds_contents=[bundle_path.read_text(encoding="utf-8")],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         assert [check_request.template for check_request in stub_engines.check_requests] == [_DOCX_BYTES]
@@ -165,8 +165,8 @@ class TestPipeDocGenSubmittedFiles:
 
         with pytest.raises(ValidateBundleError) as exc_info:
             await PipelexMTHDSProtocol(bundle_uris=[bundle_uri], pipe_run_mode=PipeRunMode.DRY).execute(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=_ESCAPING_DOCX_STEP)],
-                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=_ESCAPING_DOCX_STEP)],
+                inputs=PipeDocGenCases.INVOICE_INPUTS,
             )
 
         (item,) = exc_info.value.validation_error_items() or []
@@ -185,8 +185,8 @@ class TestPipeDocGenSubmittedFiles:
         """
         bundle_path = _bundle_file_climbing_in_its_method_tree(method_dir=tmp_path)
         read_here = (bundle_path.read_text(encoding="utf-8"), str(bundle_path))
-        under_a_label = (PipeDocGenTestData.bundle_in_the_other_domain(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP), "invoice-printer")
-        escaping_under_a_label = (PipeDocGenTestData.bundle_in_the_other_domain(step_fields=_ESCAPING_DOCX_STEP), "invoice-printer")
+        under_a_label = (PipeDocGenCases.bundle_in_the_other_domain(step_fields=PipeDocGenCases.PDF_LAYOUT_STEP), "invoice-printer")
+        escaping_under_a_label = (PipeDocGenCases.bundle_in_the_other_domain(step_fields=_ESCAPING_DOCX_STEP), "invoice-printer")
 
         def _ordered(other: tuple[str, str]) -> list[tuple[str, str]]:
             return [read_here, other] if file_first else [other, read_here]
@@ -195,7 +195,7 @@ class TestPipeDocGenSubmittedFiles:
         await PipelexMTHDSProtocol(bundle_uris=[uri for _, uri in entries], pipe_run_mode=PipeRunMode.DRY).execute(
             pipe_code="doc_gen_tests.print_invoice",
             mthds_contents=[content for content, _ in entries],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
         assert [check_request.template for check_request in stub_engines.check_requests] == [_DOCX_BYTES]
 
@@ -204,12 +204,12 @@ class TestPipeDocGenSubmittedFiles:
             await PipelexMTHDSProtocol(bundle_uris=[uri for _, uri in entries], pipe_run_mode=PipeRunMode.DRY).execute(
                 pipe_code="doc_gen_tests.print_invoice",
                 mthds_contents=[content for content, _ in entries],
-                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+                inputs=PipeDocGenCases.INVOICE_INPUTS,
             )
         (item,) = exc_info.value.validation_error_items() or []
         assert (item.category, item.domain_code, item.pipe_code) == (
             ValidationErrorCategory.BLUEPRINT_VALIDATION,
-            PipeDocGenTestData.OTHER_DOMAIN,
+            PipeDocGenCases.OTHER_DOMAIN,
             "print_invoice",
         )
         assert "it leaves the bundle through a '..' segment" in item.message
@@ -219,7 +219,7 @@ class TestPipeDocGenSubmittedFiles:
         submitted_files = {"templates/invoice.docx": _DOCX_BYTES, "templates/logo.png": b"png"}
 
         with pytest.raises(BundleResourceNotNamedError) as exc_info:
-            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)], submitted_files=submitted_files)
+            await validate_bundle(mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)], submitted_files=submitted_files)
 
         assert "'templates/logo.png'" in exc_info.value.message
 
@@ -228,7 +228,7 @@ class TestPipeDocGenSubmittedFiles:
         """An HTML template file is checked against the inputs at load, as one beside a bundle on disk is."""
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')],
+                mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')],
                 submitted_files={"invoice.html": b"<h1>{{ invoice.numbr }}</h1>"},
             )
 
@@ -236,8 +236,8 @@ class TestPipeDocGenSubmittedFiles:
 
     async def test_a_run_prints_with_the_submitted_html_template(self, stub_engines: StubEngines) -> None:
         await PipelexMTHDSProtocol(submitted_files={"invoice.html": b"<h1>{{ invoice.number }}</h1>"}).execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         (job,) = stub_engines.engine.jobs
@@ -246,8 +246,8 @@ class TestPipeDocGenSubmittedFiles:
 
     async def test_a_run_hands_the_engine_the_submitted_template_file(self, stub_engines: StubEngines) -> None:
         result = await PipelexMTHDSProtocol(submitted_files=_docx_files()).execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
@@ -261,8 +261,8 @@ class TestPipeDocGenSubmittedFiles:
 
     async def test_a_dry_run_checks_the_submitted_template_file_and_prints_nothing(self, stub_engines: StubEngines) -> None:
         result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, submitted_files=_docx_files()).execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         document = result.pipe_output.main_stuff_as(content_type=DocumentContent)
@@ -298,8 +298,8 @@ class TestPipeDocGenSubmittedFiles:
         render_spy = mocker.spy(DocGenTemplateFileStage, "render_html_template_file")
 
         await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode, submitted_files=submitted_files).execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)],
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         (received_crate,) = remote_worker.received_crates
@@ -343,8 +343,8 @@ class TestPipeDocGenSubmittedFiles:
 
         with pytest.raises(PipelexError) as exc_info:
             await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, submitted_files=_docx_files()).execute(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
-                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+                inputs=PipeDocGenCases.INVOICE_INPUTS,
             )
 
         assert remote_worker.received_crates
@@ -386,7 +386,7 @@ class TestPipeDocGenSubmittedFiles:
 
         await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)], pipe_run_mode=pipe_run_mode).execute(
             mthds_contents=[bundle_path.read_text(encoding="utf-8")],
-            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            inputs=PipeDocGenCases.INVOICE_INPUTS,
         )
 
         match pipe_run_mode:
@@ -403,12 +403,12 @@ class TestPipeDocGenSubmittedFiles:
         bundle_path = write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP)
         (tmp_path / "templates").mkdir()
         (tmp_path / "templates" / "invoice.docx").write_bytes(_DOCX_BYTES)
-        content = PipeDocGenTestData.bundle(step_fields=f'{_DOCX_TEMPLATE_STEP}\nsource = "{bundle_path}"')
+        content = PipeDocGenCases.bundle(step_fields=f'{_DOCX_TEMPLATE_STEP}\nsource = "{bundle_path}"')
 
         with pytest.raises(ValidateBundleError) as validate_exc_info:
             await validate_bundle(mthds_contents=[content])
         with pytest.raises(ValidateBundleError) as run_exc_info:
-            await PipelexMTHDSProtocol().execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
+            await PipelexMTHDSProtocol().execute(mthds_contents=[content], inputs=PipeDocGenCases.INVOICE_INPUTS)
 
         for exc_info in (validate_exc_info, run_exc_info):
             assert "which was not supplied with its bundle" in refusal_messages(exc_info.value)
@@ -427,14 +427,14 @@ class TestPipeDocGenSubmittedFiles:
         host_dir.mkdir()
         step_fields = 'format = "docx"\ntemplate_file = "invoice.docx"'
         (host_dir / "invoice.mthds").write_text(
-            PipeDocGenTestData.bundle(step_fields=step_fields).replace("doc_gen_tests", "doc_gen_host"), encoding="utf-8"
+            PipeDocGenCases.bundle(step_fields=step_fields).replace("doc_gen_tests", "doc_gen_host"), encoding="utf-8"
         )
         (host_dir / "invoice.docx").write_bytes(b"host template")
         submitted = {"invoice.docx": b"submitted template"}
-        host_inputs: dict[str, Any] = {"invoice": {**PipeDocGenTestData.INVOICE_INPUTS["invoice"], "concept": "doc_gen_host.Invoice"}}
+        host_inputs: dict[str, Any] = {"invoice": {**PipeDocGenCases.INVOICE_INPUTS["invoice"], "concept": "doc_gen_host.Invoice"}}
         runs: list[tuple[str, dict[str, Any]]] = [
             ("doc_gen_host.print_invoice", host_inputs),
-            ("doc_gen_tests.print_invoice", PipeDocGenTestData.INVOICE_INPUTS),
+            ("doc_gen_tests.print_invoice", PipeDocGenCases.INVOICE_INPUTS),
         ]
 
         if is_remote:
@@ -443,7 +443,7 @@ class TestPipeDocGenSubmittedFiles:
         for pipe_code, inputs in runs:
             await PipelexMTHDSProtocol(library_dirs=[str(host_dir)], submitted_files=submitted).execute(
                 pipe_code=pipe_code,
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
+                mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)],
                 inputs=inputs,
             )
 

@@ -17,7 +17,7 @@ from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.errors.problem import ProblemView
-from tests.unit.pipelex.cogt.test_data import GatewayThrottleTestData
+from tests.unit.pipelex.cogt.cases import GatewayThrottleCases
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -69,14 +69,14 @@ class TestGatewayThrottleClassification:
         quota-increase page decides nothing: the refusal is ``provider.rate_limited``, repeated within the run, and
         carries Azure's 57 seconds, where it used to fail at once as ``provider.quota_exhausted``.
         """
-        exc = raise_it(body=GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER)
+        exc = raise_it(body=GatewayThrottleCases.AZURE_RATE_LIMIT_BODY, retry_after=GatewayThrottleCases.AZURE_RETRY_AFTER)
 
         metadata = extract_gateway_metadata(exc)
         classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
 
         assert metadata.provider == ProviderName.GATEWAY
         assert metadata.status_code == 429
-        assert metadata.provider_error_code == GatewayThrottleTestData.AZURE_RATE_LIMIT_CODE
+        assert metadata.provider_error_code == GatewayThrottleCases.AZURE_RATE_LIMIT_CODE
         assert metadata.retry_after_seconds == 57
         assert "quota" in metadata.message
         assert metadata.limit_verdict is ProviderLimitVerdict.RATE_LIMITED
@@ -104,14 +104,14 @@ class TestGatewayThrottleClassification:
     def test_azure_s_delay_in_milliseconds_is_read_before_its_seconds(self, raise_it: Callable[..., BaseException]) -> None:
         """Azure sends its delay twice, in milliseconds and in rounded seconds, and the milliseconds are the wait read."""
         exc = raise_it(
-            body=GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY,
-            retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER,
-            extra_headers={"retry-after-ms": GatewayThrottleTestData.AZURE_RETRY_AFTER_MS},
+            body=GatewayThrottleCases.AZURE_RATE_LIMIT_BODY,
+            retry_after=GatewayThrottleCases.AZURE_RETRY_AFTER,
+            extra_headers={"retry-after-ms": GatewayThrottleCases.AZURE_RETRY_AFTER_MS},
         )
 
         metadata = extract_gateway_metadata(exc)
 
-        assert metadata.retry_after_seconds == GatewayThrottleTestData.AZURE_RETRY_AFTER_MS_SECONDS
+        assert metadata.retry_after_seconds == GatewayThrottleCases.AZURE_RETRY_AFTER_MS_SECONDS
         assert classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN).error_code == CoreCode.PROVIDER_RATE_LIMITED
 
     @pytest.mark.parametrize("raise_it", _HOPS)
@@ -121,17 +121,17 @@ class TestGatewayThrottleClassification:
         The gateway's Extract step keeps the code and the OpenAI one the type, so the rule reads both off the body. The
         code is built: one OpenAI's guide does not name.
         """
-        body = copy.deepcopy(GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY)
-        body["error"]["type"] = GatewayThrottleTestData.OPENAI_QUOTA_CODE
+        body = copy.deepcopy(GatewayThrottleCases.AZURE_RATE_LIMIT_BODY)
+        body["error"]["type"] = GatewayThrottleCases.OPENAI_QUOTA_CODE
         body["error"]["code"] = "quota_code_not_in_the_set"
-        _, response = _gateway_response(body=body, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER)
+        _, response = _gateway_response(body=body, retry_after=GatewayThrottleCases.AZURE_RETRY_AFTER)
         direct_client = openai.OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
         direct_metadata = extract_openai_metadata(direct_client._make_status_error_from_response(response))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        gateway_metadata = extract_gateway_metadata(raise_it(body=body, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER))
+        gateway_metadata = extract_gateway_metadata(raise_it(body=body, retry_after=GatewayThrottleCases.AZURE_RETRY_AFTER))
 
         assert gateway_metadata.provider_error_code == "quota_code_not_in_the_set"
-        assert direct_metadata.provider_error_code == GatewayThrottleTestData.OPENAI_QUOTA_CODE
+        assert direct_metadata.provider_error_code == GatewayThrottleCases.OPENAI_QUOTA_CODE
         for metadata in (gateway_metadata, direct_metadata):
             assert metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED
             assert classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN).error_code == CoreCode.PROVIDER_QUOTA_EXHAUSTED
@@ -139,11 +139,11 @@ class TestGatewayThrottleClassification:
     @pytest.mark.parametrize(
         ("error_type", "error_code"),
         [
-            pytest.param(None, GatewayThrottleTestData.OPENAI_QUOTA_CODE, id="broad-code"),
+            pytest.param(None, GatewayThrottleCases.OPENAI_QUOTA_CODE, id="broad-code"),
             # OpenAI's billing shape: the cause in `code`, which the Extract step reads before the broad `type`
             pytest.param(
-                GatewayThrottleTestData.OPENAI_QUOTA_CODE,
-                GatewayThrottleTestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE,
+                GatewayThrottleCases.OPENAI_QUOTA_CODE,
+                GatewayThrottleCases.OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE,
                 id="billing-code-beside-the-broad-type",
             ),
         ],
@@ -153,10 +153,10 @@ class TestGatewayThrottleClassification:
         self, raise_it: Callable[..., BaseException], error_type: str | None, error_code: str
     ) -> None:
         """The contrast: only the provider's code changes, and the code alone makes the 429 a spent quota."""
-        body = copy.deepcopy(GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY)
+        body = copy.deepcopy(GatewayThrottleCases.AZURE_RATE_LIMIT_BODY)
         body["error"]["type"] = error_type
         body["error"]["code"] = error_code
-        exc = raise_it(body=body, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER)
+        exc = raise_it(body=body, retry_after=GatewayThrottleCases.AZURE_RETRY_AFTER)
 
         metadata = extract_gateway_metadata(exc)
         classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)

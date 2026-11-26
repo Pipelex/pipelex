@@ -25,7 +25,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.test_data import ValidationDetailBundles
+from tests.integration.pipelex.cases import ValidationDetailBundles
 
 # The sentence `pipe.output_multiplicity` renders for the parallel whose plural branch feeds a single field.
 _MULTIPLICITY_SENTENCE = "Pipe 'analyze_topic' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'."

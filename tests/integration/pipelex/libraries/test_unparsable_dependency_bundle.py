@@ -18,15 +18,15 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
+from tests.integration.pipelex.libraries.cases import ProbePackageCases
 from tests.integration.pipelex.libraries.installed_packages import install_probe_globally, isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
-PROBE_ALIAS = ProbePackageTestData.DEP_ALIAS
+PROBE_ALIAS = ProbePackageCases.DEP_ALIAS
 
 # The probe package's bundle, made unparsable as TOML and as a blueprint.
 UNPARSABLE_BUNDLES: dict[str, str] = {
     "toml syntax": 'domain = "probe_dep"\n\n[pipe.entry\ntype = "PipeLLM"\n',
-    "invalid blueprint": ProbePackageTestData.DEP_BUNDLE.replace(
+    "invalid blueprint": ProbePackageCases.DEP_BUNDLE.replace(
         'domain      = "probe_dep"', 'domain      = "probe_dep"\nmain_pipe   = "Not A Pipe Code!"'
     ),
 }
@@ -46,7 +46,7 @@ class TestUnparsableDependencyBundle:
         methods_dir = vendor_probe(methods_dir=tmp_path / "request-methods", bundle=UNPARSABLE_BUNDLES[broken])
 
         with pytest.raises(ValidateBundleError) as exc_info:
-            acquire_library(library_id="", mthds_contents=[ProbePackageTestData.CONSUMER_BUNDLE], methods_dirs=[methods_dir])
+            acquire_library(library_id="", mthds_contents=[ProbePackageCases.CONSUMER_BUNDLE], methods_dirs=[methods_dir])
 
         verdict = exc_info.value
         items = verdict.validation_error_items() or []
@@ -62,7 +62,7 @@ class TestUnparsableDependencyBundle:
         install_probe_globally(root=tmp_path, bundle=UNPARSABLE_BUNDLES["toml syntax"])
 
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_contents=[ProbePackageTestData.CONSUMER_BUNDLE])
+            await validate_bundle(mthds_contents=[ProbePackageCases.CONSUMER_BUNDLE])
 
         verdict = exc_info.value
         items = verdict.validation_error_items() or []

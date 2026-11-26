@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex.core.stuffs.json_content import JSONContent
-from tests.unit.pipelex.core.stuffs.json_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.json_content.cases import JsonContentCases
 
 
 class TestJSONContentSmartDump:
@@ -11,23 +11,23 @@ class TestJSONContentSmartDump:
 
     def test_smart_dump_returns_dict(self):
         """Verify smart_dump returns a dict with json_obj key."""
-        content = JSONContent(json_obj=TestData.SAMPLE_JSON_OBJ)
+        content = JSONContent(json_obj=JsonContentCases.SAMPLE_JSON_OBJ)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP
+        assert result == JsonContentCases.EXPECTED_SMART_DUMP
         assert isinstance(result, dict)
 
     def test_smart_dump_with_nested_json(self):
         """Verify smart_dump handles nested JSON objects."""
-        content = JSONContent(json_obj=TestData.SAMPLE_NESTED_JSON_OBJ)
+        content = JSONContent(json_obj=JsonContentCases.SAMPLE_NESTED_JSON_OBJ)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP_NESTED
+        assert result == JsonContentCases.EXPECTED_SMART_DUMP_NESTED
         assert isinstance(result, dict)
 
     def test_smart_dump_empty_object(self):
         """Verify smart_dump handles empty JSON object."""
-        content = JSONContent(json_obj=TestData.EMPTY_JSON_OBJ)
+        content = JSONContent(json_obj=JsonContentCases.EMPTY_JSON_OBJ)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP_EMPTY
+        assert result == JsonContentCases.EXPECTED_SMART_DUMP_EMPTY
         assert isinstance(result, dict)
 
     @pytest.mark.parametrize(

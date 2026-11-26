@@ -32,7 +32,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, JsonLogSink
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE, LOGGING_LEVEL_VERBOSE_NAME
-from tests.integration.pipelex.pipeline.test_data import LogMarkupTestData
+from tests.integration.pipelex.pipeline.cases import LogMarkupCases
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -97,9 +97,7 @@ class TestLogMessagesCarryNoMarkup:
         buffer = io.StringIO()
 
         with _json_sink_on_root(buffer=buffer):
-            response = await runner.execute(
-                pipe_code=LogMarkupTestData.MAIN_PIPE, mthds_contents=[LogMarkupTestData.MTHDS], inputs=LogMarkupTestData.INPUTS
-            )
+            response = await runner.execute(pipe_code=LogMarkupCases.MAIN_PIPE, mthds_contents=[LogMarkupCases.MTHDS], inputs=LogMarkupCases.INPUTS)
 
         lines: list[dict[str, Any]] = [json.loads(line) for line in buffer.getvalue().splitlines() if line]
         assert response.pipe_output.main_stuff_as_text.require_text() == f"Stand-in name works in Stand-in sector: {STAND_IN_ANSWER}"

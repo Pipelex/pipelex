@@ -27,7 +27,7 @@ from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.storage.storage_file_name import STORAGE_FILE_EXTENSION_PATTERN, STORAGE_FILE_STEM_PATTERN
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.tools.uri.exceptions import UriReadRefusedError
-from tests.integration.pipelex.pipeline.test_data import LargeTextsStoredTestData
+from tests.integration.pipelex.pipeline.cases import LargeTextsStoredCases
 
 # No `from __future__ import annotations`: the function a `PipeFunc` calls has its annotations read when it is bound.
 STORAGE_URI_SCHEME = "pipelex-storage://"
@@ -35,17 +35,17 @@ STORAGE_URI_SCHEME = "pipelex-storage://"
 
 @pipe_func()
 def large_texts_return_text(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument] - a PipeFunc's signature
-    return TextContent(text=LargeTextsStoredTestData.FUNCTION_TEXT)
+    return TextContent(text=LargeTextsStoredCases.FUNCTION_TEXT)
 
 
 @pipe_func()
 def large_texts_return_html(working_memory: WorkingMemory) -> HtmlContent:  # ruff: ignore[unused-function-argument] - a PipeFunc's signature
-    return HtmlContent(inner_html=LargeTextsStoredTestData.FUNCTION_INNER_HTML)
+    return HtmlContent(inner_html=LargeTextsStoredCases.FUNCTION_INNER_HTML)
 
 
 @pipe_func()
 def large_texts_return_json(working_memory: WorkingMemory) -> JSONContent:  # ruff: ignore[unused-function-argument] - a PipeFunc's signature
-    return JSONContent(json_obj=LargeTextsStoredTestData.FUNCTION_JSON_OBJ)
+    return JSONContent(json_obj=LargeTextsStoredCases.FUNCTION_JSON_OBJ)
 
 
 @pipe_func()
@@ -59,7 +59,7 @@ class LongReportLLMWorker(LLMWorkerAbstract):
 
     @override
     async def _gen_text(self, llm_job: LLMJob) -> str:
-        return LargeTextsStoredTestData.GENERATED_TEXT
+        return LargeTextsStoredCases.GENERATED_TEXT
 
     @override
     async def _gen_object(self, llm_job: LLMJob, *, schema: type[BaseModelTypeVar]) -> BaseModelTypeVar:
@@ -86,12 +86,12 @@ def _long_report_worker() -> LongReportLLMWorker:
 
 def _run_storage_scope() -> str:
     """A storage scope of its own for each run, under the read scope, as a hosted run's is."""
-    return f"{LargeTextsStoredTestData.READ_SCOPE}/mt_large_texts/run_{uuid4().hex}"
+    return f"{LargeTextsStoredCases.READ_SCOPE}/mt_large_texts/run_{uuid4().hex}"
 
 
 async def _execute(*, pipe_code: str, inputs: dict[str, Any], storage_scope: str, pipe_run_mode: PipeRunMode | None = None) -> PipeOutput:
-    protocol = PipelexMTHDSProtocol(storage_scope=storage_scope, read_scope=LargeTextsStoredTestData.READ_SCOPE, pipe_run_mode=pipe_run_mode)
-    result = await protocol.execute(pipe_code=pipe_code, mthds_contents=[LargeTextsStoredTestData.MTHDS], inputs=inputs)
+    protocol = PipelexMTHDSProtocol(storage_scope=storage_scope, read_scope=LargeTextsStoredCases.READ_SCOPE, pipe_run_mode=pipe_run_mode)
+    result = await protocol.execute(pipe_code=pipe_code, mthds_contents=[LargeTextsStoredCases.MTHDS], inputs=inputs)
     return result.pipe_output
 
 
@@ -116,14 +116,14 @@ class TestLargeTextsStoredAtProduction:
     @pytest.mark.parametrize(
         ("pipe_code", "content_class", "stored_text", "mime_type", "extension"),
         [
-            ("write_report", TextContent, LargeTextsStoredTestData.GENERATED_TEXT, "text/plain", "txt"),
-            ("write_markdown_report", MarkdownContent, LargeTextsStoredTestData.GENERATED_TEXT, "text/markdown", "md"),
-            ("return_text", TextContent, LargeTextsStoredTestData.FUNCTION_TEXT, "text/plain", "txt"),
-            ("return_html", HtmlContent, LargeTextsStoredTestData.FUNCTION_INNER_HTML, "text/html", "html"),
+            ("write_report", TextContent, LargeTextsStoredCases.GENERATED_TEXT, "text/plain", "txt"),
+            ("write_markdown_report", MarkdownContent, LargeTextsStoredCases.GENERATED_TEXT, "text/markdown", "md"),
+            ("return_text", TextContent, LargeTextsStoredCases.FUNCTION_TEXT, "text/plain", "txt"),
+            ("return_html", HtmlContent, LargeTextsStoredCases.FUNCTION_INNER_HTML, "text/html", "html"),
             (
                 "return_json",
                 JSONContent,
-                json.dumps(LargeTextsStoredTestData.FUNCTION_JSON_OBJ, ensure_ascii=False),
+                json.dumps(LargeTextsStoredCases.FUNCTION_JSON_OBJ, ensure_ascii=False),
                 "application/json",
                 "json",
             ),
@@ -189,15 +189,15 @@ class TestLargeTextsStoredAtProduction:
     @pytest.mark.parametrize(
         ("pipe_code", "expected_text"),
         [
-            ("echo_notes", LargeTextsStoredTestData.CALLER_TEXT),
-            ("quote_notes", f"Quoted: {LargeTextsStoredTestData.CALLER_TEXT}"),
+            ("echo_notes", LargeTextsStoredCases.CALLER_TEXT),
+            ("quote_notes", f"Quoted: {LargeTextsStoredCases.CALLER_TEXT}"),
         ],
     )
     async def test_a_caller_url_input_is_read_where_a_step_reads_it(self, pipe_code: str, expected_text: str) -> None:
         """A text the caller stored and gives by URL reaches a function and a template whole, read under the run's read scope."""
-        notes_key = f"{LargeTextsStoredTestData.READ_SCOPE}/uploads/{uuid4().hex}/notes.txt"
+        notes_key = f"{LargeTextsStoredCases.READ_SCOPE}/uploads/{uuid4().hex}/notes.txt"
         notes_url = await get_storage_provider().store(
-            data=LargeTextsStoredTestData.CALLER_TEXT.encode("utf-8"), key=notes_key, content_type="text/plain; charset=utf-8"
+            data=LargeTextsStoredCases.CALLER_TEXT.encode("utf-8"), key=notes_key, content_type="text/plain; charset=utf-8"
         )
 
         pipe_output = await _execute(

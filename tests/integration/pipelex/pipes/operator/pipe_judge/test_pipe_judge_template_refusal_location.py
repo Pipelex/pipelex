@@ -8,7 +8,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData, PipeJudgeSeveralQuestionsTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.cases import PipeJudgeLoadCases, PipeJudgeSeveralQuestionsCases
 
 # A question that reads a private name its own source spells, which the sandbox refuses whatever the run's data.
 _REFUSED_QUESTION = "Is {{ message['_owner'] }} urgent?"
@@ -20,14 +20,14 @@ class TestPipeJudgeTemplateRefusalLocation:
         ("bundle", "expected_field"),
         [
             pytest.param(
-                PipeJudgeLoadTestData.bundle(question=_REFUSED_QUESTION, step_fields=f'model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"'),
+                PipeJudgeLoadCases.bundle(question=_REFUSED_QUESTION, step_fields=f'model = "{PipeJudgeLoadCases.JUDGMENT_MODEL}"'),
                 "question",
                 id="one_question",
             ),
             pytest.param(
-                PipeJudgeSeveralQuestionsTestData.bundle(
+                PipeJudgeSeveralQuestionsCases.bundle(
                     questions={
-                        **PipeJudgeSeveralQuestionsTestData.QUESTIONS,
+                        **PipeJudgeSeveralQuestionsCases.QUESTIONS,
                         "team": f'question = "{_REFUSED_QUESTION}"\noptions = {{ billing = "Charges", technical = "Errors" }}',
                     }
                 ),

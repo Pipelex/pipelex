@@ -18,7 +18,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
 
 
-class TestData:
+class PipeFuncValidationCases:
     """Test data for pipe_func validation error tests."""
 
     @staticmethod
@@ -214,11 +214,11 @@ class TestPipeFuncValidationErrors:
 
             # Create the .mthds file
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
+            mthds_file.write_text(PipeFuncValidationCases.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Create the .py file with the function (missing return type)
             py_file = temp_path / "my_funcs.py"
-            py_file.write_text(TestData.FUNC_WITH_DECORATOR_NO_RETURN_TYPE)
+            py_file.write_text(PipeFuncValidationCases.FUNC_WITH_DECORATOR_NO_RETURN_TYPE)
 
             # Validate the bundle - should fail with a CLEAR error message
             with pytest.raises(ValidateBundleError) as exc_info:
@@ -260,11 +260,11 @@ class TestPipeFuncValidationErrors:
 
             # Create the .mthds file
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
+            mthds_file.write_text(PipeFuncValidationCases.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Create the .py file with the function (WITH return type)
             py_file = temp_path / "my_funcs.py"
-            py_file.write_text(TestData.FUNC_WITH_DECORATOR_VALID)
+            py_file.write_text(PipeFuncValidationCases.FUNC_WITH_DECORATOR_VALID)
 
             # Validate the bundle - should succeed
             result = await _validate_and_release(
@@ -291,11 +291,11 @@ class TestPipeFuncValidationErrors:
 
             # Create the .py file with the function (missing return type)
             py_file = temp_path / "my_funcs.py"
-            py_file.write_text(TestData.FUNC_WITH_DECORATOR_NO_RETURN_TYPE)
+            py_file.write_text(PipeFuncValidationCases.FUNC_WITH_DECORATOR_NO_RETURN_TYPE)
 
             # Create .mthds file that references the function
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
+            mthds_file.write_text(PipeFuncValidationCases.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Try to validate - should fail with informative error
             with pytest.raises(ValidateBundleError) as exc_info:
@@ -326,8 +326,8 @@ class TestPipeFuncValidationErrors:
 
     @pytest.mark.parametrize(
         ("function_name", "python_code", "expected_error_substring"),
-        TestData.INELIGIBLE_FUNCTION_CASES,
-        ids=[case[0] for case in TestData.INELIGIBLE_FUNCTION_CASES],
+        PipeFuncValidationCases.INELIGIBLE_FUNCTION_CASES,
+        ids=[case[0] for case in PipeFuncValidationCases.INELIGIBLE_FUNCTION_CASES],
     )
     async def test_ineligible_function_returns_correct_error(
         self,
@@ -346,7 +346,7 @@ class TestPipeFuncValidationErrors:
 
             # Create the .mthds file referencing the function
             mthds_file = temp_path / "test_bundle.mthds"
-            mthds_file.write_text(TestData.make_mthds_content(function_name))
+            mthds_file.write_text(PipeFuncValidationCases.make_mthds_content(function_name))
 
             # Create the .py file with the ineligible function
             py_file = temp_path / "my_funcs.py"

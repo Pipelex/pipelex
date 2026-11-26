@@ -22,7 +22,7 @@ from tests.cases.images import ImageTestCases
 
 
 # Test data constants
-class TestWorkingMemoryData:
+class WorkingMemoryCases:
     """Test data and constants for WorkingMemory tests."""
 
     # Sample text content
@@ -70,7 +70,7 @@ def single_text_memory() -> WorkingMemory:
         stuff=StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             name="sample_text",
-            content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
+            content=TextContent(text=WorkingMemoryCases.SAMPLE_TEXT),
         ),
     )
 
@@ -111,7 +111,7 @@ def multiple_stuff_memory() -> WorkingMemory:
     document_stuff = StuffFactory.make_stuff(
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
         name="document",
-        content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
+        content=TextContent(text=WorkingMemoryCases.SAMPLE_TEXT),
     )
 
     image_stuff = StuffFactory.make_stuff(

@@ -33,7 +33,7 @@ from pipelex_api.middleware import RequestIdMiddleware
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.security import ForwardedIdentityHeader, no_auth, verify_api_key, verify_jwt
 from tests.unit._problems import assert_problem
-from tests.unit.test_data import ProblemTestData, rate_limited_failure
+from tests.unit.cases import ProblemCases, rate_limited_failure
 
 _GATEWAY_CONFIG_MESSAGE = "the gateway config is missing"
 _COMPONENT = "pipe_func_sandbox"
@@ -51,9 +51,9 @@ class _Identity(StrEnum):
 
 # Each identity's dependency, the environment it reads, and the view its requests read.
 _IDENTITIES: dict[_Identity, tuple[Any, dict[str, str], ProblemView]] = {
-    _Identity.API_KEY: (verify_api_key, {"API_KEY": ProblemTestData.SYNTHETIC_API_KEY}, ProblemView.OPERATOR),
+    _Identity.API_KEY: (verify_api_key, {"API_KEY": ProblemCases.SYNTHETIC_API_KEY}, ProblemView.OPERATOR),
     _Identity.FORWARDED_IDENTITY: (no_auth, {_TRUST_FORWARDED: "true"}, ProblemView.OPERATOR),
-    _Identity.JWT: (verify_jwt, {"JWT_SECRET_KEY": ProblemTestData.SYNTHETIC_JWT_SECRET}, ProblemView.CALLER),
+    _Identity.JWT: (verify_jwt, {"JWT_SECRET_KEY": ProblemCases.SYNTHETIC_JWT_SECRET}, ProblemView.CALLER),
     _Identity.NO_AUTH: (no_auth, {}, ProblemView.CALLER),
 }
 
@@ -111,7 +111,7 @@ async def unexpected_error_route() -> None:
 @_router.get("/unknown-code")
 async def unknown_code_route() -> None:
     msg = "a worker reported a code this server does not know"
-    raise _RecoveredProblemError(msg, problem=PipelexProblem.model_validate(ProblemTestData.UNKNOWN_OPERATOR_PROBLEM))
+    raise _RecoveredProblemError(msg, problem=PipelexProblem.model_validate(ProblemCases.UNKNOWN_OPERATOR_PROBLEM))
 
 
 async def refuse_before_authentication() -> None:
@@ -128,11 +128,11 @@ def _authenticated_client(mocker: MockerFixture, *, identity: _Identity, refuse_
     headers: dict[str, str]
     match identity:
         case _Identity.API_KEY:
-            headers = {"Authorization": f"Bearer {ProblemTestData.SYNTHETIC_API_KEY}"}
+            headers = {"Authorization": f"Bearer {ProblemCases.SYNTHETIC_API_KEY}"}
         case _Identity.FORWARDED_IDENTITY:
-            headers = {ForwardedIdentityHeader.USER_ID: ProblemTestData.FORWARDED_USER_ID}
+            headers = {ForwardedIdentityHeader.USER_ID: ProblemCases.FORWARDED_USER_ID}
         case _Identity.JWT:
-            token = jwt.encode({"user_id": ProblemTestData.JWT_USER_ID}, ProblemTestData.SYNTHETIC_JWT_SECRET, algorithm="HS256")
+            token = jwt.encode({"user_id": ProblemCases.JWT_USER_ID}, ProblemCases.SYNTHETIC_JWT_SECRET, algorithm="HS256")
             headers = {"Authorization": f"Bearer {token}"}
         case _Identity.NO_AUTH:
             headers = {}
@@ -244,15 +244,15 @@ class TestProblemViews:
 
         assert response.status_code == 500
         body = response.json()
-        assert body["code"] == ProblemTestData.UNKNOWN_OPERATOR_PROBLEM["code"]
+        assert body["code"] == ProblemCases.UNKNOWN_OPERATOR_PROBLEM["code"]
         match expected_view:
             case ProblemView.OPERATOR:
-                assert body["next_step"] == ProblemTestData.UNKNOWN_OPERATOR_PROBLEM["next_step"]
+                assert body["next_step"] == ProblemCases.UNKNOWN_OPERATOR_PROBLEM["next_step"]
                 assert body["diagnostics"]["error_class"] == "FutureSettingError"
             case ProblemView.CALLER:
                 assert body["next_step"] == {"kind": "report", "detail": "Report this problem with its request id."}
                 assert "diagnostics" not in body
-                assert ProblemTestData.PRIVATE_HOST_FILE not in response.text
+                assert ProblemCases.PRIVATE_HOST_FILE not in response.text
 
     @pytest.mark.parametrize("view", [ProblemView.OPERATOR, ProblemView.CALLER])
     @pytest.mark.parametrize("path", ["/config-error", "/misconfigured", "/llm-error", "/invalid-method", "/unexpected-error"])

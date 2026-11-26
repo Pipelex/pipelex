@@ -14,9 +14,9 @@ import pytest
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, ProviderLimitVerdict
 from pipelex.cogt.inference.provider_name import ProviderName
-from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData, GatewayThrottleTestData
+from tests.unit.pipelex.cogt.cases import DirectProviderQuotaCases, GatewayThrottleCases
 
-_Bodies = DirectProviderQuotaTestData
+_Bodies = DirectProviderQuotaCases
 
 
 def _metadata(
@@ -47,7 +47,7 @@ class _TestCases:
     OPENAI_QUOTA_CASES: ClassVar[list[tuple[str, str, int | None, str | None, Any, bool]]] = [
         (
             "insufficient_quota_type_and_code_429",
-            GatewayThrottleTestData.OPENAI_QUOTA_MESSAGE,
+            GatewayThrottleCases.OPENAI_QUOTA_MESSAGE,
             429,
             "insufficient_quota",
             _Bodies.OPENAI_INSUFFICIENT_QUOTA_BODY["error"],
@@ -259,15 +259,15 @@ class _TestCases:
     GATEWAY_QUOTA_CASES: ClassVar[list[tuple[str, str, int, str | None, bool]]] = [
         ("payment_required_402", "Payment required", 402, None, True),
         ("payment_required_402_any_message", "random text", 402, None, True),
-        ("payment_required_402_any_code", "Payment required", 402, GatewayThrottleTestData.AZURE_RATE_LIMIT_CODE, True),
-        ("openai_insufficient_quota_code_429", GatewayThrottleTestData.OPENAI_QUOTA_MESSAGE, 429, GatewayThrottleTestData.OPENAI_QUOTA_CODE, True),
-        ("insufficient_quota_code_429_any_message", "random text", 429, GatewayThrottleTestData.OPENAI_QUOTA_CODE, True),
+        ("payment_required_402_any_code", "Payment required", 402, GatewayThrottleCases.AZURE_RATE_LIMIT_CODE, True),
+        ("openai_insufficient_quota_code_429", GatewayThrottleCases.OPENAI_QUOTA_MESSAGE, 429, GatewayThrottleCases.OPENAI_QUOTA_CODE, True),
+        ("insufficient_quota_code_429_any_message", "random text", 429, GatewayThrottleCases.OPENAI_QUOTA_CODE, True),
         # OpenAI's billing codes, each naming the cause of a spent quota in `error.code`
         (
             "openai_credit_balance_exhausted_code_429",
             "Credit balance exhausted",
             429,
-            GatewayThrottleTestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE,
+            GatewayThrottleCases.OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE,
             True,
         ),
         ("openai_organization_spend_limit_code_429", "Organization spend limit reached", 429, "organization_spend_limit_exceeded", True),
@@ -275,12 +275,12 @@ class _TestCases:
         ("openai_organization_usage_limit_code_429", "Organization usage limit reached", 429, "organization_usage_limit_exceeded", True),
         (
             "azure_rate_limit_reached_429_linking_its_quota_increase_page",
-            GatewayThrottleTestData.AZURE_RATE_LIMIT_MESSAGE,
+            GatewayThrottleCases.AZURE_RATE_LIMIT_MESSAGE,
             429,
-            GatewayThrottleTestData.AZURE_RATE_LIMIT_CODE,
+            GatewayThrottleCases.AZURE_RATE_LIMIT_CODE,
             False,
         ),
-        ("azure_message_429_no_code", GatewayThrottleTestData.AZURE_RATE_LIMIT_MESSAGE, 429, None, False),
+        ("azure_message_429_no_code", GatewayThrottleCases.AZURE_RATE_LIMIT_MESSAGE, 429, None, False),
         ("generic_rate_limit_429_no_code", "Rate limit exceeded. Please retry", 429, None, False),
         # Each message the former word list read as a quota, now a rate limit since no code says otherwise
         ("quota_message_429_no_code", "Your quota has been exhausted", 429, None, False),
@@ -291,7 +291,7 @@ class _TestCases:
         ("insufficient_balance_message_429_no_code", "Insufficient balance to complete request", 429, None, False),
         ("credits_exhausted_message_429_no_code", "Credits exhausted on this key", 429, None, False),
         # The quota code decides a 429 only; on any other status the status ladder reads it
-        ("insufficient_quota_code_500_not_quota", "Internal server error", 500, GatewayThrottleTestData.OPENAI_QUOTA_CODE, False),
+        ("insufficient_quota_code_500_not_quota", "Internal server error", 500, GatewayThrottleCases.OPENAI_QUOTA_CODE, False),
         ("server_error_500", "Internal server error", 500, None, False),
     ]
 

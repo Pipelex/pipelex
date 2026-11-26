@@ -29,7 +29,7 @@ CMD_MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
 OPS_MODULE_PATH = "pipelex.cogt.models.model_listing"
 
 
-class TestData:
+class AgentModelsCases:
     """Shared test data constants."""
 
     LLM_PRESETS: ClassVar[dict[str, LLMSetting]] = {
@@ -84,26 +84,26 @@ def _make_model_deck(
         inference_models=ModelSpecIndex.make_from_specs(
             model_specs=[
                 _model_spec(name=name, backend_name=backend_name, model_type=model_type)
-                for name, (backend_name, model_type) in TestData.INFERENCE_MAP.items()
+                for name, (backend_name, model_type) in AgentModelsCases.INFERENCE_MAP.items()
             ]
         ),
         llm_default_temperature=0.7,
-        llm_presets=TestData.LLM_PRESETS,
-        llm_aliases=TestData.LLM_ALIASES if llm_aliases is None else llm_aliases,
-        llm_waterfalls=TestData.LLM_WATERFALLS if llm_waterfalls is None else llm_waterfalls,
+        llm_presets=AgentModelsCases.LLM_PRESETS,
+        llm_aliases=AgentModelsCases.LLM_ALIASES if llm_aliases is None else llm_aliases,
+        llm_waterfalls=AgentModelsCases.LLM_WATERFALLS if llm_waterfalls is None else llm_waterfalls,
         llm_choice_defaults=LLMSettingChoicesDefaults(
             default_temperature=0.7,
             for_text=LLMSetting(model="gpt-4o-mini", temperature=0.7),
             for_object=LLMSetting(model="gpt-4o-mini", temperature=0.1),
         ),
-        extract_presets=TestData.EXTRACT_PRESETS,
-        extract_aliases=TestData.EXTRACT_ALIASES,
-        extract_waterfalls=TestData.EXTRACT_WATERFALLS,
+        extract_presets=AgentModelsCases.EXTRACT_PRESETS,
+        extract_aliases=AgentModelsCases.EXTRACT_ALIASES,
+        extract_waterfalls=AgentModelsCases.EXTRACT_WATERFALLS,
         extract_choice_default="textract-model",
         img_gen_default_quality=Quality.MEDIUM,
-        img_gen_presets=TestData.IMG_GEN_PRESETS,
-        img_gen_aliases=TestData.IMG_GEN_ALIASES,
-        img_gen_waterfalls=TestData.IMG_GEN_WATERFALLS,
+        img_gen_presets=AgentModelsCases.IMG_GEN_PRESETS,
+        img_gen_aliases=AgentModelsCases.IMG_GEN_ALIASES,
+        img_gen_waterfalls=AgentModelsCases.IMG_GEN_WATERFALLS,
         img_gen_choice_default="dall-e-3",
         search_choice_default="@default-search",
         model_deck_config=ModelDeckConfig(is_model_fallback_enabled=True, missing_presets_reaction=ProblemReaction.NONE),

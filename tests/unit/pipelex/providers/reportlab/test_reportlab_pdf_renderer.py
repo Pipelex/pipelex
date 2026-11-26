@@ -27,6 +27,7 @@ from pipelex.cogt.doc_gen.layout_tree import (
 from pipelex.cogt.doc_gen.render_job import RenderJob
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from tests.unit.pipelex.providers.reportlab.cases import MARKUP_VALUE, ReportlabRendererCases, line_items_table
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     TEST_FILENAME,
     TEST_TITLE,
@@ -42,7 +43,6 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     png_data_url,
     render_layout,
 )
-from tests.unit.pipelex.providers.reportlab.test_data import MARKUP_VALUE, ReportlabRendererTestData, line_items_table
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -75,14 +75,14 @@ class TestReportlabPdfRenderer:
         assert pdf_title(pdf_data=pdf_data) == "Quarterly review"
         assert document_text(pdf_data=pdf_data) == "Quarterly review\nPage 1 of 1\nQuarterly review\nBody"
 
-    @pytest.mark.parametrize(("topic", "blocks"), ReportlabRendererTestData.MARKUP_CASES)
+    @pytest.mark.parametrize(("topic", "blocks"), ReportlabRendererCases.MARKUP_CASES)
     def test_markup_characters_print_as_written(self, topic: str, blocks: list[LayoutBlock]) -> None:
         assert MARKUP_VALUE in document_text(pdf_data=render_layout(blocks=blocks)), topic
 
     def test_the_title_prints_its_markup_characters_as_written(self) -> None:
         assert document_text(pdf_data=render_layout(blocks=[], title=MARKUP_VALUE)).count(MARKUP_VALUE) == 2
 
-    @pytest.mark.parametrize(("language", "sample"), ReportlabRendererTestData.SCRIPT_CASES)
+    @pytest.mark.parametrize(("language", "sample"), ReportlabRendererCases.SCRIPT_CASES)
     def test_text_beyond_western_european_prints_in_the_bundled_font(self, language: str, sample: str) -> None:
         pdf_data = render_layout(blocks=[ParagraphsBlock(paragraphs=[sample]), FieldGridBlock(fields=[LayoutField(label=language, value=sample)])])
         assert document_text(pdf_data=pdf_data).count(sample) == 2

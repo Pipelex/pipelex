@@ -15,7 +15,7 @@ from pipelex.cogt.model_backends.credential_resolution import CredentialResoluti
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from tests.helpers.backend_library_loading import BOTH_MODES, load_library, required_backend
-from tests.unit.pipelex.cogt.model_backends.test_data import BackendLibraryTomls
+from tests.unit.pipelex.cogt.model_backends.cases import BackendLibraryTomls
 
 
 class TestAMemberOfTheWrongTypeIsRefusedCleanly:

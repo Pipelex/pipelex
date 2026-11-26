@@ -47,7 +47,7 @@ from pipelex_api.run_webhooks import (
 )
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
-from tests.unit.test_data import ProblemTestData
+from tests.unit.cases import ProblemCases
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _CALLER_URL = "https://hooks.example.com/runs?token=caller-s3cr3t"
@@ -156,7 +156,7 @@ class TestCallerWebhooks:
 
     def test_execute_honours_the_callers_run_id_and_sends_each_callback_url_the_signed_event(self, mocker: MockerFixture) -> None:
         """A blocking `/execute` runs under the caller's id and sends its event before it answers, signed under the secret."""
-        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET})
+        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLER_WEBHOOK_SECRET})
         orchestrator = _register(mocker)
         received = _receive_caller_events(mocker)
 
@@ -193,7 +193,7 @@ class TestCallerWebhooks:
 
     def test_a_receiver_s_failure_never_changes_the_execute_answer(self, mocker: MockerFixture) -> None:
         """A caller webhook that cannot be delivered is the delivery's failure: the run's answer stands."""
-        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET})
+        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLER_WEBHOOK_SECRET})
         _register(mocker)
         mocker.patch.object(
             caller_webhook_delivery_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(lambda _request: httpx.Response(503))
@@ -210,12 +210,12 @@ class TestCallerWebhooks:
         mocker.patch.dict(
             "os.environ",
             {
-                COMPLETION_CALLBACK_URL_ENV: ProblemTestData.COMPLETION_TARGET_TEMPLATE,
-                COMPLETION_CALLBACK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLBACK_SECRET,
+                COMPLETION_CALLBACK_URL_ENV: ProblemCases.COMPLETION_TARGET_TEMPLATE,
+                COMPLETION_CALLBACK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLBACK_SECRET,
             },
         )
         orchestrator = _register(mocker, mode="temporal")
-        completion_url = ProblemTestData.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
+        completion_url = ProblemCases.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
 
         response = _client().post("/v1/start", json=_run_body(pipeline_run_id=_RUN_ID, callback_urls=[completion_url]))
 
@@ -232,14 +232,14 @@ class TestCallerWebhooks:
         mocker.patch.dict(
             "os.environ",
             {
-                COMPLETION_CALLBACK_URL_ENV: ProblemTestData.COMPLETION_TARGET_TEMPLATE,
-                COMPLETION_CALLBACK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLBACK_SECRET,
-                CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET,
+                COMPLETION_CALLBACK_URL_ENV: ProblemCases.COMPLETION_TARGET_TEMPLATE,
+                COMPLETION_CALLBACK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLBACK_SECRET,
+                CALLER_WEBHOOK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLER_WEBHOOK_SECRET,
             },
         )
         orchestrator = _register(mocker)
         received = _receive_caller_events(mocker)
-        completion_url = ProblemTestData.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
+        completion_url = ProblemCases.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
 
         response = _client().post("/v1/execute", json=_run_body(pipeline_run_id=_RUN_ID, callback_urls=[completion_url]))
 
@@ -255,7 +255,7 @@ class TestCallerWebhooks:
 
     def test_start_without_a_completion_target_notifies_only_the_callers_urls(self, mocker: MockerFixture) -> None:
         """No `COMPLETION_CALLBACK_URL`, no completion target: every `callback_urls` entry is the caller's, signed as such."""
-        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET})
+        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLER_WEBHOOK_SECRET})
         orchestrator = _register(mocker, mode="temporal")
 
         response = _client().post("/v1/start", json=_run_body(callback_urls=[_CALLER_URL, _CALLER_URL]))
@@ -315,8 +315,8 @@ class TestCallerWebhooks:
     )
     def test_the_forwarded_completion_url_is_recognised_however_its_id_is_written(self, monkeypatch: pytest.MonkeyPatch, forwarded_url: str) -> None:
         """The target's URL holds the id percent-encoded, and a host forwarding it may not: both name the same hop."""
-        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
-        monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, ProblemTestData.SYNTHETIC_CALLBACK_SECRET)
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemCases.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, ProblemCases.SYNTHETIC_CALLBACK_SECRET)
 
         assert start_caller_webhook_urls(callback_urls=[forwarded_url, _CALLER_URL], pipeline_run_id="order 42") == [_CALLER_URL]
         delivery_assignment = start_delivery_assignment(caller_urls=[forwarded_url, _CALLER_URL], pipeline_run_id="order 42")
@@ -325,7 +325,7 @@ class TestCallerWebhooks:
 
     def test_the_run_id_is_percent_encoded_into_the_completion_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An id the caller chose fills its placeholder as one path segment, never adding a segment or a query."""
-        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemCases.COMPLETION_TARGET_TEMPLATE)
 
         assert completion_callback_url(pipeline_run_id="run/../x?y") == "https://ops.example.com/runs/complete/run%2F..%2Fx%3Fy"
         assert completion_callback_url(pipeline_run_id=None) is None
@@ -333,8 +333,8 @@ class TestCallerWebhooks:
     @pytest.mark.parametrize(
         ("configured_url", "configured_secret", "refused_setting"),
         [
-            pytest.param("not a url", ProblemTestData.SYNTHETIC_CALLBACK_SECRET, COMPLETION_CALLBACK_URL_ENV, id="malformed_url"),
-            pytest.param(ProblemTestData.COMPLETION_TARGET_TEMPLATE, "", COMPLETION_CALLBACK_SECRET_ENV, id="no_secret"),
+            pytest.param("not a url", ProblemCases.SYNTHETIC_CALLBACK_SECRET, COMPLETION_CALLBACK_URL_ENV, id="malformed_url"),
+            pytest.param(ProblemCases.COMPLETION_TARGET_TEMPLATE, "", COMPLETION_CALLBACK_SECRET_ENV, id="no_secret"),
         ],
     )
     def test_the_server_boot_checks_the_completion_target(
@@ -361,7 +361,7 @@ class TestCallerWebhooks:
         self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A completion target the server cannot sign is the operator's fault, answered before the method is fetched or set up."""
-        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemCases.COMPLETION_TARGET_TEMPLATE)
         monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, "")
         _register(mocker, mode="temporal")
         run_source_spy = mocker.patch(f"{_PIPELINE_NS}._run_source")
@@ -374,7 +374,7 @@ class TestCallerWebhooks:
 
     def test_the_runner_checks_the_completion_target_before_it_sets_a_run_up(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
         """An in-process caller of the runner meets the same check, before `pipeline_run_setup` registers anything."""
-        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemCases.COMPLETION_TARGET_TEMPLATE)
         monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, "")
         _register(mocker, mode="temporal")
         setup_spy = mocker.patch(f"{_PIPELINE_NS}.pipeline_run_setup")

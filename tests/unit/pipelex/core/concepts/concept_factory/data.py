@@ -23,7 +23,7 @@ PERSON_STRUCTURE: dict[str, ConceptStructureBlueprint] = {
 }
 
 
-class TestCases:
+class ConceptFactoryCases:
     # Test cases for make_refines method
     # Format: (test_name, domain_code, blueprint, expected_result)
     MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, str, ConceptBlueprint, str]]] = [

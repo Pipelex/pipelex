@@ -26,8 +26,8 @@ from pipelex.cogt.judgment.judgment_models import (
 )
 from pipelex.reporting.reporting_protocol import ReportingNoOp
 from pipelex.system.job_metadata import JobCategory, UnitJobId
+from tests.unit.pipelex.cogt.judgment.cases import JudgmentTestCases, described_levels
 from tests.unit.pipelex.cogt.judgment.fake_judgment_worker import FakeJudgmentWorker, make_fake_judgment_job, make_fake_judgment_model
-from tests.unit.pipelex.cogt.judgment.test_data import JudgmentTestCases, described_levels
 
 
 class _RecordingDelegate(ReportingNoOp):

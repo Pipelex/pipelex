@@ -19,7 +19,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, load_text_from_path
 from tests.conftest import TEST_OUTPUTS_DIR
-from tests.e2e.pipelex.graph.test_data import GraphTestData
+from tests.e2e.pipelex.graph.cases import GraphCases
 
 
 def _get_next_output_folder() -> Path:
@@ -43,7 +43,7 @@ class TestMermaidFromJson:
 
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),
-        GraphTestData.GRAPH_JSON_TEST_CASES,
+        GraphCases.GRAPH_JSON_TEST_CASES,
     )
     async def test_mermaid_diagrams_from_json_graph(self, topic: str, graph_json_path: str) -> None:
         """Test generating Mermaid diagrams from a JSON graph file.
@@ -113,7 +113,7 @@ class TestMermaidFromJson:
 
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),
-        GraphTestData.GRAPH_JSON_TEST_CASES,
+        GraphCases.GRAPH_JSON_TEST_CASES,
     )
     async def test_mermaidflow_structure(self, topic: str, graph_json_path: str) -> None:
         """Test that mermaidflow Mermaid combines orchestration and dataflow elements."""

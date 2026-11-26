@@ -3,7 +3,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from tests.unit.pipelex.core.test_data import InterpreterTestCases
+from tests.unit.pipelex.core.cases import InterpreterTestCases
 
 
 class TestMthdsFactoryIntegration:

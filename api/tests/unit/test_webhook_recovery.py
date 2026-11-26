@@ -46,12 +46,12 @@ from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV
 from tests.unit._constants import VALID_MTHDS
-from tests.unit.test_data import ProblemTestData, rate_limited_failure
+from tests.unit.cases import ProblemCases, rate_limited_failure
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _MODE = "temporal"
 _RUN_ID = "run-webhook-view-1"
-_COMPLETION_URL = ProblemTestData.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
+_COMPLETION_URL = ProblemCases.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
 
 
 def _config_failure() -> PipelexError:
@@ -97,9 +97,9 @@ def _start_with_a_callback(mocker: MockerFixture, *, view: ProblemView) -> Deliv
     mocker.patch.dict(
         os.environ,
         {
-            "COMPLETION_CALLBACK_SECRET": ProblemTestData.SYNTHETIC_CALLBACK_SECRET,
-            COMPLETION_CALLBACK_URL_ENV: ProblemTestData.COMPLETION_TARGET_TEMPLATE,
-            CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET,
+            "COMPLETION_CALLBACK_SECRET": ProblemCases.SYNTHETIC_CALLBACK_SECRET,
+            COMPLETION_CALLBACK_URL_ENV: ProblemCases.COMPLETION_TARGET_TEMPLATE,
+            CALLER_WEBHOOK_SECRET_ENV: ProblemCases.SYNTHETIC_CALLER_WEBHOOK_SECRET,
         },
     )
     mocker.patch(f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode=_MODE, allow_request_orchestration_mode_override=False))
@@ -116,7 +116,7 @@ def _start_with_a_callback(mocker: MockerFixture, *, view: ProblemView) -> Deliv
             "mthds_contents": [VALID_MTHDS],
             "inputs": {"text": "hello"},
             "pipeline_run_id": _RUN_ID,
-            "callback_urls": [ProblemTestData.CALLBACK_URL],
+            "callback_urls": [ProblemCases.CALLBACK_URL],
         },
     )
 
@@ -165,7 +165,7 @@ def _posted_failure(mocker: MockerFixture, *, delivery_assignment: DeliveryAssig
         )
     )
 
-    assert set(received) == {_COMPLETION_URL, ProblemTestData.CALLBACK_URL}
+    assert set(received) == {_COMPLETION_URL, ProblemCases.CALLBACK_URL}
     return received
 
 
@@ -178,7 +178,7 @@ class TestWebhookRecoveryCrossPath:
         (completion_target,) = delivery_assignment.webhooks
         assert completion_target.url == _COMPLETION_URL
         assert completion_target.problem_view == ProblemView.OPERATOR
-        assert [caller_webhook.url for caller_webhook in delivery_assignment.caller_webhooks] == [ProblemTestData.CALLBACK_URL]
+        assert [caller_webhook.url for caller_webhook in delivery_assignment.caller_webhooks] == [ProblemCases.CALLBACK_URL]
 
     @pytest.mark.parametrize("view", [ProblemView.OPERATOR, ProblemView.CALLER])
     @pytest.mark.parametrize("failure_id", list(_FAILURES))
@@ -188,7 +188,7 @@ class TestWebhookRecoveryCrossPath:
 
         received = _posted_failure(mocker, delivery_assignment=delivery_assignment, failure=failure())
 
-        event = received[ProblemTestData.CALLBACK_URL]
+        event = received[ProblemCases.CALLBACK_URL]
         assert event["type"] == "run.finished"
         assert event["data"]["pipeline_run_id"] == _RUN_ID
         assert event["data"]["status"] == "failed"
@@ -211,8 +211,8 @@ class TestWebhookRecoveryCrossPath:
 
         received = _posted_failure(mocker, delivery_assignment=delivery_assignment, failure=rate_limited_failure())
 
-        posted_error = received[ProblemTestData.CALLBACK_URL]["data"]["error"]
+        posted_error = received[ProblemCases.CALLBACK_URL]["data"]["error"]
         assert posted_error["code"] == CoreCode.PROVIDER_RATE_LIMITED
-        assert posted_error["detail"] == ProblemTestData.RATE_LIMIT_DETAIL
-        for operator_only in (ProblemTestData.RATE_LIMIT_MESSAGE, ProblemTestData.RATE_LIMIT_PROVIDER_REQUEST_ID, "LLMCompletionError"):
+        assert posted_error["detail"] == ProblemCases.RATE_LIMIT_DETAIL
+        for operator_only in (ProblemCases.RATE_LIMIT_MESSAGE, ProblemCases.RATE_LIMIT_PROVIDER_REQUEST_ID, "LLMCompletionError"):
             assert operator_only not in str(posted_error), operator_only

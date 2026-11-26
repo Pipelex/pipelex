@@ -6,7 +6,7 @@ from pipelex import log, pretty_print
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from tests.unit.pipelex.core.test_data import InterpreterTestCases
+from tests.unit.pipelex.core.cases import InterpreterTestCases
 
 
 class TestMthdsParser:

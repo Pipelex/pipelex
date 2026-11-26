@@ -28,7 +28,7 @@ from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKi
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
-from tests.unit.pipelex.cogt.models.test_data import ModelDeckCheckTestData
+from tests.unit.pipelex.cogt.models.cases import ModelDeckCheckCases
 
 CheckFunction = Callable[[Any], None]
 
@@ -408,7 +408,7 @@ class TestModelDeckCheck:
         model_deck = self._create_test_model_deck()
         mocker.patch(GET_MODEL_DECK_TARGET, return_value=model_deck)
 
-        for model_choice in ModelDeckCheckTestData.EVERY_REFERENCE:
+        for model_choice in ModelDeckCheckCases.EVERY_REFERENCE:
             is_defined = model_deck.is_reference_defined(reference=ModelReference.parse(model_choice), model_type=model_type)
             try:
                 check_fn(model_choice)

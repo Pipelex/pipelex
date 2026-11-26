@@ -23,7 +23,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 from pipelex.tools.log.json_log_sink import MESSAGE_KEY, JsonLogSink
-from tests.integration.pipelex.pipeline.test_data import SummaryEventsTestData
+from tests.integration.pipelex.pipeline.cases import SummaryEventsCases
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -108,9 +108,7 @@ class TestSummaryEventsPriceARun:
         buffer = io.StringIO()
 
         with _json_sink_on_root(buffer=buffer):
-            await runner.execute(
-                pipe_code=SummaryEventsTestData.MAIN_PIPE, mthds_contents=[SummaryEventsTestData.MTHDS], inputs=SummaryEventsTestData.INPUTS
-            )
+            await runner.execute(pipe_code=SummaryEventsCases.MAIN_PIPE, mthds_contents=[SummaryEventsCases.MTHDS], inputs=SummaryEventsCases.INPUTS)
 
         lines: list[dict[str, Any]] = [json.loads(line) for line in buffer.getvalue().splitlines() if line]
         calls = [line for line in lines if line[MESSAGE_KEY] == INFERENCE_CALL_ENDS_MESSAGE]

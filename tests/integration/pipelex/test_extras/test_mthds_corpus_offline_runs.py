@@ -19,7 +19,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.test_extras.mthds_corpus.loader import CorpusEntry, iter_entries
 from pipelex.test_extras.mthds_corpus.manifest import EntryTier, EntryValidity
-from tests.integration.pipelex.test_extras.test_data import Absent, Bound, OfflineRunExpectations
+from tests.integration.pipelex.test_extras.cases import Absent, Bound, OfflineRunExpectations
 
 _OFFLINE_ENTRIES = [entry for entry in iter_entries(validity=EntryValidity.VALID) if entry.manifest.tier is EntryTier.OFFLINE]
 

@@ -22,19 +22,19 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipeline.test_data import RenderTimeTemplateTestData
+from tests.integration.pipelex.pipeline.cases import RenderTimeTemplateCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 # The filter is named, since the template applies it by that name, with the template's line, never Jinja2's own text.
-_UNKNOWN_FILTER_FAULT = f"No filter named '{RenderTimeTemplateTestData.UNKNOWN_FILTER}' at line 1."
+_UNKNOWN_FILTER_FAULT = f"No filter named '{RenderTimeTemplateCases.UNKNOWN_FILTER}' at line 1."
 
 
 def _llm_bundle(*, prompt_field: str) -> str:
-    bundle = RenderTimeTemplateTestData.LLM_MTHDS.replace(RenderTimeTemplateTestData.PROMPT_FIELD_SLOT, prompt_field)
+    bundle = RenderTimeTemplateCases.LLM_MTHDS.replace(RenderTimeTemplateCases.PROMPT_FIELD_SLOT, prompt_field)
     if prompt_field == "system_prompt":
-        bundle += RenderTimeTemplateTestData.PLAIN_PROMPT + "\n"
+        bundle += RenderTimeTemplateCases.PLAIN_PROMPT + "\n"
     return bundle
 
 
@@ -58,7 +58,7 @@ def _assert_is_the_refusal(*, error: PipelineExecutionError, message: str, detai
     assert operator.diagnostics.message == message
     # Neither the template's text nor the branch it would have rendered reaches the caller.
     caller_wire = json.dumps(caller.to_wire())
-    assert RenderTimeTemplateTestData.TEMPLATE_TEXT not in caller_wire
+    assert RenderTimeTemplateCases.TEMPLATE_TEXT not in caller_wire
     assert "{%" not in caller_wire
 
 
@@ -67,15 +67,15 @@ class TestRenderTimeTemplateRefusals:
     @pytest.mark.parametrize(
         ("expression_field", "expression_line"),
         [
-            ("expression_template", RenderTimeTemplateTestData.EXPRESSION_TEMPLATE_LINE),
-            ("expression", RenderTimeTemplateTestData.EXPRESSION_LINE),
+            ("expression_template", RenderTimeTemplateCases.EXPRESSION_TEMPLATE_LINE),
+            ("expression", RenderTimeTemplateCases.EXPRESSION_LINE),
         ],
     )
     async def test_a_condition_expression_naming_an_unknown_filter_in_a_branch_is_refused(self, expression_field: str, expression_line: str) -> None:
         """A live run taking the branch: `method.template_invalid` at the condition, on the field the bundle wrote, the filter named."""
         error = await _failed_run(
             pipe_code="route_parcel",
-            bundle=RenderTimeTemplateTestData.CONDITION_MTHDS.replace(RenderTimeTemplateTestData.EXPRESSION_LINE_SLOT, expression_line),
+            bundle=RenderTimeTemplateCases.CONDITION_MTHDS.replace(RenderTimeTemplateCases.EXPRESSION_LINE_SLOT, expression_line),
             inputs={"parcel": "a box of books", "lane": "express"},
             pipe_run_mode=PipeRunMode.LIVE,
         )
@@ -111,12 +111,12 @@ class TestRenderTimeTemplateRefusals:
         """The structure prompt is the deployment's template, rendered in the step: `runtime.unexpected`, a 500 whose message is the operator's."""
         mocker.patch.dict(
             get_config().inference.llm.generic_templates,
-            {"output_structure_prompt": RenderTimeTemplateTestData.BROKEN_STRUCTURE_PROMPT},
+            {"output_structure_prompt": RenderTimeTemplateCases.BROKEN_STRUCTURE_PROMPT},
         )
 
         error = await _failed_run(
             pipe_code="read_label",
-            bundle=RenderTimeTemplateTestData.STRUCTURED_LLM_MTHDS,
+            bundle=RenderTimeTemplateCases.STRUCTURED_LLM_MTHDS,
             inputs={"note": "To Ada, third floor"},
             pipe_run_mode=PipeRunMode.DRY,
         )
@@ -126,7 +126,7 @@ class TestRenderTimeTemplateRefusals:
         assert caller.diagnostics is None
         assert error_code_spec(CoreCode.RUNTIME_UNEXPECTED).status == 500
         # Neither the deployment's template nor what Jinja2 refused in it reaches the caller.
-        assert RenderTimeTemplateTestData.UNKNOWN_STRUCTURE_FILTER not in json.dumps(caller.to_wire())
+        assert RenderTimeTemplateCases.UNKNOWN_STRUCTURE_FILTER not in json.dumps(caller.to_wire())
         operator = error.to_problem(view=ProblemView.OPERATOR)
         assert operator.diagnostics is not None
         diagnosed_classes = {operator.diagnostics.error_class, *(cause.error_class for cause in operator.diagnostics.causes or [])}

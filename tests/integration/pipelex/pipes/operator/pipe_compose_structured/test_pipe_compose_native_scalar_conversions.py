@@ -38,7 +38,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import NativeScalarConversionTestData
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.cases import NativeScalarConversionCases
 
 
 def _make_tag_texts() -> ListContent[TextContent]:
@@ -78,7 +78,7 @@ class TestPipeComposeNativeScalarConversions:
                 "note_text",
                 NativeConceptCode.TEXT,
                 TextContent(text="A short note"),
-                NativeScalarConversionTestData.TEXT_TO_OPTIONAL_STR_CONSTRUCT,
+                NativeScalarConversionCases.TEXT_TO_OPTIONAL_STR_CONSTRUCT,
                 "NoteHolder",
                 "note",
                 "A short note",
@@ -89,7 +89,7 @@ class TestPipeComposeNativeScalarConversions:
                 "tag_texts",
                 NativeConceptCode.TEXT,
                 _make_tag_texts(),
-                NativeScalarConversionTestData.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
+                NativeScalarConversionCases.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
                 "TagsHolder",
                 "tags",
                 ["alpha", "bravo", "charlie"],
@@ -100,7 +100,7 @@ class TestPipeComposeNativeScalarConversions:
                 "tag_texts",
                 NativeConceptCode.TEXT,
                 _make_tag_texts(),
-                NativeScalarConversionTestData.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
+                NativeScalarConversionCases.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
                 "OptionalTagsHolder",
                 "tags",
                 ["alpha", "bravo", "charlie"],
@@ -111,7 +111,7 @@ class TestPipeComposeNativeScalarConversions:
                 "tag_texts",
                 NativeConceptCode.TEXT,
                 _make_tag_texts(),
-                NativeScalarConversionTestData.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
+                NativeScalarConversionCases.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
                 "NullableTagsHolder",
                 "tags",
                 ["alpha", "bravo", "charlie"],
@@ -122,7 +122,7 @@ class TestPipeComposeNativeScalarConversions:
                 "score_number",
                 NativeConceptCode.NUMBER,
                 NumberContent(number=42.5),
-                NativeScalarConversionTestData.NUMBER_TO_FLOAT_CONSTRUCT,
+                NativeScalarConversionCases.NUMBER_TO_FLOAT_CONSTRUCT,
                 "ScoreHolder",
                 "score",
                 42.5,
@@ -133,7 +133,7 @@ class TestPipeComposeNativeScalarConversions:
                 "approval_flag",
                 NativeConceptCode.YES_NO,
                 YesNoContent(yes_no=False),
-                NativeScalarConversionTestData.YES_NO_TO_BOOL_CONSTRUCT,
+                NativeScalarConversionCases.YES_NO_TO_BOOL_CONSTRUCT,
                 "ApprovalHolder",
                 "approved",
                 False,
@@ -144,7 +144,7 @@ class TestPipeComposeNativeScalarConversions:
                 "deadline_date",
                 NativeConceptCode.DATE,
                 DateContent(date=datetime.date(2026, 3, 14)),
-                NativeScalarConversionTestData.DATE_TO_DATE_CONSTRUCT,
+                NativeScalarConversionCases.DATE_TO_DATE_CONSTRUCT,
                 "DeadlineHolder",
                 "deadline",
                 datetime.date(2026, 3, 14),
@@ -155,7 +155,7 @@ class TestPipeComposeNativeScalarConversions:
                 "start_time",
                 NativeConceptCode.TIME,
                 TimeContent(time=datetime.time(15, 40, tzinfo=_PARIS_OFFSET)),
-                NativeScalarConversionTestData.TIME_TO_TIME_CONSTRUCT,
+                NativeScalarConversionCases.TIME_TO_TIME_CONSTRUCT,
                 "StartTimeHolder",
                 "start",
                 datetime.time(15, 40, tzinfo=_PARIS_OFFSET),
@@ -166,7 +166,7 @@ class TestPipeComposeNativeScalarConversions:
                 "slot_times",
                 NativeConceptCode.TIME,
                 _make_slot_times(),
-                NativeScalarConversionTestData.TIME_LIST_TO_TIME_LIST_CONSTRUCT,
+                NativeScalarConversionCases.TIME_LIST_TO_TIME_LIST_CONSTRUCT,
                 "SlotTimesHolder",
                 "slots",
                 [datetime.time(9, 0), datetime.time(13, 30, tzinfo=_PARIS_OFFSET), datetime.time(17, 15)],
@@ -263,7 +263,7 @@ class TestPipeComposeNativeScalarConversions:
             {
                 "description": "Compose DeadlineHolder from a whole timestamped Date stuff",
                 "inputs": {"deadline_date": NativeConceptCode.DATE},
-                "construct": NativeScalarConversionTestData.DATE_TO_DATE_CONSTRUCT,
+                "construct": NativeScalarConversionCases.DATE_TO_DATE_CONSTRUCT,
                 "output": "compose_structured_test.DeadlineHolder",
             }
         )

@@ -9,7 +9,7 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.runtime_hub import get_llm_worker
 from pipelex.system.job_metadata import JobMetadata
-from tests.integration.pipelex.cogt.test_data import LLMReasoningTestCases, ReasonedAnswer
+from tests.integration.pipelex.cogt.cases import LLMReasoningTestCases, ReasonedAnswer
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

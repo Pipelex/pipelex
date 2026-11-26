@@ -17,7 +17,7 @@ from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases import DocumentTestCases, ImageTestCases
-from tests.integration.pipelex.cogt.test_data import Employee
+from tests.integration.pipelex.cogt.cases import Employee
 
 USER_TEXT_FOR_BASE = """
 Write a detailed description of a woman's clothing in the style of a 19th-century novel.

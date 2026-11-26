@@ -18,7 +18,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.typing import class_utils
 from pipelex.tools.typing.class_utils import are_classes_equivalent
-from tests.unit.pipelex.tools.typing.test_data import (
+from tests.unit.pipelex.tools.typing.cases import (
     CodeAliasedAsRef,
     Coded,
     ConstrainedPerson,

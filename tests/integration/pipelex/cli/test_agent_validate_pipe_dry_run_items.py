@@ -16,7 +16,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.validate.pipe_cmd import validate_pipe_cmd as agent_validate_pipe_cmd
-from tests.integration.pipelex.test_data import ValidationDetailBundles
+from tests.integration.pipelex.cases import ValidationDetailBundles
 
 _PIPE_CMD_MODULE = "pipelex.cli.agent_cli.commands.validate.pipe_cmd"
 

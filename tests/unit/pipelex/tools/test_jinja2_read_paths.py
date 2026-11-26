@@ -7,7 +7,7 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
-class ReadPathsTestData:
+class ReadPathsCases:
     """Templates, and the dotted paths through which each reads its inputs."""
 
     CASES: ClassVar[list[tuple[str, str, set[str]]]] = [
@@ -29,13 +29,13 @@ class ReadPathsTestData:
 
 
 class TestDetectJinja2ReadPaths:
-    @pytest.mark.parametrize(("topic", "template_source", "expected_paths"), ReadPathsTestData.CASES)
+    @pytest.mark.parametrize(("topic", "template_source", "expected_paths"), ReadPathsCases.CASES)
     def test_read_paths(self, topic: str, template_source: str, expected_paths: set[str]) -> None:
         read_paths = detect_jinja2_read_paths(template_category=TemplateCategory.LLM_PROMPT, template_source=template_source)
 
         assert read_paths == expected_paths, topic
 
-    @pytest.mark.parametrize(("topic", "template_source", "expected_paths"), ReadPathsTestData.CASES)
+    @pytest.mark.parametrize(("topic", "template_source", "expected_paths"), ReadPathsCases.CASES)
     def test_the_roots_are_the_required_variables_roots(self, topic: str, template_source: str, expected_paths: set[str]) -> None:
         """A read path adds the object a method is called on, which never adds a root: the inputs required stay the same."""
         read_roots = {

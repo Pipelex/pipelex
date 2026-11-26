@@ -16,7 +16,7 @@ from tests.helpers.hosted_account_check import (
     require_hosted_account,
     stop_message,
 )
-from tests.unit.repo.test_data import HostedAccountCheckTestData
+from tests.unit.repo.cases import HostedAccountCheckCases
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,7 +44,7 @@ def _answer(*, body: object, status_code: int = 200) -> _RecordingFetcher:
 
 def _me(**changes: Any) -> dict[str, Any]:
     """The matching `/v1/me` body with some members replaced, or removed when given `...`."""
-    body: dict[str, Any] = json.loads(json.dumps(HostedAccountCheckTestData.MATCHING_ME))
+    body: dict[str, Any] = json.loads(json.dumps(HostedAccountCheckCases.MATCHING_ME))
     for member, value in changes.items():
         if value is ...:
             del body[member]
@@ -54,7 +54,7 @@ def _me(**changes: Any) -> dict[str, Any]:
 
 
 def _environ(**changes: str | None) -> dict[str, str]:
-    environ = dict(HostedAccountCheckTestData.ENVIRON)
+    environ = dict(HostedAccountCheckCases.ENVIRON)
     for name, value in changes.items():
         if value is None:
             environ.pop(name, None)
@@ -66,38 +66,38 @@ def _environ(**changes: str | None) -> dict[str, str]:
 class TestHostedAccountCheck:
     def test_the_expected_account_passes_with_one_request_to_the_handed_over_origin(self) -> None:
         """The account, organization and role match, the email ignoring case: nothing stands in the way."""
-        fetcher = _answer(body=_me(email=HostedAccountCheckTestData.EMAIL.upper()))
+        fetcher = _answer(body=_me(email=HostedAccountCheckCases.EMAIL.upper()))
 
         findings = hosted_account_findings(environ=_environ(), dotenv_sources={}, fetch=fetcher)
 
         assert findings == []
-        assert fetcher.requests == [(HostedAccountCheckTestData.DEV_BASE_URL, HostedAccountCheckTestData.API_KEY)]
+        assert fetcher.requests == [(HostedAccountCheckCases.DEV_BASE_URL, HostedAccountCheckCases.API_KEY)]
 
     @pytest.mark.parametrize(
         ("topic", "body", "expected_fragments"),
         [
             (
                 "another organization",
-                _me(organization={"org_id": HostedAccountCheckTestData.OTHER_ORG_ID, "name": "QA Lab", "role_in_org": "member"}),
+                _me(organization={"org_id": HostedAccountCheckCases.OTHER_ORG_ID, "name": "QA Lab", "role_in_org": "member"}),
                 [
-                    f"states the organization QA Lab ({HostedAccountCheckTestData.OTHER_ORG_ID})",
-                    f"PIPELEX_API_KEY_EXPECTED_ORG_ID expects '{HostedAccountCheckTestData.ORG_ID}'",
+                    f"states the organization QA Lab ({HostedAccountCheckCases.OTHER_ORG_ID})",
+                    f"PIPELEX_API_KEY_EXPECTED_ORG_ID expects '{HostedAccountCheckCases.ORG_ID}'",
                 ],
             ),
             (
                 "another role",
-                _me(organization={"org_id": HostedAccountCheckTestData.ORG_ID, "name": "QA Runtime", "role_in_org": "runner"}),
+                _me(organization={"org_id": HostedAccountCheckCases.ORG_ID, "name": "QA Runtime", "role_in_org": "runner"}),
                 ["states the role 'runner' in QA Runtime", "PIPELEX_API_KEY_EXPECTED_ROLE expects 'member'"],
             ),
             (
                 "another account",
                 _me(email="someone.else@example.test"),
-                ["states the account 'someone.else@example.test'", f"PIPELEX_API_KEY_EXPECTED_EMAIL expects '{HostedAccountCheckTestData.EMAIL}'"],
+                ["states the account 'someone.else@example.test'", f"PIPELEX_API_KEY_EXPECTED_EMAIL expects '{HostedAccountCheckCases.EMAIL}'"],
             ),
             (
                 "no organization",
                 _me(organization=None),
-                ["states the key acts for no organization", f"PIPELEX_API_KEY_EXPECTED_ORG_ID expects '{HostedAccountCheckTestData.ORG_ID}'"],
+                ["states the key acts for no organization", f"PIPELEX_API_KEY_EXPECTED_ORG_ID expects '{HostedAccountCheckCases.ORG_ID}'"],
             ),
         ],
     )
@@ -208,7 +208,7 @@ class TestHostedAccountCheck:
         message = str(stopped.value.msg)
         assert message.startswith("The hosted end-to-end cases did not start:\n- PIPELEX_BASE_URL is not set")
         assert "\n- PIPELEX_API_KEY: PIPELEX_API_KEY_EXPECTED_EMAIL is not set" in message
-        assert HostedAccountCheckTestData.API_KEY not in message
+        assert HostedAccountCheckCases.API_KEY not in message
 
     def test_a_held_account_lets_the_session_go_on(self) -> None:
         require_hosted_account(environ=_environ(), dotenv_sources={}, fetch=_answer(body=_me()))
@@ -218,15 +218,15 @@ class TestHostedAccountCheck:
 
         def handler(request: httpx.Request) -> httpx.Response:
             seen.append(request)
-            return httpx.Response(200, json=HostedAccountCheckTestData.MATCHING_ME)
+            return httpx.Response(200, json=HostedAccountCheckCases.MATCHING_ME)
 
         answer = fetch_me(
-            base_url=f"{HostedAccountCheckTestData.DEV_BASE_URL}/", api_key=HostedAccountCheckTestData.API_KEY, transport=httpx.MockTransport(handler)
+            base_url=f"{HostedAccountCheckCases.DEV_BASE_URL}/", api_key=HostedAccountCheckCases.API_KEY, transport=httpx.MockTransport(handler)
         )
 
-        assert answer == MeAnswer(status_code=200, body=HostedAccountCheckTestData.MATCHING_ME)
-        assert [str(request.url) for request in seen] == [f"{HostedAccountCheckTestData.DEV_BASE_URL}/v1/me"]
-        assert seen[0].headers["Authorization"] == f"Bearer {HostedAccountCheckTestData.API_KEY}"
+        assert answer == MeAnswer(status_code=200, body=HostedAccountCheckCases.MATCHING_ME)
+        assert [str(request.url) for request in seen] == [f"{HostedAccountCheckCases.DEV_BASE_URL}/v1/me"]
+        assert seen[0].headers["Authorization"] == f"Bearer {HostedAccountCheckCases.API_KEY}"
 
     @pytest.mark.parametrize(
         ("topic", "response", "expected"),
@@ -243,7 +243,7 @@ class TestHostedAccountCheck:
             return response
 
         answer = fetch_me(
-            base_url=HostedAccountCheckTestData.DEV_BASE_URL, api_key=HostedAccountCheckTestData.API_KEY, transport=httpx.MockTransport(handler)
+            base_url=HostedAccountCheckCases.DEV_BASE_URL, api_key=HostedAccountCheckCases.API_KEY, transport=httpx.MockTransport(handler)
         )
 
         assert answer == expected, topic
@@ -253,7 +253,7 @@ class TestHostedAccountCheck:
         [
             ("no key", None, False, True),
             ("a placeholder", "placeholder-for-PIPELEX_API_KEY", False, True),
-            ("a key", HostedAccountCheckTestData.API_KEY, False, False),
+            ("a key", HostedAccountCheckCases.API_KEY, False, False),
             ("an empty line in a .env over a key", "", True, False),
             ("a placeholder in a .env over a key", "placeholder-for-PIPELEX_API_KEY", True, False),
         ],

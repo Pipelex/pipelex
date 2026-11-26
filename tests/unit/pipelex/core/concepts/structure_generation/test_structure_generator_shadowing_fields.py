@@ -7,9 +7,9 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
-from tests.unit.pipelex.core.concepts.structure_generation.test_data import ShadowingFieldCase, ShadowingFieldNamesTestData
+from tests.unit.pipelex.core.concepts.structure_generation.cases import ShadowingFieldCase, ShadowingFieldNamesCases
 
-_DOMAIN = ShadowingFieldNamesTestData.FORWARD_REF_DOMAIN
+_DOMAIN = ShadowingFieldNamesCases.FORWARD_REF_DOMAIN
 _CLASS_NAME = f"{_DOMAIN}__Shadowing"
 
 
@@ -36,7 +36,7 @@ class TestStructureGeneratorShadowingFields:
     @pytest.mark.filterwarnings('ignore:Field name "dict" in .* shadows an attribute in parent:UserWarning')
     @pytest.mark.parametrize(
         "case",
-        [*ShadowingFieldNamesTestData.READ_NAME_CASES, *ShadowingFieldNamesTestData.UNREAD_NAME_CASES],
+        [*ShadowingFieldNamesCases.READ_NAME_CASES, *ShadowingFieldNamesCases.UNREAD_NAME_CASES],
         ids=lambda case: case.shadowed_name,
     )
     def test_a_field_named_like_a_module_level_name_builds_holds_and_round_trips(self, case: ShadowingFieldCase):
@@ -49,19 +49,19 @@ class TestStructureGeneratorShadowingFields:
 
     def test_a_field_named_like_its_temporal_type_keeps_its_default(self):
         """A field named like its temporal type holds its default as a value of that type."""
-        generated_class = _generate(ShadowingFieldNamesTestData.TEMPORAL_DEFAULTS_STRUCTURE)
+        generated_class = _generate(ShadowingFieldNamesCases.TEMPORAL_DEFAULTS_STRUCTURE)
 
-        for field_name, expected_default in ShadowingFieldNamesTestData.TEMPORAL_DEFAULTS.items():
+        for field_name, expected_default in ShadowingFieldNamesCases.TEMPORAL_DEFAULTS.items():
             assert generated_class.model_fields[field_name].default == expected_default
         instance = generated_class.model_validate({})
-        assert instance.model_dump() == ShadowingFieldNamesTestData.TEMPORAL_DEFAULTS
+        assert instance.model_dump() == ShadowingFieldNamesCases.TEMPORAL_DEFAULTS
         assert generated_class.model_validate_json(instance.model_dump_json()) == instance
 
-    @pytest.mark.parametrize(("topic", "structure"), ShadowingFieldNamesTestData.FORWARD_REF_STRUCTURES)
+    @pytest.mark.parametrize(("topic", "structure"), ShadowingFieldNamesCases.FORWARD_REF_STRUCTURES)
     def test_a_field_named_like_a_class_the_structure_refers_to_is_refused(self, topic: str, structure: dict[str, ConceptStructureBlueprint]):
         """A forward reference is resolved by its name, which the field would shadow: the field is refused, naming it and the concept."""
         with pytest.raises(ConceptStructureGeneratorError) as exc_info:
             _generate(structure)
 
-        assert exc_info.value.given_params == {"finding": ShadowingFieldNamesTestData.FORWARD_REF_FINDING}, topic
-        assert exc_info.value.message == f"Cannot generate the structure class '{_CLASS_NAME}': {ShadowingFieldNamesTestData.FORWARD_REF_FINDING}."
+        assert exc_info.value.given_params == {"finding": ShadowingFieldNamesCases.FORWARD_REF_FINDING}, topic
+        assert exc_info.value.message == f"Cannot generate the structure class '{_CLASS_NAME}': {ShadowingFieldNamesCases.FORWARD_REF_FINDING}."

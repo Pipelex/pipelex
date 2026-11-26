@@ -23,8 +23,8 @@ from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACE
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.validation_error_types import TemplateCheckErrorType
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockType
@@ -51,7 +51,7 @@ _NOTES_LOG_FIELDS = {
     "finding_location": "the field notes on page 2",
 }
 
-_CALLER_MTHDS = PipeDocGenTestData.CALLER_BUNDLE_MTHDS
+_CALLER_MTHDS = PipeDocGenCases.CALLER_BUNDLE_MTHDS
 
 
 @pytest.fixture(autouse=True)

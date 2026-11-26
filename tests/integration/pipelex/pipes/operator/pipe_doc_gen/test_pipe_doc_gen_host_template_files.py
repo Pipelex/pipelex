@@ -11,6 +11,7 @@ from pipelex.interpreter_hub import clear_current_library, get_current_library_i
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     StubEngines,
     caller_text,
@@ -18,7 +19,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _HOST_TEMPLATE_FILE = "templates/host-invoice.docx"
 
@@ -62,7 +62,7 @@ class TestPipeDocGenHostTemplateFiles:
         write_bundle(directory=tmp_path, step_fields=f'format = "docx"\ntemplate_file = "{_HOST_TEMPLATE_FILE}"')
         stub_engines.findings = [TemplateFinding(severity=TemplateFindingSeverity.ERROR, message="The tag {{ invoice.totl }} names no field")]
 
-        verdict = await _caller_verdict(mthds_content=PipeDocGenTestData.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
+        verdict = await _caller_verdict(mthds_content=PipeDocGenCases.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
 
         assert only_problem_item(verdict).code == PipelexErrorCode.DOCGEN_TEMPLATE_INVALID
         report = caller_text(verdict)
@@ -83,7 +83,7 @@ class TestPipeDocGenHostTemplateFiles:
         """A host step refused while the host's library loads beside submitted content is the host's fault, naming no template file of it."""
         write_bundle(directory=tmp_path, step_fields=step_fields)
 
-        strict_payload = await _host_fault_strict_payload(mthds_content=PipeDocGenTestData.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
+        strict_payload = await _host_fault_strict_payload(mthds_content=PipeDocGenCases.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
 
         assert "host-invoice" not in strict_payload
         assert str(tmp_path) not in strict_payload
@@ -94,7 +94,7 @@ class TestPipeDocGenHostTemplateFiles:
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
         write_bundle(directory=tmp_path, step_fields=f'format = "docx"\ntemplate_file = "{(tmp_path / "invoice.docx").resolve()}"')
 
-        strict_payload = await _host_fault_strict_payload(mthds_content=PipeDocGenTestData.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
+        strict_payload = await _host_fault_strict_payload(mthds_content=PipeDocGenCases.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
 
         assert str(tmp_path.resolve()) not in strict_payload
         assert str(tmp_path) not in strict_payload
@@ -104,7 +104,7 @@ class TestPipeDocGenHostTemplateFiles:
         """A template file the submitted content names is the caller's own, so its refusal keeps naming it."""
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
         write_bundle(directory=tmp_path, step_fields='format = "docx"\ntemplate_file = "invoice.docx"')
-        own_bundle = PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "invoice.docx"').replace("doc_gen_tests", "doc_gen_own")
+        own_bundle = PipeDocGenCases.bundle(step_fields='format = "docx"\ntemplate_file = "invoice.docx"').replace("doc_gen_tests", "doc_gen_own")
 
         verdict = await _caller_verdict(mthds_content=own_bundle, host_dir=tmp_path)
 
