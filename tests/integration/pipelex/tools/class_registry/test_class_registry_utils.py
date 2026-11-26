@@ -63,9 +63,9 @@ class TestClassRegistryUtilsIntegration:
         empty_dir = tmp_path / "empty_folder"
         empty_dir.mkdir()
 
-        # This should not raise an error and should not register any classes
+        class_registry = get_class_registry()
+        registered_before = set(class_registry.get_classes_dict())
+
         ClassRegistryUtils.register_classes_in_folder(folder_path=empty_dir, base_class=StuffContent, is_recursive=True)
 
-        # Verify no new classes were registered (we can't easily check the exact count,
-        # but the operation should complete without error)
-        assert True  # If we get here without exception, the test passed
+        assert set(class_registry.get_classes_dict()) == registered_before
