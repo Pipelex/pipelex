@@ -1,0 +1,25 @@
+{% extends "main.html" %}
+
+{# Override site_meta because main.html puts the canonical tag there (inherited from
+   Material's base.html). Without this override, the 404 page would get main.html's
+   canonical for the page path AND 404.html's own canonical — two conflicting tags. #}
+{% block site_meta %}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% if config.site_description %}
+    <meta name="description" content="{{ config.site_description }}">
+  {% endif %}
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="canonical" href="https://docs.pipelex.com/latest/">
+{% endblock %}
+
+{# Empty extrahead to suppress OG tags, Twitter cards, and JSON-LD from main.html.
+   404 pages should not carry social metadata. #}
+{% block extrahead %}
+{% endblock %}
+
+{% block content %}
+<h1>Page not found</h1>
+<p>The page you requested does not exist in this documentation version.</p>
+<p><a href="{{ config.site_url }}">Go to the latest docs</a></p>
+{% endblock %}
