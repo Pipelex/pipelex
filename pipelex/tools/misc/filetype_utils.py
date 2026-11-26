@@ -290,7 +290,7 @@ def is_single_media_type(*, media_type: str) -> bool:
     character anywhere, ASCII whitespace around the value included, so no reader of the type, a browser included, can
     read a second type out of it, and a `type/subtype` of two tokens before the first `;`. Parameters are not parsed
     further, as a browser skips one it cannot parse, so a quoted `boundary="a;b"` passes. `text/html; charset=utf-8` is
-    one; `application/pdf;,text/html` and `image/png,text/html` are not.
+    one; `application/pdf;,text/plain` and `image/png,image/webp` are not.
     """
     if _holds_control_character(text=media_type):
         return False
