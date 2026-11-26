@@ -25500,7 +25500,7 @@ The runtime itself stays transport-agnostic: the machinery that carries an error
 
 **A fail-safe floor.** Ensure a domain error that escapes the conversion path fails the unit of work *terminally* rather than hanging. In a durable-execution system the default for an unconverted exception might be to retry forever, so "convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
 
-**Net effect:** a pipe failing on a remote worker reaches the CLI and HTTP adapters with the *same* problem as the identical failure run locally — and a failure that escapes conversion fails loud and bounded instead of hanging. `pipelex.test_extras.problem_parity`, shipped in the package, holds the injected failures and their expected code, domain, verdict and operator step kind (`ProblemParityTestData`, `SearchProblemParityTestData` and `JudgeProblemParityTestData`), so this repository's local arm and a distributed plugin's arm check the same classification against the same data.
+**Net effect:** a pipe failing on a remote worker reaches the CLI and HTTP adapters with the *same* problem as the identical failure run locally — and a failure that escapes conversion fails loud and bounded instead of hanging. `pipelex.test_extras.problem_parity`, shipped in the package, holds the injected failures and their expected code, domain, verdict and operator step kind (`ProblemParityCases`, `SearchProblemParityCases` and `JudgeProblemParityCases`), so this repository's local arm and a distributed plugin's arm check the same classification against the same data.
 
 See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for the boundary these converters span; the per-backend converters themselves live in the host-runtime plugins.
 
@@ -25787,7 +25787,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.118.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.119.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -27894,7 +27894,7 @@ An entry directory is a method's folder whose bundles declare one `main_pipe` be
     .venv/bin/pipelex validate bundle pipelex/test_extras/mthds_corpus/entries/native_time_departure/
     ```
 
-6. **Give an `offline` entry its expectations.** An `offline` entry ships an `inputs.json` and runs for real in the offline runner, which checks what the run leaves in working memory against the expectations in `tests/integration/pipelex/test_extras/test_data.py`, keyed by the entry's name: a value's concept and the fields its content must hold, or a recorded absence and its kind.
+6. **Give an `offline` entry its expectations.** An `offline` entry ships an `inputs.json` and runs for real in the offline runner, which checks what the run leaves in working memory against the expectations in `tests/integration/pipelex/test_extras/cases.py`, keyed by the entry's name: a value's concept and the fields its content must hold, or a recorded absence and its kind.
 
 7. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
 
@@ -27971,7 +27971,7 @@ The tier governs execution, never validation: the entry-validation gate below pa
 | Manifest | `tests/unit/pipelex/test_extras/test_mthds_corpus_manifest.py` | The strict `entry.toml` model rejected something. |
 | Layout and filters | `tests/unit/pipelex/test_extras/test_mthds_corpus_loader.py` | An entry's name does not match its directory, its bundle does not resolve, or the loader's filter semantics changed. |
 | Entry validation | `tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py` | A valid entry stopped validating, or an invalid one stopped failing with exactly its declared error. Runs over every entry regardless of tier, so an `inference`-tier entry that broke is caught without spending a token. |
-| Offline runs | `tests/integration/pipelex/test_extras/test_mthds_corpus_offline_runs.py` | An `offline`-tier entry stopped running live with its `inputs.json`, or left values in working memory other than the ones its expectations name. An entry holds no expected outputs, so each offline entry's expectations live in that suite's `test_data.py`, keyed by entry name, and a new offline entry with none there is red too. |
+| Offline runs | `tests/integration/pipelex/test_extras/test_mthds_corpus_offline_runs.py` | An `offline`-tier entry stopped running live with its `inputs.json`, or left values in working memory other than the ones its expectations name. An entry holds no expected outputs, so each offline entry's expectations live in that suite's `cases.py`, keyed by entry name, and a new offline entry with none there is red too. |
 | Packaging | `tests/integration/pipelex/test_extras/test_mthds_corpus_packaging.py` | A corpus file stopped shipping in the wheel, or the generator started shipping. It builds a real wheel and derives what it expects from the corpus tree, so a new entry is covered with no wiring. |
 
 ## Consuming the corpus from a test
