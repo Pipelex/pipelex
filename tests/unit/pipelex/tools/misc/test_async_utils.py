@@ -177,6 +177,69 @@ class TestGatherBounded:
         assert probe.ran_indices == {0, 2, 3}, "running items are drained despite the sync raise, and no later item starts"
         assert probe.in_flight == 0, "every started item has ended when the error is raised"
 
+    async def test_a_failure_ending_in_the_same_turn_as_a_success_stops_new_starts(self) -> None:
+        """A failure seen in the same loop turn as a sibling's success stops that sibling's slot from taking a new item.
+
+        Items 0 and 1 wait on one event, so they end in the same turn, item 0 first. Item 0's slot must not take item 2
+        before item 1's failure is recorded.
+        """
+        both_may_end = asyncio.Event()
+        called_indices: list[int] = []
+
+        async def succeed(index: int) -> int:
+            called_indices.append(index)
+            await both_may_end.wait()
+            return index
+
+        async def fail(index: int) -> int:
+            called_indices.append(index)
+            await both_may_end.wait()
+            msg = f"branch {index} failed"
+            raise ValueError(msg)
+
+        factories: list[Callable[[], Awaitable[int]]] = [
+            functools.partial(succeed, 0),
+            functools.partial(fail, 1),
+            functools.partial(succeed, 2),
+        ]
+        gathering = asyncio.ensure_future(gather_bounded(factories, max_concurrency=2))
+        for _ in range(3):
+            await asyncio.sleep(0)
+        both_may_end.set()
+
+        with pytest.raises(ValueError, match="branch 1 failed"):
+            await gathering
+
+        assert called_indices == [0, 1], "no factory is called once a failure has ended, even in the same turn"
+
+    async def test_a_cancelled_caller_resumes_only_once_every_running_item_has_cleaned_up(self) -> None:
+        """A cancellation reaches the caller only after every running item has finished its own cleanup.
+
+        The caller's own teardown, such as closing what the items work on, must never run under an item still cleaning up.
+        """
+        cleaned_up: list[int] = []
+        cleanup_delays = {0: 0.001, 1: 0.05}
+
+        async def wait_then_clean_up(index: int) -> int:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                await asyncio.sleep(cleanup_delays[index])
+                cleaned_up.append(index)
+                raise
+            return index
+
+        factories = [functools.partial(wait_then_clean_up, index) for index in range(2)]
+        gathering = asyncio.ensure_future(gather_bounded(factories, max_concurrency=2))
+        for _ in range(3):
+            await asyncio.sleep(0)
+        gathering.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await gathering
+
+        assert sorted(cleaned_up) == [0, 1], "the caller resumed while an item was still cleaning up"
+
     async def test_cancelling_the_caller_cancels_every_running_item(self) -> None:
         """A cancelled caller cancels the items in flight and starts none after them."""
         started_indices: list[int] = []

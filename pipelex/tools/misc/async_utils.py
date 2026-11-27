@@ -148,22 +148,42 @@ async def gather_bounded(
     next_index = 0
     has_failed = False
 
+    def note_failure(  # kw-only: ignore
+        item_task: asyncio.Future[Any],
+    ) -> None:
+        """Record an item's failure the moment its task ends, before any slot resumes from what ended in that turn.
+
+        A done-callback of the item's task, which asyncio calls with the task as its one positional argument. It runs one
+        loop step before the slot awaiting that task resumes, so when items end in the same turn, every failure among
+        them is recorded before any of their slots takes another factory, whatever order the slots resume in.
+        """
+        nonlocal has_failed
+        if item_task.cancelled() or item_task.exception() is not None:
+            has_failed = True
+
     async def run_slot() -> None:
-        nonlocal next_index, has_failed
+        nonlocal next_index
         while not has_failed and next_index < factory_count:
             # Taken and advanced with no await in between, so no two slots ever take the same factory.
             factory_index = next_index
             next_index += 1
-            # Gathering the one awaitable captures its error as its outcome, so the slot records it rather than dies.
-            (outcome,) = await asyncio.gather(_invoke(task_factories[factory_index]), return_exceptions=True)
+            item_task = asyncio.ensure_future(_invoke(task_factories[factory_index]))
+            item_task.add_done_callback(note_failure)
+            # Gathering the one task captures its error as its outcome, so the slot records it rather than dies, and a
+            # cancelled slot ends only once its item has ended.
+            (outcome,) = await asyncio.gather(item_task, return_exceptions=True)
             outcomes[factory_index] = outcome
-            if isinstance(outcome, BaseException):
-                has_failed = True
 
     # The slots are started in order and each takes its first factory before its first await, so the first factories
-    # start in input order. `asyncio.gather` with no `return_exceptions` cancels the slots, and through them every
-    # awaitable in flight, when the caller is cancelled; a slot itself never raises.
-    await asyncio.gather(*(run_slot() for _ in range(slot_count)))
+    # start in input order. A cancellation of the caller cancels every slot and, through it, its item; with
+    # `return_exceptions=True` the cancellation reaches the caller only once every slot, and so every item, has ended,
+    # so the caller's own cleanup never runs under an item still cleaning up. `asyncio.wait` is not used to watch the
+    # items: it iterates over sets, which a deterministic event loop such as a Temporal workflow's cannot replay.
+    slot_outcomes = await asyncio.gather(*(run_slot() for _ in range(slot_count)), return_exceptions=True)
+    for slot_outcome in slot_outcomes:
+        # A slot records its item's error rather than raising it, so a slot that raised hit a bug of its own.
+        if isinstance(slot_outcome, BaseException):
+            raise slot_outcome
 
     results: list[_T] = []
     for factory_index in sorted(outcomes):
