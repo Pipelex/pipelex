@@ -149,8 +149,7 @@ class TestGatherBounded:
         with pytest.raises(ValueError, match="branch 0 failed"):
             await gather_bounded(factories, max_concurrency=2)
 
-        assert 2 in probe.ran_indices, "the freed slot started item 2 before item 0 failed"
-        assert 5 not in probe.ran_indices, "no item starts after the failure"
+        assert probe.ran_indices == {0, 1, 2}, "the freed slot started item 2 before item 0 failed, and no item starts after it"
         assert probe.in_flight == 0, "item 2 is drained before the error is raised"
 
     async def test_synchronous_factory_error_is_captured_and_running_items_are_drained(self) -> None:

@@ -3,8 +3,8 @@ comes off the payload rather than live config.
 
 Both are the core half of the flat-topology seam. The hook is the ONLY signal a distributed router
 gets that a dispatch is a per-item fan-out branch (the branch job is otherwise indistinguishable
-from a sequence step); the frozen bound is what keeps the fan-out grouping a pure function of the
-run, so a config redeploy cannot reshape an in-flight batch.
+from a sequence step); the frozen bound is what keeps the order in which branches start a pure
+function of the run, so a config redeploy cannot reshape an in-flight batch.
 """
 
 from collections.abc import Awaitable, Callable, Sequence
