@@ -32,7 +32,7 @@ Results always preserve input order regardless of the concurrency bound.
 
 When a branch fails, the batch starts no further branch. The branches already running are not cancelled: each runs to its end, so its steps finish cleanly and record their trace and their cost, rather than being cut off in the middle of a model call that is billed either way. Once every running branch has ended, the batch fails with the error of the failed branch that comes first in the list, whichever failed first in time. The branches that had not started never run, and the batch hands back no partial list.
 
-So a failure costs at most the branches that were running beside it, `max_concurrency` minus one at the most, never the rest of the list. On a durable backend, which branches had started when the failure came depends only on the order in which branches ended, which the run's history records, so a replay starts exactly the same branches.
+So with a bounded window a failure costs at most the branches that were running beside it, `max_concurrency` minus one at the most, never the rest of the list. Under `max_concurrency = "unbounded"` every branch is already running when one fails, so every one of them runs to its end. On a durable backend, which branches had started when the failure came depends only on the order in which branches ended, which the run's history records, so a replay starts exactly the same branches.
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track. A live batch over more than 100 items run in process logs a warning saying so; a durable backend whose router runs the batch durably leaves that warning out.
 
