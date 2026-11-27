@@ -213,8 +213,10 @@ class PipeBatch(PipeController):
         # submit time precisely so the fan-out shape stays a pure function of the run. See
         # `PipeRunParams.batch_max_concurrency`.
         max_concurrency = pipe_run_params.batch_max_concurrency
-        # The router gives the advice on a live batch's width, since only it knows whether it runs the batch durably.
-        get_pipe_router().advise_on_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
+        # The router gives the advice on a live batch's width, since only it knows whether it runs the batch durably. A dry
+        # run, which runs through this same method, is advised nothing: it starts no inference and no durable history.
+        if pipe_run_params.run_mode.is_live:
+            get_pipe_router().advise_on_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
 
         async def _run_branch(*, branch_index: int) -> PipeOutput:
             pipe_job = first_branch_job if branch_index == 0 and first_branch_job is not None else _make_branch_job(branch_index=branch_index)

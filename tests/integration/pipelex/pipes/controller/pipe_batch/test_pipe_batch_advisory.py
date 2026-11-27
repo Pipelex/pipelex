@@ -149,3 +149,21 @@ class TestPipeBatchAdvisory:
             )
 
         assert _advisory_calls(warning_spy) == 0
+
+    async def test_a_dry_run_is_advised_nothing(
+        self, job_metadata: JobMetadata, load_empty_library: Callable[[], str], mocker: MockerFixture
+    ) -> None:
+        """A dry run goes through the same method as a live one, yet the router is not asked for its advice."""
+        load_empty_library()
+        batch = _build_batch()
+        router = PipeRouter()
+        advise_spy = mocker.spy(router, "advise_on_batch")
+        warning_spy = mocker.patch.object(log, "warning")
+
+        with scoped_pipe_router(router):
+            await router.run(
+                _make_batch_job(batch=batch, job_metadata=job_metadata, item_count=LARGE_BATCH_ADVISORY_THRESHOLD + 1, run_mode=PipeRunMode.DRY)
+            )
+
+        advise_spy.assert_not_called()
+        assert _advisory_calls(warning_spy) == 0

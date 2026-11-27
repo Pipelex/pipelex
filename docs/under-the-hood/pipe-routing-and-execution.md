@@ -175,9 +175,9 @@ A batch over a large list runs very differently on an in-process router and on a
 def advise_on_batch(self, *, pipe_code: str, item_count: int, max_concurrency: int | None) -> None: ...
 ```
 
-`PipeBatch` calls it once per live batch, after the batch fits and has recorded its fan-out, before any branch starts; a dry run never calls it. `max_concurrency` is the run's frozen bound (`PipeRunParams.batch_max_concurrency`), `None` when the configuration's `"unbounded"` set none.
+`PipeBatch` calls it once per live batch, after the batch fits and has recorded its fan-out, before any branch starts; a dry run, which runs through the same method, never calls it. `max_concurrency` is the run's frozen bound (`PipeRunParams.batch_max_concurrency`), `None` when the configuration's `"unbounded"` set none.
 
-The default body is the behavior for in-process routers, whose bounded fan-out is backpressure rather than durable execution: past `LARGE_BATCH_ADVISORY_THRESHOLD` items (`pipelex/pipe_run/large_batch_advisory.py`) it logs the warning "A PipeBatch fans out over a large list without durable execution", with a `user_action` pointing at a durable execution backend. A durable router overrides it, since its run is durable already and the advice would be false; a batch too wide for its run's history it refuses earlier, through `check_batch_fits`.
+The default body is the behavior for in-process routers, whose bounded fan-out is backpressure rather than durable execution: past `LARGE_BATCH_ADVISORY_THRESHOLD` items (`pipelex/pipe_run/large_batch_advisory.py`) it logs the warning "A PipeBatch fans out over a large list without durable execution", with a `user_action` pointing at a durable execution backend. A durable router overrides it, since its run is durable already and the advice would be false, and it may log there what is true of a wide batch on its backend instead; a batch too wide for its run's history it refuses earlier, through `check_batch_fits`.
 
 ---
 

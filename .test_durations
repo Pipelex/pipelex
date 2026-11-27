@@ -14794,10 +14794,8 @@
     "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_blueprint.py::TestPipeBatchBlueprint::test_pipe_dependencies_correct": 0.837,
     "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_input.py::TestPipeBatchValidateInputs::test_validate_inputs_valid_cases[valid_multiple_inputs-blueprint1]": 0.2244,
     "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_input.py::TestPipeBatchValidateInputs::test_validate_inputs_valid_cases[valid_simple_batch-blueprint0]": 0.8001,
-    "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_large_batch_advisory.py::TestPipeBatchLargeBatchAdvisory::test_the_advisory_is_one_event_whose_bound_is_a_field[bounded]": 0.1027,
-    "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_large_batch_advisory.py::TestPipeBatchLargeBatchAdvisory::test_the_advisory_is_one_event_whose_bound_is_a_field[unbounded]": 0.0007,
-    "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_large_batch_advisory.py::TestPipeBatchLargeBatchAdvisory::test_the_advisory_says_what_the_fan_out_is[bounded]": 0.0891,
-    "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_large_batch_advisory.py::TestPipeBatchLargeBatchAdvisory::test_the_advisory_says_what_the_fan_out_is[unbounded]": 0.1038,
+    "tests/unit/pipelex/pipe_run/test_large_batch_advisory.py::TestLargeBatchAdvisory::test_the_advisory_is_one_event_whose_bound_is_a_field[bounded]": 0.1027,
+    "tests/unit/pipelex/pipe_run/test_large_batch_advisory.py::TestLargeBatchAdvisory::test_the_advisory_is_one_event_whose_bound_is_a_field[unbounded]": 0.0007,
     "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_missing_branch.py::TestPipeBatchMissingBranch::test_a_branch_pipe_no_bundle_declares_is_refused_naming_the_batch": 0.0655,
     "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_too_wide_error.py::TestPipeBatchTooWideError::test_the_message_is_built_from_the_figures[refused_none_fit]": 0.171,
     "tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_too_wide_error.py::TestPipeBatchTooWideError::test_the_message_is_built_from_the_figures[refused_some_fit]": 0.0014,
@@ -24245,5 +24243,7 @@
     "tests/unit/repo/test_slow_test_marker.py::TestSlowTestMarker::test_refuses_a_threshold_that_is_not_positive[0.0]": 0.0706,
     "tests/unit/repo/test_test_durations_paths.py::TestTestDurationsPaths::test_durations_file_is_committed_and_not_empty": 0.8507,
     "tests/unit/repo/test_test_durations_paths.py::TestTestDurationsPaths::test_every_node_id_is_rooted_in_a_test_file_path": 0.0153,
-    "tests/unit/repo/test_test_durations_paths.py::TestTestDurationsPaths::test_every_recorded_test_file_still_exists": 0.1253
+    "tests/unit/repo/test_test_durations_paths.py::TestTestDurationsPaths::test_every_recorded_test_file_still_exists": 0.1253,
+    "tests/unit/pipelex/pipe_run/test_large_batch_advisory.py::TestLargeBatchAdvisory::test_an_in_process_router_advises_only_past_the_threshold[at_threshold]": 0.001,
+    "tests/unit/pipelex/pipe_run/test_large_batch_advisory.py::TestLargeBatchAdvisory::test_an_in_process_router_advises_only_past_the_threshold[past_threshold]": 0.001
 }

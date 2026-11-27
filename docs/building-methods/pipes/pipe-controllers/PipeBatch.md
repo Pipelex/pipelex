@@ -28,7 +28,7 @@ The setting is read **once, when the run's parameters are built**, and then froz
 
 Results always preserve input order regardless of the concurrency bound. If a branch fails, the failure propagates and the first error by input index wins.
 
-For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track. A batch over more than 100 items run in process logs a warning saying so; a run on a durable backend does not.
+For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track. A live batch over more than 100 items run in process logs a warning saying so; a durable backend whose router runs the batch durably leaves that warning out.
 
 ## Very wide batches on a durable runtime
 
