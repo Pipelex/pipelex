@@ -7,6 +7,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
+from pipelex.pipe_run.large_batch_advisory import LARGE_BATCH_ADVISORY_THRESHOLD, warn_of_large_batch
 from pipelex.pipe_run.pipe_job import PipeJob
 
 
@@ -173,6 +174,33 @@ class PipeRouterProtocol(Protocol):
         # Every batch fits an in-process router, which reads none of what it is given; the body is not empty, so the type
         # checkers read a default that does nothing rather than an abstract method.
         del pipe_code, input_list_label, item_count, first_branch_job
+
+    def advise_on_batch(
+        self,
+        *,
+        pipe_code: str,
+        item_count: int,
+        max_concurrency: int | None,
+    ) -> None:
+        """Give the run the advice its router has on a live ``PipeBatch``'s width, once per batch.
+
+        ``PipeBatch`` calls it in a live run, once it knows the batch fits and has recorded its fan-out, before it starts
+        a branch, and never in a dry run.
+
+        The default body IS the behavior for in-process routers, which run a batch in one process whose bounded fan-out
+        is backpressure, not durable execution: past ``LARGE_BATCH_ADVISORY_THRESHOLD`` items it logs the advisory
+        pointing at a durable execution backend (``warn_of_large_batch``). A durable router overrides it, since it
+        already runs the batch durably and telling its run to use durable execution would be false; what it can say
+        instead, it says there, and a batch its run's history cannot hold it refuses earlier, in :meth:`check_batch_fits`.
+
+        Args:
+            pipe_code: The code of the ``PipeBatch``.
+            item_count: How many items the list holds.
+            max_concurrency: The run's frozen bound on the branches running at once (``PipeRunParams.batch_max_concurrency``),
+                ``None`` when the configuration's ``"unbounded"`` set none.
+        """
+        if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
+            warn_of_large_batch(pipe_code=pipe_code, item_count=item_count, max_concurrency=max_concurrency)
 
     @abstractmethod
     async def _run_pipe_job(
