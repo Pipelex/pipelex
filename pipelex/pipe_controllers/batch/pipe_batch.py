@@ -20,11 +20,8 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.system.invocation_path import item_segment
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.system.telemetry.otel_constants import OTelLogAttr
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -32,25 +29,6 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-
-# When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
-# durable execution — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
-LARGE_BATCH_ADVISORY_THRESHOLD = 100
-
-
-def warn_of_large_batch(*, pipe_code: str, item_count: int, max_concurrency: int | None) -> None:
-    """Advise a durable execution backend for a batch past ``LARGE_BATCH_ADVISORY_THRESHOLD`` items.
-
-    Bounded or not, the fan-out is one event: a bound is backpressure, and neither is durable, rate-limited execution.
-    ``max_concurrency`` is always an integer, so a log query reads one type: it is absent from the line when the
-    configuration's ``"unbounded"`` resolved to no bound at all.
-    """
-    fields: dict[str, str | int] = {"pipe_code": pipe_code, "item_count": item_count}
-    if max_concurrency is not None:
-        fields["max_concurrency"] = max_concurrency
-    fields[OTelLogAttr.URL_FULL] = URLs.durable_execution
-    fields[USER_ACTION_FIELD] = "Consider a durable execution backend for rate-limited, resumable runs"
-    log.warning("A PipeBatch fans out over a large list without durable execution", fields=fields)
 
 
 def names_read_by_branch(*, branch_pipe: "PipeAbstract", input_item_stuff_name: str) -> set[str]:
@@ -235,8 +213,8 @@ class PipeBatch(PipeController):
         # submit time precisely so the fan-out shape stays a pure function of the run. See
         # `PipeRunParams.batch_max_concurrency`.
         max_concurrency = pipe_run_params.batch_max_concurrency
-        if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
-            warn_of_large_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
+        # The router gives the advice on a live batch's width, since only it knows whether it runs the batch durably.
+        get_pipe_router().advise_on_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
 
         async def _run_branch(*, branch_index: int) -> PipeOutput:
             pipe_job = first_branch_job if branch_index == 0 and first_branch_job is not None else _make_branch_job(branch_index=branch_index)

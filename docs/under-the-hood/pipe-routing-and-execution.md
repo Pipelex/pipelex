@@ -167,6 +167,18 @@ def check_batch_fits(self, *, pipe_code: str, input_list_label: str, item_count:
 
 In-process routers keep the default: every batch fits. A durable router may estimate what the whole batch would write into its run's history and refuse by raising `PipeBatchTooWideError` (`pipelex/pipe_controllers/exceptions.py`), which fails the `PipeBatch` located at it, with no fan-out recorded and no branch started. The error takes the batch's figures as keyword arguments (the pipe code, the list's label, the item count, the estimated bytes and events, the bytes and events left, the largest item count that fits, and, for a batch stopped during its fan-out rather than refused before it, the number of items started) and builds its message from them, so the wording is Pipelex's whichever backend raises it. Its problem is `input.too_large`, whose `input` is the list's label, `size` the item count and `limit` the largest count that fits. When that count is zero, no shorter list would run: the problem withholds `limit`, so the code's sentence for a withheld limit applies, and the message and the advice ask for smaller items.
 
+### The batch-advisory hook
+
+A batch over a large list runs very differently on an in-process router and on a durable one, and only the router knows which it is. So `PipeRouterProtocol` carries a third batch entry point, synchronous, which gives the run the router's advice on a batch's width:
+
+```python
+def advise_on_batch(self, *, pipe_code: str, item_count: int, max_concurrency: int | None) -> None: ...
+```
+
+`PipeBatch` calls it once per live batch, after the batch fits and has recorded its fan-out, before any branch starts; a dry run never calls it. `max_concurrency` is the run's frozen bound (`PipeRunParams.batch_max_concurrency`), `None` when the configuration's `"unbounded"` set none.
+
+The default body is the behavior for in-process routers, whose bounded fan-out is backpressure rather than durable execution: past `LARGE_BATCH_ADVISORY_THRESHOLD` items (`pipelex/pipe_run/large_batch_advisory.py`) it logs the warning "A PipeBatch fans out over a large list without durable execution", with a `user_action` pointing at a durable execution backend. A durable router overrides it, since its run is durable already and the advice would be false; a batch too wide for its run's history it refuses earlier, through `check_batch_fits`.
+
 ---
 
 ## Pipe Controllers

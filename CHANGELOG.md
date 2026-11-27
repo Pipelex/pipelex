@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **A router gives the advice on a large `PipeBatch`, `PipeRouterProtocol.advise_on_batch`**: a live `PipeBatch` hands its router its width and the run's concurrency bound once, before any branch starts, and the default body logs the large-batch warning advising a durable execution backend past 100 items, as `PipeBatch` did itself; a durable router overrides it, so a run already on a durable backend is no longer told to use durable execution. The advisory and its threshold moved from `pipelex.pipe_controllers.batch.pipe_batch` to `pipelex.pipe_run.large_batch_advisory`.
+
 ## [v0.119.0] - 2026-11-26
 
 ### Changed
