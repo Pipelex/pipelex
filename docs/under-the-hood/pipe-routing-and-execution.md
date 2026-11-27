@@ -188,7 +188,7 @@ Controllers are pipes that orchestrate the execution of other pipes. They resolv
 | Controller | Behavior |
 |------------|----------|
 | **PipeSequence** | Executes `sequential_sub_pipes` one after another. Each step receives working memory with outputs from previous steps. |
-| **PipeBatch** | Iterates over a `ListContent` input. For each item, loads `branch_pipe` and executes it on a working memory of its own, holding a deep copy of its item and of what `branch_pipe` reads (`WorkingMemory.make_deep_copy_of`, over the names `names_read_by_branch` works out once per batch), never a copy of the whole memory and its list. Items run concurrently via asyncio, in chunks of `batch_max_concurrency`. |
+| **PipeBatch** | Iterates over a `ListContent` input. For each item, loads `branch_pipe` and executes it on a working memory of its own, holding a deep copy of its item and of what `branch_pipe` reads (`WorkingMemory.make_deep_copy_of`, over the names `names_read_by_branch` works out once per batch), never a copy of the whole memory and its list. Items run concurrently via asyncio, through a sliding window of `batch_max_concurrency` (`gather_bounded`): a branch starts as soon as a running one ends. Each branch keeps only its resolved main stuff or its recorded absence, never the working memory it ran in. |
 | **PipeCondition** | Evaluates a Jinja2 `expression` against working memory, after loading through the content generator's `load_stored_texts` leaf any stored text the expression reads, maps the result via `outcome_map` to a pipe code, and executes that pipe. |
 | **PipeParallel** | Loads multiple child pipes and executes them concurrently, each with its own working memory copy. |
 

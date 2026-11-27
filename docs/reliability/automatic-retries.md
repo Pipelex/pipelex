@@ -40,7 +40,7 @@ Keep the two settings distinct in your mind: `transport_max_retries` handles a f
 
 ## Bounded fan-out for batches
 
-When `PipeBatch` maps a pipe over a large list, it does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by `max_concurrency` (default `8`):
+When `PipeBatch` maps a pipe over a large list, it does not spawn every branch at once. At most `max_concurrency` branches run at a time (default `8`), and the next branch starts as soon as any running one ends:
 
 ```toml
 [interpreter.pipeline_execution]

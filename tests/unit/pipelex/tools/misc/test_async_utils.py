@@ -58,14 +58,14 @@ class TestGatherBounded:
         assert len(probe.ran_indices) == item_count, "every item must run exactly once"
         if max_concurrency is not None:
             assert probe.peak_in_flight <= max_concurrency, "in-flight count must never exceed max_concurrency"
-        # An unbounded run (max_concurrency is None, or >= item_count) is a single chunk over every branch.
+        # An unbounded run (max_concurrency is None, or >= item_count) starts every branch at once.
         if max_concurrency is None or max_concurrency >= item_count:
             assert probe.peak_in_flight == item_count, "unbounded run keeps every branch in flight at once"
         else:
             assert probe.peak_in_flight == max_concurrency, "a bounded run saturates the bound"
 
     async def test_unbounded_run_propagates_lowest_index_error_over_a_faster_one(self) -> None:
-        """In a single (unbounded) chunk, the lowest input index wins even though it fails later."""
+        """In an unbounded run, the lowest input index wins even though it fails later."""
         probe = _ConcurrencyProbe()
         factories = [
             functools.partial(probe.run, 0),
@@ -78,30 +78,91 @@ class TestGatherBounded:
         with pytest.raises(ValueError, match="branch 1 failed"):
             await gather_bounded(factories, max_concurrency=None)
 
-    async def test_failing_chunk_is_drained_lowest_index_wins_and_later_chunks_skipped(self) -> None:
-        """The failing chunk is fully awaited, its lowest-index error wins, and no later chunk starts."""
-        probe = _ConcurrencyProbe()
-        # max_concurrency=2 → chunks [0,1] [2,3] [4,5]; both branches of the second chunk fail.
-        factories = [functools.partial(probe.run, index) for index in range(6)]
-        factories[2] = functools.partial(probe.fail, 2, 0.05)  # lower index, fails slower
-        factories[3] = functools.partial(probe.fail, 3, 0.01)  # higher index, fails faster
+    async def test_a_slow_item_does_not_hold_the_other_slots(self) -> None:
+        """A slot that frees starts the next item at once: a slow item never holds back the items after it.
 
-        with pytest.raises(ValueError, match="branch 2 failed"):
+        Item 0 waits until the last item has finished, so it can end only if every other item ran while it was still
+        running. Fixed chunks would never start the last item before item 0 ended, and the wait would time out.
+        """
+        item_count = 6
+        last_item_done = asyncio.Event()
+        start_order: list[int] = []
+
+        async def slow_first() -> int:
+            start_order.append(0)
+            await last_item_done.wait()
+            return 0
+
+        async def fast(index: int) -> int:
+            start_order.append(index)
+            await asyncio.sleep(0)
+            if index == item_count - 1:
+                last_item_done.set()
+            return index
+
+        factories: list[Callable[[], Awaitable[int]]] = [slow_first]
+        factories.extend(functools.partial(fast, index) for index in range(1, item_count))
+
+        results = await asyncio.wait_for(gather_bounded(factories, max_concurrency=2), timeout=5)
+
+        assert results == list(range(item_count)), "results must preserve input order"
+        assert start_order == list(range(item_count)), "items start in input order"
+
+    async def test_a_failure_stops_new_starts_and_lets_running_items_finish(self) -> None:
+        """After a failure no item starts, every running item finishes, and the lowest-index failure is raised.
+
+        With a window of 3, items 0, 1 and 2 start together. Item 2 fails first; items 0 and 1, still running, are not
+        cancelled and finish, item 1 failing in turn. No later item starts, and item 1's error wins by input index.
+        """
+        probe = _ConcurrencyProbe()
+        finished_indices: list[int] = []
+
+        async def run_and_record(index: int, delay: float) -> int:
+            result = await probe.run(index, delay)
+            finished_indices.append(index)
+            return result
+
+        factories: list[Callable[[], Awaitable[int]]] = [functools.partial(run_and_record, index, 0.01) for index in range(6)]
+        factories[0] = functools.partial(run_and_record, 0, 0.05)  # still running when item 2 fails
+        factories[1] = functools.partial(probe.fail, 1, 0.03)  # lower index, fails after item 2
+        factories[2] = functools.partial(probe.fail, 2, 0.01)  # higher index, fails first
+
+        with pytest.raises(ValueError, match="branch 1 failed"):
+            await gather_bounded(factories, max_concurrency=3)
+
+        assert probe.ran_indices == {0, 1, 2}, "no item starts after the first failure"
+        assert finished_indices == [0], "an item running when a sibling fails is not cancelled: it finishes"
+        assert probe.in_flight == 0, "every started item has ended when the error is raised"
+
+    async def test_items_started_before_a_failure_are_drained_in_a_sliding_window(self) -> None:
+        """An item a freed slot started before the failure still finishes, and nothing starts after the failure.
+
+        Window of 2: item 1 ends quickly, so item 2 starts while item 0 runs; item 0 then fails. Item 2 is drained, and
+        items 3 and later never start.
+        """
+        probe = _ConcurrencyProbe()
+        factories = [functools.partial(probe.run, index, 0.01) for index in range(6)]
+        factories[0] = functools.partial(probe.fail, 0, 0.03)
+        factories[1] = functools.partial(probe.run, 1, 0.001)
+        factories[2] = functools.partial(probe.run, 2, 0.05)
+
+        with pytest.raises(ValueError, match="branch 0 failed"):
             await gather_bounded(factories, max_concurrency=2)
 
-        assert probe.ran_indices == {0, 1, 2, 3}, "the failing chunk is drained (2 and 3 both run) and no later chunk starts (4, 5 never run)"
+        assert 2 in probe.ran_indices, "the freed slot started item 2 before item 0 failed"
+        assert 5 not in probe.ran_indices, "no item starts after the failure"
+        assert probe.in_flight == 0, "item 2 is drained before the error is raised"
 
-    async def test_synchronous_factory_error_is_captured_and_chunk_is_drained(self) -> None:
-        """A factory raising synchronously is captured per-task: the chunk still drains and the lowest-index error wins."""
+    async def test_synchronous_factory_error_is_captured_and_running_items_are_drained(self) -> None:
+        """A factory raising synchronously fails like any item: running items finish, none starts, lowest index wins."""
         probe = _ConcurrencyProbe()
 
         def sync_raiser(index: int) -> Awaitable[int]:
             msg = f"branch {index} raised synchronously"
             raise RuntimeError(msg)
 
-        # max_concurrency=4 → chunks [0,1,2,3] [4,5]. Index 1 raises synchronously and index 3
-        # fails asynchronously; index 1 wins by input index. Indices 0 and 2 must still run
-        # (the chunk drains despite the synchronous raise) and the later chunk never starts.
+        # A window of 4 starts items 0 to 3 together. Index 1 raises synchronously and index 3 fails asynchronously;
+        # index 1 wins by input index. Indices 0, 2 and 3 still run to their end, and items 4 and 5 never start.
         factories: list[Callable[[], Awaitable[int]]] = [
             functools.partial(probe.run, 0),
             functools.partial(sync_raiser, 1),
@@ -114,7 +175,34 @@ class TestGatherBounded:
         with pytest.raises(RuntimeError, match="branch 1 raised synchronously"):
             await gather_bounded(factories, max_concurrency=4)
 
-        assert probe.ran_indices == {0, 2, 3}, "the chunk drains (0, 2, 3 run despite the sync raise) and no later chunk starts"
+        assert probe.ran_indices == {0, 2, 3}, "running items are drained despite the sync raise, and no later item starts"
+        assert probe.in_flight == 0, "every started item has ended when the error is raised"
+
+    async def test_cancelling_the_caller_cancels_every_running_item(self) -> None:
+        """A cancelled caller cancels the items in flight and starts none after them."""
+        started_indices: list[int] = []
+        cancelled_indices: list[int] = []
+
+        async def wait_forever(index: int) -> int:
+            started_indices.append(index)
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled_indices.append(index)
+                raise
+            return index
+
+        factories = [functools.partial(wait_forever, index) for index in range(5)]
+        gathering = asyncio.ensure_future(gather_bounded(factories, max_concurrency=2))
+        for _ in range(3):
+            await asyncio.sleep(0)
+        gathering.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await gathering
+
+        assert started_indices == [0, 1], "only the window's items started"
+        assert sorted(cancelled_indices) == [0, 1], "every running item was cancelled with its caller"
 
     @pytest.mark.parametrize("bad_max_concurrency", [0, -1])
     async def test_non_positive_max_concurrency_is_rejected(self, bad_max_concurrency: int) -> None:

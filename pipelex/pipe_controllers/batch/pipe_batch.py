@@ -26,6 +26,7 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -218,16 +219,29 @@ class PipeBatch(PipeController):
         if pipe_run_params.run_mode.is_live:
             get_pipe_router().advise_on_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
 
-        async def _run_branch(*, branch_index: int) -> PipeOutput:
-            pipe_job = first_branch_job if branch_index == 0 and first_branch_job is not None else _make_branch_job(branch_index=branch_index)
+        async def _run_branch(*, branch_index: int) -> "Stuff | AbsenceRecord":
+            """Run branch ``branch_index`` and keep only what the batch aggregates: its main stuff or its recorded absence.
+
+            The branch's working memory, with every intermediate value its steps added, is dropped as soon as the branch
+            ends, so a batch holds one result per finished branch rather than one memory per branch until it aggregates.
+            """
+            nonlocal first_branch_job
+            pipe_job: PipeJob
+            if branch_index == 0 and first_branch_job is not None:
+                # Handed over and released: the batch keeps no reference to the first branch's memory while it runs.
+                pipe_job = first_branch_job
+                first_branch_job = None
+            else:
+                pipe_job = _make_branch_job(branch_index=branch_index)
             # `run_batch_branch`, not `run`: this is the one dispatch in the pipe tree whose
             # semantics are "a per-item fan-out branch". In-process routers treat it as a plain
             # run (the protocol's default body); a distributed router may isolate it.
-            return await get_pipe_router().run_batch_branch(pipe_job=pipe_job)
+            branch_output = await get_pipe_router().run_batch_branch(pipe_job=pipe_job)
+            return branch_output.working_memory.resolve_main_stuff()
 
-        # Build one factory per branch. Each factory but the first defers its working-memory deep copy until it
-        # actually runs, so gather_bounded materializes at most `max_concurrency` of them at once.
-        branch_factories: list[Callable[[], Awaitable[PipeOutput]]] = []
+        # Build one factory per branch. Each factory but the first defers its working-memory deep copy until a slot of
+        # gather_bounded's window takes it, so at most `max_concurrency` branch memories are made and alive at once.
+        branch_factories: list[Callable[[], Awaitable[Stuff | AbsenceRecord]]] = []
         for branch_index in range(item_count):
             # Register batch item extraction with graph tracer
             if job_metadata.trace_context is not None:
@@ -245,13 +259,14 @@ class PipeBatch(PipeController):
 
             branch_factories.append(functools.partial(_run_branch, branch_index=branch_index))
 
-        pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
+        # A sliding window: a branch starts as soon as any running branch ends, never waiting for a whole group to end.
+        # Once a branch fails, no branch starts, the running ones finish, and the failure of the lowest index is raised.
+        branch_results = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 
         output_items: list[StuffContent] = []
         branch_output_stuff_codes: list[str] = []
 
-        for branch_index, pipe_output in enumerate(pipe_outputs):
-            branch_resolved = pipe_output.working_memory.resolve_main_stuff()
+        for branch_index, branch_resolved in enumerate(branch_results):
             if isinstance(branch_resolved, AbsenceRecord):
                 # Compaction (D4): an absent branch result cannot occupy a list slot — it is
                 # dropped, so the aggregated output holds only the found items (compactMap).

@@ -5,7 +5,7 @@ import os
 import threading
 from collections.abc import Awaitable, Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, ParamSpec, TypeVar, cast
+from typing import Any, ParamSpec, TypeVar
 
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
@@ -99,7 +99,7 @@ async def _invoke(factory: Callable[[], Awaitable[_T]]) -> _T:
     Calling `factory()` here — rather than where `gather` builds its arguments — means a
     factory that raises *synchronously* fails inside the gathered task. `asyncio.gather`
     with `return_exceptions=True` then captures that error like any other failure, instead
-    of it propagating out before `gather` runs and orphaning the chunk's other coroutines.
+    of it propagating out of the slot that called it.
     """
     return await factory()
 
@@ -109,19 +109,24 @@ async def gather_bounded(
     *,
     max_concurrency: int | None,
 ) -> list[_T]:
-    """Run `task_factories` in chunks with at most `max_concurrency` awaitables in flight at once.
+    """Run `task_factories` through a sliding window of at most `max_concurrency` awaitables in flight at once.
 
-    Each factory is called only when its chunk is about to run, so a factory that
-    materializes an expensive resource — a deep-copied working memory, say — keeps at
-    most `max_concurrency` of those resources alive at once. A bare `asyncio.Semaphore`
+    The window has `max_concurrency` slots. Each slot takes the next factory in input order, calls it and awaits it, then
+    takes the next as soon as it is free, so one slow awaitable holds only its own slot and never the others. Each
+    factory is called only when a slot takes it, so a factory that materializes an expensive resource — a copied
+    working memory, say — keeps at most `max_concurrency` of those resources alive at once. A bare `asyncio.Semaphore`
     over already-created coroutines would bound execution but not that materialization.
 
     A `max_concurrency` of `None`, or any value at least as large as the factory count,
-    runs every factory in a single chunk (unbounded fan-out).
+    starts every factory at once (unbounded fan-out).
 
-    Failure semantics are the same whether or not the run is bounded: within a chunk,
-    every awaitable is awaited (drained) — never orphaned or cancelled — then the first
-    error by input index is raised and no later chunk is started.
+    Failure semantics are the same whether or not the run is bounded: once an awaitable
+    fails, no slot takes another factory, every awaitable already running is awaited to
+    its end (drained) — never orphaned or cancelled — and the error of the lowest input
+    index among those that failed is raised. Which factories ran depends only on the order
+    in which the running awaitables end, so a replay that sees the same order of ends starts
+    the same factories in the same order. A cancellation of the caller cancels every
+    awaitable in flight.
 
     Args:
         task_factories: Ordered callables, each returning a fresh awaitable when called.
@@ -137,15 +142,33 @@ async def gather_bounded(
         msg = f"gather_bounded requires max_concurrency to be a positive int or None, got {max_concurrency}"
         raise ValueError(msg)
 
-    chunk_size = (len(task_factories) or 1) if max_concurrency is None else max_concurrency
+    factory_count = len(task_factories)
+    slot_count = factory_count if max_concurrency is None else min(max_concurrency, factory_count)
+    outcomes: dict[int, _T | BaseException] = {}
+    next_index = 0
+    has_failed = False
+
+    async def run_slot() -> None:
+        nonlocal next_index, has_failed
+        while not has_failed and next_index < factory_count:
+            # Taken and advanced with no await in between, so no two slots ever take the same factory.
+            factory_index = next_index
+            next_index += 1
+            # Gathering the one awaitable captures its error as its outcome, so the slot records it rather than dies.
+            (outcome,) = await asyncio.gather(_invoke(task_factories[factory_index]), return_exceptions=True)
+            outcomes[factory_index] = outcome
+            if isinstance(outcome, BaseException):
+                has_failed = True
+
+    # The slots are started in order and each takes its first factory before its first await, so the first factories
+    # start in input order. `asyncio.gather` with no `return_exceptions` cancels the slots, and through them every
+    # awaitable in flight, when the caller is cancelled; a slot itself never raises.
+    await asyncio.gather(*(run_slot() for _ in range(slot_count)))
 
     results: list[_T] = []
-    for chunk_start in range(0, len(task_factories), chunk_size):
-        chunk = task_factories[chunk_start : chunk_start + chunk_size]
-        chunk_outcomes = await asyncio.gather(*(_invoke(factory) for factory in chunk), return_exceptions=True)
-        for outcome in chunk_outcomes:
-            if isinstance(outcome, BaseException):
-                raise outcome
-        # The loop above proved every outcome in this chunk is a real result, not an exception.
-        results.extend(cast("list[_T]", chunk_outcomes))
+    for factory_index in sorted(outcomes):
+        outcome = outcomes[factory_index]
+        if isinstance(outcome, BaseException):
+            raise outcome
+        results.append(outcome)
     return results

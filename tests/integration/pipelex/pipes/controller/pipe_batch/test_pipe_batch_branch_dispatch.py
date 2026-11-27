@@ -8,15 +8,18 @@ run, so a config redeploy cannot reshape an in-flight batch.
 """
 
 from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from typing_extensions import override
 
 from pipelex.config import get_config
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_pipe_library, scoped_pipe_router
@@ -32,6 +35,9 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import pipe_func
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 _DOMAIN_CODE = "test_batch_branch_dispatch"
 
@@ -128,8 +134,8 @@ class TestPipeBatchBranchDispatch:
     ):
         """Params built under `max_concurrency = 2` keep that bound after the config flips to 5.
 
-        This is the replay hazard the freeze exists for: the bound is `gather_bounded`'s chunk size,
-        so a live read here would let a mid-run worker redeploy regroup the branch dispatches.
+        This is the replay hazard the freeze exists for: the bound is the width of `gather_bounded`'s window,
+        so a live read here would let a mid-run worker redeploy start the branch dispatches in another order.
         """
         load_empty_library()
         batch = _build_batch()
@@ -138,10 +144,10 @@ class TestPipeBatchBranchDispatch:
         real_gather_bounded = pipe_batch_module.gather_bounded
 
         async def _spying_gather_bounded(
-            task_factories: "Sequence[Callable[[], Awaitable[PipeOutput]]]",
+            task_factories: "Sequence[Callable[[], Awaitable[Stuff | AbsenceRecord]]]",
             *,
             max_concurrency: int | None,
-        ) -> list[PipeOutput]:
+        ) -> list[Stuff | AbsenceRecord]:
             captured_bounds.append(max_concurrency)
             return await real_gather_bounded(task_factories, max_concurrency=max_concurrency)
 
@@ -164,3 +170,43 @@ class TestPipeBatchBranchDispatch:
             execution_config.max_concurrency = original_setting
 
         assert captured_bounds == [2]
+
+    async def test_the_batch_keeps_each_branch_result_never_its_memory(
+        self,
+        job_metadata: JobMetadata,
+        load_empty_library: Callable[[], str],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """What the batch holds per finished branch is the branch's main stuff, not the output and memory it ran in.
+
+        A branch's memory carries every intermediate value its steps added; holding one per branch until aggregation made
+        a batch's peak memory its width times a branch's memory, whatever its concurrency bound.
+        """
+        load_empty_library()
+        batch = _build_batch()
+
+        captured_results: list[Stuff | AbsenceRecord] = []
+        real_gather_bounded = pipe_batch_module.gather_bounded
+
+        async def _spying_gather_bounded(
+            task_factories: "Sequence[Callable[[], Awaitable[Stuff | AbsenceRecord]]]",
+            *,
+            max_concurrency: int | None,
+        ) -> list[Stuff | AbsenceRecord]:
+            results = await real_gather_bounded(task_factories, max_concurrency=max_concurrency)
+            captured_results.extend(results)
+            return results
+
+        monkeypatch.setattr(pipe_batch_module, "gather_bounded", _spying_gather_bounded)
+
+        with scoped_pipe_router(_HookCountingRouter()):
+            batch_output = await batch.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=_make_items_memory(batch, ["alpha", "beta", "gamma"]),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
+            )
+
+        assert all(isinstance(result, Stuff) for result in captured_results)
+        assert [cast("Stuff", result).content.rendered_plain() for result in captured_results] == ["ALPHA", "BETA", "GAMMA"]
+        aggregated = cast("ListContent[StuffContent]", batch_output.working_memory.get_main_stuff().content)
+        assert [item.rendered_plain() for item in aggregated.items] == ["ALPHA", "BETA", "GAMMA"]

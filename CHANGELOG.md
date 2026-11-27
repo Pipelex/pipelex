@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A `PipeBatch` runs its branches through a sliding window**: at most `max_concurrency` branches still run at once, but the next one starts as soon as any running branch ends, where the batch used to wait for a whole group of `max_concurrency` branches to end before starting the next group, so one slow item no longer leaves the other places idle. When a branch fails, no further branch starts, the running ones finish, and the batch fails with the error of the failed branch that comes first in the list. Each finished branch now keeps only its result, so a batch no longer holds every branch's working memory until it aggregates. `gather_bounded` in `pipelex.tools.misc.async_utils` runs every caller this way, the stored-value reads and writes included.
+
 ## [v0.120.0] - 2026-11-27
 
 ### Added

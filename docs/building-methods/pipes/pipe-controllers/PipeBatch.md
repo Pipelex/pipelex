@@ -15,18 +15,24 @@ This is the ideal controller for processing collections of documents, images, or
 1.  **Input List**: It identifies an input list from the working memory.
 2.  **Branching**: For each item in the input list, it creates a new, isolated execution branch.
 3.  **Isolation & Injection**: Each branch gets its own working memory, holding a copy of its item, under the `input_item_name`, and a copy of each value its branch pipe reads: the pipe's declared inputs, and what its own steps need when it is a controller. The rest of the batch's working memory, the batched list included, is not copied into the branch, so starting a batch costs its number of items plus the size of what a branch reads, never the two multiplied. Because every copy is the branch's own, a branch that rewrites its item or an input in place (a `PipeFunc` can) leaves the batched list, the batch's memory and every other branch as they were. A branch pipe reads only what it declares as inputs: a `PipeFunc` branch looking up a value its pipe does not declare does not find it.
-4.  **Concurrent Execution**: The specified `branch_pipe_code` runs across the branches concurrently — in bounded chunks, by default at most `max_concurrency` branches at a time. Each branch pipe operates only on its own item.
-5.  **Aggregation**: After all branches have completed, `PipeBatch` collects the individual output from each one and aggregates them into a single new list. This list becomes the final output of the `PipeBatch` pipe.
+4.  **Concurrent Execution**: The specified `branch_pipe_code` runs across the branches concurrently, by default at most `max_concurrency` branches at a time, the next branch starting as soon as a running one ends. Each branch pipe operates only on its own item.
+5.  **Aggregation**: As each branch ends, `PipeBatch` keeps its output and drops the working memory the branch ran in, with the intermediate values its steps produced. After all branches have completed, it aggregates the outputs into a single new list, which becomes the final output of the `PipeBatch` pipe.
 
 ## Concurrency
 
-`PipeBatch` does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by the `max_concurrency` setting under `[interpreter.pipeline_execution]` (default `8`). This keeps a large batch — one pipe over thousands of items — from overwhelming memory, the asyncio event loop, and provider rate limits.
+`PipeBatch` does not spawn every branch at once. At most `max_concurrency` branches run at a time, a setting under `[interpreter.pipeline_execution]` (default `8`), and they run as a sliding window: the branches start in the order of the list, and the next one starts as soon as any running branch ends, so one slow item holds up only its own place and never the branches after it. A branch's working memory is made only when it starts, so at most `max_concurrency` branch memories exist at once. This keeps a large batch — one pipe over thousands of items — from overwhelming memory, the asyncio event loop, and provider rate limits.
 
 To restore unbounded fan-out (every branch started at once), set `max_concurrency = "unbounded"`.
 
-The setting is read **once, when the run's parameters are built**, and then frozen onto the run (`PipeRunParams.batch_max_concurrency`) — every `PipeBatch` in that run, at any depth, uses the value that was in effect when the run started. Editing the config while a run is in flight does not reshape it. This matters most on a durable-execution backend, where the bound is also the chunk size that decides where the backend's task boundaries fall between branch dispatches: a value re-read mid-run could make a replay group its dispatches differently from the recorded history.
+The setting is read **once, when the run's parameters are built**, and then frozen onto the run (`PipeRunParams.batch_max_concurrency`) — every `PipeBatch` in that run, at any depth, uses the value that was in effect when the run started. Editing the config while a run is in flight does not reshape it. This matters most on a durable-execution backend, where the bound also decides which branches start at each of the backend's task boundaries: a value re-read mid-run could make a replay start its branches in a different order from the recorded history.
 
-Results always preserve input order regardless of the concurrency bound. If a branch fails, the failure propagates and the first error by input index wins.
+Results always preserve input order regardless of the concurrency bound.
+
+### When a branch fails
+
+When a branch fails, the batch starts no further branch. The branches already running are not cancelled: each runs to its end, so its steps finish cleanly and record their trace and their cost, rather than being cut off in the middle of a model call that is billed either way. Once every running branch has ended, the batch fails with the error of the failed branch that comes first in the list, whichever failed first in time. The branches that had not started never run, and the batch hands back no partial list.
+
+So a failure costs at most the branches that were running beside it, `max_concurrency` minus one at the most, never the rest of the list. On a durable backend, which branches had started when the failure came depends only on the order in which branches ended, which the run's history records, so a replay starts exactly the same branches.
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track. A live batch over more than 100 items run in process logs a warning saying so; a durable backend whose router runs the batch durably leaves that warning out.
 
@@ -89,7 +95,7 @@ How this works:
 2.  `PipeBatch` creates 10 parallel branches.
 3.  In branch #1, it takes the first article from the `articles` list, puts it into the branch's isolated working memory, and gives it the name `article` (as specified by `input_item_name`).
 4.  The `summarize_one_article` pipe is then executed in branch #1. It looks for an input named `article`, finds the injected article, and produces a summary.
-5.  Steps 3 and 4 run concurrently across branches, up to `max_concurrency` at a time (8 by default), until all 10 articles are processed.
+5.  Steps 3 and 4 run concurrently across branches, up to `max_concurrency` at a time (8 by default): articles 1 to 8 start together, and article 9 starts as soon as any of them is summarized, until all 10 articles are processed.
 6.  Once all `summarize_one_article` pipes are done, `PipeBatch` collects the 10 `ArticleSummary` outputs and bundles them into a single `ArticleSummary[]` list. This list is the final result.
 
 ## Related Documentation
