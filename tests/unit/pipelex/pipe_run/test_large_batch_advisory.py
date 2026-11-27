@@ -2,12 +2,13 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex import log
-from pipelex.pipe_controllers.batch.pipe_batch import warn_of_large_batch
+from pipelex.pipe_run.large_batch_advisory import LARGE_BATCH_ADVISORY_THRESHOLD, warn_of_large_batch
+from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.urls import URLs
 
 
-class TestPipeBatchLargeBatchAdvisory:
+class TestLargeBatchAdvisory:
     @pytest.mark.parametrize(
         ("max_concurrency", "expected_bound_fields"),
         [(8, {"max_concurrency": 8}), (None, {})],
@@ -34,3 +35,16 @@ class TestPipeBatchLargeBatchAdvisory:
                 USER_ACTION_FIELD: "Consider a durable execution backend for rate-limited, resumable runs",
             },
         )
+
+    @pytest.mark.parametrize(
+        ("item_count", "expects_advisory"),
+        [(LARGE_BATCH_ADVISORY_THRESHOLD, False), (LARGE_BATCH_ADVISORY_THRESHOLD + 1, True)],
+        ids=["at_threshold", "past_threshold"],
+    )
+    def test_an_in_process_router_advises_only_past_the_threshold(self, mocker: MockerFixture, item_count: int, expects_advisory: bool) -> None:
+        """An in-process router runs no batch durably, so it advises a durable backend for a batch past the threshold."""
+        warning_spy = mocker.patch.object(log, "warning")
+
+        PipeRouter().advise_on_batch(pipe_code="summarize_each", item_count=item_count, max_concurrency=8)
+
+        assert warning_spy.call_count == (1 if expects_advisory else 0)
