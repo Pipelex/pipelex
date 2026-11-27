@@ -9788,7 +9788,7 @@ The setting is read **once, when the run's parameters are built**, and then froz
 
 Results always preserve input order regardless of the concurrency bound. If a branch fails, the failure propagates and the first error by input index wins.
 
-For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
+For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track. A live batch over more than 100 items run in process logs a warning saying so; a durable backend whose router runs the batch durably leaves that warning out.
 
 ## Very wide batches on a durable runtime
 
@@ -22546,6 +22546,18 @@ def check_batch_fits(self, *, pipe_code: str, input_list_label: str, item_count:
 
 In-process routers keep the default: every batch fits. A durable router may estimate what the whole batch would write into its run's history and refuse by raising `PipeBatchTooWideError` (`pipelex/pipe_controllers/exceptions.py`), which fails the `PipeBatch` located at it, with no fan-out recorded and no branch started. The error takes the batch's figures as keyword arguments (the pipe code, the list's label, the item count, the estimated bytes and events, the bytes and events left, the largest item count that fits, and, for a batch stopped during its fan-out rather than refused before it, the number of items started) and builds its message from them, so the wording is Pipelex's whichever backend raises it. Its problem is `input.too_large`, whose `input` is the list's label, `size` the item count and `limit` the largest count that fits. When that count is zero, no shorter list would run: the problem withholds `limit`, so the code's sentence for a withheld limit applies, and the message and the advice ask for smaller items.
 
+### The batch-advisory hook
+
+A batch over a large list runs very differently on an in-process router and on a durable one, and only the router knows which it is. So `PipeRouterProtocol` carries a third batch entry point, synchronous, which gives the run the router's advice on a batch's width:
+
+```python
+def advise_on_batch(self, *, pipe_code: str, item_count: int, max_concurrency: int | None) -> None: ...
+```
+
+`PipeBatch` calls it once per live batch, after the batch fits and has recorded its fan-out, before any branch starts; a dry run, which runs through the same method, never calls it. `max_concurrency` is the run's frozen bound (`PipeRunParams.batch_max_concurrency`), `None` when the configuration's `"unbounded"` set none.
+
+The default body is the behavior for in-process routers, whose bounded fan-out is backpressure rather than durable execution: past `LARGE_BATCH_ADVISORY_THRESHOLD` items (`pipelex/pipe_run/large_batch_advisory.py`) it logs the warning "A PipeBatch fans out over a large list without durable execution", with a `user_action` pointing at a durable execution backend. A durable router overrides it, since its run is durable already and the advice would be false, and it may log there what is true of a wide batch on its backend instead; a batch too wide for its run's history it refuses earlier, through `check_batch_fits`.
+
 ---
 
 ## Pipe Controllers
@@ -23912,7 +23924,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 | Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`), `pipelex.errors.security_event` (`emit_security_event_for_run`, `emit_security_event`, `mark_security_event_emitted`) |
 | Working-memory hydration | `pipelex.runtime_bridge.primitives.hydration` (re-hydrate `working_memory_raw` → typed `WorkingMemory`; stayed open because it is host-agnostic — used by core delivery and the open `pipelex-api` runner, and re-used across the boundary by the commercial plugins) |
 | Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_bundle_validator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`), `pipelex.plugins.bundle_validator_registry` (`BundleValidatorProtocol`, `BundleValidationVerdict`) |
-| Execution protocols | `PipeRouterProtocol` (incl. the [`run_batch_branch`](./pipe-routing-and-execution.md#the-batch-branch-hook) fan-out hook — concrete default, override it only to isolate batch branches), `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |
+| Execution protocols | `PipeRouterProtocol` (incl. the [`run_batch_branch`](./pipe-routing-and-execution.md#the-batch-branch-hook) fan-out hook — concrete default, override it only to isolate batch branches — and the [`advise_on_batch`](./pipe-routing-and-execution.md#the-batch-advisory-hook) hook, which a durable router overrides so that its runs are not told to use durable execution), `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |
 | Payload / core types | `PipeJob`, `PipeOutput`, `DeliveryAssignment`, `WorkingMemory` (+ factory, `dump_for_transport`), `JobMetadata`, `LibraryCrate` |
 | Library + hub scoping | `set_current_library` / `get_current_library`, `scoped_pipe_router`, `get_class_registry` (per-call library hydration via `library_crate_dump`) |
 | Tracing / graph hooks | `trace_events`, `graph_tracer_manager`, `tracing_assembly` (per-step trace/usage events across the boundary) |
@@ -25787,7 +25799,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.119.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.120.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
