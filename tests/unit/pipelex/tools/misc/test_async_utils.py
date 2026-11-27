@@ -137,20 +137,44 @@ class TestGatherBounded:
     async def test_items_started_before_a_failure_are_drained_in_a_sliding_window(self) -> None:
         """An item a freed slot started before the failure still finishes, and nothing starts after the failure.
 
-        Window of 2: item 1 ends quickly, so item 2 starts while item 0 runs; item 0 then fails. Item 2 is drained, and
-        items 3 and later never start.
+        Window of 2: item 1 ends at once, so its slot starts item 2 while item 0 runs; item 0 fails only once item 2 has
+        started, and item 2 ends only once item 0 has failed. Item 2 is drained, and items 3 and later never start. The
+        steps are ordered by events rather than timers, so a stalled event loop cannot reorder them.
         """
-        probe = _ConcurrencyProbe()
-        factories = [functools.partial(probe.run, index, 0.01) for index in range(6)]
-        factories[0] = functools.partial(probe.fail, 0, 0.03)
-        factories[1] = functools.partial(probe.run, 1, 0.001)
-        factories[2] = functools.partial(probe.run, 2, 0.05)
+        item_two_started = asyncio.Event()
+        item_zero_failed = asyncio.Event()
+        started_indices: list[int] = []
+        finished_indices: list[int] = []
+
+        async def fail_once_item_two_runs() -> int:
+            started_indices.append(0)
+            await item_two_started.wait()
+            item_zero_failed.set()
+            msg = "branch 0 failed"
+            raise ValueError(msg)
+
+        async def end_at_once(index: int) -> int:
+            started_indices.append(index)
+            await asyncio.sleep(0)
+            finished_indices.append(index)
+            return index
+
+        async def end_once_item_zero_failed() -> int:
+            started_indices.append(2)
+            item_two_started.set()
+            await item_zero_failed.wait()
+            await asyncio.sleep(0)
+            finished_indices.append(2)
+            return 2
+
+        factories: list[Callable[[], Awaitable[int]]] = [fail_once_item_two_runs, functools.partial(end_at_once, 1), end_once_item_zero_failed]
+        factories.extend(functools.partial(end_at_once, index) for index in range(3, 6))
 
         with pytest.raises(ValueError, match="branch 0 failed"):
-            await gather_bounded(factories, max_concurrency=2)
+            await asyncio.wait_for(gather_bounded(factories, max_concurrency=2), timeout=5)
 
-        assert probe.ran_indices == {0, 1, 2}, "the freed slot started item 2 before item 0 failed, and no item starts after it"
-        assert probe.in_flight == 0, "item 2 is drained before the error is raised"
+        assert started_indices == [0, 1, 2], "the freed slot started item 2 before item 0 failed, and no item starts after it"
+        assert finished_indices == [1, 2], "item 2, running when item 0 failed, is drained before the error is raised"
 
     async def test_synchronous_factory_error_is_captured_and_running_items_are_drained(self) -> None:
         """A factory raising synchronously fails like any item: running items finish, none starts, lowest index wins."""
