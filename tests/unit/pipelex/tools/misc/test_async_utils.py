@@ -177,11 +177,12 @@ class TestGatherBounded:
         assert probe.ran_indices == {0, 2, 3}, "running items are drained despite the sync raise, and no later item starts"
         assert probe.in_flight == 0, "every started item has ended when the error is raised"
 
-    async def test_a_failure_ending_in_the_same_turn_as_a_success_stops_new_starts(self) -> None:
-        """A failure seen in the same loop turn as a sibling's success stops that sibling's slot from taking a new item.
+    @pytest.mark.parametrize("turns_between_ends", [0, 1])
+    async def test_a_failure_one_turn_after_a_success_stops_new_starts(self, turns_between_ends: int) -> None:
+        """A failure that ends a loop turn after a sibling's success still stops that sibling's slot from taking an item.
 
-        Items 0 and 1 wait on one event, so they end in the same turn, item 0 first. Item 0's slot must not take item 2
-        before item 1's failure is recorded.
+        The succeeding item's slot resumes a couple of loop steps after its item ends; a failure ending in between must
+        already be recorded by then, so the failure is recorded in the very step that ends the failing item.
         """
         both_may_end = asyncio.Event()
         called_indices: list[int] = []
@@ -191,15 +192,17 @@ class TestGatherBounded:
             await both_may_end.wait()
             return index
 
-        async def fail(index: int) -> int:
+        async def fail_later(index: int) -> int:
             called_indices.append(index)
             await both_may_end.wait()
+            for _ in range(turns_between_ends):
+                await asyncio.sleep(0)
             msg = f"branch {index} failed"
             raise ValueError(msg)
 
         factories: list[Callable[[], Awaitable[int]]] = [
             functools.partial(succeed, 0),
-            functools.partial(fail, 1),
+            functools.partial(fail_later, 1),
             functools.partial(succeed, 2),
         ]
         gathering = asyncio.ensure_future(gather_bounded(factories, max_concurrency=2))
@@ -210,7 +213,7 @@ class TestGatherBounded:
         with pytest.raises(ValueError, match="branch 1 failed"):
             await gathering
 
-        assert called_indices == [0, 1], "no factory is called once a failure has ended, even in the same turn"
+        assert called_indices == [0, 1], "no factory is called once a failure has ended"
 
     async def test_a_cancelled_caller_resumes_only_once_every_running_item_has_cleaned_up(self) -> None:
         """A cancellation reaches the caller only after every running item has finished its own cleanup.

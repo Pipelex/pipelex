@@ -93,17 +93,6 @@ def _drop_outcome(  # kw-only: ignore
         outcome.exception()
 
 
-async def _invoke(factory: Callable[[], Awaitable[_T]]) -> _T:
-    """Call `factory` and await its result, both inside a coroutine.
-
-    Calling `factory()` here — rather than where `gather` builds its arguments — means a
-    factory that raises *synchronously* fails inside the gathered task. `asyncio.gather`
-    with `return_exceptions=True` then captures that error like any other failure, instead
-    of it propagating out of the slot that called it.
-    """
-    return await factory()
-
-
 async def gather_bounded(
     task_factories: Sequence[Callable[[], Awaitable[_T]]],
     *,
@@ -148,18 +137,23 @@ async def gather_bounded(
     next_index = 0
     has_failed = False
 
-    def note_failure(  # kw-only: ignore
-        item_task: asyncio.Future[Any],
-    ) -> None:
-        """Record an item's failure the moment its task ends, before any slot resumes from what ended in that turn.
+    async def run_item(*, factory_index: int) -> _T:
+        """Call factory ``factory_index`` and await its result, recording a failure in the step that ends it.
 
-        A done-callback of the item's task, which asyncio calls with the task as its one positional argument. It runs one
-        loop step before the slot awaiting that task resumes, so when items end in the same turn, every failure among
-        them is recorded before any of their slots takes another factory, whatever order the slots resume in.
+        Calling the factory here means one that raises *synchronously* fails inside the item's task like any other
+        failure. The failure is recorded in the item's own last step, before any slot resumes from what ended meanwhile
+        (a slot resumes a couple of loop steps after its own item ends), so no slot takes a factory once an item has
+        failed. A cancelled item counts as failed too.
         """
         nonlocal has_failed
-        if item_task.cancelled() or item_task.exception() is not None:
-            has_failed = True
+        has_succeeded = False
+        try:
+            result = await task_factories[factory_index]()
+            has_succeeded = True
+            return result
+        finally:
+            if not has_succeeded:
+                has_failed = True
 
     async def run_slot() -> None:
         nonlocal next_index
@@ -167,11 +161,9 @@ async def gather_bounded(
             # Taken and advanced with no await in between, so no two slots ever take the same factory.
             factory_index = next_index
             next_index += 1
-            item_task = asyncio.ensure_future(_invoke(task_factories[factory_index]))
-            item_task.add_done_callback(note_failure)
-            # Gathering the one task captures its error as its outcome, so the slot records it rather than dies, and a
+            # Gathering the one item captures its error as its outcome, so the slot records it rather than dies, and a
             # cancelled slot ends only once its item has ended.
-            (outcome,) = await asyncio.gather(item_task, return_exceptions=True)
+            (outcome,) = await asyncio.gather(run_item(factory_index=factory_index), return_exceptions=True)
             outcomes[factory_index] = outcome
 
     # The slots are started in order and each takes its first factory before its first await, so the first factories
