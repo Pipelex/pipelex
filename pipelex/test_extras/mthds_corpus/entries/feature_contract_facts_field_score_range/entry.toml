@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_score_range"
+description = "A cheese-tasting card whose score runs from one to five"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

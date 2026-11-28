@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_format_on_number"
+description = "A volunteer card putting a text format on a number"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

@@ -20,6 +20,7 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.language.contract_facts import TextFormat, format_sample
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -214,6 +215,26 @@ class DryRunFactory:
         """
         if hasattr(field_info, "examples") and field_info.examples:
             return list(field_info.examples)
+        # A field that may hold nothing wraps its constrained type in a union, `Annotated[str, ...] | None`, so the
+        # examples and the format of its contract facts sit on the union's annotated arm, not on the field itself.
+        arm_infos = [
+            metadata
+            for arm in get_args(field_info.annotation)
+            if get_origin(arm) is typing.Annotated
+            for metadata in get_args(arm)[1:]
+            if isinstance(metadata, FieldInfo)
+        ]
+        for arm_info in arm_infos:
+            if arm_info.examples:
+                return list(arm_info.examples)
+        # A text field asserting a `format` and giving no example: a random string would break the format, so the mock
+        # takes the format's own well-formed sample.
+        for candidate in [field_info, *arm_infos]:
+            extra = candidate.json_schema_extra
+            if isinstance(extra, dict):
+                text_format: Any = extra.get("format")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                if isinstance(text_format, str) and text_format in set(TextFormat):
+                    return [format_sample(text_format=TextFormat(text_format))]
         return None
 
     @classmethod

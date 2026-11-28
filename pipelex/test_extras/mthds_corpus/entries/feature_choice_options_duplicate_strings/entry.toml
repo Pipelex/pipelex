@@ -1,0 +1,10 @@
+name = "feature_choice_options_duplicate_strings"
+description = "An account card repeating a plain option, which only warns"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.choice_options",
+]

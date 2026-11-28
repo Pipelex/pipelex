@@ -1,7 +1,7 @@
 import traceback
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, final
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast, final
 
 import shortuuid
 from mthds.protocol.problem.registry import CoreCode
@@ -12,6 +12,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.contract_fact_projection import carried_field_name, contract_break
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
@@ -675,11 +676,44 @@ class PipeAbstract(ABC, BaseModel):
                             variable_name=variable_name,
                         ).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
 
+        # The input gate's contract check: the caller's value of a slot declaring contract facts or options must satisfy
+        # them. Only at the run's entry pipe, whose inputs are the caller's, and never on a dry run's mock values.
+        if not pipe_run_params.run_mode.is_dry and len(pipe_run_params.pipe_stack) <= 1:
+            self.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=pipe_run_params)
+
         # Specific pipe validation function
         await self._validate_before_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
         return presence_scan
+
+    def ensure_inputs_honour_their_contracts(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> None:
+        """Refuse a caller's input that breaks its slot's contract facts or options, as `input.invalid`."""
+        for variable_name, stuff_spec in self.inputs.root.items():
+            if not stuff_spec.contract_facts and stuff_spec.choice_values is None:
+                continue
+            stuff = working_memory.get_optional_stuff(variable_name)
+            if stuff is None:
+                continue
+            stuff_content: Any = stuff.content
+            contents: list[Any] = (
+                list(cast("ListContent[StuffContent]", stuff_content).items) if isinstance(stuff_content, ListContent) else [stuff_content]
+            )
+            for content in contents:
+                message = contract_break(value=content, facts=stuff_spec.contract_facts, choice_values=stuff_spec.choice_values)
+                if message is None:
+                    continue
+                msg = f"Input '{variable_name}' of pipe '{self.code}' breaks its contract: {message}"
+                raise (
+                    PipeRunInputsError(
+                        message=msg,
+                        run_mode=pipe_run_params.run_mode,
+                        pipe_code=self.code,
+                        variable_name=variable_name,
+                    )
+                    .with_error_code(CoreCode.INPUT_INVALID)
+                    .with_params(input=variable_name, field=carried_field_name(value=content))
+                )
 
     @abstractmethod
     async def _validate_before_run(

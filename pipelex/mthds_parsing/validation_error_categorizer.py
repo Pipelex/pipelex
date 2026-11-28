@@ -401,6 +401,12 @@ def categorize_blueprint_validation_error(
     if len(loc) >= 2 and loc[0] == "pipe":
         pipe_code = str(loc[1])
 
+    # The union-branch noise of an input slot declared as `str | InputSlotBlueprint`: a slot written as a table that
+    # fails reports its fault through the table branch, and the `str` branch's "Input should be a valid string" adds
+    # nothing an author can act on.
+    if pipe_code is not None and error["type"] == "string_type" and "inputs" in loc and tuple(loc)[-1:] == ("str",):
+        return None
+
     # A blueprint-stage ``PipeValidationError`` (e.g. the PipeBatch ``input_item_name`` ==
     # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, the SubPipe
     # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``, or a

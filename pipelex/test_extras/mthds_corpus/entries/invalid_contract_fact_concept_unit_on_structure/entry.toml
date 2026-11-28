@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_concept_unit_on_structure"
+description = "A delivery address concept that claims a currency"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

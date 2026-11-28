@@ -1,0 +1,18 @@
+domain      = "facts_date_example"
+description = "A market-day card giving an example date"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+when = { type = "date", description = "The market day", examples = [
+  2026-07-07,
+] }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

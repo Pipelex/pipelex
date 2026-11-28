@@ -13,7 +13,7 @@ from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory
 from pipelex.interpreter_hub import get_concept_library
-from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
+from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint, PipeBlueprint, PipeCategory, PipeType
 from pipelex.runtime_hub import get_class_registry
 from pipelex.validation_error_types import PipeFactoryErrorType
 
@@ -111,6 +111,13 @@ class PipeFactory(Generic[PipeAbstractType]):
             domain_code=domain_code,
             blueprint=blueprint.inputs_concept_specs or {},
         )
+        # An expanded slot's contract facts and options are normative, unlike its hints: they ride the runtime spec so the
+        # input gate enforces them and the slot's input JSON Schema states them.
+        for slot_name, slot_value in (blueprint.inputs or {}).items():
+            if isinstance(slot_value, InputSlotBlueprint) and (slot_value.contract_facts or slot_value.choices is not None):
+                parsed_inputs.root[slot_name] = parsed_inputs.root[slot_name].model_copy(
+                    update={"contract_facts": slot_value.contract_facts, "choice_values": slot_value.choice_values}
+                )
 
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix.
         # A signature is outside the executable taxonomy: its `type` ("PipeSignature") is not a `PipeType`

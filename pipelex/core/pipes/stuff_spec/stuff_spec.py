@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
@@ -17,6 +17,11 @@ class StuffSpec(BaseModel):
     concept: Concept
     multiplicity: VariableMultiplicity | None = None
     presence: PresenceMarker = PresenceMarker.PLAIN
+    contract_facts: dict[str, Any] = Field(default_factory=dict)
+    """The contract facts an expanded input slot authors, empty elsewhere: its constraints are enforced on the caller's
+    value at the run's input gate, and every fact is stated in the slot's input JSON Schema."""
+    choice_values: list[str] | None = None
+    """The option values of an input slot's `choices`, which its value must be one of, `None` when it declares none."""
 
     def is_multiple(self) -> bool:
         return is_multiple_multiplicity(multiplicity=self.multiplicity)

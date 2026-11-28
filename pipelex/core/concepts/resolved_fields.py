@@ -49,6 +49,26 @@ class ResolvedTypeKind(StrEnum):
     DICT = "dict"
     ANY = "any"
 
+    @property
+    def is_concept(self) -> bool:
+        match self:
+            case ResolvedTypeKind.CONCEPT:
+                return True
+            case (
+                ResolvedTypeKind.TEXT
+                | ResolvedTypeKind.NUMBER
+                | ResolvedTypeKind.INTEGER
+                | ResolvedTypeKind.BOOLEAN
+                | ResolvedTypeKind.DATE
+                | ResolvedTypeKind.DATETIME
+                | ResolvedTypeKind.TIME
+                | ResolvedTypeKind.LITERAL
+                | ResolvedTypeKind.LIST
+                | ResolvedTypeKind.DICT
+                | ResolvedTypeKind.ANY
+            ):
+                return False
+
 
 class ResolvedType(BaseModel):
     """A resolved, language-neutral type tree node.

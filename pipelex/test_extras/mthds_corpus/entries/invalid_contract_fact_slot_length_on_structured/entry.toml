@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_slot_length_on_structured"
+description = "A note putting a length on a slot that holds a structured contract"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

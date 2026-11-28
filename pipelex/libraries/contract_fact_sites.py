@@ -12,6 +12,8 @@ runtime's own validation of its values still applies, and nothing is refused on 
 
 from typing import Any
 
+from mthds.protocol.problem.registry import MethodOptionalUnhandledSite
+
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
@@ -31,6 +33,10 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_value_kinds import CrateConceptKinds
 from pipelex.libraries.crate_qualification import QualifiedCrateContent
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_optional_guards import detect_unguarded_optional_references
+from pipelex.tools.jinja2.jinja2_parsing import are_authored_templates_trusted
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -126,6 +132,15 @@ def ensure_contract_fact_sites_valid(*, qualified: QualifiedCrateContent, source
                     )
                 )
         if blueprint.output_filename is not None:
+            unguarded_item = _unguarded_output_filename_item(
+                output_filename=blueprint.output_filename,
+                concept_specs=blueprint.inputs_concept_specs or {},
+                domain_code=domain_code,
+                pipe_code=pipe_code,
+                source=source,
+            )
+            if unguarded_item is not None:
+                pipe_items.append(unguarded_item)
             output_kind = kinds.kind_of(concept_ref=parse_concept_with_multiplicity(blueprint.output).concept_ref_or_code)
             if output_kind is not None and not output_kind.is_file_valued:
                 pipe_items.append(
@@ -147,6 +162,49 @@ def ensure_contract_fact_sites_valid(*, qualified: QualifiedCrateContent, source
         messages = [item.message for item in concept_items] + [item.message for item in pipe_items]
         msg = "Contract facts that do not apply where they are written:\n  - " + "\n  - ".join(messages)
         raise ConceptLibraryError(msg, blueprint_validation_errors=concept_items, pipe_concept_validation_errors=pipe_items)
+
+
+def _unguarded_output_filename_item(
+    *,
+    output_filename: str,
+    concept_specs: dict[str, str],
+    domain_code: str | None,
+    pipe_code: str,
+    source: str | None,
+) -> PipesAndConceptValidationErrorData | None:
+    """The fault of an `output_filename` reading an optional input with no guard, as a template does (spec: mthds-format.md,
+    "Naming Produced Files"): `method.optional_unhandled` at the `template` site.
+    """
+    if are_authored_templates_trusted():
+        return None
+    optional_names = {name for name, spec in concept_specs.items() if parse_concept_with_multiplicity(spec).presence.is_optional}
+    if not optional_names:
+        return None
+    try:
+        findings = detect_unguarded_optional_references(
+            template_category=TemplateCategory.BASIC, template_source=output_filename, optional_variable_names=optional_names
+        )
+    except Jinja2DetectVariablesError:
+        # A template that does not parse is reported by the blueprint, never twice.
+        return None
+    if not findings:
+        return None
+    finding = findings[0]
+    return PipesAndConceptValidationErrorData(
+        error_type=PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED,
+        domain_code=domain_code,
+        source=source,
+        pipe_code=pipe_code,
+        field_name="output_filename",
+        variable_names=[finding.variable_name],
+        field_path=f"pipe.{pipe_code}.output_filename",
+        message=(
+            f"In the output_filename of pipe '{pipe_code}', the reference '{{{{ {finding.path} }}}}' uses the optional input "
+            f"'{finding.variable_name}' unguarded: wrap it in `{{% if {finding.variable_name} %}}...{{% endif %}}` or use an "
+            f"inline conditional"
+        ),
+        params={"input": finding.variable_name, "site": MethodOptionalUnhandledSite.TEMPLATE},
+    )
 
 
 def _class_of(*, kind: HintSiteValueKind | None) -> ValueClass | None:

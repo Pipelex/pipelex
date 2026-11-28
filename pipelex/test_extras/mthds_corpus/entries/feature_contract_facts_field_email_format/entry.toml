@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_email_format"
+description = "A volunteer card whose contact is an email address"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

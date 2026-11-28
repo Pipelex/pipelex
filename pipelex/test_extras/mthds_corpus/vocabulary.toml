@@ -284,11 +284,20 @@ excluded = "Advisory-only: the intent-hints lint rides the validation report's `
 code = "template_check_warning"
 excluded = "Advisory-only, for the same reason as `optional_force_redundant`: a warning of a PipeDocGen step's template check rides the validation report's `warnings` array and never makes a verdict invalid. It also needs what a focused entry cannot carry: a template file beside the bundle, an office format, and an engine that reads that format, which no consumer but a runtime holding the document generation plugin has. Revisit if the manifest ever grows a warnings axis and an entry can carry its template files."
 
+[feature.activity]
+description = "A pipe's `activity`, the short phrase a person watching a run reads while the step works, `activity = \"Reading the lease\"`, one line and never on a signature."
+
 [feature.binding_step]
 description = "A PipeSequence step `{ from = \"invoice.total\", result = \"total_amount\" }` that binds the value at a path in working memory to a new name: its concept is derived from the declared structures the path walks, its value is a deep copy taken when the step runs, a path crossing a list binds a flat list, and a path reaching nothing records an absence."
 
+[feature.choice_options]
+description = "A `choices` list whose options are plain strings or option tables, `{ value = \"strategic\", label = \"Strategic\", tone = \"positive\" }`, giving a value the words and the tone a person reads in its place; a repeated or empty plain option only warns."
+
+[feature.contract_facts]
+description = "The contract facts a structure field, an expanded input slot, or a concept refining Number states about its value: the constraints that refuse a value (bounds, lengths, `pattern`, `format`), which the runtime enforces, and the descriptions that never do (`unit`, `aggregate`, `examples`)."
+
 [feature.intent_hints]
-description = "An `intent` hint authored in a `hints` table — on a concept, a structure field, or an expanded input slot — carrying non-normative presentation intent (`prose`, `label`, `rating`, `quantity`) that renderers may honor and every other consumer safely ignores."
+description = "A `hints` table — on a concept, a structure field, or an expanded input slot — carrying non-normative presentation intent that renderers may honor and every other consumer safely ignores: an `intent` saying what kind of value it is (`prose`, `label`, `code`, `photo`...), an input's `role` (`subject`, `context`, `guidance`...), or a field's `part` in the record (`title`, `verdict`, `summary`...)."
 
 [feature.markdown_filter]
 description = "The `markdown` filter of an HTML template, `{{ order.notes | markdown }}`, which turns Markdown held in a plain text field into HTML: raw HTML in the source is shown as text, and only a URL with a scheme becomes a link."
@@ -298,6 +307,12 @@ description = "A method split across several `.mthds` files in one directory and
 
 [feature.optionals]
 description = "An input declared optional with the `?` suffix, so a run that has no value for it proceeds instead of failing and the absence is recorded in the working memory. How a method copes with the absence is the method's business — guarding the reference in a prompt, in a condition expression, or letting it lift through a chain."
+
+[feature.outcome_labels]
+description = "A PipeCondition outcome written as a table, `high = { pipe = \"detailed_check\", label = \"Detailed check\" }`, giving the route the words a timeline shows, each label unique within the condition."
+
+[feature.output_filename]
+description = "An `output_filename` template on an operator whose output is an Image or a Document, naming the file it writes from the inputs it reads, each optional one guarded."
 
 [feature.smart_inputs]
 description = "Bare caller values — a string, a number, a dict, a list — interpreted top-down against the entry pipe's declared signature, so a caller need not wrap each one in its concept envelope."

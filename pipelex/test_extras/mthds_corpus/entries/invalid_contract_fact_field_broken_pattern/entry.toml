@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_broken_pattern"
+description = "A delivery card whose reference pattern does not compile"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

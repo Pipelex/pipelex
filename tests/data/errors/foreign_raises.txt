@@ -240,3 +240,5 @@ pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
 pipelex/pipe_machinery/pipe_blueprint.py | PipeBlueprint.output_filename_variable_paths | ValueError | validator
 pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
 pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/core/concepts/contract_fact_projection.py | constrained_annotation.enforce | ValueError | validator
+pipelex/core/concepts/contract_fact_projection.py | constrained_annotation.enforce_format | ValueError | validator

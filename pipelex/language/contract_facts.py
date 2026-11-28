@@ -280,6 +280,25 @@ _IPV4_PATTERN = re.compile(r"(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]
 _HOSTNAME_MAX_LENGTH = 253
 
 
+def format_sample(*, text_format: TextFormat) -> str:
+    """A well-formed text of a format, for a mock value that has to satisfy the format and has no authored example."""
+    match text_format:
+        case TextFormat.EMAIL:
+            return "someone@example.com"
+        case TextFormat.URI:
+            return "https://example.com/"
+        case TextFormat.DATE_TIME:
+            return "2026-01-01T09:00:00Z"
+        case TextFormat.UUID:
+            return "123e4567-e89b-42d3-a456-426614174000"
+        case TextFormat.HOSTNAME:
+            return "example.com"
+        case TextFormat.IPV4:
+            return "192.0.2.1"
+        case TextFormat.IPV6:
+            return "2001:db8::1"
+
+
 def text_matches_format(*, text: str, text_format: TextFormat) -> bool:
     """Whether a text is well-formed in a format. The runtime asserts every format, whatever a schema validator does by default."""
     match text_format:

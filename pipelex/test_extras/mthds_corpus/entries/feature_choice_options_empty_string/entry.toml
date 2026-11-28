@@ -1,0 +1,10 @@
+name = "feature_choice_options_empty_string"
+description = "An account card with an empty plain option, which only warns"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.choice_options",
+]

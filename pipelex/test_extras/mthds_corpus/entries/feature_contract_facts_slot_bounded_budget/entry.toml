@@ -1,0 +1,10 @@
+name = "feature_contract_facts_slot_bounded_budget"
+description = "A note about a budget that is never negative and counts euros"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

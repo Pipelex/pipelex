@@ -1,0 +1,11 @@
+domain      = "filename_optional_unguarded"
+description = "Drawing a cover whose file name reads an optional client without allowing for its absence"
+main_pipe   = "draw_cover"
+
+[pipe.draw_cover]
+type            = "PipeImgGen"
+description     = "Draw the cover for the topic"
+inputs          = { topic = "Text", client = "Text?" }
+output          = "Image"
+prompt          = "A warm watercolour cover about $topic"
+output_filename = "{{ client }} - cover"

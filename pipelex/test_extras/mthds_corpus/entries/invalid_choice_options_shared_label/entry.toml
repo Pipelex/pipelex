@@ -1,0 +1,12 @@
+name = "invalid_choice_options_shared_label"
+description = "An account card whose two options share a label"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

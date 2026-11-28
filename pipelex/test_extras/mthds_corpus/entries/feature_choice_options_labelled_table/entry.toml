@@ -1,0 +1,10 @@
+name = "feature_choice_options_labelled_table"
+description = "An account card whose options carry a label"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.choice_options",
+]

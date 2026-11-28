@@ -1,0 +1,16 @@
+domain      = "facts_reference_pattern"
+description = "A delivery card whose purchase order reference follows the PO pattern"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+po_ref = { type = "text", description = "The purchase order reference", pattern = "^PO-[0-9]{6}$" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

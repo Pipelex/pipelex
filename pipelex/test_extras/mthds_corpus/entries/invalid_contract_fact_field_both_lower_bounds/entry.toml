@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_both_lower_bounds"
+description = "A tasting card stating both an inclusive and an exclusive lower bound"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

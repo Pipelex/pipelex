@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_unit_on_text"
+description = "A parcel card putting a unit on a text field"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

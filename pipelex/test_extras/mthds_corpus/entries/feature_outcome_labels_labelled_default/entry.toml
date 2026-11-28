@@ -1,0 +1,10 @@
+name = "feature_outcome_labels_labelled_default"
+description = "Routing a claim, with words for the default route"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.outcome_labels",
+]

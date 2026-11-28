@@ -1,0 +1,17 @@
+domain      = "address_unit"
+description = "Writing a delivery address whose concept claims a currency"
+main_pipe   = "write_address"
+
+[concept.Address]
+description = "A delivery address"
+unit        = "EUR"
+
+[concept.Address.structure]
+street = { type = "text", description = "The street", required = true }
+
+[pipe.write_address]
+type        = "PipeLLM"
+description = "Write the delivery address"
+inputs      = { brief = "Text" }
+output      = "Address"
+prompt      = "Write the delivery address from this brief: $brief"

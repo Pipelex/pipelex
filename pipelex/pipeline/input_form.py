@@ -41,7 +41,7 @@ registry, and bundle-defined classes are only reliably current while their libra
 
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import Any, get_origin
+from typing import Any, cast, get_origin
 
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from mthds.protocol.input_form import (
@@ -96,6 +96,7 @@ from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_va
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
+from pipelex.language.contract_facts import ContractFactKey, json_example
 from pipelex.language.intent_hints import HintSiteValueKind, IntentWord, applicable_intent, merge_hints
 from pipelex.libraries.crate_qualification import QualifiedCrateContent, qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
@@ -181,10 +182,17 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifie
         # (the fallback path) derives with no hints.
         blueprint = qualified.pipes.get(pipe.pipe_ref)
         blueprint_inputs: Mapping[str, str | InputSlotBlueprint] = blueprint.inputs if blueprint is not None and blueprint.inputs else {}
-        fields = [
-            deriver.derive_slot(name=var_name, stuff_spec=stuff_spec, slot_hints=_slot_hints_of(blueprint_inputs.get(var_name)))
-            for var_name, stuff_spec in pipe.inputs.root.items()
-        ]
+        fields: list[InputFormField] = []
+        for var_name, stuff_spec in pipe.inputs.root.items():
+            slot_value = blueprint_inputs.get(var_name)
+            fields.append(
+                deriver.derive_slot(
+                    name=var_name,
+                    stuff_spec=stuff_spec,
+                    slot_hints=_slot_hints_of(slot_value),
+                    slot=slot_value if isinstance(slot_value, InputSlotBlueprint) else None,
+                )
+            )
         input_form[pipe.pipe_ref] = PipeInputFormDescriptor(fields=fields)
     return input_form
 
@@ -288,13 +296,25 @@ class InputFormDeriver:
 
     # ---- Pipe slots -------------------------------------------------------------------------------
 
-    def derive_slot(self, *, name: str, stuff_spec: StuffSpec, slot_hints: dict[str, str] | None = None) -> InputFormField:
+    def derive_slot(
+        self,
+        *,
+        name: str,
+        stuff_spec: StuffSpec,
+        slot_hints: dict[str, str] | None = None,
+        slot: InputSlotBlueprint | None = None,
+    ) -> InputFormField:
         """A top-level field: the concept node, list-wrapped when multiple, stamped with slot facts.
 
         `slot_hints` are the slot's authored hints from the qualified blueprint; the site-over-concept
-        merge happens here (the concept node already carries the concept's effective hints).
+        merge happens here (the concept node already carries the concept's effective hints). `slot` is
+        the expanded slot table, whose description replaces the concept's (L-261107-df1c70), whose
+        contract facts are stated on the value node (a plural slot's `item`), and whose `choices` make
+        a text-valued node an `enum`.
         """
         node = self._concept_node(name=name, concept_ref=stuff_spec.concept.concept_ref, seen=frozenset())
+        if slot is not None:
+            node = _with_slot_meaning(node=node, slot=slot)
         effective_hints = merge_hints([node.hints, slot_hints])
         if stuff_spec.is_multiple():
             item_count = fixed_item_count(multiplicity=stuff_spec.multiplicity)
@@ -674,6 +694,7 @@ class InputFormDeriver:
                     return _unknown_node(name=name, description=field.description, required=field.required)
                 node = self._concept_node(name=name, concept_ref=field.concept_ref, seen=seen)
                 node = _with_effective_hints(node=node, hints=merge_hints([node.hints, field.hints]))
+                node = _with_contract_facts(node=node, facts=field.contract_facts)
                 return node.model_copy(update={"description": field.description, "required": field.required})
             case ConceptStructureBlueprintFieldType.LIST:
                 item = self._list_item(name=name, field=field, seen=seen)
@@ -705,6 +726,7 @@ class InputFormDeriver:
                 scalar = _scalar_field(
                     field_type=field.type, name=name, description=field.description, required=field.required, default_value=field.default_value
                 )
+                scalar = _with_contract_facts(node=scalar, facts=field.contract_facts)
                 return _with_effective_hints(node=scalar, hints=field.hints)
 
     def _list_item(self, *, name: str, field: ConceptStructureBlueprint, seen: frozenset[str]) -> InputFormField:
@@ -816,6 +838,58 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
         pattern=node.pattern,
         format=node.format,
     )
+
+
+def _with_contract_facts(*, node: InputFormField, facts: Mapping[str, Any]) -> InputFormField:
+    """The node with every contract fact its descriptor kind has a member for, examples as JSON values.
+
+    `unit` and `aggregate` have no member on the pinned descriptor models yet: they are stated once the `mthds` release
+    carrying the 9.2.0 descriptor lands (the `number` node's `unit` and `aggregate`), and are left out until then.
+    """
+    if not facts:
+        return node
+    members = type(node).model_fields
+    update: dict[str, Any] = {}
+    for key, value in facts.items():
+        if key not in members:
+            continue
+        match ContractFactKey(key):
+            case ContractFactKey.EXAMPLES:
+                update[key] = [json_example(value=example) for example in cast("list[Any]", value)]
+            case ContractFactKey.FORMAT:
+                update[key] = str(value)
+            case (
+                ContractFactKey.MINIMUM
+                | ContractFactKey.MAXIMUM
+                | ContractFactKey.EXCLUSIVE_MINIMUM
+                | ContractFactKey.EXCLUSIVE_MAXIMUM
+                | ContractFactKey.MIN_LENGTH
+                | ContractFactKey.MAX_LENGTH
+                | ContractFactKey.PATTERN
+                | ContractFactKey.UNIT
+                | ContractFactKey.AGGREGATE
+            ):
+                update[key] = value
+    return node.model_copy(update=update) if update else node
+
+
+def _with_slot_meaning(*, node: InputFormField, slot: InputSlotBlueprint) -> InputFormField:
+    """A slot's concept node with the slot's own description, contract facts and options stated on it."""
+    if slot.description is not None:
+        node = node.model_copy(update={"description": slot.description})
+    option_values = slot.choice_values
+    if option_values is not None and isinstance(node, TextValuedItemBase):
+        node = EnumField(
+            name=node.name,
+            title=node.title,
+            concept_ref=node.concept_ref,
+            refines=node.refines,
+            description=node.description,
+            required=node.required,
+            hints=node.hints,
+            choices=option_values,
+        )
+    return _with_contract_facts(node=node, facts=slot.contract_facts)
 
 
 TIME_TEXT_FORMAT = "time"

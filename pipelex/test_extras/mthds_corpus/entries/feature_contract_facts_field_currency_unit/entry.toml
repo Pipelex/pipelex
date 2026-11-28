@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_currency_unit"
+description = "A festival card whose budget is in euros"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

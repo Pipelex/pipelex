@@ -1,0 +1,16 @@
+domain      = "facts_ratio_open_bound"
+description = "An orchard's harvest card stating the share sold, above nothing and at most all of it"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+ratio = { type = "number", description = "The share of the harvest sold", exclusive_minimum = 0, maximum = 1 }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

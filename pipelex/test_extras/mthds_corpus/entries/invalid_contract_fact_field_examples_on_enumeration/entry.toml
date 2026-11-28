@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_examples_on_enumeration"
+description = "A river-level card giving examples to an enumeration field"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

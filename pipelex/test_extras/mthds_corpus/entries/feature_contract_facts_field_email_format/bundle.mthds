@@ -1,0 +1,16 @@
+domain      = "facts_email_format"
+description = "A volunteer card whose contact is an email address"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+contact = { type = "text", description = "The contact address", format = "email" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

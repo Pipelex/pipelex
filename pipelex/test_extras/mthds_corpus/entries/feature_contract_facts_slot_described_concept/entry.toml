@@ -1,0 +1,10 @@
+name = "feature_contract_facts_slot_described_concept"
+description = "A note about a signed agreement, whose slot says what it holds"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

@@ -1,0 +1,11 @@
+domain      = "filename_optional_guarded"
+description = "Drawing a cover whose file name names the client only when there is one"
+main_pipe   = "draw_cover"
+
+[pipe.draw_cover]
+type            = "PipeImgGen"
+description     = "Draw the cover for the topic"
+inputs          = { topic = "Text", client = "Text?" }
+output          = "Image"
+prompt          = "A warm watercolour cover about $topic"
+output_filename = "{% if client %}{{ client }} - {% endif %}cover"
