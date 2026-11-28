@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Generic, Literal, TypeVar, final
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, final
 
 from typing_extensions import override
 
@@ -9,6 +9,7 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelDeckChoiceUnr
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -28,6 +29,12 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     @property
     def class_name(self) -> str:
         return self.__class__.__name__
+
+    @override
+    async def _load_stored_input_values(self, *, roots: dict[str, Any], job_metadata: JobMetadata, pipe_run_params: PipeRunParams) -> None:
+        await load_stored_values_through_leaf(
+            roots=roots, read_paths=None, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
+        )
 
     @final
     @contextmanager

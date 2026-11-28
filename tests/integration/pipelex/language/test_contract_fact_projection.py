@@ -10,6 +10,9 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.core.concepts.choice_options import DubiousOptionReason
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -28,6 +31,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from mthds.protocol.pipeline_inputs import PipelineInputs
+    from pytest_mock import MockerFixture
+
+    from pipelex.system.job_metadata import JobMetadata
 
 _FACTS_MTHDS = """
 domain = "facts_projection_test"
@@ -50,7 +56,7 @@ unit = "EUR"
 type = "PipeLLM"
 description = "Take an order"
 output = "Text"
-prompt = "$code $budget $order $tags $tone"
+prompt = "$code $budget $order $tags $tone\\n@?mail"
 
 [pipe.take_order.inputs]
 code = { concept = "Text", description = "The customer's code", min_length = 3, max_length = 8, examples = ["ABC123"] }
@@ -58,6 +64,7 @@ budget = { concept = "Number", minimum = 0, examples = [100] }
 order = "Order"
 tags = { concept = "Text[]", pattern = "^[a-z]+$" }
 tone = { concept = "Text", choices = [{ value = "warm", label = "Warm" }, "formal"] }
+mail = { concept = "Text?", format = "email" }
 """
 
 
@@ -143,11 +150,12 @@ class TestContractFactProjection:
             ({"code": "ABC", "budget": -1, "tone": "warm"}, "below the minimum 0"),
             ({"code": "ABC", "budget": 5, "tone": "shouty"}, "not one of the options"),
             ({"code": "ABC", "budget": 5, "tone": "warm", "tags": ["fine", "NOT"]}, "does not match the pattern"),
-            ({"code": "ABC", "budget": 5, "tone": "formal", "tags": ["fine"]}, None),
+            ({"code": "ABC", "budget": 5, "tone": "warm", "mail": "not-an-email"}, "not well-formed as email"),
+            ({"code": "ABC", "budget": 5, "tone": "formal", "tags": ["fine"], "mail": "a@example.com"}, None),
         ],
     )
     async def test_the_input_gate_enforces_slot_constraints(
-        self, load_empty_library: Callable[[], str], inputs: dict[str, Any], refusal: str | None
+        self, load_empty_library: Callable[[], str], job_metadata: JobMetadata, inputs: dict[str, Any], refusal: str | None
     ) -> None:
         """A caller's value breaking its slot's facts or options is `input.invalid`; a value honouring them passes."""
         outer_library_id = load_empty_library()
@@ -159,11 +167,114 @@ class TestContractFactProjection:
             )
             run_params = PipeRunParamsFactory.make_run_params()
             if refusal is None:
-                pipe.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=run_params)
+                await pipe.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=run_params, job_metadata=job_metadata)
             else:
                 with pytest.raises(PipeRunInputsError, match=refusal) as exc_info:
-                    pipe.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=run_params)
+                    await pipe.ensure_inputs_honour_their_contracts(
+                        working_memory=working_memory, pipe_run_params=run_params, job_metadata=job_metadata
+                    )
                 assert exc_info.value.resolve_error_code() == CoreCode.INPUT_INVALID
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+    @pytest.mark.parametrize(
+        ("slot", "stored_text", "is_list", "refusal"),
+        [
+            pytest.param("code", "AB", False, "fewer than 3 characters", id="length"),
+            pytest.param("tone", "shouty", False, "not one of the options", id="choices"),
+            pytest.param("tags", "NOT", True, "does not match the pattern", id="pattern-on-an-item"),
+            pytest.param("mail", "not-an-email", False, "not well-formed as email", id="format"),
+            pytest.param("code", "ABC", False, None, id="honoured"),
+        ],
+    )
+    async def test_the_input_gate_reads_a_text_given_by_url(
+        self,
+        mocker: MockerFixture,
+        load_empty_library: Callable[[], str],
+        job_metadata: JobMetadata,
+        slot: str,
+        stored_text: str,
+        is_list: bool,
+        refusal: str | None,
+    ) -> None:
+        """A text the caller gave by URL is loaded through the leaf and checked as its real value, never skipped."""
+        content_generator = mocker.MagicMock()
+        content_generator.load_stored_texts = mocker.AsyncMock(return_value=[stored_text])
+        mocker.patch("pipelex.kernel.stored_value_ops.get_content_generator", return_value=content_generator)
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_FACTS_MTHDS])
+            pipe = next(pipe for pipe in result.pipes if pipe.code == "take_order")
+            reference = TextContent.model_validate({"url": _STORED_URL, "size": len(stored_text), "mime_type": "text/plain", "preview": ""})
+            content: Any = ListContent[TextContent](items=[TextContent(text="fine"), reference]) if is_list else reference
+            stuff = StuffFactory.make_stuff(concept=pipe.inputs.root[slot].concept, content=content, name=slot)
+            working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[stuff], main_name=slot)
+            run_params = PipeRunParamsFactory.make_run_params()
+            if refusal is None:
+                await pipe.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=run_params, job_metadata=job_metadata)
+            else:
+                with pytest.raises(PipeRunInputsError, match=refusal) as exc_info:
+                    await pipe.ensure_inputs_honour_their_contracts(
+                        working_memory=working_memory, pipe_run_params=run_params, job_metadata=job_metadata
+                    )
+                assert exc_info.value.resolve_error_code() == CoreCode.INPUT_INVALID
+        finally:
+            _teardown_validation_library(outer_library_id)
+        content_generator.load_stored_texts.assert_awaited_once()
+        uri_references = content_generator.load_stored_texts.call_args.kwargs["uri_references"]
+        assert [uri_reference.uri for uri_reference in uri_references] == [_STORED_URL]
+
+    @pytest.mark.parametrize(
+        ("stored_text", "refusal"),
+        [
+            pytest.param("ABCDEFGHIJ", "more than 8 characters", id="too-long"),
+            pytest.param("ABCDEF", None, id="honoured"),
+        ],
+    )
+    async def test_the_input_gate_reads_a_large_text_the_normalizer_stored(
+        self, mocker: MockerFixture, load_empty_library: Callable[[], str], job_metadata: JobMetadata, stored_text: str, refusal: str | None
+    ) -> None:
+        """A text past the inline threshold is stored before the gate, and the gate still checks the text it holds."""
+        load_spy = mocker.patch("pipelex.kernel.stored_value_ops.get_content_generator")
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_FACTS_MTHDS])
+            pipe = next(pipe for pipe in result.pipes if pipe.code == "take_order")
+            content = TextContent(text=stored_text)
+            content.accept_storage(url=_STORED_URL, size=len(stored_text), mime_type="text/plain", preview="")
+            assert content.is_stored
+            stuff = StuffFactory.make_stuff(concept=pipe.inputs.root["code"].concept, content=content, name="code")
+            working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[stuff], main_name="code")
+            run_params = PipeRunParamsFactory.make_run_params()
+            if refusal is None:
+                await pipe.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=run_params, job_metadata=job_metadata)
+            else:
+                with pytest.raises(PipeRunInputsError, match=refusal):
+                    await pipe.ensure_inputs_honour_their_contracts(
+                        working_memory=working_memory, pipe_run_params=run_params, job_metadata=job_metadata
+                    )
+        finally:
+            _teardown_validation_library(outer_library_id)
+        # The value was kept loaded when it was stored, so nothing is dispatched to read it again.
+        load_spy.assert_not_called()
+
+    async def test_the_input_gate_refuses_a_stored_text_it_cannot_read(
+        self, mocker: MockerFixture, load_empty_library: Callable[[], str], job_metadata: JobMetadata
+    ) -> None:
+        """A stored value the gate cannot read is refused, never let through unchecked."""
+        mocker.patch("pipelex.pipe_operators.pipe_operator.load_stored_values_through_leaf", return_value=0)
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_FACTS_MTHDS])
+            pipe = next(pipe for pipe in result.pipes if pipe.code == "take_order")
+            reference = TextContent.model_validate({"url": _STORED_URL, "size": 3, "mime_type": "text/plain", "preview": ""})
+            stuff = StuffFactory.make_stuff(concept=pipe.inputs.root["tone"].concept, content=reference, name="tone")
+            working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[stuff], main_name="tone")
+            with pytest.raises(PipeRunInputsError, match="could not be read") as exc_info:
+                await pipe.ensure_inputs_honour_their_contracts(
+                    working_memory=working_memory, pipe_run_params=PipeRunParamsFactory.make_run_params(), job_metadata=job_metadata
+                )
+            assert exc_info.value.resolve_error_code() == CoreCode.INPUT_INVALID
         finally:
             _teardown_validation_library(outer_library_id)
 
@@ -186,6 +297,8 @@ class TestContractFactProjection:
             ),
         ]
 
+
+_STORED_URL = "pipelex-storage://facts-test/inputs/value.txt"
 
 _DUBIOUS_MTHDS = """
 domain = "dubious_options_test"

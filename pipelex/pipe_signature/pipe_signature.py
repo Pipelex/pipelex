@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from typing_extensions import override
 
@@ -6,6 +6,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -29,6 +30,12 @@ class PipeSignature(PipeAbstract):
     # discriminator tag; `pipe_category` is None (the base validator admits None only for signatures).
     pipe_category: None = None
     signature_for: PipeType | None = None
+
+    @override
+    async def _load_stored_input_values(self, *, roots: dict[str, Any], job_metadata: JobMetadata, pipe_run_params: PipeRunParams) -> None:
+        await load_stored_values_through_leaf(
+            roots=roots, read_paths=None, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
+        )
 
     @property
     @override

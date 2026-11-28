@@ -53,14 +53,15 @@ def fact_json_schema(*, facts: Mapping[str, Any], choice_values: list[str] | Non
 
 
 def carried_value(*, value: Any) -> Any:
-    """The plain value a value of a concept-typed site carries: the number of a `Number`, the inline text of a `Text`, or
-    the value itself for a site typed by a field type. A date or a time carries no constrainable value, since only
-    examples apply to them.
+    """The plain value a value of a concept-typed site carries: the number of a `Number`, the text of a `Text`, or the value
+    itself for a site typed by a field type. A date or a time carries no constrainable value, since only examples apply to
+    them. A stored text is read from its loaded value; one never loaded carries nothing readable here, so the input gate
+    loads every stored value it checks first and refuses one it still cannot read.
     """
     if isinstance(value, NumberContent):
         return value.number
     if isinstance(value, TextContent):
-        return value.text
+        return value.require_value() if value.is_loaded else None
     if isinstance(value, StuffContent):
         return None
     return value
