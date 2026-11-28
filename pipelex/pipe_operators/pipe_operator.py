@@ -9,10 +9,9 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelDeckChoiceUnr
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
-from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_reading_stored_inputs import PipeReadingStoredInputs
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_operators.produced_file_naming import name_produced_files
+from pipelex.pipe_operators.produced_file_naming import name_produced_files, prepare_naming_context
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 
@@ -24,18 +23,12 @@ if TYPE_CHECKING:
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
 
 
-class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
+class PipeOperator(PipeReadingStoredInputs, Generic[PipeOperatorOutputType]):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
 
     @property
     def class_name(self) -> str:
         return self.__class__.__name__
-
-    @override
-    async def _load_stored_input_values(self, *, roots: dict[str, Any], job_metadata: JobMetadata, pipe_run_params: PipeRunParams) -> None:
-        await load_stored_values_through_leaf(
-            roots=roots, read_paths=None, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
-        )
 
     @final
     @contextmanager
@@ -77,10 +70,13 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         try:
+            naming_context = await self._prepare_naming_context(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params
+            )
             pipe_output = await self._live_run_operator_pipe(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
-            await self._name_produced_files(pipe_output=pipe_output, working_memory=working_memory)
+            await self._name_produced_files(pipe_output=pipe_output, naming_context=naming_context)
 
             main_stuff = pipe_output.main_stuff
             # Read the concept from main_stuff, not self.output: when the pipe declares
@@ -135,21 +131,40 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
+        naming_context = await self._prepare_naming_context(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params)
         pipe_output = await self._dry_run_operator_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
-        await self._name_produced_files(pipe_output=pipe_output, working_memory=working_memory)
+        await self._name_produced_files(pipe_output=pipe_output, naming_context=naming_context)
         return pipe_output
 
     @final
-    async def _name_produced_files(self, *, pipe_output: PipeOutput, working_memory: WorkingMemory) -> None:
+    async def _prepare_naming_context(
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams
+    ) -> dict[str, Any] | None:
+        """The inputs `output_filename` renders with, taken before the operator runs, or None when it names no file.
+
+        Taken before the run, so an output the operator writes under one of its inputs' names never stands in for that input.
+        """
+        if self.output_filename is None:
+            return None
+        return await prepare_naming_context(
+            output_filename=self.output_filename,
+            working_memory=working_memory,
+            job_metadata=job_metadata,
+            pipe_run_params=pipe_run_params,
+            pipe_code=self.code,
+        )
+
+    @final
+    async def _name_produced_files(self, *, pipe_output: PipeOutput, naming_context: dict[str, Any] | None) -> None:
         """Name the files this operator produced from its `output_filename`, rendered with its inputs, in a live run and a
         dry run alike (spec: mthds-format.md, "Naming Produced Files").
         """
-        if self.output_filename is None:
+        if self.output_filename is None or naming_context is None:
             return
         await name_produced_files(
-            output_filename=self.output_filename, main_stuff=pipe_output.main_stuff, working_memory=working_memory, pipe_code=self.code
+            output_filename=self.output_filename, main_stuff=pipe_output.main_stuff, naming_context=naming_context, pipe_code=self.code
         )
 
     @abstractmethod

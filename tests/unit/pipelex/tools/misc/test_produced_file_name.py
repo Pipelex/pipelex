@@ -47,3 +47,21 @@ class TestProducedFileName:
         assert encoded.decode("utf-8") == name
         assert name.endswith(f" ({item_number}).pdf" if item_number > 1 else ".pdf")
         assert len(encoded) > MAX_FILE_NAME_BYTES - 4
+
+    @pytest.mark.parametrize(
+        ("rendered", "default_name", "item_number", "expected"),
+        [
+            ("Report", "generated." + "x" * 300, 1, "Report"),
+            ("Report", "generated." + "é" * 200, 2, "Report (2)"),
+            (None, "generated." + "x" * 300, 1, "generated"),
+            ("", "z" * 400 + ".png", 1, "z" * 251 + ".png"),
+            (None, "é" * 300 + ".png", 1, "é" * 125 + ".png"),
+        ],
+    )
+    def test_never_passes_255_bytes_whatever_the_runtime_name_carries(
+        self, rendered: str | None, default_name: str, item_number: int, expected: str
+    ) -> None:
+        """An extension leaving no room for the name is dropped, and the runtime's own name is capped when it is the fallback."""
+        name = build_produced_file_name(rendered=rendered, default_name=default_name, item_number=item_number)
+        assert name == expected
+        assert len(name.encode("utf-8")) <= MAX_FILE_NAME_BYTES

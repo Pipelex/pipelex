@@ -55,6 +55,37 @@ def _truncate_to_bytes(*, text: str, max_bytes: int) -> str:
     return encoded[:max_bytes].decode("utf-8", errors="ignore")
 
 
+def _fitted_name(*, base: str, suffix: str, extension: str) -> str | None:
+    """`base`, `suffix` and `extension` joined and capped at `MAX_FILE_NAME_BYTES`, the base shortened to fit, or None.
+
+    An extension so long that, with the suffix, it leaves no byte for the base is dropped: the cap holds whatever the
+    runtime's name carried. None when nothing is left of the base.
+    """
+    suffix_bytes = len(suffix.encode("utf-8"))
+    room = MAX_FILE_NAME_BYTES - suffix_bytes - len(extension.encode("utf-8"))
+    if room < 1:
+        extension = ""
+        room = MAX_FILE_NAME_BYTES - suffix_bytes
+    shortened = _truncate_to_bytes(text=base, max_bytes=room)
+    if len(shortened) < len(base):
+        shortened = shortened.rstrip(" .")
+    if not shortened:
+        return None
+    return f"{shortened}{suffix}{extension}"
+
+
+def capped_runtime_name(*, default_name: str) -> str:
+    """The name the runtime would have given the file, capped at `MAX_FILE_NAME_BYTES` like a rendered name.
+
+    Its stem is shortened, at a character boundary, keeping its extension when the extension leaves room for it.
+    """
+    if len(default_name.encode("utf-8")) <= MAX_FILE_NAME_BYTES:
+        return default_name
+    extension = default_extension(default_name=default_name)
+    stem = default_name[: len(default_name) - len(extension)] if extension else default_name
+    return _fitted_name(base=stem, suffix="", extension=extension) or _truncate_to_bytes(text=default_name, max_bytes=MAX_FILE_NAME_BYTES)
+
+
 def build_produced_file_name(*, rendered: str | None, default_name: str, item_number: int = 1) -> str:
     """The name of a produced file, from the rendered `output_filename` and the name the runtime would have given it.
 
@@ -65,10 +96,12 @@ def build_produced_file_name(*, rendered: str | None, default_name: str, item_nu
             ` (2)`, ` (3)` and so on before the extension, since the template is rendered once for all of them.
 
     Returns:
-        The name, or `default_name` when rendering failed or nothing is left before the extension.
+        The name, never longer than `MAX_FILE_NAME_BYTES` in UTF-8, or `default_name`, capped the same way, when rendering
+        failed or nothing is left before the extension.
     """
+    fallback = capped_runtime_name(default_name=default_name)
     if rendered is None:
-        return default_name
+        return fallback
     cleaned = clean_rendered_name(rendered=rendered)
     extension = default_extension(default_name=default_name)
     base = cleaned
@@ -77,12 +110,6 @@ def build_produced_file_name(*, rendered: str | None, default_name: str, item_nu
         base = cleaned[: -len(extension)]
         extension = cleaned[-len(extension) :]
     if not base.strip(" ."):
-        return default_name
+        return fallback
     suffix = f" ({item_number})" if item_number > 1 else ""
-    room = MAX_FILE_NAME_BYTES - len(suffix.encode("utf-8")) - len(extension.encode("utf-8"))
-    shortened = _truncate_to_bytes(text=base, max_bytes=room)
-    if len(shortened) < len(base):
-        shortened = shortened.rstrip(" .")
-    if not shortened:
-        return default_name
-    return f"{shortened}{suffix}{extension}"
+    return _fitted_name(base=base, suffix=suffix, extension=extension) or fallback
