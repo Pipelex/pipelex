@@ -37,7 +37,7 @@ class PresentationWords(BaseModel):
         return self.label is not None or self.description is not None or self.tone is not None
 
 
-class ChoiceOption(PresentationWords):
+class ChoiceOptionTable(PresentationWords):
     """An option of a `choices` list written as a table: its value, and the words for the people who read it."""
 
     value: str
@@ -49,7 +49,7 @@ class ChoiceOption(PresentationWords):
         return {key: value for key, value in dumped.items() if value is not None}
 
 
-ChoiceOptionValue = str | ChoiceOption
+ChoiceOptionValue = str | ChoiceOptionTable
 
 
 class OutcomeTable(PresentationWords):
@@ -106,7 +106,7 @@ def choice_values(*, options: Sequence[ChoiceOptionValue]) -> list[str]:
 
 def options_carry_words(*, options: Sequence[ChoiceOptionValue]) -> bool:
     """Whether at least one option of a list carries a word: a label, a description or a tone."""
-    return any(isinstance(option, ChoiceOption) and option.has_words for option in options)
+    return any(isinstance(option, ChoiceOptionTable) and option.has_words for option in options)
 
 
 def _malformed(*, message: str) -> ContractFactInvalidError:
@@ -167,7 +167,7 @@ def parse_choices(*, raw: Any) -> Any:
         fault = presentation_words_fault(table=table, key_name="value", table_name="an option table")
         if fault is not None:
             raise _malformed(message=fault)
-        option = ChoiceOption.model_validate(table)
+        option = ChoiceOptionTable.model_validate(table)
         table_values.append(option.value)
         options.append(option if option.has_words else option.value)
     all_values = choice_values(options=options)
@@ -175,7 +175,7 @@ def parse_choices(*, raw: Any) -> Any:
         if all_values.count(table_value) > 1:
             msg = f"an option table shares the value {table_value!r} with another option of its list"
             raise ContractFactInvalidError(msg, fact=CHOICES_KEY, reason=ContractFactReason.DUPLICATE_OPTION)
-    duplicate_label = duplicate_option_message(values=[], labels=[option.label if isinstance(option, ChoiceOption) else None for option in options])
+    duplicate_label = duplicate_option_message(values=[], labels=[option.label if isinstance(option, ChoiceOptionTable) else None for option in options])
     if duplicate_label is not None:
         raise ContractFactInvalidError(duplicate_label, fact=CHOICES_KEY, reason=ContractFactReason.DUPLICATE_OPTION)
     return options

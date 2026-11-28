@@ -52,7 +52,7 @@ ConfigValidationError | pipelex.config.invalid
 ConstructFieldBlueprintTypeError | method.schema_violation
 ConstructFieldBlueprintValueError | method.schema_violation
 ContextProviderError | abstract
-ContractFactInvalidError | method.schema_violation
+ContractFactInvalidError | method.contract_fact_invalid
 CoreUnconditionalPluginDisabledError | pipelex.config.invalid
 CostRegistryError | runtime.unexpected
 CrateNormalizationError | one of runtime.unexpected, method.cycle
@@ -313,7 +313,7 @@ PipeRunParamsError | method.schema_violation
 PipeSequenceValueError | method.wiring_invalid
 PipeSignatureNotExecutableError | method.not_runnable
 PipeStackOverflowError | pipe.stack_overflow
-PipeValidationError | one of method.schema_violation, method.input_undeclared, method.input_unused, method.input_concept_mismatch, method.output_concept_mismatch, method.output_multiplicity_mismatch, method.identifier_invalid, method.pipe_type_invalid, method.name_conflict, method.binding_step_invalid, method.field_path_unresolved, method.optional_marker_invalid, method.optional_unhandled, method.template_private_name, method.optional_force_redundant, method.input_presence_vacuous, method.concept_unresolved, method.pipe_unresolved, method.dependency_missing, method.pipe_not_exported, method.function_invalid, method.wiring_invalid, model.unknown, model.capability_unsupported, runtime.unexpected
+PipeValidationError | one of method.schema_violation, method.input_undeclared, method.input_unused, method.input_concept_mismatch, method.output_concept_mismatch, method.output_multiplicity_mismatch, method.identifier_invalid, method.pipe_type_invalid, method.name_conflict, method.binding_step_invalid, method.field_path_unresolved, method.optional_marker_invalid, method.optional_unhandled, method.template_private_name, method.optional_force_redundant, method.input_presence_vacuous, method.concept_unresolved, method.pipe_unresolved, method.dependency_missing, method.pipe_not_exported, method.function_invalid, method.wiring_invalid, method.contract_fact_invalid, method.choice_option_dubious, model.unknown, model.capability_unsupported, runtime.unexpected
 PipeVariableMultiplicityError | method.schema_violation
 PipelexBridgeDispatchError | inherits cause, else runtime.unexpected; or chosen: runtime.unsupported, request.invalid
 PipelexCLIError | inherits cause, else runtime.unexpected; or chosen: pipelex.config.invalid, pipelex.config.variable_missing, pipelex.config.credential_missing, provider.credential_refused, provider.failed

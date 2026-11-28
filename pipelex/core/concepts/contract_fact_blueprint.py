@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, StrictFloat, StrictInt, ValidationInfo, f
 from pipelex.core.concepts.exceptions import ContractFactInvalidError
 from pipelex.language.contract_facts import (
     CONTRACT_FACT_KEY_NAMES,
-    Aggregate,
+    AggregateWord,
     ContractFactFinding,
     ContractFactKey,
     ContractFactReason,
@@ -62,7 +62,7 @@ class ContractFactsBlueprint(BaseModel):
     """The format a text-valued site is well-formed in."""
     unit: str | None = None
     """What a number-valued site counts: an ISO 4217 currency code, `percent`, or a unit of measure."""
-    aggregate: Aggregate | None = Field(default=None, strict=False)
+    aggregate: AggregateWord | None = Field(default=None, strict=False)
     """How the values of a number-valued field combine across records. Never on an input slot."""
     examples: list[Any] | None = None
     """Examples of a good value, each written as the value itself."""
@@ -87,6 +87,6 @@ class ContractFactsBlueprint(BaseModel):
 
 def _plain(*, value: Any) -> Any:
     """A fact's value as plain data, a `StrEnum` member as its string."""
-    if isinstance(value, (ValueFormat, Aggregate)):
+    if isinstance(value, (ValueFormat, AggregateWord)):
         return str(value)
     return value

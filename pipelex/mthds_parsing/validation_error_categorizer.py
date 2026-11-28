@@ -121,7 +121,7 @@ def _contract_fact_site_path(*, loc: tuple[int | str, ...], fact: str) -> str | 
     return ".".join(parts) or None
 
 
-_CONTRACT_FACT_INTERNAL_LOC_ELEMENTS = frozenset({"InputSlotBlueprint", "ConceptStructureBlueprint", "ChoiceOption", "OutcomeTable"})
+_CONTRACT_FACT_INTERNAL_LOC_ELEMENTS = frozenset({"InputSlotBlueprint", "ConceptStructureBlueprint", "ChoiceOptionTable", "OutcomeTable"})
 """The model names pydantic puts in a ``loc`` when it validates a union arm, which no author writes as a key."""
 
 

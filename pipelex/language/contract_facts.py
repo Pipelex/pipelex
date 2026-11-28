@@ -200,7 +200,7 @@ class ValueFormat(StrEnum):
     IPV6 = "ipv6"
 
 
-class Aggregate(StrEnum):
+class AggregateWord(StrEnum):
     """How the values of a number-valued field combine across the records that hold it."""
 
     SUM = "sum"
@@ -403,8 +403,8 @@ def malformed_fact_message(*, key: ContractFactKey, value: Any) -> str | None:
                     f"{', '.join(sorted(UNITS_OF_MEASURE))}; got {value!r}"
                 )
         case ContractFactKey.AGGREGATE:
-            if not isinstance(value, str) or value not in set(Aggregate):
-                return f"'aggregate' must be one of {', '.join(Aggregate)}, got {value!r}"
+            if not isinstance(value, str) or value not in set(AggregateWord):
+                return f"'aggregate' must be one of {', '.join(AggregateWord)}, got {value!r}"
         case ContractFactKey.EXAMPLES:
             if not isinstance(value, list) or not value:
                 return f"'examples' must be a non-empty array, got {value!r}"

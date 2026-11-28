@@ -2144,6 +2144,20 @@ components:
       - sum
       - average
       title: Aggregate
+      description: 'How the values of a number-valued field combine across the records that hold it.
+
+
+        A consumer presenting several records together may show the sum or the average a field
+
+        declares, counted in the field''s effective unit, and never a total or an average of a field
+
+        that declares no `aggregate`.'
+    AggregateWord:
+      type: string
+      enum:
+      - sum
+      - average
+      title: AggregateWord
       description: How the values of a number-valued field combine across the records that hold it.
     AliasMatch:
       properties:
@@ -2350,8 +2364,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -2416,8 +2435,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -2515,6 +2539,44 @@ components:
       description: Which cells of a matched row an `update` may write. A null field writes nothing under either.
     ChoiceOption:
       properties:
+        value:
+          type: string
+          title: Value
+        label:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Description
+        tone:
+          anyOf:
+          - $ref: '#/components/schemas/OptionTone'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - value
+      title: ChoiceOption
+      description: 'One option of an `enum` node''s `options`: its value, and the words and tone the method gives it.
+
+
+        `value` is the option''s value exactly as `choices` lists it at the same position, so it may be
+
+        any string a `choices` list holds, the empty string included for a list written before option
+
+        tables existed. `label`, `description` and `tone` are each present only when the option declares
+
+        them, and a declared word is never empty. Only `value` matters to a payload; the rest is
+
+        presentation. Closed shape (`extra="forbid"`), absent never `null`.'
+    ChoiceOptionTable:
+      properties:
         label:
           anyOf:
           - type: string
@@ -2536,7 +2598,7 @@ components:
       type: object
       required:
       - value
-      title: ChoiceOption
+      title: ChoiceOptionTable
       description: 'An option of a `choices` list written as a table: its value, and the words for the people who read it.'
     CodegenRequest:
       properties:
@@ -2891,7 +2953,7 @@ components:
           title: Unit
         aggregate:
           anyOf:
-          - $ref: '#/components/schemas/Aggregate'
+          - $ref: '#/components/schemas/AggregateWord'
           - type: 'null'
         examples:
           anyOf:
@@ -2960,7 +3022,7 @@ components:
           - items:
               anyOf:
               - type: string
-              - $ref: '#/components/schemas/ChoiceOption'
+              - $ref: '#/components/schemas/ChoiceOptionTable'
             type: array
           - type: 'null'
           title: Choices
@@ -3077,6 +3139,30 @@ components:
       - nested
       title: ConstructFieldMethod
       description: Method used to compose a field value.
+    ContractFormat:
+      type: string
+      enum:
+      - email
+      - uri
+      - date-time
+      - uuid
+      - hostname
+      - ipv4
+      - ipv6
+      - time
+      title: ContractFormat
+      description: 'The `format` a text node may carry: the language''s formats, plus `time`.
+
+
+        The first seven are the closed set the language authors as a text field''s or slot''s `format`
+
+        contract fact, each the JSON Schema format of the same name. `time` is not a value an author
+
+        writes: the `time` field type and `native.Time` produce it, as a `text` node with
+
+        `format: "time"`. Since `9.2.0` a producer emits no other value, so a node carrying one fails
+
+        the parse.'
     CrateInvalidReport:
       properties:
         is_valid:
@@ -3148,8 +3234,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3218,8 +3309,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3452,8 +3548,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3518,8 +3619,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3662,8 +3768,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3683,6 +3794,13 @@ components:
             type: string
           type: array
           title: Choices
+        options:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ChoiceOption'
+            type: array
+          - type: 'null'
+          title: Options
         name:
           type: string
           title: Name
@@ -3734,8 +3852,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3755,6 +3878,13 @@ components:
             type: string
           type: array
           title: Choices
+        options:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ChoiceOption'
+            type: array
+          - type: 'null'
+          title: Options
       additionalProperties: false
       type: object
       required:
@@ -4143,8 +4273,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -4216,8 +4351,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -4350,7 +4490,7 @@ components:
           title: Unit
         aggregate:
           anyOf:
-          - $ref: '#/components/schemas/Aggregate'
+          - $ref: '#/components/schemas/AggregateWord'
           - type: 'null'
         examples:
           anyOf:
@@ -4378,7 +4518,7 @@ components:
           - items:
               anyOf:
               - type: string
-              - $ref: '#/components/schemas/ChoiceOption'
+              - $ref: '#/components/schemas/ChoiceOptionTable'
             type: array
           - type: 'null'
           title: Choices
@@ -4720,8 +4860,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -4820,8 +4965,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5787,8 +5937,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5830,6 +5985,16 @@ components:
           - type: number
           - type: 'null'
           title: Exclusive Maximum
+        unit:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/Aggregate'
+          - type: 'null'
         name:
           type: string
           title: Name
@@ -5881,8 +6046,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5924,6 +6094,16 @@ components:
           - type: number
           - type: 'null'
           title: Exclusive Maximum
+        unit:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/Aggregate'
+          - type: 'null'
       additionalProperties: false
       type: object
       required:
@@ -5971,8 +6151,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -6068,8 +6253,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -6121,6 +6311,20 @@ components:
       - fields
       title: ObjectItem
       description: '`object` — a structured concept, recursing through its resolved payload fields.'
+    OptionTone:
+      type: string
+      enum:
+      - positive
+      - caution
+      - negative
+      - neutral
+      title: OptionTone
+      description: 'How a choice option reads to a person, never a colour; an option without a tone reads as `neutral`.
+
+
+        A consumer maps a tone to its own palette or icon, and never infers one from an option''s value
+
+        or label.'
     OutcomeTable:
       properties:
         label:
@@ -8804,8 +9008,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -8818,11 +9027,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -8832,9 +9043,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: prose
@@ -8890,8 +9100,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -8904,11 +9119,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -8918,9 +9135,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: prose
@@ -9462,8 +9678,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9476,11 +9697,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -9490,9 +9713,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: text
@@ -9556,8 +9778,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9570,11 +9797,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -9584,9 +9813,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: text
@@ -9783,8 +10011,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9849,8 +10082,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:

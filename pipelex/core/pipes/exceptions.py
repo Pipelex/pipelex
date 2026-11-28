@@ -315,19 +315,6 @@ def refusal_detail(*, refusal: PipelexError, pipe_code: str | None = None) -> st
     return caller_refusal(refusal=refusal, pipe_code=pipe_code).detail
 
 
-CONTRACT_FACT_INVALID_CODE = CoreCode.METHOD_SCHEMA_VIOLATION
-"""The code a misplaced or invalid contract fact takes. The standard names it `method.contract_fact_invalid` (registry
-9.2.0), which the `mthds` release this runtime pins does not carry yet; until a release does, the fault is reported as
-the declaration breaking a rule of the language it is, its item carrying `fact`, `reason` and `field_path` for the day
-this constant becomes `CoreCode.METHOD_CONTRACT_FACT_INVALID`."""
-
-CHOICE_OPTION_DUBIOUS_CODE = CoreCode.METHOD_SCHEMA_VIOLATION
-"""The code of the warning about an empty or repeated string choice option. The standard names it
-`method.choice_option_dubious` (registry 9.2.0), which the pinned `mthds` release does not carry yet; until one does, the
-warning takes the code an unclassified warning takes, its item carrying `field_path` and `reason` for the day this constant
-becomes `CoreCode.METHOD_CHOICE_OPTION_DUBIOUS`."""
-
-
 def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) -> ErrorCode:
     """The code of a pipe validation refusal of a type, ``method.schema_violation`` for one with no type."""
     match error_type:
@@ -381,9 +368,9 @@ def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) ->
         case PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED:
             return CoreCode.METHOD_FUNCTION_INVALID
         case PipeValidationErrorType.CONTRACT_FACT_INVALID:
-            return CONTRACT_FACT_INVALID_CODE
+            return CoreCode.METHOD_CONTRACT_FACT_INVALID
         case PipeValidationErrorType.CHOICE_OPTION_DUBIOUS:
-            return CHOICE_OPTION_DUBIOUS_CODE
+            return CoreCode.METHOD_CHOICE_OPTION_DUBIOUS
         case PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR | None:
             return CoreCode.METHOD_SCHEMA_VIOLATION
 
@@ -424,6 +411,8 @@ class PipeValidationError(PipelexError, ValueError):
             CoreCode.METHOD_PIPE_NOT_EXPORTED,
             CoreCode.METHOD_FUNCTION_INVALID,
             CoreCode.METHOD_WIRING_INVALID,
+            CoreCode.METHOD_CONTRACT_FACT_INVALID,
+            CoreCode.METHOD_CHOICE_OPTION_DUBIOUS,
             CoreCode.MODEL_UNKNOWN,
             CoreCode.MODEL_CAPABILITY_UNSUPPORTED,
             CoreCode.RUNTIME_UNEXPECTED,

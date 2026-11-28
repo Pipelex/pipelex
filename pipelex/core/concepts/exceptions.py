@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
@@ -77,14 +78,22 @@ class ContractFactInvalidError(PipelexError, ValueError):
     Raised from the blueprints' validators, so a ``ValueError`` too: pydantic keeps the original in ``ctx["error"]``,
     and the blueprint categorizer recovers the key at fault and the reason structurally, never from the message.
 
-    The standard names the fault ``method.contract_fact_invalid``, whose code the ``mthds`` release this runtime pins
-    does not carry yet; until it does, the fault takes ``method.schema_violation``, a declaration breaking a rule of the
-    language, with the same ``field_path`` and the reason in its finding (`CONTRACT_FACT_INVALID_CODE`).
+    The standard names the fault ``method.contract_fact_invalid``, with the key at fault as ``fact`` and the reason. The
+    key path of the site is known to the blueprint that declares it, not to the validator that raises: the categorizer
+    gives it to the item it builds, and a raise site that knows it passes ``field_path``.
     """
 
-    error_code = CoreCode.METHOD_SCHEMA_VIOLATION
+    error_code = CoreCode.METHOD_CONTRACT_FACT_INVALID
 
-    def __init__(self, message: str, *, fact: str, reason: str):
+    def __init__(self, message: str, *, fact: str, reason: str, field_path: str | None = None):
         self.fact = fact
         self.reason = reason
+        self.field_path = field_path
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        params: dict[str, Any] = {"fact": self.fact, "reason": self.reason}
+        if self.field_path is not None:
+            params["field_path"] = self.field_path
+        return params

@@ -45,8 +45,10 @@ from typing import Any, cast, get_origin
 
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from mthds.protocol.input_form import (
+    Aggregate,
     BooleanField,
     BooleanItem,
+    ContractFormat,
     DateField,
     DateItem,
     DocumentField,
@@ -66,6 +68,7 @@ from mthds.protocol.input_form import (
     NumberItem,
     ObjectField,
     ObjectItem,
+    OptionTone,
     PipeInputFormDescriptor,
     ProseField,
     ProseItem,
@@ -75,6 +78,7 @@ from mthds.protocol.input_form import (
     UnknownField,
     UnknownItem,
 )
+from mthds.protocol.input_form import ChoiceOption as DescriptorChoiceOption
 from mthds.protocol.output_form import OutputForm, PipeOutputFormDescriptor
 from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -88,7 +92,7 @@ from pipelex.core.concepts.annotation_shapes import (
     scalar_field_type,
     strip_optional,
 )
-from pipelex.core.concepts.choice_options import choice_values
+from pipelex.core.concepts.choice_options import ChoiceOptionTable, ChoiceOptionValue, choice_values, options_carry_words
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -364,6 +368,10 @@ class InputFormDeriver:
     def _blueprint_node(self, *, name: str, concept_ref: str, blueprint: ConceptBlueprint, seen: frozenset[str]) -> InputFormField:
         chain = self._refines_chain(concept_ref=concept_ref)
         node = self._blueprint_node_for_chain(name=name, concept_ref=concept_ref, blueprint=blueprint, chain=chain, seen=seen)
+        if blueprint.unit is not None and isinstance(node, NumberItem):
+            # The qualified crate carries a concept's unit inherited along refinement, so this is the concept's effective
+            # unit, which a field's or a slot's own `unit` replaces when the site states one (`_with_contract_facts`).
+            node = node.model_copy(update={"unit": blueprint.unit})
         # The concept's effective hints: its refinement chain merged nearer-wins, computed with the
         # same `_refines_chain` walk the structure merge uses. Carried on the node WITHOUT feeding
         # `kind` yet: this node may still receive a site layer (a slot's or a field's hints), and
@@ -447,7 +455,7 @@ class InputFormDeriver:
                         # A producer may report a probability beside the verdict: the pinned object.
                         return self._pinned_object_node(name=name, node_ref=node_ref, refines=refines, description=text, pinned=pinned, seen=seen)
             case NativeConceptCode.TIME:
-                return TextField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, format="time")
+                return TextField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, format=ContractFormat.TIME)
             case NativeConceptCode.DOCUMENT:
                 return DocumentField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case NativeConceptCode.IMAGE:
@@ -685,6 +693,7 @@ class InputFormDeriver:
                 description=field.description,
                 required=field.required,
                 choices=choice_values(options=field.choices),
+                options=descriptor_options(options=field.choices),
                 default_value=field.default_value,
             )
             return _with_effective_hints(node=enum_node, hints=field.hints)
@@ -843,8 +852,8 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
 def _with_contract_facts(*, node: InputFormField, facts: Mapping[str, Any]) -> InputFormField:
     """The node with every contract fact its descriptor kind has a member for, examples as JSON values.
 
-    `unit` and `aggregate` have no member on the pinned descriptor models yet: they are stated once the `mthds` release
-    carrying the 9.2.0 descriptor lands (the `number` node's `unit` and `aggregate`), and are left out until then.
+    A `number` node carries `unit` and `aggregate` (spec: input-form-descriptor.md), a site's own `unit` replacing the one
+    its concept gave the node; a `text` node carries `format` as the descriptor's `ContractFormat`.
     """
     if not facts:
         return node
@@ -857,7 +866,9 @@ def _with_contract_facts(*, node: InputFormField, facts: Mapping[str, Any]) -> I
             case ContractFactKey.EXAMPLES:
                 update[key] = [json_example(value=example) for example in cast("list[Any]", value)]
             case ContractFactKey.FORMAT:
-                update[key] = str(value)
+                update[key] = ContractFormat(str(value))
+            case ContractFactKey.AGGREGATE:
+                update[key] = Aggregate(str(value))
             case (
                 ContractFactKey.MINIMUM
                 | ContractFactKey.MAXIMUM
@@ -867,10 +878,28 @@ def _with_contract_facts(*, node: InputFormField, facts: Mapping[str, Any]) -> I
                 | ContractFactKey.MAX_LENGTH
                 | ContractFactKey.PATTERN
                 | ContractFactKey.UNIT
-                | ContractFactKey.AGGREGATE
             ):
                 update[key] = value
     return node.model_copy(update=update) if update else node
+
+
+def descriptor_options(*, options: Sequence[ChoiceOptionValue]) -> list[DescriptorChoiceOption] | None:
+    """The `options` of an `enum` node: one entry per choice, in order, present only when an option carries a word.
+
+    A string option is its value alone; an option table gives its label, description and tone (spec:
+    input-form-descriptor.md, "Choice options"). A list whose options carry no word has no `options` member.
+    """
+    if not options_carry_words(options=options):
+        return None
+    entries: list[DescriptorChoiceOption] = []
+    for option in options:
+        match option:
+            case str():
+                entries.append(DescriptorChoiceOption(value=option))
+            case ChoiceOptionTable():
+                tone = OptionTone(option.tone) if option.tone is not None else None
+                entries.append(DescriptorChoiceOption(value=option.value, label=option.label, description=option.description, tone=tone))
+    return entries
 
 
 def _with_slot_meaning(*, node: InputFormField, slot: InputSlotBlueprint) -> InputFormField:
@@ -888,6 +917,7 @@ def _with_slot_meaning(*, node: InputFormField, slot: InputSlotBlueprint) -> Inp
             required=node.required,
             hints=node.hints,
             choices=option_values,
+            options=descriptor_options(options=slot.choices or []),
         )
     return _with_contract_facts(node=node, facts=slot.contract_facts)
 
@@ -948,7 +978,7 @@ def _scalar_field(
         case ConceptStructureBlueprintFieldType.DATETIME:
             return DateField(name=name, description=description, required=required, default_value=default_value, datetime=True)
         case ConceptStructureBlueprintFieldType.TIME:
-            return TextField(name=name, description=description, required=required, default_value=default_value, format="time")
+            return TextField(name=name, description=description, required=required, default_value=default_value, format=ContractFormat.TIME)
         case ConceptStructureBlueprintFieldType.LIST | ConceptStructureBlueprintFieldType.DICT | ConceptStructureBlueprintFieldType.CONCEPT:
             return UnknownField(name=name, description=description, required=required, default_value=default_value)
 
