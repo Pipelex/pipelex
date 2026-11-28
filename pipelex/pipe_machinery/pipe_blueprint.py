@@ -338,9 +338,10 @@ class PipeBlueprint(ABC, BaseModel):
         concept that is not file-valued. An output naming a declared concept is judged once the library's concepts are known
         (`pipelex.libraries.contract_fact_sites`). Every variable it reads must be a declared input.
         """
-        if self.output_filename is None:
+        if self.output_filename is None or self.is_signature:
+            # A signature refuses `output_filename` outright, with its own sentence (`PipeSignatureBlueprint`).
             return self
-        if self.is_signature or (self.pipe_category is not None and PipeCategory(self.pipe_category).is_controller):
+        if self.pipe_category is not None and PipeCategory(self.pipe_category).is_controller:
             msg = "`output_filename` is not allowed on a controller, which writes no file of its own: set it on the operator that produces the file"
             raise ValueError(msg)
         output_ref = parse_concept_with_multiplicity(self.output).concept_ref_or_code

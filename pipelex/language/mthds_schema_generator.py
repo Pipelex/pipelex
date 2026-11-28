@@ -22,7 +22,7 @@ from pipelex.pipe_machinery.validation import (
     STORED_NAME_PATTERN,
 )
 from pipelex.pipe_operators.judge.pipe_judge_blueprint import QUESTION_KIND_FIELDS, JudgeQuestionBlueprint, JudgeRatingLevel, PipeJudgeBlueprint
-from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+from pipelex.pipe_signature.pipe_signature_blueprint import SIGNATURE_REFUSED_FIELDS, PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -165,7 +165,8 @@ def _normalize_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any
       arms cleanly instead of ambiguously multi-matching.
     - **The signature arm** is the one typeless arm: we REMOVE `type` from it entirely (property and
       `required`). Every pipe def has `additionalProperties: false`, so the signature arm becomes
-      `{description, output, inputs?, signature_for?}` with no `type`. A typeless contract table
+      `{description, output, inputs?, signature_for?}` with no `type` (nor `activity` or `output_filename`, which a
+      signature refuses). A typeless contract table
       therefore matches only this arm (concrete arms require `type`); a table with a *concrete* `type`
       fails this arm (extra `type` property) and matches only its own arm; a typeless table with a
       stray field matches no arm; and an explicit `type = "PipeSignature"` is rejected here too (extra
@@ -181,9 +182,11 @@ def _normalize_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any
             continue
         properties = def_schema.get("properties", {})
         if def_name == _SIGNATURE_DEFINITION_NAME:
-            # Typeless arm: no `type` at all, so an explicit tag is rejected as an extra property.
-            properties.pop("type", None)
-            _remove_from_required(def_schema, field_names={"type"})
+            # Typeless arm: no `type` at all, so an explicit tag is rejected as an extra property. Nor the fields a
+            # signature refuses (`SIGNATURE_REFUSED_FIELDS`), which it inherits from the base pipe blueprint.
+            for field_name in ("type", *SIGNATURE_REFUSED_FIELDS):
+                properties.pop(field_name, None)
+            _remove_from_required(def_schema, field_names={"type", *SIGNATURE_REFUSED_FIELDS})
             continue
         if "type" not in properties:
             continue

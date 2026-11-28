@@ -251,6 +251,9 @@ class TestMthdsSchemaGeneration:
             # no `type` neither matches any arm.
             pytest.param({"description": "looks like an impl", "output": "Text", "prompt": "do it"}, id="stray-prompt"),
             pytest.param({"description": "looks like PipeFunc", "output": "Text", "function_name": "funcs.do_it"}, id="stray-function-name"),
+            # A signature runs nothing and writes no file, so the base pipe's `activity` and `output_filename` are off its arm.
+            pytest.param({"description": "with an activity", "output": "Text", "activity": "Reading"}, id="stray-activity"),
+            pytest.param({"description": "with a file name", "output": "Image", "output_filename": "cover"}, id="stray-output-filename"),
         ],
     )
     def test_typeless_table_with_stray_field_is_rejected(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
