@@ -5,13 +5,18 @@ load puts the template on that pipe (`PipeAbstract.result_line`). When a run end
 template once against the main output, as a stuff carries it on the wire, and keeps the line with the run's output. When
 there is no template, or it renders empty or fails, the line is derived from the output's `verdict` enumeration field.
 A result line never fails a run: a run that has neither a line nor a derived one simply has none.
+
+The template reads each object of the output as a `WireRecord`, whose fields win over the names a Python dict answers
+with, so `{{ output.items }}` reads a field named `items`, as the line reads in every engine.
 """
 
 import json
 import re
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any, cast
+
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.choice_options import ChoiceOptionTable, ChoiceOptionValue
@@ -19,6 +24,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
 from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -32,11 +38,13 @@ from pipelex.tools.jinja2.exceptions import (
     Jinja2StuffError,
     Jinja2TemplateBudgetError,
     Jinja2TemplateRenderError,
+    Jinja2TemplateSecurityError,
     Jinja2TemplateSyntaxError,
 )
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
+from pipelex.tools.jinja2.template_surface import TemplateSurface
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
@@ -53,6 +61,10 @@ def wire_output_content(*, content: StuffContent) -> Any:
     """The output's content as a stuff carries it on the wire: an object for a single value, an array for a plural one.
 
     A stored value is its reference, as on the wire.
+
+    Raises:
+        TypeError: A value of the content has no JSON form.
+        ValueError: The content holds itself, which no JSON form can.
     """
     dumped: Any = json.loads(clean_json_dumps(content.smart_dump()))
     if isinstance(content, ListContent) and isinstance(dumped, dict):
@@ -61,22 +73,121 @@ def wire_output_content(*, content: StuffContent) -> Any:
     return dumped
 
 
+def as_template_value(*, value: Any) -> Any:
+    """A wire value as a result line reads it: each object a `WireRecord`, each array a list of such values."""
+    if isinstance(value, dict):
+        return WireRecord(fields=cast("dict[str, Any]", value))
+    if isinstance(value, list):
+        return [as_template_value(value=item) for item in cast("list[Any]", value)]
+    return value
+
+
+class WireRecord:
+    """An object of the wire as a result line's template reads it: its fields first, whatever their names.
+
+    Jinja2 reads `record.name` as an attribute before an item, so on a Python dict a field named `items`, `values`,
+    `keys`, `get` or `update` would read as the dict's method, or be refused by the sandbox as one that changes the
+    dict. Here a field always wins: `{{ output.items }}` reads the field `items`. Without a field of that name, `get`,
+    `items`, `keys` and `values` are the methods a template may call, as on a dict. Printed, the record is the plain
+    object it wraps, as the dict printed before.
+    """
+
+    __slots__ = ("_fields",)
+    _fields: dict[str, Any]
+
+    __template_surface__ = TemplateSurface(callable_names=frozenset({"get", "items", "keys", "values"}), private_names=frozenset())
+
+    def __init__(self, *, fields: dict[str, Any]) -> None:
+        object.__setattr__(self, "_fields", fields)
+
+    @override
+    def __getattribute__(self, key: str) -> Any:
+        if not key.startswith("_"):
+            fields: dict[str, Any] = object.__getattribute__(self, "_fields")
+            if key in fields:
+                return as_template_value(value=fields[key])
+        return object.__getattribute__(self, key)
+
+    def __getitem__(self, key: str) -> Any:
+        return as_template_value(value=self._fields[key])
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._fields
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._fields)
+
+    def __len__(self) -> int:
+        return len(self._fields)
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, WireRecord):
+            return self._fields == other._fields
+        return self._fields == other
+
+    @override
+    def __hash__(self) -> int:
+        # Mutable like the dict it wraps, so unhashable like it.
+        msg = f"unhashable type: '{type(self).__name__}'"
+        raise TypeError(msg)
+
+    @override
+    def __str__(self) -> str:
+        return str(self._fields)
+
+    @override
+    def __repr__(self) -> str:
+        return repr(self._fields)
+
+    def get(self, key: str, default: Any = None) -> Any:  # kw-only: ignore (a template calls it as a dict's get)
+        """The field `key`, or `default` when the record has none."""
+        return as_template_value(value=self._fields[key]) if key in self._fields else default
+
+    def items(self) -> list[tuple[str, Any]]:
+        """The record's fields and their values, in order."""
+        return [(key, as_template_value(value=value)) for key, value in self._fields.items()]
+
+    def keys(self) -> list[str]:
+        """The record's field names, in order."""
+        return list(self._fields)
+
+    def values(self) -> list[Any]:
+        """The record's field values, in order."""
+        return [as_template_value(value=value) for value in self._fields.values()]
+
+
 def collapse_line(*, rendered: str) -> str:
     """The rendered text as one line: each run of white space a single space, trimmed at both ends."""
     return _WHITE_SPACE_RUN.sub(" ", rendered).strip()
 
 
 async def render_result_line(*, result_line: str, content: StuffContent, pipe_code: str) -> str | None:
-    """The authored line, rendered against the output and collapsed, or None when it fails or leaves nothing."""
+    """The authored line, rendered against the output and collapsed, or None, with a warning, when it fails or leaves nothing.
+
+    Every way the line can fail is caught, since a result line never fails a run: an output with no JSON form, the
+    template's own faults, a refusal of the sandbox, which is warned and never rendered past, a render past its budget,
+    and a `ValueError` a filter or a string method raises on this run's value, which the render passes on untranslated.
+    """
     try:
+        output = as_template_value(value=wire_output_content(content=content))
         rendered = await render_jinja2_async(
             result_line,
             template_category=TemplateCategory.BASIC,
-            templating_context={RESULT_LINE_VARIABLE: wire_output_content(content=content)},
+            templating_context={RESULT_LINE_VARIABLE: output},
             is_undefined_strict=True,
             template_owner=TemplateOwner.METHOD,
         )
-    except (Jinja2TemplateSyntaxError, Jinja2TemplateRenderError, Jinja2StuffError, Jinja2ContextError, Jinja2TemplateBudgetError) as exc:
+    except (
+        Jinja2TemplateSyntaxError,
+        Jinja2TemplateRenderError,
+        Jinja2StuffError,
+        Jinja2ContextError,
+        Jinja2TemplateBudgetError,
+        Jinja2TemplateSecurityError,
+        TypeError,
+        ValueError,
+    ) as exc:
         log.warning("A result line failed to render, so the line is derived", fields={"pipe_code": pipe_code, **error_fields(exc=exc)})
         return None
     return collapse_line(rendered=rendered) or None
@@ -200,9 +311,14 @@ def derive_result_line(*, stuff: Stuff) -> str | None:
 async def result_line_of_run(*, result_line: str | None, pipe_output: PipeOutput, pipe_code: str) -> str | None:
     """The result line of a run that ended with `pipe_output`: the authored line, else the derived one, else None.
 
-    A run whose output resolved absent has no line.
+    A run whose output resolved absent has no line, and so has one whose working memory holds no main output, with a
+    warning: the run's own result is reported as it is, since a result line never fails a run.
     """
-    main_stuff = pipe_output.working_memory.resolve_main_stuff()
+    try:
+        main_stuff = pipe_output.working_memory.resolve_main_stuff()
+    except WorkingMemoryStuffNotFoundError as exc:
+        log.warning("A run ended with no main output, so it has no result line", fields={"pipe_code": pipe_code, **error_fields(exc=exc)})
+        return None
     if isinstance(main_stuff, AbsenceRecord):
         return None
     if result_line is not None:
