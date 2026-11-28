@@ -1521,13 +1521,16 @@ class LibraryManager(LibraryManagerAbstract):
             library.loaded_mthds_paths.append(resolved_path)
 
         try:
-            return self.load_from_blueprints(
+            loaded_pipes = self.load_from_blueprints(
                 library_id=library_id,
                 blueprints=blueprints,
                 methods_dirs=methods_dirs,
                 address_dependency_sources=address_dependency_sources,
                 tree_listing=tree_listing,
             )
+            if manifest is not None:
+                attach_result_line(manifest=manifest, blueprints=blueprints, loaded_pipes=loaded_pipes)
+            return loaded_pipes
         except ValidationError as validation_error:
             # Categorize before wrapping. `translate_to_validate_bundle_error` has its own
             # `except ValidationError` arm that categorizes, but it never sees this error: wrapping it
@@ -2506,3 +2509,19 @@ def _reserved_domain_refusal(*, reserved_errors: list[VisibilityError], blueprin
         .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
         .with_params(name=reserved_errors[0].source_domain, conflict=MethodNameConflictConflict.RESERVED_DOMAIN)
     )
+
+
+def attach_result_line(*, manifest: MethodsManifest, blueprints: list[PipelexBundleBlueprint], loaded_pipes: list[PipeAbstract]) -> None:
+    """Put the manifest's `result_line` on the pipe it names as `main_pipe`, so a run starting there renders it.
+
+    The main pipe is the pipe of that code a bundle of this load defines; when several bundles define one, no single pipe
+    is the main pipe and none takes the line, as `select_entry` refuses to choose between them.
+    """
+    if manifest.result_line is None or manifest.main_pipe is None:
+        return
+    main_pipe_refs = {f"{blueprint.domain}.{manifest.main_pipe}" for blueprint in blueprints if manifest.main_pipe in (blueprint.pipe or {})}
+    if len(main_pipe_refs) != 1:
+        return
+    for pipe in loaded_pipes:
+        if pipe.pipe_ref in main_pipe_refs:
+            pipe.result_line = manifest.result_line

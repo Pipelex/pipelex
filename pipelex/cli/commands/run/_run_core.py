@@ -74,6 +74,8 @@ if TYPE_CHECKING:
 
 COMMAND = "run"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
+_RESULT_LINE_FILENAME = "result_line.txt"
+"""The file of a run's output folder holding its result line, when it has one."""
 
 
 def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_inputs: bool) -> None:
@@ -449,6 +451,13 @@ async def _execute_run(
                     )
                 except (PipelexError, OSError, ValueError) as file_exc:
                     typer.secho(f"Could not copy the main output's file into {output_path}: {file_exc}", fg=typer.colors.YELLOW, err=True)
+
+    # The run's result line, the one line wording what it produced (spec: manifest-format.md, "Result Line"), is
+    # kept beside the output's files and shown to the person who ran it.
+    if pipe_output.result_line is not None:
+        if output_path:
+            (output_path / _RESULT_LINE_FILENAME).write_text(f"{pipe_output.result_line}\n", encoding="utf-8")
+        typer.secho(f"Result: {pipe_output.result_line}", fg=typer.colors.GREEN, err=True)
 
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None

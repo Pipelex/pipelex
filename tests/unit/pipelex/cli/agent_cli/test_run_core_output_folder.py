@@ -28,7 +28,7 @@ class TestAgentRunCoreOutputFolder:
         memory.record_new_main_absence(
             AbsenceRecord(variable_name="summary", kind=AbsenceKind.DECLARED_ABSENT, reason="nothing to say", producing_pipe="gate")
         )
-        pipe_output = SimpleNamespace(working_memory=memory, graph_spec=None, tokens_usages=None)
+        pipe_output = SimpleNamespace(working_memory=memory, graph_spec=None, tokens_usages=None, result_line=None)
         runner_mock = mocker.MagicMock()
         runner_mock.execute = mocker.AsyncMock(return_value=SimpleNamespace(pipe_output=pipe_output))
         mocker.patch("pipelex.cli.agent_cli.commands.run._run_core.PipelexMTHDSProtocol", return_value=runner_mock)

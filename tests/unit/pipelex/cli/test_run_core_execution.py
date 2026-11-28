@@ -114,6 +114,7 @@ class TestRunCoreExecution:
             graph_spec=graph_spec,
             pipe_io_artifacts=None,
             working_memory=working_memory,
+            result_line=None,
         )
 
     def _make_absent_main_pipe_output(self) -> Any:
@@ -130,7 +131,7 @@ class TestRunCoreExecution:
                 producing_pipe="summarize",
             )
         )
-        return SimpleNamespace(graph_spec=None, pipe_io_artifacts=None, working_memory=memory)
+        return SimpleNamespace(graph_spec=None, pipe_io_artifacts=None, working_memory=memory, result_line=None)
 
     @pytest.mark.usefixtures("config_mock")
     def test_absent_main_output_prints_absence_and_saves_artifact(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
