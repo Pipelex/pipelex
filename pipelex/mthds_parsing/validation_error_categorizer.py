@@ -1,5 +1,5 @@
 import re
-from typing import Any, cast, get_args
+from typing import Any, TypeVar, cast, get_args
 
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
@@ -10,8 +10,10 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.libraries.pipe.pipe_suggestions import MAIN_PIPE_DECLARATION, close_pipe_refs
 from pipelex.mthds_parsing.exceptions import (
     InvalidPipeCodeSyntaxError,
+    MainPipeUnresolvedError,
     NativeConceptRedeclarationError,
 )
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
@@ -29,6 +31,8 @@ PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD = "main_pipe"
 PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
 PIPELEX_BUNDLE_BLUEPRINT_CONCEPT_FIELD = "concept"
+
+_WrappedValueErrorT = TypeVar("_WrappedValueErrorT", bound=ValueError)
 
 # Distinctive fragments of the two type-tag errors raised by the bundle blueprint's `pipe`
 # before-validator (via `normalize_typeless_signature_section` in `pipe_blueprint.py`). Kept in sync
@@ -54,40 +58,21 @@ _PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE = "extra_forbidden"
 _PYDANTIC_VALUE_ERROR_PREFIX = "Value error, "
 
 
-def _extract_wrapped_native_concept_redeclaration_error(error: ErrorDetails) -> NativeConceptRedeclarationError | None:
-    """Extract a ``NativeConceptRedeclarationError`` wrapped by pydantic, or ``None``.
+def _extract_wrapped_value_error(error: ErrorDetails, *, error_class: type[_WrappedValueErrorT]) -> _WrappedValueErrorT | None:
+    """Extract the typed ``ValueError`` of class ``error_class`` that a blueprint validator raised and pydantic wrapped, or ``None``.
 
-    ``validate_concept_keys`` raises it (a ``ValueError`` subclass) from a ``mode="before"``
-    field validator, so pydantic reports a ``value_error`` and keeps the original in
-    ``ctx["error"]`` — the same wrapping ``extract_wrapped_pipe_validation_error`` unwraps for
-    pipe errors. Structural, never message-matched: the offending ``concept_code`` rides the
-    exception itself.
+    A blueprint validator raises a typed ``ValueError`` subclass, such as ``NativeConceptRedeclarationError`` from
+    ``validate_concept_keys``, ``InvalidPipeCodeSyntaxError`` from the ``main_pipe`` / ``pipe`` field validators or
+    ``MainPipeUnresolvedError`` from ``validate_main_pipe``, so pydantic reports a ``value_error`` and keeps the
+    original in ``ctx["error"]``, the same wrapping ``extract_wrapped_pipe_validation_error`` unwraps for pipe errors.
+    Structural, never message-matched: the facts the item names ride the exception itself.
     """
     if error["type"] != "value_error":
         return None
     ctx: dict[str, Any] | None = error.get("ctx")
     if ctx:
         original_error = ctx.get("error")
-        if isinstance(original_error, NativeConceptRedeclarationError):
-            return original_error
-    return None
-
-
-def _extract_wrapped_invalid_pipe_code_syntax_error(error: ErrorDetails) -> InvalidPipeCodeSyntaxError | None:
-    """Extract an ``InvalidPipeCodeSyntaxError`` wrapped by pydantic, or ``None``.
-
-    Raised (a ``ValueError`` subclass) from the ``main_pipe`` / ``pipe`` ``mode="before"`` field
-    validators only when the over-qualified code is safely strippable, so pydantic reports a
-    ``value_error`` and keeps the original in ``ctx["error"]`` — the same wrapping the native-concept
-    and pipe-error unwraps rely on. Structural, never message-matched: the offending + stripped codes
-    ride the exception itself.
-    """
-    if error["type"] != "value_error":
-        return None
-    ctx: dict[str, Any] | None = error.get("ctx")
-    if ctx:
-        original_error = ctx.get("error")
-        if isinstance(original_error, InvalidPipeCodeSyntaxError):
+        if isinstance(original_error, error_class):
             return original_error
     return None
 
@@ -419,7 +404,7 @@ def categorize_blueprint_validation_error(
     # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``
     # carrying the offending code (which the pydantic ``loc`` — ``("concept",)`` — cannot). Recover
     # it structurally so the fix planner can strip exactly that concept key.
-    wrapped_native_redeclaration = _extract_wrapped_native_concept_redeclaration_error(error)
+    wrapped_native_redeclaration = _extract_wrapped_value_error(error, error_class=NativeConceptRedeclarationError)
     if wrapped_native_redeclaration is not None:
         return PipelexBundleBlueprintValidationErrorData(
             error_type=PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION,
@@ -445,7 +430,7 @@ def categorize_blueprint_validation_error(
     # it), so the safety gate lives here, on the raw bundle dict: a strip that would retarget
     # ``main_pipe`` to a different declaration, or rewrite it to a pipe that does not exist,
     # keeps its category but loses the enrichment → no fix is planned.
-    wrapped_invalid_pipe_code = _extract_wrapped_invalid_pipe_code_syntax_error(error)
+    wrapped_invalid_pipe_code = _extract_wrapped_value_error(error, error_class=InvalidPipeCodeSyntaxError)
     if wrapped_invalid_pipe_code is not None:
         is_main_pipe = bool(loc) and loc[0] == PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD
         stripped_pipe_code: str | None = wrapped_invalid_pipe_code.stripped_code
@@ -468,6 +453,26 @@ def categorize_blueprint_validation_error(
             identifier_name=wrapped_invalid_pipe_code.offending_code,
             stripped_pipe_code=stripped_pipe_code,
             message=str(wrapped_invalid_pipe_code),
+        )
+
+    # A ``main_pipe`` naming no pipe the bundle defines: ``validate_main_pipe`` raised a typed ``ValueError``
+    # carrying the name and the bundle's pipes, which a model validator's empty pydantic ``loc`` cannot carry. It is
+    # the bundle's own ``method.pipe_unresolved``, refused as a manifest's ``main_pipe`` naming no pipe is: its
+    # ``pipe`` is the declaration holding the reference, ``main_pipe``, which ``field_path`` locates. A ``main_pipe``
+    # names one of its own bundle's pipes, so each of them is a candidate, those nearest the name first.
+    wrapped_main_pipe_unresolved = _extract_wrapped_value_error(error, error_class=MainPipeUnresolvedError)
+    if wrapped_main_pipe_unresolved is not None:
+        defined_pipe_refs = wrapped_main_pipe_unresolved.defined_pipe_refs
+        nearest_refs = close_pipe_refs(name=wrapped_main_pipe_unresolved.main_pipe, pipe_refs=defined_pipe_refs)
+        candidates = [*nearest_refs, *(pipe_ref for pipe_ref in defined_pipe_refs if pipe_ref not in nearest_refs)]
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
+            domain_code=domain,
+            source=source,
+            field_path=PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD,
+            missing_pipe_code=wrapped_main_pipe_unresolved.main_pipe,
+            params={"pipe": MAIN_PIPE_DECLARATION, "candidates": candidates},
+            message=str(wrapped_main_pipe_unresolved),
         )
 
     error_scope = get_error_scope(loc)

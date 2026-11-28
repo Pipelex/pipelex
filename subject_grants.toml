@@ -3892,11 +3892,7 @@ rationale = "Verb-object: categorizes the error at the loc; context stays keywor
 param = "message"
 rationale = "Verb-object: categorizes the message; the rest is context."
 
-["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
-param = "error"
-rationale = "Extraction from the single error operand."
-
-["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_native_concept_redeclaration_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_value_error"]
 param = "error"
 rationale = "Extraction from the single error operand."
 

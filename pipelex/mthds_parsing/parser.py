@@ -170,7 +170,8 @@ class MthdsParser(BaseModel):
         try:
             elaborated_blueprint = BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
         except BundleElaboratorError as exc:
-            raise MthdsParserError(message=str(exc)).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION) from exc
+            # The elaborator names the pipe it could not elaborate and what it found, which the verdict's item renders.
+            raise MthdsParserError(message=str(exc)).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION).with_params(**exc.given_params) from exc
         # Only a bundle read from a file here may read beside it: a content string's `mthds_source` is a label.
         if bundle_path is not None:
             elaborated_blueprint.mark_read_from_host_file(bundle_file=Path(bundle_path))

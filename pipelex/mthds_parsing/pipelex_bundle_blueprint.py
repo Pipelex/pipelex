@@ -13,7 +13,7 @@ from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.mthds_parsing.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
+from pipelex.mthds_parsing.exceptions import InvalidPipeCodeSyntaxError, MainPipeUnresolvedError, NativeConceptRedeclarationError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -236,9 +236,18 @@ class PipelexBundleBlueprint(BaseModel):
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":
+        """Refuse a ``main_pipe`` that names no pipe of the bundle, naming every pipe the bundle defines.
+
+        Raised typed so the categorizer turns it into a ``method.pipe_unresolved`` item located at ``main_pipe``, whose
+        candidates it orders from the pipes the error names.
+        """
         if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
-            msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
-            raise ValueError(msg)
+            msg = (
+                f"The main_pipe '{self.main_pipe}' names no pipe of the bundle at source '{self.source}' in domain '{self.domain}'. "
+                f"Its pipes: {', '.join(sorted(self.pipe or {})) or 'none'}."
+            )
+            defined_pipe_refs = sorted(f"{self.domain}.{pipe_code}" for pipe_code in self.pipe or {})
+            raise MainPipeUnresolvedError(msg, main_pipe=self.main_pipe, defined_pipe_refs=defined_pipe_refs)
         return self
 
     def get_elaboration_for(self, pipe_code: str) -> ElaborationMetadata | None:
