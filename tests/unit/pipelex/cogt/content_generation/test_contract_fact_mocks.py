@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 from pydantic import create_model
 
+from pipelex.cogt.content_generation.contract_fact_mocks import MAX_MOCK_TEXT_LENGTH, mock_text
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.concepts.contract_fact_projection import constrained_annotation
 from pipelex.core.stuffs.number_content import NumberContent
@@ -26,6 +27,10 @@ class TestContractFactMocks:
             pytest.param(str, {"format": "email", "max_length": 10}, True, False, id="text-email-max-length"),
             pytest.param(str, {"format": "email", "pattern": "@corp\\.com$"}, True, True, id="text-email-pattern-optional"),
             pytest.param(str, {"format": "uri", "max_length": 14}, True, False, id="text-uri-max-length"),
+            pytest.param(TextContent, {"max_length": 3}, False, False, id="concept-text-max-length-below-the-plain-mock"),
+            pytest.param(TextContent, {"pattern": "^[A-Z]", "min_length": 10}, False, False, id="concept-text-pattern-min-length"),
+            pytest.param(str, {"pattern": "[0-9]$", "min_length": 12, "max_length": 12}, True, False, id="text-pattern-exact-length"),
+            pytest.param(str, {"min_length": 50_000}, True, False, id="text-long-min-length"),
         ],
     )
     def test_every_mock_honours_the_facts(self, annotation: Any, facts: dict[str, Any], states_schema: bool, optional: bool) -> None:
@@ -38,3 +43,18 @@ class TestContractFactMocks:
             built = factory.build().model_dump()["value"]
             plain = built["number"] if annotation is NumberContent else built["text"] if annotation is TextContent else built
             assert constraint_break_message(value=plain, facts=facts) is None, plain
+
+    @pytest.mark.parametrize(
+        ("annotation", "states_schema"),
+        [pytest.param(str, True, id="text"), pytest.param(TextContent, False, id="concept-text")],
+    )
+    def test_a_mock_never_passes_the_size_bound(self, annotation: Any, states_schema: bool) -> None:
+        """A `min_length` past the bound leaves the site without an honouring mock rather than allocating its size: the
+        mock holds at most `MAX_MOCK_TEXT_LENGTH` characters, and validation refuses it as for any site no mock satisfies.
+        """
+        facts = {"min_length": 10**9}
+        assert len(mock_text(facts=facts)) == MAX_MOCK_TEXT_LENGTH
+        constrained = constrained_annotation(annotation=annotation, facts=facts, states_schema=states_schema)
+        model = create_model("FactsMockModel", __base__=StructuredContent, value=(constrained, ...))
+        with pytest.raises(ValueError, match=r"fewer than|at least"):
+            DryRunFactory.make_dry_run_factory(model).build()
