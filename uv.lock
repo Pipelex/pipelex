@@ -25,7 +25,6 @@ members = [
     "pipelex",
     "pipelex-api",
 ]
-overrides = [{ name = "mthds", specifier = "==0.29.0" }]
 
 [[package]]
 name = "accelerate"
@@ -3664,7 +3663,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=13.0.0" },
-    { name = "pipelex-sdk", specifier = "==0.69.0" },
+    { name = "pipelex-sdk", specifier = "==0.72.0" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3781,7 +3780,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pipelex-sdk"
-version = "0.69.0"
+version = "0.72.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -3789,9 +3788,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/f0/61baf9ee1e9b2d33b2e80731ec85d13aca9581ecb70cf3fd5a8a3fac7904/pipelex_sdk-0.69.0.tar.gz", hash = "sha256:aebec15d254b4c3065b5c77640f2de260a39efd1920ae61cdcad4acee5c6931c", size = 906151, upload-time = "2026-11-16T13:14:11.884Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/62/0fd46f635ba1d9df51f3aec2ad80966ae936eb37213ef3b57c63413b8c0e/pipelex_sdk-0.72.0.tar.gz", hash = "sha256:3151df88334d6b8b2b5de8fbfe28a5007cd0a6226bd9157191b45f7cddb9bd8b", size = 922047, upload-time = "2026-11-28T14:15:18.389Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/5e/d177222687fd7c82e64f5ad6d79d114ba9b346fa96d5dbc1b67fddac7abe/pipelex_sdk-0.69.0-py3-none-any.whl", hash = "sha256:f9d6f1bd94b754870ddfd62200405345585008097d60d5b5cb2cda4c2789e45c", size = 342463, upload-time = "2026-11-16T13:14:09.977Z" },
+    { url = "https://files.pythonhosted.org/packages/44/e0/2d7f684df9a31ac91e50b71cfe91eba5ea9cd5b96d6903bd636591f3016c/pipelex_sdk-0.72.0-py3-none-any.whl", hash = "sha256:b2e04d953fa08eb39eb0e03f70dbdf12e8ce37b2d54a4f9a0473489189825376", size = 349855, upload-time = "2026-11-28T14:15:17.024Z" },
 ]
 
 [[package]]
