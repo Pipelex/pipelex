@@ -165,9 +165,9 @@ def collapse_line(*, rendered: str) -> str:
 async def render_result_line(*, result_line: str, content: StuffContent, pipe_code: str) -> str | None:
     """The authored line, rendered against the output and collapsed, or None, with a warning, when it fails or leaves nothing.
 
-    Every way the line can fail is caught, since a result line never fails a run: an output with no JSON form, the
-    template's own faults, a refusal of the sandbox, which is warned and never rendered past, a render past its budget,
-    and a `ValueError` a filter or a string method raises on this run's value, which the render passes on untranslated.
+    Every way the line can fail is caught, since a result line never fails a run: an output with no JSON form (a
+    `TypeError` or a `ValueError`), the template's own faults, a filter or a method refusing this run's value, a refusal
+    of the sandbox, which is warned and never rendered past, and a render past its budget.
     """
     try:
         output = as_template_value(value=wire_output_content(content=content))

@@ -24,6 +24,10 @@
 - **An empty `choices` list is refused (Breaking)**: `choices = []` was accepted and now fails as `contract_fact_invalid`, since it offers no option.
 - **A pipe's unread-input check counts `output_filename`**: an input that only the file name reads is no longer reported as unused, and one that the file name reads without declaring it is reported as undeclared.
 
+### Fixed
+
+- **A template failing on a value with a `ValueError` reports a render failure**: a method template whose filter or string method refuses the value it is given, such as `wordwrap(0)` or `'{:d}'.format('a')`, in a `PipeCompose`, a prompt or any other template a method writes, fails as `pipe.template_render_failed` naming the class and the line, never the value, where the raw `ValueError` escaped the render as an unexpected error.
+
 ## [v0.121.0] - 2026-11-28
 
 ### Changed

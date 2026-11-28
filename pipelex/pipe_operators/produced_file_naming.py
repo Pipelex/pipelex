@@ -107,9 +107,8 @@ async def render_output_filename(*, output_filename: str, naming_context: dict[s
     """The template rendered with the pipe's inputs, or `None`, with a warning, when it fails to render.
 
     Plain Jinja2, as the standard writes it: the `$` and `@` shorthands are not expanded, so a name may hold either. Every
-    way the render can fail is caught, since naming a file never fails a run: the template's own faults, a refusal of the
-    sandbox, a render past its budget, a stored value never loaded, and a `ValueError` a filter or a string method raises
-    on this run's value, which the render passes on untranslated.
+    way the render can fail is caught, since naming a file never fails a run: the template's own faults, a filter or a
+    method refusing this run's value, a refusal of the sandbox, a render past its budget and a stored value never loaded.
     """
     try:
         return await render_jinja2_async(
@@ -127,7 +126,6 @@ async def render_output_filename(*, output_filename: str, naming_context: dict[s
         Jinja2TemplateBudgetError,
         Jinja2TemplateSecurityError,
         StoredValueNotLoadedError,
-        ValueError,
     ) as exc:
         log.warning("A file name template failed to render, so the file keeps its own name", fields={"pipe_code": pipe_code, **error_fields(exc=exc)})
         return None
