@@ -6,7 +6,10 @@ from typing import Any, Self, cast, final
 
 from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
-from pipelex.core.concepts.exceptions import ConceptStringError
+from pipelex.core.concepts.choice_options import ChoiceOptionValue, choice_values, parse_choices
+from pipelex.core.concepts.contract_fact_blueprint import ContractFactsBlueprint, drop_absent_members, raise_first_finding
+from pipelex.core.concepts.exceptions import ConceptStringError, ContractFactInvalidError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode, is_file_valued_native
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import (
@@ -20,7 +23,19 @@ from pipelex.core.pipes.variable_multiplicity import (
     presence_from_symbol,
     presence_symbol,
 )
-from pipelex.pipe_machinery.validation import validate_input_names
+from pipelex.language.contract_facts import (
+    CONTRACT_FACT_KEY_NAMES,
+    TEXT_CONSTRAINT_KEYS,
+    ContractFactKey,
+    ContractFactReason,
+    contradiction_findings,
+)
+from pipelex.pipe_machinery.validation import check_variables_are_declared, validate_input_names
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # A signature is NOT an executable pipe kind: it is deliberately absent from `PipeType` and
@@ -182,21 +197,31 @@ def valid_pipe_type_tags() -> list[str]:
     return [*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG]
 
 
-class InputSlotBlueprint(BaseModel):
-    """The expanded input-slot form: `name = { concept = "…", hints = { … } }` (spec: intent-hints.md).
+class InputSlotBlueprint(ContractFactsBlueprint):
+    """The expanded input-slot form: `name = { concept = "…", description = "…", hints = { … }, … }` (spec: mthds-format.md,
+    "Input slot declarations").
 
-    `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional
-    presence marker). The form is deliberately closed (`extra="forbid"` implements the spec's
-    "unknown slot-table keys MUST be rejected") so future per-slot semantic keys land here without a
-    second syntax. A slot table carrying no hints collapses to its plain string at parse time (see
-    `PipeBlueprint.collapse_hint_free_slot_tables`), so a slot value that IS a table carries
-    non-empty hints — hint-free bundles produce byte-identical blueprints to the string form.
+    `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional presence marker). Beside
+    it, a slot may say what it is for in this pipe (`description`), carry intent hints, and, on a slot holding a plain value,
+    the contract facts (`ContractFactsBlueprint`) and `choices` a structure field takes, which apply to each item of a plural
+    slot. The form is deliberately closed (`extra="forbid"` implements the spec's "unknown slot-table keys MUST be
+    rejected"). A slot table carrying none of these collapses to its plain string at parse time (see
+    `PipeBlueprint.collapse_plain_slot_tables`), so such bundles produce byte-identical blueprints to the string form.
+
+    What this blueprint judges alone: a description that is empty, `aggregate` (never on a slot), a text constraint or
+    `examples` beside `choices`, and facts that contradict each other. Whether a fact or `choices` applies to the slot's value
+    class depends on its concept, which a slot cannot resolve alone, so it is judged once the library's concepts are known
+    (`pipelex.libraries.contract_fact_sites`).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     concept: str
+    description: str | None = None
+    """What the slot is for in this pipe, which a consumer presenting the slot shows in place of its concept's description."""
     hints: dict[str, str] | None = None
+    choices: list[ChoiceOptionValue] | None = None
+    """The options a text-valued slot's text must be one of, each a string or an option table carrying words for people."""
 
     @field_validator("hints", mode="after")
     @classmethod
@@ -205,19 +230,57 @@ class InputSlotBlueprint(BaseModel):
         # key); hint key order is not semantic, unlike structure-field order.
         return dict(sorted(hints.items())) if hints else None
 
+    @field_validator("description", mode="after")
+    @classmethod
+    def refuse_empty_description(cls, description: str | None) -> str | None:
+        if description is not None and not description:
+            msg = "An input slot's description must not be empty"
+            raise ValueError(msg)
+        return description
+
+    @field_validator("choices", mode="before")
+    @classmethod
+    def read_choice_options(cls, choices: Any) -> Any:
+        """Read the options into normal form, refusing a malformed option table (`parse_choices`)."""
+        return parse_choices(raw=choices)
+
+    @model_validator(mode="after")
+    def refuse_facts_the_slot_alone_refuses(self) -> Self:
+        """Refuse what a slot refuses whatever its concept: `aggregate`, a text constraint or `examples` beside `choices`,
+        and facts that contradict each other. A concept holds any number, never only integers.
+        """
+        facts = self.contract_facts
+        if self.aggregate is not None:
+            msg = "'aggregate' is not allowed on an input slot, which holds one value, never a column of records"
+            raise ContractFactInvalidError(msg, fact=ContractFactKey.AGGREGATE, reason=ContractFactReason.INAPPLICABLE)
+        if self.choices:
+            for key_name in facts:
+                key = ContractFactKey(key_name)
+                if key in TEXT_CONSTRAINT_KEYS or key is ContractFactKey.EXAMPLES:
+                    msg = f"'{key}' is not allowed beside 'choices': the options list every value"
+                    raise ContractFactInvalidError(msg, fact=key, reason=ContractFactReason.INAPPLICABLE)
+        raise_first_finding(findings=contradiction_findings(facts=facts, is_integer=False))
+        return self
+
+    @property
+    def carries_meaning(self) -> bool:
+        """Whether the slot carries anything beyond its concept: hints, a description, a contract fact or `choices`."""
+        return bool(self.hints) or self.description is not None or bool(self.contract_facts) or self.choices is not None
+
+    @property
+    def choice_values(self) -> list[str] | None:
+        """The values the slot's options declare, in declared order, or `None` for a slot with no `choices`."""
+        return choice_values(options=self.choices) if self.choices is not None else None
+
     @model_serializer(mode="wrap")
-    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler):
-        """Absent hints are an absent member — never `null` (spec rule). Unreachable for a
-        hint-free slot in practice (the parse-time collapse leaves it a plain string), kept so any
-        directly-constructed instance still serializes canonically.
+    def serialize_without_absent_members(self, handler: SerializerFunctionWrapHandler):
+        """Absent members are absent — never `null` (spec rule): hints, description, choices and every contract fact.
 
         The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`:
         an annotation here becomes the model's serialization JSON Schema and erases its shape.
         """
         dumped: dict[str, Any] = handler(self)
-        if dumped.get("hints") is None:
-            dumped.pop("hints", None)
-        return dumped
+        return drop_absent_members(dumped=dumped, keys=("hints", "description", "choices", *CONTRACT_FACT_KEY_NAMES))
 
 
 def slot_concept_spec(slot_value: "str | InputSlotBlueprint") -> str:
@@ -240,17 +303,93 @@ class PipeBlueprint(ABC, BaseModel):
     passing plain `dict[str, str]` without a cast. Values are strings except for slots authored in
     the expanded form WITH hints (see the collapse rule below)."""
     output: str
+    activity: str | None = None
+    """What the pipe is doing, in the present tense, for a person watching a run (spec: mthds-format.md, "What a Run
+    Shows"). Plain text, never a template. A contract-only signature does not carry it."""
+    output_filename: str | None = None
+    """A Jinja2 template naming the file an operator with a file-valued output writes (spec: "Naming Produced Files"). It
+    reads the pipe's inputs, so it counts as reading them; a controller writes no file and refuses it. Naming the file is
+    the runtime's when the pipe produces its output."""
+
+    @model_serializer(mode="wrap")
+    def serialize_without_absent_presentation(self, handler: SerializerFunctionWrapHandler):
+        """An absent `activity` or `output_filename` is an absent member, never `null`, so a library that authors neither
+        keeps its fingerprint. The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`.
+        """
+        dumped: dict[str, Any] = handler(self)
+        return drop_absent_members(dumped=dumped, keys=("activity", "output_filename"))
+
+    @field_validator("activity", mode="before")
+    @classmethod
+    def validate_activity(cls, activity: Any) -> Any:
+        if activity is None or not isinstance(activity, str):
+            return activity
+        if not activity.strip():
+            msg = "A pipe's activity must not be empty"
+            raise ValueError(msg)
+        if "\n" in activity or "\r" in activity:
+            msg = "A pipe's activity must hold no line break: it is a short phrase for a person watching a run"
+            raise ValueError(msg)
+        return activity
+
+    @model_validator(mode="after")
+    def validate_output_filename_site(self) -> Self:
+        """Refuse `output_filename` where no file is written: on a controller, and on an operator whose output names a native
+        concept that is not file-valued. An output naming a declared concept is judged once the library's concepts are known
+        (`pipelex.libraries.contract_fact_sites`). Every variable it reads must be a declared input.
+        """
+        if self.output_filename is None:
+            return self
+        if self.is_signature or (self.pipe_category is not None and PipeCategory(self.pipe_category).is_controller):
+            msg = "`output_filename` is not allowed on a controller, which writes no file of its own: set it on the operator that produces the file"
+            raise ValueError(msg)
+        output_ref = parse_concept_with_multiplicity(self.output).concept_ref_or_code
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=output_ref) and not is_file_valued_native(native_ref=output_ref):
+            msg = (
+                "`output_filename` is allowed only on an operator whose output is file-valued (an Image or a Document), "
+                f"and this output is '{self.output}'"
+            )
+            raise ValueError(msg)
+        check_variables_are_declared(
+            declared_inputs=set(self.input_names), variable_paths=self.output_filename_variable_paths(), reader="output_filename"
+        )
+        return self
+
+    def output_filename_variable_paths(self) -> set[str]:
+        """The dotted variable paths `output_filename` reads, internal names (starting with an underscore) excluded.
+
+        It is plain Jinja2: the `$` and `@` shorthands are not expanded in it, so a file name may hold either as itself.
+
+        Raises:
+            ValueError: When the template does not parse.
+        """
+        if self.output_filename is None:
+            return set()
+        try:
+            check_jinja2_parsing(template_source=self.output_filename, template_category=TemplateCategory.BASIC)
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse the output_filename template: {exc}"
+            raise ValueError(msg) from exc
+        full_paths = detect_jinja2_required_variables(template_category=TemplateCategory.BASIC, template_source=self.output_filename)
+        return {path for path in full_paths if not get_root_from_dotted_path(path).startswith("_")}
+
+    def reader_with_output_filename(self, *, reader: str) -> str:
+        """The fields that read an operator's inputs, as a message names them, `output_filename` included when it is set."""
+        return f"{reader} or output_filename" if self.output_filename is not None else reader
 
     @field_validator("inputs", mode="after")
     @classmethod
-    def collapse_hint_free_slot_tables(cls, inputs: Mapping[str, str | InputSlotBlueprint] | None) -> Mapping[str, str | InputSlotBlueprint] | None:
+    def collapse_plain_slot_tables(cls, inputs: Mapping[str, str | InputSlotBlueprint] | None) -> Mapping[str, str | InputSlotBlueprint] | None:
         """Parse-time collapse rule: `x = { concept = "S" }` and `x = { concept = "S", hints = {} }`
         are the same slot as `x = "S"` and become that string (the spec says they hash identically).
-        Invariant bought downstream: a slot value that is a table carries non-empty hints.
+        Invariant bought downstream: a slot value that is a table carries hints, a description, a
+        contract fact or `choices` (`InputSlotBlueprint.carries_meaning`).
         """
         if not inputs:
             return inputs
-        return {name: value.concept if isinstance(value, InputSlotBlueprint) and not value.hints else value for name, value in inputs.items()}
+        return {
+            name: value.concept if isinstance(value, InputSlotBlueprint) and not value.carries_meaning else value for name, value in inputs.items()
+        }
 
     @property
     def nb_inputs(self) -> int:

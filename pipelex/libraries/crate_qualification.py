@@ -44,6 +44,7 @@ crate to read the envelope from, and `normalize_crate` builds a fresh one anyway
 
 from typing import TYPE_CHECKING, NamedTuple
 
+from pipelex.core.concepts.choice_options import OutcomeValue
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
@@ -171,6 +172,12 @@ def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str,
     def qualify(*, pipe_ref: str) -> str:
         return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain, package_alias=package_alias)
 
+    def qualify_outcome_value(*, outcome: OutcomeValue) -> OutcomeValue:
+        """An outcome in either form, its pipe reference qualified and its words kept as authored."""
+        if isinstance(outcome, str):
+            return qualify_outcome(outcome=outcome)
+        return outcome.model_copy(update={"pipe": qualify_outcome(outcome=outcome.pipe)})
+
     def qualify_outcome(*, outcome: str) -> str:
         """A condition outcome may be a `SpecialOutcome` instead of a pipe ref.
 
@@ -194,9 +201,9 @@ def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str,
             updates["branches"] = [branch.model_copy(update={"pipe": qualify(pipe_ref=branch.pipe)}) for branch in blueprint.branches]
         case PipeConditionBlueprint():
             if blueprint.outcomes:
-                updates["outcomes"] = {key: qualify_outcome(outcome=outcome) for key, outcome in blueprint.outcomes.items()}
+                updates["outcomes"] = {key: qualify_outcome_value(outcome=outcome) for key, outcome in blueprint.outcomes.items()}
             if blueprint.default_outcome:
-                updates["default_outcome"] = qualify_outcome(outcome=blueprint.default_outcome)
+                updates["default_outcome"] = qualify_outcome_value(outcome=blueprint.default_outcome)
         case PipeBatchBlueprint():
             if blueprint.branch_pipe_code:
                 updates["branch_pipe_code"] = qualify(pipe_ref=blueprint.branch_pipe_code)

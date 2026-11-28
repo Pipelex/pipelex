@@ -46,6 +46,7 @@ from pipelex.interpreter_hub import get_current_library, get_current_library_id_
 from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items, duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
+from pipelex.libraries.contract_fact_sites import ensure_contract_fact_sites_valid
 from pipelex.libraries.crate_class_cache import CRATE_CLASS_CACHE, CrateClasses
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.declared_item_counts import ensure_pipe_declared_item_counts_allowed
@@ -1054,7 +1055,14 @@ class LibraryManager(LibraryManagerAbstract):
             # earlier, by `validate_concept_references_in_blueprints`, which runs on the blueprints
             # before this. The parameter is vestigial here rather than load-bearing; removing it is a
             # signature change across PipeFactory and belongs with the concept-side work.
-            qualified_pipes = qualify_crate(crate).pipes
+            qualified_crate = qualify_crate(crate)
+            qualified_pipes = qualified_crate.pipes
+
+            # The contract facts whose site is typed by a concept, and the outputs an `output_filename` needs file-valued,
+            # are judged here, where the batch's concepts are merged and before any pipe is built. A prevalidated crate
+            # passed this check where its library was validated.
+            if not is_crate_prevalidated:
+                ensure_contract_fact_sites_valid(qualified=qualified_crate, source_map=crate.source_map)
 
             # Load pipes with domain-filtered concept codes
             all_pipes: list[PipeAbstract] = []

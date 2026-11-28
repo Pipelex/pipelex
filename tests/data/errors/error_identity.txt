@@ -52,6 +52,7 @@ ConfigValidationError | pipelex.config.invalid
 ConstructFieldBlueprintTypeError | method.schema_violation
 ConstructFieldBlueprintValueError | method.schema_violation
 ContextProviderError | abstract
+ContractFactInvalidError | method.schema_violation
 CoreUnconditionalPluginDisabledError | pipelex.config.invalid
 CostRegistryError | runtime.unexpected
 CrateNormalizationError | one of runtime.unexpected, method.cycle

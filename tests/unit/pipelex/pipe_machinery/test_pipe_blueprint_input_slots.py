@@ -79,7 +79,7 @@ class TestInputSlotCollapse:
 class TestInputSlotRejection:
     def test_unknown_slot_table_key_is_rejected(self):
         with pytest.raises(ValidationError, match=r"[Ee]xtra"):
-            make_blueprint({"doc": {"concept": "Text", "description": "the document"}})
+            make_blueprint({"doc": {"concept": "Text", "placeholder": "Type here"}})
 
     def test_non_table_hints_are_rejected(self):
         with pytest.raises(ValidationError):

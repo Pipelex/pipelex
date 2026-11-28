@@ -69,3 +69,22 @@ class ConceptRefAmbiguousError(ConceptError):
     """
 
     error_code = CoreCode.METHOD_REF_AMBIGUOUS
+
+
+class ContractFactInvalidError(PipelexError, ValueError):
+    """A contract fact or a choice option that is misplaced or invalid, on a structure field, an input slot or a concept.
+
+    Raised from the blueprints' validators, so a ``ValueError`` too: pydantic keeps the original in ``ctx["error"]``,
+    and the blueprint categorizer recovers the key at fault and the reason structurally, never from the message.
+
+    The standard names the fault ``method.contract_fact_invalid``, whose code the ``mthds`` release this runtime pins
+    does not carry yet; until it does, the fault takes ``method.schema_violation``, a declaration breaking a rule of the
+    language, with the same ``field_path`` and the reason in its finding (`CONTRACT_FACT_INVALID_CODE`).
+    """
+
+    error_code = CoreCode.METHOD_SCHEMA_VIOLATION
+
+    def __init__(self, message: str, *, fact: str, reason: str):
+        self.fact = fact
+        self.reason = reason
+        super().__init__(message)

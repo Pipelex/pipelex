@@ -7,6 +7,7 @@ from pydantic_core.core_schema import CoreSchemaType
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.exceptions import ContractFactInvalidError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -90,6 +91,33 @@ def _extract_wrapped_invalid_pipe_code_syntax_error(error: ErrorDetails) -> Inva
         if isinstance(original_error, InvalidPipeCodeSyntaxError):
             return original_error
     return None
+
+
+def _extract_wrapped_contract_fact_error(*, error: ErrorDetails) -> ContractFactInvalidError | None:
+    """Extract a ``ContractFactInvalidError`` wrapped by pydantic in ``ctx["error"]``, or ``None``."""
+    ctx: dict[str, Any] | None = error.get("ctx")
+    if ctx:
+        original_error = ctx.get("error")
+        if isinstance(original_error, ContractFactInvalidError):
+            return original_error
+    return None
+
+
+def _contract_fact_site_path(*, loc: tuple[int | str, ...], fact: str) -> str | None:
+    """The bundle-root path of the site a contract fact sits on: the pydantic ``loc``, its own elements and the key dropped.
+
+    A field validator's ``loc`` ends with the key (``concept.Review.structure.score.minimum``), a model validator's at the
+    site (``pipe.review.inputs.budget``); an option table's fault ends inside its list (``….choices.1``), so what follows
+    the key goes too.
+    """
+    parts = (_bundle_field_path(loc=loc, ends_with_authored_key=False) or "").split(".")
+    if fact in parts:
+        parts = parts[: parts.index(fact)]
+    return ".".join(part for part in parts if part not in _CONTRACT_FACT_INTERNAL_LOC_ELEMENTS) or None
+
+
+_CONTRACT_FACT_INTERNAL_LOC_ELEMENTS = frozenset({"InputSlotBlueprint", "ConceptStructureBlueprint", "ChoiceOption", "OutcomeTable"})
+"""The model names pydantic puts in a ``loc`` when it validates a union arm, which no author writes as a key."""
 
 
 def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, blueprint_dict: dict[str, Any]) -> bool:
@@ -414,6 +442,24 @@ def categorize_blueprint_validation_error(
             dropped_input_marker=wrapped_pipe_error.dropped_input_marker,
             root_input_marker=wrapped_pipe_error.root_input_marker,
             redundant_input_unwalkable_reason=redundant_input_unwalkable_reason,
+        )
+
+    # A misplaced or invalid contract fact: a blueprint validator raised a typed ``ValueError`` carrying the key at fault and
+    # the reason, which the message cannot carry structurally. The site is the declaration the pydantic ``loc`` names, a
+    # structure field, an input slot or a concept, by its bundle-root path without the key itself.
+    wrapped_contract_fact = _extract_wrapped_contract_fact_error(error=error)
+    if wrapped_contract_fact is not None:
+        site_path = _contract_fact_site_path(loc=loc, fact=wrapped_contract_fact.fact)
+        concept_code = str(loc[1]) if len(loc) >= 2 and loc[0] == "concept" else None
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.CONTRACT_FACT_INVALID,
+            domain_code=domain,
+            source=source,
+            pipe_code=pipe_code,
+            concept_code=concept_code,
+            field_path=site_path,
+            message=str(wrapped_contract_fact),
+            params={"fact": wrapped_contract_fact.fact, "reason": wrapped_contract_fact.reason, "field_path": site_path},
         )
 
     # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``

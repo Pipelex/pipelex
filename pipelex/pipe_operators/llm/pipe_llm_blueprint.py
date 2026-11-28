@@ -118,8 +118,8 @@ class PipeLLMBlueprint(PipeBlueprint):
 
         check_inputs_match_variables(
             declared_inputs=declared_inputs,
-            variable_paths=filtered_variable_paths,
-            reader="prompt or system_prompt",
+            variable_paths=filtered_variable_paths | self.output_filename_variable_paths(),
+            reader=self.reader_with_output_filename(reader="prompt or system_prompt"),
         )
 
     @override

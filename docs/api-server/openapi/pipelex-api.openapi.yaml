@@ -2138,6 +2138,13 @@ components:
         fact: who produced it, why, and which upstream absence it chains to. Provenance is captured
 
         at the moment absence is produced, not reconstructed at failure time.'
+    Aggregate:
+      type: string
+      enum:
+      - sum
+      - average
+      title: Aggregate
+      description: How the values of a number-valued field combine across the records that hold it.
     AliasMatch:
       properties:
         category:
@@ -2506,6 +2513,31 @@ components:
       - overwrite
       title: CellPolicy
       description: Which cells of a matched row an `update` may write. A null field writes nothing under either.
+    ChoiceOption:
+      properties:
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        tone:
+          anyOf:
+          - $ref: '#/components/schemas/Tone'
+          - type: 'null'
+        value:
+          type: string
+          title: Value
+      additionalProperties: false
+      type: object
+      required:
+      - value
+      title: ChoiceOption
+      description: 'An option of a `choices` list written as a table: its value, and the words for the people who read it.'
     CodegenRequest:
       properties:
         files:
@@ -2795,6 +2827,11 @@ components:
             type: object
           - type: 'null'
           title: Hints
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
       additionalProperties: false
       type: object
       required:
@@ -2802,6 +2839,66 @@ components:
       title: ConceptBlueprint
     ConceptStructureBlueprint:
       properties:
+        minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Minimum
+        maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Maximum
+        exclusive_minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Minimum
+        exclusive_maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Maximum
+        min_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Min Length
+        max_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Max Length
+        pattern:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pattern
+        format:
+          anyOf:
+          - $ref: '#/components/schemas/pipelex__language__contract_facts__TextFormat'
+          - type: 'null'
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/Aggregate'
+          - type: 'null'
+        examples:
+          anyOf:
+          - items: {}
+            type: array
+          - type: 'null'
+          title: Examples
         description:
           type: string
           title: Description
@@ -2861,7 +2958,9 @@ components:
         choices:
           anyOf:
           - items:
-              type: string
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/ChoiceOption'
             type: array
           - type: 'null'
           title: Choices
@@ -2890,7 +2989,16 @@ components:
 
         keys are strict, exactly like an input slot table''s; hint *content* stays lenient (unknown
 
-        hint keys warn and are preserved, per intent-hints.md).'
+        hint keys warn and are preserved, per intent-hints.md).
+
+
+        A field may state contract facts about its value (`ContractFactsBlueprint`). A field typed by a field type is judged
+
+        here, where its value class is known; a `concept` field''s value class depends on the concept it names, which a field
+
+        cannot resolve alone, so whether its facts apply is judged once the library''s concepts are known
+
+        (`pipelex.libraries.contract_fact_sites`), and only what holds whatever its class is judged here.'
     ConceptStructureBlueprintFieldType:
       type: string
       enum:
@@ -4190,9 +4298,74 @@ components:
       title: ImgGenSetting
     InputSlotBlueprint:
       properties:
+        minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Minimum
+        maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Maximum
+        exclusive_minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Minimum
+        exclusive_maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Maximum
+        min_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Min Length
+        max_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Max Length
+        pattern:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pattern
+        format:
+          anyOf:
+          - $ref: '#/components/schemas/pipelex__language__contract_facts__TextFormat'
+          - type: 'null'
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/Aggregate'
+          - type: 'null'
+        examples:
+          anyOf:
+          - items: {}
+            type: array
+          - type: 'null'
+          title: Examples
         concept:
           type: string
           title: Concept
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
         hints:
           anyOf:
           - additionalProperties:
@@ -4200,25 +4373,50 @@ components:
             type: object
           - type: 'null'
           title: Hints
+        choices:
+          anyOf:
+          - items:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/ChoiceOption'
+            type: array
+          - type: 'null'
+          title: Choices
       additionalProperties: false
       type: object
       required:
       - concept
       title: InputSlotBlueprint
-      description: 'The expanded input-slot form: `name = { concept = "…", hints = { … } }` (spec: intent-hints.md).
+      description: 'The expanded input-slot form: `name = { concept = "…", description = "…", hints = { … }, … }` (spec: mthds-format.md,
+
+        "Input slot declarations").
 
 
-        `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional
+        `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional presence marker).
+        Beside
 
-        presence marker). The form is deliberately closed (`extra="forbid"` implements the spec''s
+        it, a slot may say what it is for in this pipe (`description`), carry intent hints, and, on a slot holding a plain
+        value,
 
-        "unknown slot-table keys MUST be rejected") so future per-slot semantic keys land here without a
+        the contract facts (`ContractFactsBlueprint`) and `choices` a structure field takes, which apply to each item of a
+        plural
 
-        second syntax. A slot table carrying no hints collapses to its plain string at parse time (see
+        slot. The form is deliberately closed (`extra="forbid"` implements the spec''s "unknown slot-table keys MUST be
 
-        `PipeBlueprint.collapse_hint_free_slot_tables`), so a slot value that IS a table carries
+        rejected"). A slot table carrying none of these collapses to its plain string at parse time (see
 
-        non-empty hints — hint-free bundles produce byte-identical blueprints to the string form.'
+        `PipeBlueprint.collapse_plain_slot_tables`), so such bundles produce byte-identical blueprints to the string form.
+
+
+        What this blueprint judges alone: a description that is empty, `aggregate` (never on a slot), a text constraint or
+
+        `examples` beside `choices`, and facts that contradict each other. Whether a fact or `choices` applies to the slot''s
+        value
+
+        class depends on its concept, which a slot cannot resolve alone, so it is judged once the library''s concepts are
+        known
+
+        (`pipelex.libraries.contract_fact_sites`).'
     InvalidReport:
       properties:
         is_valid:
@@ -5923,6 +6121,32 @@ components:
       - fields
       title: ObjectItem
       description: '`object` — a structured concept, recursing through its resolved payload fields.'
+    OutcomeTable:
+      properties:
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        tone:
+          anyOf:
+          - $ref: '#/components/schemas/Tone'
+          - type: 'null'
+        pipe:
+          type: string
+          title: Pipe
+      additionalProperties: false
+      type: object
+      required:
+      - pipe
+      title: OutcomeTable
+      description: 'A condition''s outcome written as a table: its pipe reference (or special outcome), and the words for
+        people.'
     PipeBatchBlueprint:
       properties:
         source:
@@ -5955,6 +6179,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         branch_pipe_code:
           type: string
           title: Branch Pipe Code
@@ -6005,6 +6239,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         template:
           anyOf:
           - type: string
@@ -6053,6 +6297,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         expression_template:
           anyOf:
           - type: string
@@ -6065,7 +6319,29 @@ components:
           title: Expression
         outcomes:
           additionalProperties:
-            type: string
+            anyOf:
+            - type: string
+            - properties:
+                pipe:
+                  type: string
+                  minLength: 1
+                label:
+                  type: string
+                  minLength: 1
+                description:
+                  type: string
+                  minLength: 1
+                tone:
+                  type: string
+                  enum:
+                  - positive
+                  - caution
+                  - negative
+                  - neutral
+              additionalProperties: false
+              type: object
+              required:
+              - pipe
           type: object
           title: Outcomes
           x-schema-required: true
@@ -6073,6 +6349,7 @@ components:
           anyOf:
           - type: string
           - $ref: '#/components/schemas/SpecialOutcome'
+          - $ref: '#/components/schemas/OutcomeTable'
           title: Default Outcome
         add_alias_from_expression_to:
           anyOf:
@@ -6118,6 +6395,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         format:
           $ref: '#/components/schemas/DocGenFormat'
         model:
@@ -6257,6 +6544,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         model:
           anyOf:
           - $ref: '#/components/schemas/ExtractSetting'
@@ -6332,6 +6629,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         function_name:
           type: string
           pattern: ^[^.]+(\.[^.]+)+$
@@ -6647,6 +6954,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         prompt:
           type: string
           title: Prompt
@@ -6814,6 +7131,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         prompt:
           type: string
           title: Prompt
@@ -6916,6 +7243,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         model:
           anyOf:
           - $ref: '#/components/schemas/LLMSetting'
@@ -7141,6 +7478,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         branches:
           items:
             $ref: '#/components/schemas/SubPipeBlueprint'
@@ -7189,6 +7536,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         prompt:
           type: string
           title: Prompt
@@ -7272,6 +7629,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         steps:
           items:
             oneOf:
@@ -7308,6 +7675,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         signature_for:
           anyOf:
           - $ref: '#/components/schemas/PipeType'
@@ -7359,6 +7736,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         model:
           anyOf:
           - $ref: '#/components/schemas/LLMSetting'
@@ -9027,7 +9414,7 @@ components:
         tag_style:
           $ref: '#/components/schemas/TagStyle'
         text_format:
-          $ref: '#/components/schemas/TextFormat'
+          $ref: '#/components/schemas/pipelex__tools__templating__text_format__TextFormat'
           default: plain
       additionalProperties: false
       type: object
@@ -9121,14 +9508,6 @@ components:
       - name
       title: TextField
       description: '`text` at a named position — a top-level field or a structure field.'
-    TextFormat:
-      type: string
-      enum:
-      - plain
-      - markdown
-      - html
-      - json
-      title: TextFormat
     TextItem:
       properties:
         title:
@@ -9300,6 +9679,16 @@ components:
         ``nb_tokens_by_category`` keys) are open sets on the wire, typed as plain strings —
 
         runtime enum churn is non-breaking for clients.'
+    Tone:
+      type: string
+      enum:
+      - positive
+      - caution
+      - negative
+      - neutral
+      title: Tone
+      description: 'How a choice option or a condition''s outcome reads to a person. Never a colour: each consumer maps it
+        to its own palette.'
     TreeFileRead:
       properties:
         tree_path:
@@ -9911,3 +10300,23 @@ components:
       additionalProperties: false
       type: object
       title: WorkingMemory
+    pipelex__language__contract_facts__TextFormat:
+      type: string
+      enum:
+      - email
+      - uri
+      - date-time
+      - uuid
+      - hostname
+      - ipv4
+      - ipv6
+      title: TextFormat
+      description: The closed set of `format` values, each the JSON Schema format of the same name.
+    pipelex__tools__templating__text_format__TextFormat:
+      type: string
+      enum:
+      - plain
+      - markdown
+      - html
+      - json
+      title: TextFormat

@@ -88,6 +88,7 @@ from pipelex.core.concepts.annotation_shapes import (
     scalar_field_type,
     strip_optional,
 )
+from pipelex.core.concepts.choice_options import choice_values
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -663,7 +664,7 @@ class InputFormDeriver:
                 name=name,
                 description=field.description,
                 required=field.required,
-                choices=list(field.choices),
+                choices=choice_values(options=field.choices),
                 default_value=field.default_value,
             )
             return _with_effective_hints(node=enum_node, hints=field.hints)
@@ -775,11 +776,13 @@ def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None)
     if not hints:
         return node
     match applicable_intent(hints, site_kind=_node_site_kind(node)):
-        case IntentWord.PROSE:
+        case IntentWord.PROSE | IntentWord.CODE | IntentWord.QUESTION:
+            # A passage, a code block and a question each take several lines to write.
             return _recast_text_kind(node=node, hints=hints, to_prose=True)
-        case IntentWord.LABEL:
+        case IntentWord.LABEL | IntentWord.IDENTIFIER:
             return _recast_text_kind(node=node, hints=hints, to_prose=False)
-        case IntentWord.RATING | IntentWord.QUANTITY | None:
+        case IntentWord.RATING | IntentWord.QUANTITY | IntentWord.PHOTO | IntentWord.SCREENSHOT | IntentWord.SCAN | None:
+            # A number keeps its kind, and an image or a document its own: the word rides as a hint for the consumer.
             return node.model_copy(update={"hints": hints})
 
 
@@ -815,6 +818,10 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
     )
 
 
+TIME_TEXT_FORMAT = "time"
+"""The `format` a text node carries for a time of day, which the `time` field type and `native.Time` produce."""
+
+
 def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
 
@@ -829,10 +836,18 @@ def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
         case NumberField():
             return HintSiteValueKind.NUMBER_VALUED
         case TextField() | ProseField():
-            if node.format is not None:
-                return HintSiteValueKind.OTHER
+            # A time-formatted text (`type = "time"`, `native.Time`) is time-valued; any other format (an email, a URI) is
+            # a constraint on a text, which stays text-valued.
+            if node.format == TIME_TEXT_FORMAT:
+                return HintSiteValueKind.TIME_VALUED
             return HintSiteValueKind.TEXT_VALUED
-        case DateField() | BooleanField() | EnumField() | DocumentField() | ImageField() | ObjectField() | ListField() | UnknownField():
+        case DateField():
+            return HintSiteValueKind.DATE_VALUED
+        case ImageField():
+            return HintSiteValueKind.IMAGE_VALUED
+        case DocumentField():
+            return HintSiteValueKind.DOCUMENT_VALUED
+        case BooleanField() | EnumField() | ObjectField() | ListField() | UnknownField():
             return HintSiteValueKind.OTHER
 
 

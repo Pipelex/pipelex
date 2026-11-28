@@ -270,9 +270,9 @@ class PipelexBundleBlueprint(BaseModel):
             elif isinstance(pipe_blueprint, PipeBatchBlueprint):
                 pipe_refs.append(LocatedPipeReference(pipe_blueprint.branch_pipe_code, pipe_code, f"pipe.{pipe_code}.branch_pipe_code"))
             elif isinstance(pipe_blueprint, PipeConditionBlueprint):
-                for outcome_key, outcome_pipe in pipe_blueprint.outcomes.items():
+                for outcome_key, outcome_pipe in pipe_blueprint.outcome_pipes.items():
                     pipe_refs.append(LocatedPipeReference(outcome_pipe, pipe_code, f"pipe.{pipe_code}.outcomes[{outcome_key}]"))
-                pipe_refs.append(LocatedPipeReference(pipe_blueprint.default_outcome, pipe_code, f"pipe.{pipe_code}.default_outcome"))
+                pipe_refs.append(LocatedPipeReference(pipe_blueprint.default_outcome_pipe, pipe_code, f"pipe.{pipe_code}.default_outcome"))
             elif isinstance(pipe_blueprint, PipeParallelBlueprint):
                 for branch_index, branch in enumerate(pipe_blueprint.branches):
                     pipe_refs.append(LocatedPipeReference(branch.pipe, pipe_code, f"pipe.{pipe_code}.branches[{branch_index}].pipe"))

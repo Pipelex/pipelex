@@ -25,4 +25,4 @@ class TestRejectedStructureFieldParsing:
         with pytest.raises(MthdsParserError) as exc_info:
             MthdsParser.make_pipelex_bundle_blueprint(bundle_path=_REJECTED_DIR / "unknown_structure_field_key.mthds_invalid")
         message = str(exc_info.value)
-        assert "minimum" in message
+        assert "placeholder" in message

@@ -224,6 +224,14 @@ fails_at = "runtime"
 code = "pipe_func_function_refused"
 excluded = "It refuses a PipeFunc step whose function its method tree does not hold or cannot be proven, so only a PipeFunc step produces it, and the PipeFunc operator is excluded: a focused entry is one bundle that has to validate everywhere, and its Python module would have to travel with it to consumers that do not read Python. Exercise it in a consumer's own fixtures, beside the operator."
 
+[error.contract_fact_invalid]
+code = "contract_fact_invalid"
+fails_at = "runtime"
+
+[error.choice_option_dubious]
+code = "choice_option_dubious"
+excluded = "Advisory-only, for the same reason as `optional_force_redundant`: an empty or repeated string choice option rides the validation report's `warnings` array and never makes a verdict invalid, and an entry asserts a verdict, not its warnings. Revisit if the manifest ever grows a warnings axis."
+
 [error.unknown_validation_error]
 code = "unknown_validation_error"
 excluded = "The generic fallback for a validation failure that matched no specific code. Reaching it on purpose would mean authoring a bundle that breaks in a way the categorizer does not recognize — which is a state to fix in the runtime, not to pin in a corpus entry that would then have to be rewritten the moment the fault gets a code of its own."
@@ -250,6 +258,26 @@ excluded = "Advisory-only: the intent-hints lint rides the validation report's `
 
 [error.hint_inapplicable_intent]
 code = "hint_inapplicable_intent"
+excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
+
+[error.hint_unknown_role]
+code = "hint_unknown_role"
+excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
+
+[error.hint_inapplicable_role]
+code = "hint_inapplicable_role"
+excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
+
+[error.hint_unknown_part]
+code = "hint_unknown_part"
+excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
+
+[error.hint_inapplicable_part]
+code = "hint_inapplicable_part"
+excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
+
+[error.hint_duplicate_part]
+code = "hint_duplicate_part"
 excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
 
 [error.template_check_warning]

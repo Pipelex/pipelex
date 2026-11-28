@@ -234,8 +234,12 @@ def validation_item_code(*, item: ValidationErrorItem, residual_code: ErrorCode)
     return residual_code
 
 
-def _hint_reason(*, error_type: HintLintErrorType) -> MethodHintInvalidReason:
-    """The `reason` of `method.hint_invalid` a hint lint finding of this type gives."""
+def _hint_reason(*, error_type: HintLintErrorType) -> str:
+    """The `reason` of `method.hint_invalid` a hint lint finding of this type gives.
+
+    The reasons the standard added at 9.2.0 for `role` and `part` are written out, as the pinned `mthds` release lists only
+    the first three in `MethodHintInvalidReason`, whose parameter takes any string.
+    """
     match error_type:
         case HintLintErrorType.HINT_UNKNOWN_KEY:
             return MethodHintInvalidReason.UNKNOWN_KEY
@@ -243,6 +247,16 @@ def _hint_reason(*, error_type: HintLintErrorType) -> MethodHintInvalidReason:
             return MethodHintInvalidReason.UNKNOWN_INTENT
         case HintLintErrorType.HINT_INAPPLICABLE_INTENT:
             return MethodHintInvalidReason.INAPPLICABLE_INTENT
+        case HintLintErrorType.HINT_UNKNOWN_ROLE:
+            return "unknown_role"
+        case HintLintErrorType.HINT_INAPPLICABLE_ROLE:
+            return "inapplicable_role"
+        case HintLintErrorType.HINT_UNKNOWN_PART:
+            return "unknown_part"
+        case HintLintErrorType.HINT_INAPPLICABLE_PART:
+            return "inapplicable_part"
+        case HintLintErrorType.HINT_DUPLICATE_PART:
+            return "duplicate_part"
 
 
 def _hint_facts(*, item: ValidationErrorItem) -> dict[str, Any]:

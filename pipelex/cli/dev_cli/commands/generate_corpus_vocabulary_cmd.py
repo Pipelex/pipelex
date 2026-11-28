@@ -193,6 +193,16 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_UNKNOWN_ROLE: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_INAPPLICABLE_ROLE: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_UNKNOWN_PART: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_INAPPLICABLE_PART: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_DUPLICATE_PART: _ADVISORY_HINT_LINT_EXCLUSION,
+    PipeValidationErrorType.CHOICE_OPTION_DUBIOUS: (
+        "Advisory-only, for the same reason as `optional_force_redundant`: an empty or repeated string choice option rides "
+        "the validation report's `warnings` array and never makes a verdict invalid, and an entry asserts a verdict, not "
+        "its warnings. Revisit if the manifest ever grows a warnings axis."
+    ),
     TemplateCheckErrorType.TEMPLATE_CHECK_WARNING: (
         "Advisory-only, for the same reason as `optional_force_redundant`: a warning of a PipeDocGen step's template check rides "
         "the validation report's `warnings` array and never makes a verdict invalid. It also needs what a focused "

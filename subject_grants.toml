@@ -4468,10 +4468,6 @@ rationale = "Verb-object read with a single obvious operand: the site or ref bei
 param = "field"
 rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
 
-["pipelex/pipeline/hint_warnings.py::_HintLinter._resolve_concept_kind"]
-param = "concept_ref"
-rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
-
 ["pipelex/pipeline/hint_warnings.py::_HintLinter._slot_site_kind"]
 param = "concept_spec"
 rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."

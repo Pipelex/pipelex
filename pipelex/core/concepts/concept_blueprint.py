@@ -8,7 +8,11 @@ from pipelex.core.concepts.concept_structure_blueprint import (
     FieldNameRefusal,
     structure_field_name_refusal,
 )
+from pipelex.core.concepts.exceptions import ContractFactInvalidError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.language.contract_facts import ContractFactKey, ContractFactReason, malformed_fact_message
 
 ConceptStructureBlueprintType = str | ConceptStructureBlueprint
 
@@ -26,6 +30,63 @@ class ConceptBlueprint(BaseModel):
     """MTHDS intent hints (spec: intent-hints.md) — non-normative presentation intent. Shape is
     strict (flat string->string table), content is lenient (unknown entries preserved, advisory
     lint warns). An empty table is equivalent to no hints and normalizes to absence."""
+    unit: str | None = None
+    """What a number-valued concept counts (spec: mthds-format.md, Units): allowed only on a concept whose refinement chain
+    reaches `native.Number`, and inherited by its refiners, the nearer declaration winning. A refinement of another concept
+    of this library is judged once the library's concepts are known (`pipelex.libraries.contract_fact_sites`)."""
+
+    @field_validator("unit", mode="before")
+    @classmethod
+    def refuse_malformed_unit(cls, unit: Any) -> Any:
+        if unit is None:
+            return unit
+        message = malformed_fact_message(key=ContractFactKey.UNIT, value=unit)
+        if message is not None:
+            raise ContractFactInvalidError(message, fact=ContractFactKey.UNIT, reason=ContractFactReason.MALFORMED)
+        return unit
+
+    @model_validator(mode="after")
+    def refuse_unit_on_a_concept_not_number_valued(self) -> "ConceptBlueprint":
+        """Refuse a `unit` on a concept that is known here not to be number-valued: a structured or description-only
+        concept, or one refining a native other than `Number`. A concept refining another declared concept is judged once
+        the library's concepts are known.
+        """
+        if self.unit is None or self.refines_number_or_unknown:
+            return self
+        msg = "'unit' is allowed only on a concept whose refinement chain reaches native.Number, and this concept is not number-valued"
+        raise ContractFactInvalidError(msg, fact=ContractFactKey.UNIT, reason=ContractFactReason.INAPPLICABLE)
+
+    @property
+    def refines_number_or_unknown(self) -> bool:
+        """Whether the concept refines `native.Number`, or a declared concept whose class this blueprint cannot know."""
+        if self.structure is not None or not self.refines:
+            return False
+        if not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=self.refines):
+            return True
+        native_code = NativeConceptCode(QualifiedRef.parse(self.refines).local_code)
+        match native_code:
+            case NativeConceptCode.NUMBER:
+                return True
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.MARKDOWN
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.COMPOSITE
+                | NativeConceptCode.ANYTHING
+            ):
+                return False
 
     @field_validator("hints", mode="after")
     @classmethod
@@ -50,6 +111,9 @@ class ConceptBlueprint(BaseModel):
         dumped: dict[str, Any] = handler(self)
         if dumped.get("hints") is None:
             dumped.pop("hints", None)
+        # An absent unit is an absent member too, so a library that authors none keeps its fingerprint.
+        if dumped.get("unit") is None:
+            dumped.pop("unit", None)
         return dumped
 
     @field_validator("refines", mode="before")
