@@ -14,7 +14,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineInputContentError
 from pipelex.pipeline.input_normalizer import prepare_file_inputs
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from tests.unit.pipelex.pipeline.test_data import DeclaredMediaTypeTestData, DeclaredTypeRefusalCase
+from tests.unit.pipelex.pipeline.cases import DeclaredMediaTypeCases, DeclaredTypeRefusalCase
 
 STORAGE_SCOPE = "org_abc/run_1"
 STORED_URI = "pipelex-storage://org_abc/run_1/assets/stored.txt"
@@ -49,7 +49,7 @@ def _patch_storage(mocker: MockerFixture) -> AsyncMockType:
 @pytest.mark.asyncio(loop_scope="class")
 class TestInputNormalizerDeclaredMediaType:
     @pytest.mark.parametrize(
-        ("_topic", "url", "mime_type", "expected_content_type", "expected_extension"), DeclaredMediaTypeTestData.STORED_UNDER_BARE_TYPE
+        ("_topic", "url", "mime_type", "expected_content_type", "expected_extension"), DeclaredMediaTypeCases.STORED_UNDER_BARE_TYPE
     )
     async def test_a_stored_data_url_is_stored_under_its_bare_type(
         self, mocker: MockerFixture, _topic: str, url: str, mime_type: str | None, expected_content_type: str, expected_extension: str
@@ -70,7 +70,7 @@ class TestInputNormalizerDeclaredMediaType:
         assert content.url == STORED_URI
         assert content.mime_type == expected_content_type
 
-    @pytest.mark.parametrize(("_topic", "url", "mime_type", "expected_mime_type", "_extension"), DeclaredMediaTypeTestData.STORED_UNDER_BARE_TYPE)
+    @pytest.mark.parametrize(("_topic", "url", "mime_type", "expected_mime_type", "_extension"), DeclaredMediaTypeCases.STORED_UNDER_BARE_TYPE)
     async def test_a_kept_data_url_carries_its_bare_type(
         self, mocker: MockerFixture, _topic: str, url: str, mime_type: str | None, expected_mime_type: str, _extension: str
     ) -> None:
@@ -86,7 +86,7 @@ class TestInputNormalizerDeclaredMediaType:
         assert content.mime_type == expected_mime_type
 
     @pytest.mark.parametrize("read_scope", [None, "org_abc"])
-    @pytest.mark.parametrize(("_topic", "case"), DeclaredMediaTypeTestData.REFUSED)
+    @pytest.mark.parametrize(("_topic", "case"), DeclaredMediaTypeCases.REFUSED)
     async def test_a_declaration_that_is_not_one_media_type_is_refused_naming_its_field(
         self, mocker: MockerFixture, _topic: str, case: DeclaredTypeRefusalCase, read_scope: str | None
     ) -> None:

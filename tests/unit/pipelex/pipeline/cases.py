@@ -95,7 +95,7 @@ class DeclaredTypeRefusalCase(NamedTuple):
     expected_reason: str
 
 
-class DeclaredMediaTypeTestData:
+class DeclaredMediaTypeCases:
     """File inputs whose declared media type is read as its bare type, or refused when it is not one media type."""
 
     HELLO_BASE64 = base64.b64encode(b"hello").decode("ascii")
