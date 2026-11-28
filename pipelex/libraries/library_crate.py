@@ -53,6 +53,13 @@ class LibraryCrate(BaseModel):
     submitted. Transport-only: EXCLUDED from the fingerprint and from the normalized crate.
     """
 
+    result_lines: dict[str, str] = Field(default_factory=dict)
+    """pipe_ref -> the `result_line` of the manifest whose `main_pipe` the pipe is, the template its runs are worded with
+    (spec: manifest-format.md, "Result Line"). A manifest belongs to a package, not to the language, so it stays out of the
+    normalized crate; it is in the fingerprint only when present, so a library with no result line keeps its fingerprint
+    while a change of line is a different crate.
+    """
+
     def tree_digests(self) -> list[str]:
         """The digest of every tree the crate's pipes belong to, each once, sorted."""
         return sorted({tree_bundle_ref.tree_digest for tree_bundle_ref in self.tree_bundles.values()})
@@ -67,7 +74,7 @@ class LibraryCrate(BaseModel):
             mthds_version=self.mthds_version,
             concepts=dict(self.concepts),
             domains=dict(self.domains),
-            fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes={}),
+            fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes={}, result_lines={}),
         )
 
     def restricted_to_pipe(self, *, pipe_ref: str) -> "LibraryCrate | None":
@@ -75,7 +82,8 @@ class LibraryCrate(BaseModel):
 
         A process that runs one step, such as a sandbox running a `PipeFunc` call, builds that step and no other, so no
         check of a sibling step that depends on its environment, such as a `PipeDocGen` step's document engine, can stop it.
-        The pipe keeps its source, its tree bundle and its elaboration metadata; the fingerprint is the restricted crate's own.
+        The pipe keeps its source, its tree bundle, its elaboration metadata and its result line; the fingerprint is the
+        restricted crate's own.
 
         Returns:
             The restricted crate, or None when the crate holds no pipe `pipe_ref`.
@@ -87,6 +95,8 @@ class LibraryCrate(BaseModel):
         source_map = {ref: source for ref, source in self.source_map.items() if ref in self.concepts or ref == pipe_ref}
         tree_bundle_ref = self.tree_bundles.get(pipe_ref)
         elaboration = self.elaboration_metadata.get(pipe_ref)
+        result_line = self.result_lines.get(pipe_ref)
+        result_lines = {pipe_ref: result_line} if result_line is not None else {}
         return LibraryCrate(
             mthds_version=self.mthds_version,
             concepts=dict(self.concepts),
@@ -95,34 +105,39 @@ class LibraryCrate(BaseModel):
             source_map=source_map,
             elaboration_metadata={pipe_ref: elaboration} if elaboration is not None else {},
             tree_bundles={pipe_ref: tree_bundle_ref} if tree_bundle_ref is not None else {},
-            fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes=pipes),
+            result_lines=result_lines,
+            fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes=pipes, result_lines=result_lines),
         )
 
     fingerprint: str = ""
-    """SHA-256 hex digest of the serialized concepts + pipes content (source is intentionally excluded)."""
+    """SHA-256 hex digest of the serialized concepts + pipes content, and the result lines when present (source is intentionally excluded)."""
 
     @staticmethod
     def compute_fingerprint_from_content(
         *,
         concepts: dict[str, "ConceptBlueprint | str"],
         pipes: dict[str, PipeBlueprintUnion],
+        result_lines: dict[str, str],
     ) -> str:
-        """Compute SHA-256 fingerprint from concepts and pipes content.
+        """Compute SHA-256 fingerprint from concepts and pipes content, and the result lines when there are any.
 
-        Uses deterministic JSON serialization of concepts and pipes only
-        (excludes domains, source_map, and fingerprint itself).
+        Uses deterministic JSON serialization of concepts and pipes (excludes domains, source_map, and fingerprint
+        itself). The result lines join the payload only when there are some, so a crate with none keeps the fingerprint
+        it had before crates carried them.
         """
         concepts_json: dict[str, object] = {}
         for ref, value in sorted(concepts.items()):
             concepts_json[ref] = value if isinstance(value, str) else value.model_dump(mode="json")
         pipes_json = {ref: blueprint.model_dump(mode="json") for ref, blueprint in sorted(pipes.items())}
-        payload = {"concepts": concepts_json, "pipes": pipes_json}
+        payload: dict[str, object] = {"concepts": concepts_json, "pipes": pipes_json}
+        if result_lines:
+            payload["result_lines"] = dict(sorted(result_lines.items()))
         serialized = json.dumps(payload, sort_keys=True, ensure_ascii=True)
         return hashlib.sha256(serialized.encode()).hexdigest()
 
     def compute_fingerprint(self) -> str:
-        """Compute SHA-256 fingerprint from this crate's concepts and pipes."""
-        return self.compute_fingerprint_from_content(concepts=self.concepts, pipes=self.pipes)
+        """Compute SHA-256 fingerprint from this crate's concepts and pipes, and its result lines when it has any."""
+        return self.compute_fingerprint_from_content(concepts=self.concepts, pipes=self.pipes, result_lines=self.result_lines)
 
     @staticmethod
     def compute_normalized_fingerprint(

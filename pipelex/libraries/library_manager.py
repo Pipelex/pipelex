@@ -8,11 +8,13 @@ from typing import TYPE_CHECKING, Any, ForwardRef, Literal, get_args, get_origin
 
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
+from mthds.method_tree.discovery import MANIFEST_NAME
 from mthds.method_tree.models import MethodTree
 from mthds.method_tree.tree_path import path_collisions, tree_path_violation
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
+from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
 from mthds.package.visibility import VisibilityError
 from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
@@ -86,6 +88,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import (
     ElaborationMetadata,
     LocatedPipeReference,
+    MainPipeResultLine,
     PipeBlueprintUnion,
     PipelexBundleBlueprint,
     StepRole,
@@ -1100,6 +1103,8 @@ class LibraryManager(LibraryManagerAbstract):
                         blueprint=pipe_blueprint,
                         concept_codes_from_the_same_domain=concept_codes_for_domain,
                     )
+                # The manifest's `result_line`, on the main pipe it words the runs of (`attach_manifest_result_lines`).
+                pipe.result_line = crate.result_lines.get(pipe_ref)
                 all_pipes.append(pipe)
 
                 # Track source file for this pipe (used by get_pipe_source)
@@ -1209,6 +1214,8 @@ class LibraryManager(LibraryManagerAbstract):
             # The library holds every tree its bundles were read from for its runs, which read a file of one, a
             # PipeFunc call's or a PipeDocGen template, by the tree's digest through the method file store.
             live_trees = self._hold_trees_of(library_id=library_id, blueprints=blueprints)
+            # Each bundle's tree may hold a manifest whose `result_line` words the runs of its main pipe: the crate carries it.
+            attach_manifest_result_lines(blueprints=blueprints)
 
             # Accumulate blueprints for later crate construction via get_crate()
             self._blueprints.setdefault(library_id, []).extend(blueprints)
@@ -1521,16 +1528,13 @@ class LibraryManager(LibraryManagerAbstract):
             library.loaded_mthds_paths.append(resolved_path)
 
         try:
-            loaded_pipes = self.load_from_blueprints(
+            return self.load_from_blueprints(
                 library_id=library_id,
                 blueprints=blueprints,
                 methods_dirs=methods_dirs,
                 address_dependency_sources=address_dependency_sources,
                 tree_listing=tree_listing,
             )
-            if manifest is not None:
-                attach_result_line(manifest=manifest, blueprints=blueprints, loaded_pipes=loaded_pipes)
-            return loaded_pipes
         except ValidationError as validation_error:
             # Categorize before wrapping. `translate_to_validate_bundle_error` has its own
             # `except ValidationError` arm that categorizes, but it never sees this error: wrapping it
@@ -2511,17 +2515,46 @@ def _reserved_domain_refusal(*, reserved_errors: list[VisibilityError], blueprin
     )
 
 
-def attach_result_line(*, manifest: MethodsManifest, blueprints: list[PipelexBundleBlueprint], loaded_pipes: list[PipeAbstract]) -> None:
-    """Put the manifest's `result_line` on the pipe it names as `main_pipe`, so a run starting there renders it.
+def attach_manifest_result_lines(*, blueprints: "Iterable[PipelexBundleBlueprint]") -> None:
+    """Mark the bundle defining each tree's main pipe with the `result_line` of the manifest at the tree's root.
 
-    The main pipe is the pipe of that code a bundle of this load defines; when several bundles define one, no single pipe
-    is the main pipe and none takes the line, as `select_entry` refuses to choose between them.
+    Each bundle placed in a method tree is read against its own tree's manifest, so a bundle file run alone under a
+    `METHODS.toml`, a library directory, the tree of the files a caller submits beside content strings, and each package of
+    a load holding several are all worded by their own manifest. The crate built from the bundles then carries the line on
+    the main pipe's ref (`LibraryCrate.result_lines`), so a library rebuilt from that crate, in a worker for instance, holds
+    it too. The main pipe is the pipe of that code a bundle of the tree defines; when bundles of several domains define one,
+    no single pipe is the main pipe and none takes the line, as `select_entry` refuses to choose between them. A manifest
+    that cannot be read words nothing here: refusing it is the validation's, which reports why.
     """
-    if manifest.result_line is None or manifest.main_pipe is None:
-        return
-    main_pipe_refs = {f"{blueprint.domain}.{manifest.main_pipe}" for blueprint in blueprints if manifest.main_pipe in (blueprint.pipe or {})}
-    if len(main_pipe_refs) != 1:
-        return
-    for pipe in loaded_pipes:
-        if pipe.pipe_ref in main_pipe_refs:
-            pipe.result_line = manifest.result_line
+    blueprints_by_tree: dict[str, list[PipelexBundleBlueprint]] = {}
+    trees: dict[str, MethodTree] = {}
+    for blueprint in blueprints:
+        if blueprint.tree_bundle is None:
+            continue
+        tree = blueprint.tree_bundle.tree
+        trees.setdefault(tree.digest, tree)
+        blueprints_by_tree.setdefault(tree.digest, []).append(blueprint)
+    for tree_digest, tree_blueprints in blueprints_by_tree.items():
+        manifest = _tree_root_manifest(tree=trees[tree_digest])
+        if manifest is None or manifest.result_line is None or manifest.main_pipe is None:
+            continue
+        main_pipe = manifest.main_pipe
+        defining = [blueprint for blueprint in tree_blueprints if main_pipe in (blueprint.pipe or {})]
+        if len({blueprint.domain for blueprint in defining}) != 1:
+            continue
+        for blueprint in defining:
+            blueprint.attach_main_pipe_result_line(main_pipe_result_line=MainPipeResultLine(pipe_code=main_pipe, result_line=manifest.result_line))
+
+
+def _tree_root_manifest(*, tree: MethodTree) -> MethodsManifest | None:
+    """The `METHODS.toml` at the root of a tree this process holds, read as listed, or None when it holds none or it cannot be read."""
+    if MANIFEST_NAME not in tree.members:
+        return None
+    manifest_bytes = LOCAL_METHOD_FILES.read_held_file(tree_digest=tree.digest, tree_path=MANIFEST_NAME)
+    if manifest_bytes is None:
+        return None
+    try:
+        return parse_methods_toml(manifest_bytes.decode("utf-8"))
+    except (ManifestError, UnicodeDecodeError) as exc:
+        log.verbose("A method tree's manifest could not be read for its result line", fields=error_fields(exc=exc))
+        return None

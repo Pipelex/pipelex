@@ -103,6 +103,13 @@ class ElaborationMetadata(BaseModel):
     step_role: StepRole
 
 
+class MainPipeResultLine(NamedTuple):
+    """A manifest's `result_line` and the code of the `main_pipe` it words a run of (spec: manifest-format.md, "Result Line")."""
+
+    pipe_code: str
+    result_line: str
+
+
 class PipelexBundleBlueprint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -135,6 +142,9 @@ class PipelexBundleBlueprint(BaseModel):
     # names, such as a PipeDocGen `template_file`, only by resolving it in this tree. A bundle parsed from a string sits at
     # the root of the tree of the files submitted with it, with no tree path, and has no tree when none was submitted.
     _tree_bundle: TreeBundle | None = PrivateAttr(default=None)
+    # The `result_line` of the manifest at the root of the bundle's tree, set by the loader on the one bundle of the tree
+    # that defines the manifest's `main_pipe`, with that pipe's code. Never serialized: the crate carries it by pipe ref.
+    _main_pipe_result_line: "MainPipeResultLine | None" = PrivateAttr(default=None)
 
     @property
     def host_bundle_file(self) -> Path | None:
@@ -151,6 +161,15 @@ class PipelexBundleBlueprint(BaseModel):
     def mark_read_from_host_file(self, *, bundle_file: Path) -> None:
         """Record that this host read the bundle from `bundle_file`, whose method tree the load lists."""
         self._host_bundle_file = bundle_file
+
+    @property
+    def main_pipe_result_line(self) -> "MainPipeResultLine | None":
+        """The result line of its tree's manifest, with the main pipe this bundle defines, or None."""
+        return self._main_pipe_result_line
+
+    def attach_main_pipe_result_line(self, *, main_pipe_result_line: "MainPipeResultLine") -> None:
+        """Record that this bundle defines the main pipe of its tree's manifest, which words its runs with `result_line`."""
+        self._main_pipe_result_line = main_pipe_result_line
 
     def place_in_tree(self, *, tree_bundle: TreeBundle) -> None:
         """Record the bundle as `tree_bundle`: the member of the method tree a loader listed it in, or a bundle parsed from a
