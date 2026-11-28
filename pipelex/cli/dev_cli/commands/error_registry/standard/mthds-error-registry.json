@@ -1,5 +1,5 @@
 {
-  "version": "9.0.0",
+  "version": "9.2.0",
   "base_url": "https://mthds.ai/errors",
   "extension_prefixes": [
     {
@@ -2384,6 +2384,99 @@
       ]
     },
     {
+      "code": "method.choice_option_dubious",
+      "title": "A string choice option is empty or repeated",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "warning",
+      "detail": "The choices at '{field_path}' hold a string option that is empty or repeated (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove the empty or repeated option from the choices at '{field_path}'."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove the empty or repeated option from the choices at '{field_path}'."
+        }
+      },
+      "params": {
+        "field_path": {
+          "type": "identifier",
+          "description": "The key path of the field or input slot whose `choices` hold the option."
+        },
+        "reason": {
+          "type": "enum",
+          "values": [
+            "empty_value",
+            "duplicate_value"
+          ],
+          "description": "Whether a string option is the empty string, or repeats the value of another string option."
+        }
+      },
+      "meaning": "An advisory finding: a `choices` list holds an empty string option, or two string options with the same value. Bundles written before option tables could hold such lists, so it never makes a method invalid; the same fault in an option table is refused as `method.contract_fact_invalid`.",
+      "what_to_do": "Remove the empty option or the repeated one.",
+      "see": [
+        {
+          "title": "Choice options",
+          "href": "spec/mthds-format.md#choice-options"
+        }
+      ]
+    },
+    {
+      "code": "method.contract_fact_invalid",
+      "title": "A contract fact is misplaced or invalid",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The contract fact '{fact}' at '{field_path}' is invalid (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct or remove the contract fact '{fact}' at '{field_path}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the contract fact '{fact}' at '{field_path}'."
+        }
+      },
+      "params": {
+        "fact": {
+          "type": "identifier",
+          "description": "The key at fault, such as `minimum`, `unit` or `choices`."
+        },
+        "field_path": {
+          "type": "identifier",
+          "description": "The key path of the field, input slot or concept that declares it."
+        },
+        "reason": {
+          "type": "enum",
+          "values": [
+            "inapplicable",
+            "not_value_slot",
+            "malformed",
+            "contradictory",
+            "value_breaks_contract",
+            "duplicate_option"
+          ],
+          "description": "Whether the key does not apply to its site's value class, sits on an input slot whose concept holds no plain value, has a value outside its rules, contradicts another fact of the site, is broken by an example or a default of the site, or gives an option table a value another option of its list holds, or a label another option carries."
+        }
+      },
+      "meaning": "A field, an input slot or a concept declares a contract fact, such as a bound, a length, a pattern, a format, a unit, an aggregate, examples or choice options, that does not apply where it is written or whose value breaks the language's rules for it.",
+      "what_to_do": "Check the key against the contract facts the `.mthds` file format defines for the site's value class, then correct its value, move it to a field it applies to, or remove it.",
+      "see": [
+        {
+          "title": "Contract facts",
+          "href": "spec/mthds-format.md#contract-facts"
+        },
+        {
+          "title": "Choice options",
+          "href": "spec/mthds-format.md#choice-options"
+        }
+      ]
+    },
+    {
       "code": "method.model_setting_invalid",
       "title": "A model setting in the method is invalid",
       "domain": "method",
@@ -2498,16 +2591,21 @@
           "values": [
             "unknown_key",
             "unknown_intent",
-            "inapplicable_intent"
+            "inapplicable_intent",
+            "unknown_role",
+            "inapplicable_role",
+            "unknown_part",
+            "inapplicable_part",
+            "duplicate_part"
           ],
-          "description": "Whether the hint's key is unknown, its intent word is unknown, or its intent does not apply where it is written."
+          "description": "Whether the hint's key is unknown; its intent, role or part word is unknown; its word does not apply where it is written; or a second field of one structure holds a part that one field at most should hold."
         },
         "hint": {
           "type": "caller_text",
           "description": "The hint as the method writes it."
         }
       },
-      "meaning": "An advisory finding: a hint's key or intent word is unknown, or its intent does not apply where it is written. It never makes a method invalid.",
+      "meaning": "An advisory finding: a hint's key or word is unknown, its word does not apply where it is written, such as a `role` on a structure field or a `part` on an input slot, or two fields of one structure hold the `title`, the `summary` or the `verdict`. It never makes a method invalid.",
       "what_to_do": "Check the hint against the intent hints the standard defines, and correct or remove it.",
       "see": [
         {

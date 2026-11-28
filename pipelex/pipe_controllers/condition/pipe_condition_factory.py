@@ -38,7 +38,9 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
             output=output,
             expression=expression,
             expression_field=blueprint.runtime_expression_field,
-            outcome_map=blueprint.outcomes,
-            default_outcome=blueprint.default_outcome,
+            outcome_map=blueprint.outcome_pipes,
+            default_outcome=blueprint.default_outcome_pipe,
+            outcome_words=blueprint.outcome_words,
+            default_outcome_words=blueprint.default_outcome_words,
             add_alias_from_expression_to=blueprint.add_alias_from_expression_to,
         )

@@ -1,0 +1,18 @@
+domain      = "facts_example_too_long"
+description = "A locker card whose example code is longer than its codes may be"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+code = { type = "text", description = "The code", max_length = 6, examples = [
+  "ABCDEFGH",
+] }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

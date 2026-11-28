@@ -24,6 +24,12 @@ _WORKBOOK_INPUTS: dict[str, str] = {"workbook": "Document", "rows": "Row[]", "ma
 
 
 class TestPipeDocGenBlueprint:
+    def test_output_filename_alone_names_the_document(self) -> None:
+        """The standard's key is accepted alone: the produced file takes its name when the step ends."""
+        blueprint = _blueprint(output_filename="Invoice {{ invoice.number }}")
+        assert blueprint.output_filename == "Invoice {{ invoice.number }}"
+        assert blueprint.filename is None
+
     def test_a_pdf_without_a_template_is_the_auto_layout(self) -> None:
         blueprint = _blueprint(filename="invoice-{{ invoice.number }}")
         assert blueprint.format == DocGenFormat.PDF
@@ -41,6 +47,11 @@ class TestPipeDocGenBlueprint:
             ("template_reads_an_undeclared_input", {"template": "<p>{{ customer.name }}</p>"}, "Variable 'customer'"),
             ("filename_reads_an_undeclared_input", {"filename": "invoice-{{ order.number }}"}, "Variable 'order'"),
             ("list_output", {"output": "Document[]"}, "produces one file"),
+            (
+                "filename_beside_output_filename",
+                {"filename": "invoice-{{ invoice.number }}", "output_filename": "Invoice {{ invoice.number }}"},
+                "both 'filename' and 'output_filename'",
+            ),
             ("broken_template", {"template": "{% for %}"}, "Could not parse"),
             ("posix_absolute_template_file", {"format": "docx", "template_file": "/srv/methods/invoice.docx"}, "it is absolute"),
             ("windows_rooted_template_file", {"format": "docx", "template_file": "\\methods\\invoice.docx"}, "it holds a backslash"),

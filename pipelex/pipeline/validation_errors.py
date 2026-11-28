@@ -244,6 +244,16 @@ def _hint_reason(*, error_type: HintLintErrorType) -> MethodHintInvalidReason:
             return MethodHintInvalidReason.UNKNOWN_INTENT
         case HintLintErrorType.HINT_INAPPLICABLE_INTENT:
             return MethodHintInvalidReason.INAPPLICABLE_INTENT
+        case HintLintErrorType.HINT_UNKNOWN_ROLE:
+            return MethodHintInvalidReason.UNKNOWN_ROLE
+        case HintLintErrorType.HINT_INAPPLICABLE_ROLE:
+            return MethodHintInvalidReason.INAPPLICABLE_ROLE
+        case HintLintErrorType.HINT_UNKNOWN_PART:
+            return MethodHintInvalidReason.UNKNOWN_PART
+        case HintLintErrorType.HINT_INAPPLICABLE_PART:
+            return MethodHintInvalidReason.INAPPLICABLE_PART
+        case HintLintErrorType.HINT_DUPLICATE_PART:
+            return MethodHintInvalidReason.DUPLICATE_PART
 
 
 def _hint_facts(*, item: ValidationErrorItem) -> dict[str, Any]:

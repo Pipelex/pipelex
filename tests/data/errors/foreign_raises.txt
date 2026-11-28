@@ -157,6 +157,7 @@ pipelex/pipe_operators/structure/pipe_structure_blueprint.py | PipeStructureBlue
 pipelex/pipe_operators/structure/pipe_structure_blueprint.py | PipeStructureBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_operators/structure/pipe_structure_blueprint.py | PipeStructureBlueprint.validate_output | ValueError | validator
 pipelex/pipe_run/caller_webhook_delivery.py | first_attempt_of_step | ValueError | invariant
+pipelex/pipe_run/result_line.py | WireRecord.__hash__ | TypeError | carrier
 pipelex/providers/anthropic/anthropic_factory.py | AnthropicFactory._make_document_block_param | TypeError | invariant
 pipelex/providers/anthropic/anthropic_factory.py | AnthropicFactory._make_image_block_param | TypeError | invariant
 pipelex/providers/azure_rest/azure_img_gen_worker.py | AzureImgGenWorker.__init__ | NotImplementedError | invariant
@@ -236,3 +237,9 @@ pipelex/tracing/dynamodb_event_log.py | dynamodb_item_size | TypeError | invaria
 pipelex/tracing/trace_events.py | _execution_data_omission.leave_out | TypeError | invariant
 pipelex/tracing/trace_events.py | _input_spec_omission.leave_out | TypeError | invariant
 pipelex/tracing/trace_events.py | _output_spec_omission.leave_out | TypeError | invariant
+pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/pipe_machinery/pipe_blueprint.py | PipeBlueprint.output_filename_variable_paths | ValueError | validator
+pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/core/concepts/contract_fact_projection.py | constrained_annotation.enforce | ValueError | validator
+pipelex/core/concepts/contract_fact_projection.py | constrained_annotation.enforce_asserted | ValueError | validator

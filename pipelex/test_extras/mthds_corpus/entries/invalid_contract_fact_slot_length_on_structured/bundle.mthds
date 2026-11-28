@@ -1,0 +1,16 @@
+domain      = "slots_length_on_structured"
+description = "A note putting a length on a slot that holds a structured contract"
+main_pipe   = "write_note"
+
+[concept.Contract]
+description = "A signed agreement"
+
+[concept.Contract.structure]
+heading = { type = "text", description = "Its heading", required = true }
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "Contract", max_length = 80 } }
+output      = "Text"
+prompt      = "Write a short note about $item"

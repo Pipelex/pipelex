@@ -22,7 +22,7 @@ from pipelex.tools.storage.exceptions import StorageInvalidUriError, StorageS3Er
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StoredData
-from pipelex_sdk.artifact_models import BulkResolvedStorageUrls, LoadStoredTextsOptions
+from pipelex_sdk.artifact_models import BulkResolvedStorageUrls
 from pipelex_sdk.artifacts import load_stored_texts
 from pipelex_sdk.runs import RunResults
 from pytest_mock import MockerFixture
@@ -575,6 +575,12 @@ class TestStorageRoutes:
         asgi_app = client.app
 
         class _RunnerBulkResolveClient:
+            # The runner's own origin: its storage route hands back plain-http links there, which pipelex-sdk fetches
+            # without `allow_http`, as it does for a self-hosted runner listening on plain http.
+            @property
+            def origin_url(self) -> str:
+                return "http://testserver"
+
             async def resolve_storage_urls_bulk(self, uris: list[str]) -> BulkResolvedStorageUrls:
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=asgi_app), base_url="http://testserver") as http:
                     answer = await http.post(_RESOLVE_PATH, json={"uris": uris})
@@ -586,6 +592,6 @@ class TestStorageRoutes:
 
         monkeypatch.setattr("pipelex_sdk.artifacts._new_storage_client", _storage_client)
 
-        loaded = await load_stored_texts(_RunnerBulkResolveClient(), results, LoadStoredTextsOptions(allow_http=True))
+        loaded = await load_stored_texts(_RunnerBulkResolveClient(), results)
 
         assert loaded.main_stuff == {"text": StorageRouteCases.LONG_TEXT}

@@ -1,0 +1,10 @@
+domain      = "slots_text_options"
+description = "A note about a tier picked among options"
+main_pipe   = "write_note"
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "Text", choices = ["strategic", "tactical"] } }
+output      = "Text"
+prompt      = "Write a short note about $item"

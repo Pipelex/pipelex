@@ -1,11 +1,12 @@
 """The one composition point for the validation report's advisory `warnings`.
 
 A warning is a finding worth surfacing on a VALID bundle that must never flip `is_valid`. There are
-four families of them today, each derived from a different substrate:
+five families of them today, each derived from a different substrate:
 
 - **`optionality`** — the useless-`!` lint, from the controllers' taint analyses.
 - **`presence vacuity`** — the entry-pipe lint, from the input-form descriptors.
 - **`hints`** — the intent-hints lints, from the qualified crate.
+- **`choice options`** — an empty or repeated plain option in a `choices` list, from the qualified crate.
 - **`dry-run findings`** — what the sweep's dry runs found without failing, such as the warnings of a
   `PipeDocGen` step's template check, from the sweep's per-pipe status map.
 
@@ -40,6 +41,7 @@ from pipelex.libraries.crate_qualification import QualifiedCrateContent
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import DryRunOutput
+from pipelex.pipeline.choice_option_warnings import build_choice_option_warnings
 from pipelex.pipeline.controller_taint import ControllerTaintAnalysis, collect_controller_taint_analyses
 from pipelex.pipeline.dry_run_warnings import build_dry_run_warnings
 from pipelex.pipeline.hint_warnings import build_hint_warnings
@@ -71,12 +73,14 @@ def build_advisory_warnings(
             from a sweep run with `collect_dry_run_warnings`.
 
     Returns:
-        The advisory items: optionality, then presence vacuity, then hints, then the dry-run findings.
+        The advisory items: optionality, then presence vacuity, then hints, then dubious choice options, then the dry-run
+        findings.
     """
     return [
         *build_optionality_warnings(taint_analyses),
         *build_vacuous_presence_warnings(input_form=input_form, entry_pipe_refs=entry_pipe_refs),
         *build_hint_warnings(qualified_crate),
+        *build_choice_option_warnings(qualified=qualified_crate),
         *build_dry_run_warnings(dry_run_result),
     ]
 

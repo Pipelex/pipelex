@@ -1,0 +1,11 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: a pipe input slot cannot carry a key the language does not define — placeholder is an unknown slot-table key"
+
+[pipe.annotated_inputs]
+type = "PipeLLM"
+description = "Pipe trying to give an input slot a placeholder"
+inputs = { doc = { concept = "Text", placeholder = "Paste the document" } }
+output = "Text"
+prompt = """
+@doc
+"""

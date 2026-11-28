@@ -63,7 +63,7 @@ Here a caller may provide only `topic`. The `enrich_hint` step (which consumes `
 
 ## Guarding Templates Over Optional Inputs
 
-A template that renders an optional input must guard the reference — otherwise validation rejects it (`optional_input_unguarded`). Three guard idioms are recognized:
+A template that renders an optional input must guard the reference — otherwise validation rejects it, as the error type `optional_input_unguarded` under the code `method.optional_unhandled`, its `site` being `template`. Three guard idioms are recognized:
 
 - **The optional block sigil `@?`** — inserts the input's content when present, renders nothing when absent:
 
@@ -108,7 +108,7 @@ You never discover an unhandled absence at run time. Validation walks every cont
 | `optional_marker_invalid` | Grammar misuse: a marker combined with multiplicity, or `!` on an output. |
 | `optional_not_handled` | A maybe-absent value escapes through a non-optional boundary. The message names the absence origin, the propagation path, and the fixes. |
 | `optional_output_required` | A `continue`-reachable PipeCondition without a `?` output. |
-| `optional_input_unguarded` | An unguarded template reference to a declared-optional input. |
+| `optional_input_unguarded` | An unguarded template reference to a declared-optional input, an `output_filename` included, under the code `method.optional_unhandled`. |
 | `optional_branch_required_field` | A maybe-absent parallel branch feeding a required structure field. |
 
 Two more facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API) — the first about optionality, the second a mixed bag of advisories that the same report carries:
@@ -118,7 +118,8 @@ Two more facts surface on the **valid** report (`pipelex validate`, the agent CL
 
     - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
     - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).
-    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent` — the intent-hints lints: a hint key this version of the standard does not define, an `intent` word outside the vocabulary, and a known word on a site it does not apply to. Hints are non-normative, so the entry is preserved and only named.
+    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`, `hint_unknown_role`, `hint_inapplicable_role`, `hint_unknown_part`, `hint_inapplicable_part`, `hint_duplicate_part` — the intent-hints lints: a hint key this version of the standard does not define, an `intent`, `role` or `part` word outside its vocabulary, a known word on a site it does not apply to, and a part held once per record that two fields claim. Hints are non-normative, so the entry is preserved and only named.
+    - `choice_option_dubious` — a list of plain `choices` that repeats a value or holds an empty one, which a person could not tell apart or pick.
 
 ## Best Practices
 

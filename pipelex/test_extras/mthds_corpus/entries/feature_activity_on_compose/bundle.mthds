@@ -1,0 +1,11 @@
+domain      = "activity_on_compose"
+description = "Assembling a street-works notice, whose activity is never displayed"
+main_pipe   = "assemble_notice"
+
+[pipe.assemble_notice]
+type        = "PipeCompose"
+description = "Assemble the notice"
+inputs      = { street = "Text" }
+output      = "Text"
+template    = "Street works on $street next week."
+activity    = "Assembling the notice"

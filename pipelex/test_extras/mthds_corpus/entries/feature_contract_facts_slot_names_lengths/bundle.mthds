@@ -1,0 +1,10 @@
+domain      = "slots_names_lengths"
+description = "A note about a list of names, each at most eighty characters"
+main_pipe   = "write_note"
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "Text[]", max_length = 80 } }
+output      = "Text"
+prompt      = "Write a short note about $item"

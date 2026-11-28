@@ -504,6 +504,17 @@ class TreePythonSyntaxError(PipelexError):
     error_code = CoreCode.METHOD_SYNTAX
 
 
+class ManifestPresentationError(PipelexError):
+    """A manifest's `result_line` or `examples` breaks a rule only a runtime holding the method can apply.
+
+    `method.package_invalid` with the `ManifestPackageReason` the format names (`result_line_invalid`, or
+    `example_invalid` with the example file's path), or `method.resource_missing` for an example naming no file of the
+    method's tree. Raised where a method is validated, it becomes the verdict's item.
+    """
+
+    error_code = ErrorCodeSet(default=CoreCode.METHOD_PACKAGE_INVALID, others=(CoreCode.METHOD_RESOURCE_MISSING,))
+
+
 class HostLibraryLoadRefusalError(PipelexError):
     """A method of this host's own library directories refused to load: the deployment's fault, never the caller's input.
 

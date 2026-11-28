@@ -8,6 +8,7 @@ from pipelex.language.intent_hints import (
     HintSiteValueKind,
     IntentWord,
     applicable_intent,
+    intent_applicable_kinds,
     intent_word_applies,
     is_intent_word_known,
     merge_hints,
@@ -78,11 +79,26 @@ class TestApplicability:
     def test_intent_word_applies(self, word: IntentWord, site_kind: HintSiteValueKind, applies: bool):
         assert intent_word_applies(word, site_kind=site_kind) is applies
 
-    def test_every_word_applies_to_exactly_one_value_kind(self):
-        # The vocabulary partition: enum growth keeps this meaningful without enumerating members.
+    def test_every_word_applies_to_one_value_kind_except_scan(self):
+        # `scan` alone applies to two kinds, an image and a document; every other word to exactly one.
         for word in IntentWord:
             applicable = [kind for kind in HintSiteValueKind if intent_word_applies(word, site_kind=kind)]
-            assert len(applicable) == 1
+            match word:
+                case IntentWord.SCAN:
+                    assert applicable == [HintSiteValueKind.IMAGE_VALUED, HintSiteValueKind.DOCUMENT_VALUED]
+                case (
+                    IntentWord.PROSE
+                    | IntentWord.LABEL
+                    | IntentWord.RATING
+                    | IntentWord.QUANTITY
+                    | IntentWord.CODE
+                    | IntentWord.IDENTIFIER
+                    | IntentWord.QUESTION
+                    | IntentWord.PHOTO
+                    | IntentWord.SCREENSHOT
+                ):
+                    assert len(applicable) == 1
+        assert HintSiteValueKind.OTHER not in {kind for word in IntentWord for kind in intent_applicable_kinds(word=word)}
 
 
 class TestApplicableIntent:

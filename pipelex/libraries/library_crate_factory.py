@@ -46,7 +46,8 @@ class LibraryCrateFactory:
         4. Collect domain metadata (order-independent, omission-quiet merge per domain code)
         5. Track source file for each concept_ref and pipe_ref
         6. Detect duplicate refs across bundles (raise ConceptLibraryError / PipeLibraryError)
-        7. Compute SHA-256 fingerprint
+        7. Carry the manifest's result line on the main pipe a loader marked a bundle as defining
+        8. Compute SHA-256 fingerprint
 
         Args:
             blueprints: List of parsed MTHDS bundle blueprints, each naming the method tree it belongs to, if any
@@ -60,6 +61,7 @@ class LibraryCrateFactory:
         source_map: dict[str, str] = {}
         tree_bundles: dict[str, TreeBundleRef] = {}
         elaboration_metadata: dict[str, ElaborationMetadata] = {}
+        result_lines: dict[str, str] = {}
 
         for blueprint in blueprints:
             domain_code = blueprint.domain
@@ -155,6 +157,9 @@ class LibraryCrateFactory:
                         else:
                             source_map.pop(pipe_ref, None)
                         if winner.blueprint is pipe_blueprint:
+                            # A result line recorded for the declaration this one beat words it no more: the winner's
+                            # own bundle records one below when its manifest has one.
+                            result_lines.pop(pipe_ref, None)
                             # The tree a step resolves the files it names in follows the winner too.
                             if tree_bundle_ref is not None:
                                 tree_bundles[pipe_ref] = tree_bundle_ref
@@ -173,11 +178,20 @@ class LibraryCrateFactory:
                         elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
                     )
 
+            # The manifest's result line words the runs of its main pipe, which this bundle defines when the loader says so.
+            # It follows the declaration the crate kept, so a pipe this bundle lost a collision for takes none from it.
+            main_pipe_result_line = blueprint.main_pipe_result_line
+            if main_pipe_result_line is not None and blueprint.pipe is not None:
+                main_pipe_blueprint = blueprint.pipe.get(main_pipe_result_line.pipe_code)
+                main_pipe_ref = PipeFactory.make_pipe_ref_with_domain(domain_code=domain_code, pipe_code=main_pipe_result_line.pipe_code)
+                if main_pipe_blueprint is not None and pipes.get(main_pipe_ref) is main_pipe_blueprint:
+                    result_lines[main_pipe_ref] = main_pipe_result_line.result_line
+
         # Concept-reference validation is NOT done here: this factory performs a world-agnostic
         # structural merge. Same-domain concept references resolve against the live library (which
         # may hold concepts from prior load batches), so that check lives in the loader
         # (`LibraryManager.load_from_blueprints` -> `validate_concept_references_in_blueprints`).
-        fingerprint = LibraryCrate.compute_fingerprint_from_content(concepts=concepts, pipes=pipes)
+        fingerprint = LibraryCrate.compute_fingerprint_from_content(concepts=concepts, pipes=pipes, result_lines=result_lines)
         return LibraryCrate(
             concepts=concepts,
             pipes=pipes,
@@ -185,6 +199,7 @@ class LibraryCrateFactory:
             source_map=source_map,
             tree_bundles=tree_bundles,
             elaboration_metadata=elaboration_metadata,
+            result_lines=result_lines,
             fingerprint=fingerprint,
         )
 

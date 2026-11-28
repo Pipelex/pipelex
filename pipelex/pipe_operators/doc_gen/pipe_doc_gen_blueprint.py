@@ -123,6 +123,14 @@ class PipeDocGenBlueprint(PipeBlueprint):
         if self.template is not None and self.template_file is not None:
             msg = "PipeDocGen cannot have both 'template' and 'template_file': use one or the other."
             raise ValueError(msg)
+        if self.filename is not None and self.output_filename is not None:
+            # Two keys would name one file. `output_filename` is the standard's key and names the file a download reads;
+            # `filename` is PipeDocGen's own, and also names the stored file. Which one wins is no rule a reader can guess.
+            msg = (
+                "PipeDocGen cannot have both 'filename' and 'output_filename', which would name one file twice: keep "
+                "'output_filename', the standard's key, or 'filename', which also names the stored file."
+            )
+            raise ValueError(msg)
         if self.template is not None and not self.format.is_template_html:
             msg = (
                 f"PipeDocGen's inline 'template' is an HTML template, for the 'pdf' format only. "

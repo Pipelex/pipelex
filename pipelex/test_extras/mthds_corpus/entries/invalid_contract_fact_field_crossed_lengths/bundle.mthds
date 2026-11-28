@@ -1,0 +1,16 @@
+domain      = "facts_crossed_lengths"
+description = "A village notice whose headline lengths cross"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+headline = { type = "text", description = "The headline", min_length = 10, max_length = 5 }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

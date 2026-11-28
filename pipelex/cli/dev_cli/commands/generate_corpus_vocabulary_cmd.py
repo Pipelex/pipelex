@@ -114,9 +114,33 @@ _FEATURE_TAGS: dict[str, str] = {
         "pipe's declared signature, so a caller need not wrap each one in its concept envelope."
     ),
     "intent_hints": (
-        "An `intent` hint authored in a `hints` table — on a concept, a structure field, or an expanded "
-        "input slot — carrying non-normative presentation intent (`prose`, `label`, `rating`, `quantity`) "
-        "that renderers may honor and every other consumer safely ignores."
+        "A `hints` table — on a concept, a structure field, or an expanded input slot — carrying non-normative "
+        "presentation intent that renderers may honor and every other consumer safely ignores: an `intent` saying "
+        "what kind of value it is (`prose`, `label`, `code`, `photo`...), an input's `role` (`subject`, `context`, "
+        "`guidance`...), or a field's `part` in the record (`title`, `verdict`, `summary`...)."
+    ),
+    "contract_facts": (
+        "The contract facts a structure field, an expanded input slot, or a concept refining Number states about its "
+        "value: the constraints that refuse a value (bounds, lengths, `pattern`, `format`), which the runtime enforces, "
+        "and the descriptions that never do (`unit`, `aggregate`, `examples`)."
+    ),
+    "choice_options": (
+        "A `choices` list whose options are plain strings or option tables, "
+        '`{ value = "strategic", label = "Strategic", tone = "positive" }`, giving a value the words and the tone a '
+        "person reads in its place; a repeated or empty plain option only warns."
+    ),
+    "activity": (
+        "A pipe's `activity`, the short phrase a person watching a run reads while the step works, "
+        '`activity = "Reading the lease"`, one line and never on a signature.'
+    ),
+    "output_filename": (
+        "An `output_filename` template on an operator whose output is an Image or a Document, naming the file it "
+        "writes from the inputs it reads, each optional one guarded."
+    ),
+    "outcome_labels": (
+        "A PipeCondition outcome written as a table, "
+        '`high = { pipe = "detailed_check", label = "Detailed check" }`, giving the route the words a timeline shows, '
+        "each label unique within the condition."
     ),
     "multi_file_library": (
         "A method split across several `.mthds` files in one directory and merged additively behind a "
@@ -193,6 +217,16 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_UNKNOWN_ROLE: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_INAPPLICABLE_ROLE: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_UNKNOWN_PART: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_INAPPLICABLE_PART: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_DUPLICATE_PART: _ADVISORY_HINT_LINT_EXCLUSION,
+    PipeValidationErrorType.CHOICE_OPTION_DUBIOUS: (
+        "Advisory-only, for the same reason as `optional_force_redundant`: an empty or repeated string choice option rides "
+        "the validation report's `warnings` array and never makes a verdict invalid, and an entry asserts a verdict, not "
+        "its warnings. Revisit if the manifest ever grows a warnings axis."
+    ),
     TemplateCheckErrorType.TEMPLATE_CHECK_WARNING: (
         "Advisory-only, for the same reason as `optional_force_redundant`: a warning of a PipeDocGen step's template check rides "
         "the validation report's `warnings` array and never makes a verdict invalid. It also needs what a focused "

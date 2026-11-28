@@ -35,6 +35,7 @@ from pydantic import BaseModel, PydanticUndefinedAnnotation, PydanticUserError
 
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
+from pipelex.core.concepts.contract_fact_projection import slot_schema_with_facts
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -189,6 +190,8 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
                         concept=stuff_spec.concept.concept_ref, finding=SCHEMA_UNRENDERABLE_FINDING
                     ) from exc
                 schema_memo[memo_key] = json_schema
+            # The memo holds the bare concept's schema; a slot's own facts and options are stated on a copy.
+            json_schema = slot_schema_with_facts(json_schema=json_schema, facts=stuff_spec.contract_facts, choice_values=stuff_spec.choice_values)
             input_multiplicity, input_item_count = make_io_multiplicity(multiplicity=stuff_spec.multiplicity)
             pipe_inputs[var_name] = PipeInputContract(
                 concept_ref=stuff_spec.concept.concept_ref,

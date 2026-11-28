@@ -1,0 +1,16 @@
+domain      = "slots_examples_on_structured"
+description = "A note giving examples to a slot that holds a structured review"
+main_pipe   = "write_note"
+
+[concept.SupplierReview]
+description = "A review of a supplier"
+
+[concept.SupplierReview.structure]
+heading = { type = "text", description = "Its heading", required = true }
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "SupplierReview", examples = ["x"] } }
+output      = "Text"
+prompt      = "Write a short note about $item"

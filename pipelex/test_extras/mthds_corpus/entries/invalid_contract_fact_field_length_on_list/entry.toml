@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_length_on_list"
+description = "A library card putting a length on a list field"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

@@ -15,10 +15,15 @@ Python standards. The emitted bytes are lint-clean on
 arrival so a consumer's `ruff` run cannot invalidate the codegen stamp; see `render_import_block`.
 """
 
+from datetime import date, datetime, time
+from typing import Any, cast
+
 from pipelex.codegen.emitters.naming import python_class_name
 from pipelex.codegen.emitters.python_common import (
+    PY_EXPLODE_WIDTH,
     any_annotation,
     field_line,
+    format_default_value,
     literal_annotation,
     order_by_base,
     python_header,
@@ -104,10 +109,79 @@ def _structured_content(*, imports: set[str]) -> str:
 
 def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     annotation = _annotation(concept_field.resolved_type, by_ref=by_ref, imports=imports)
+    if concept_field.contract_facts:
+        return field_line(
+            concept_field,
+            annotation=_constrained(annotation=annotation, concept_field=concept_field, imports=imports),
+            imports=imports,
+        )
     # Only a field that may hold nothing is nullable: a defaulted field is never `None`, as in the runtime class.
     if concept_field.may_hold_nothing:
         annotation = f"{annotation} | None"
     return field_line(concept_field, annotation=annotation, imports=imports)
+
+
+def _constrained(*, annotation: str, concept_field: ResolvedField, imports: set[str]) -> str:
+    """The annotation carrying the field's contract facts, which the runtime class enforces and states alike (`ContractFacts`),
+    `| None` included when the field may hold nothing.
+
+    A field typed by a concept is marked `carried`, since its facts constrain the value its concept carries. The facts are
+    authored values, rendered as literals (`format_default_value`). Flat when the field's head fits `PY_EXPLODE_WIDTH`, as
+    `field_line` leaves a flat annotation; otherwise in the exploded form `ruff format` writes, a magic trailing comma
+    closing every bracket, so no consumer's line length rewraps it.
+    """
+    imports.add("from typing import Annotated")
+    imports.add("from pipelex.core.concepts.contract_fact_projection import ContractFacts")
+    _register_temporal_imports(value=concept_field.contract_facts, imports=imports)
+    facts = {format_default_value(key): format_default_value(value) for key, value in sorted(concept_field.contract_facts.items())}
+    carried = concept_field.resolved_type.kind.is_concept
+    may_hold_nothing = concept_field.may_hold_nothing
+    flat_entries = ", ".join(f"{key}: {value}" for key, value in facts.items())
+    flat = f"Annotated[{annotation}, ContractFacts({{{flat_entries}}}{', carried=True' if carried else ''})]"
+    if may_hold_nothing:
+        flat = f"{flat} | None"
+    if len(flat) <= PY_EXPLODE_WIDTH - len(f"    {concept_field.name}: ") - len(" = Field("):
+        return flat
+    depth = 2 if may_hold_nothing else 1
+    lines = ["Annotated[", f"{_indent(depth=depth + 1)}{annotation},", f"{_indent(depth=depth + 1)}ContractFacts(", f"{_indent(depth=depth + 2)}{{"]
+    for key, value in sorted(concept_field.contract_facts.items()):
+        lines.extend(_exploded_entry(key=format_default_value(key), value=value, depth=depth + 3))
+    lines.append(f"{_indent(depth=depth + 2)}}},")
+    if carried:
+        lines.append(f"{_indent(depth=depth + 2)}carried=True,")
+    lines.extend((f"{_indent(depth=depth + 1)}),", f"{_indent(depth=depth)}]"))
+    exploded = "\n".join(lines)
+    if not may_hold_nothing:
+        return exploded
+    return f"(\n{_indent(depth=2)}{exploded}\n{_indent(depth=2)}| None\n{_indent(depth=1)})"
+
+
+def _indent(*, depth: int) -> str:
+    return "    " * depth
+
+
+def _exploded_entry(*, key: str, value: Any, depth: int) -> list[str]:
+    """One entry of an exploded facts table: flat, but a list exploded with a magic trailing comma, as `examples` may run long."""
+    if isinstance(value, list):
+        items = [f"{_indent(depth=depth + 1)}{format_default_value(item)}," for item in cast("list[Any]", value)]
+        return [f"{_indent(depth=depth)}{key}: [", *items, f"{_indent(depth=depth)}],"]
+    return [f"{_indent(depth=depth)}{key}: {format_default_value(value)},"]
+
+
+def _register_temporal_imports(*, value: Any, imports: set[str]) -> None:
+    """Register the `datetime` names `format_default_value` spells a date, a date-time or a time of `value` with."""
+    if isinstance(value, datetime):
+        imports.add("from datetime import datetime")
+    elif isinstance(value, date):
+        imports.add("from datetime import date")
+    elif isinstance(value, time):
+        imports.add("from datetime import time")
+    elif isinstance(value, list):
+        for item in cast("list[Any]", value):
+            _register_temporal_imports(value=item, imports=imports)
+    elif isinstance(value, dict):
+        for item in cast("dict[Any, Any]", value).values():
+            _register_temporal_imports(value=item, imports=imports)
 
 
 def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:

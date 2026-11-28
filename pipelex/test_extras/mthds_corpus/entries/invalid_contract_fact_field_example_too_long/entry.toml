@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_example_too_long"
+description = "A locker card whose example code is longer than its codes may be"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

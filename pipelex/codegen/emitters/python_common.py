@@ -103,8 +103,10 @@ def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> s
     comment, comment_continuation = _imprecision_comment(field)
 
     flat = f"    {field.name}: {annotation} = Field({', '.join(params)})"
-    # The trailing comment counts toward the width: ruff splits the call to fit `)  # imprecise: …` too.
-    if len(flat) + len(comment) <= PY_EXPLODE_WIDTH:
+    # The trailing comment counts toward the width: ruff splits the call to fit `)  # imprecise: …` too. An annotation
+    # the emitter already exploded over several lines is never part of a flat line.
+    is_exploded_annotation = "\n" in annotation
+    if not is_exploded_annotation and len(flat) + len(comment) <= PY_EXPLODE_WIDTH:
         return flat + comment + comment_continuation
 
     # Too long to be left alone: hand the formatter an already-exploded call with a magic trailing comma,
@@ -113,7 +115,8 @@ def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> s
     # cannot rewrite. The annotation gets the same treatment when the head line alone is still too long.
     opening = f"    {field.name}: "
     head_overhead = len(opening) + len(" = Field(")
-    head = f"{opening}{explode_bracket(annotation, budget=PY_EXPLODE_WIDTH - head_overhead)} = Field("
+    head_annotation = annotation if is_exploded_annotation else explode_bracket(annotation, budget=PY_EXPLODE_WIDTH - head_overhead)
+    head = f"{opening}{head_annotation} = Field("
     body = "".join(f"        {param},\n" for param in params)
     return f"{head}\n{body}    ){comment}{comment_continuation}"
 
@@ -160,7 +163,8 @@ def _split_top_level(inner: str) -> list[str]:
             current = ""
             continue
         else:
-            depth += {"[": 1, "]": -1}.get(char, 0)
+            # Every bracket nests: a member may be a call or a table, such as `ContractFacts({...})`, whose commas are its own.
+            depth += {"[": 1, "]": -1, "(": 1, ")": -1, "{": 1, "}": -1}.get(char, 0)
         current += char
     members.append(current.strip())
     return members

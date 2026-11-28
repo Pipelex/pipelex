@@ -4,7 +4,6 @@ from enum import StrEnum
 from typing import Annotated, Any, Self
 
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
@@ -15,7 +14,19 @@ from pydantic import (
     model_validator,
 )
 
+from pipelex.core.concepts.choice_options import ChoiceOptionValue, choice_values, parse_choices
+from pipelex.core.concepts.contract_fact_blueprint import ContractFactsBlueprint, drop_absent_members, raise_first_finding
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
+from pipelex.language.contract_facts import (
+    CONTRACT_FACT_KEY_NAMES,
+    NUMERIC_BOUND_KEYS,
+    ContractFactFinding,
+    ContractFactReason,
+    FactSiteType,
+    applicability_findings,
+    contradiction_findings,
+    value_findings,
+)
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
 
 # Reserved field names that cannot be used in concept structures
@@ -110,10 +121,15 @@ def field_may_hold_nothing(*, required: bool, default_value: Any) -> bool:
     return not required and default_value is None
 
 
-class ConceptStructureBlueprint(BaseModel):
+class ConceptStructureBlueprint(ContractFactsBlueprint):
     """One field of a concept's structure table. Unknown keys are rejected — the field table's
     keys are strict, exactly like an input slot table's; hint *content* stays lenient (unknown
     hint keys warn and are preserved, per intent-hints.md).
+
+    A field may state contract facts about its value (`ContractFactsBlueprint`). A field typed by a field type is judged
+    here, where its value class is known; a `concept` field's value class depends on the concept it names, which a field
+    cannot resolve alone, so whether its facts apply is judged once the library's concepts are known
+    (`pipelex.libraries.contract_fact_sites`), and only what holds whatever its class is judged here.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -129,7 +145,9 @@ class ConceptStructureBlueprint(BaseModel):
     concept_ref: str | None = None
     item_concept_ref: str | None = None
 
-    choices: list[str] | None = Field(default=None)
+    choices: list[ChoiceOptionValue] | None = Field(default=None)
+    """The options of an enumeration field, each a string or an option table carrying words for people. An option table
+    carrying `value` alone is read as its value's string (`parse_choices`)."""
     default_value: Any | None = None
     required: bool = Field(default=False)
     hints: dict[str, str] | None = None
@@ -141,6 +159,66 @@ class ConceptStructureBlueprint(BaseModel):
     def may_hold_nothing(self) -> bool:
         """Whether a value of this field may hold nothing, by `field_may_hold_nothing`."""
         return field_may_hold_nothing(required=self.required, default_value=self.default_value)
+
+    @property
+    def choice_values(self) -> list[str] | None:
+        """The values the field's options declare, in declared order, or `None` for a field with no `choices`."""
+        return choice_values(options=self.choices) if self.choices is not None else None
+
+    @property
+    def fact_site_type(self) -> FactSiteType | None:
+        """The type a field typed by a field type holds, for its contract facts; `None` for a field of no value class
+        (an enumeration, a `boolean`, a `list` or a `dict`) and for a `concept` field, whose class its concept decides.
+        """
+        if self.choices:
+            return None
+        match self.type:
+            case ConceptStructureBlueprintFieldType.TEXT:
+                return FactSiteType.TEXT
+            case ConceptStructureBlueprintFieldType.INTEGER:
+                return FactSiteType.INTEGER
+            case ConceptStructureBlueprintFieldType.NUMBER:
+                return FactSiteType.NUMBER
+            case ConceptStructureBlueprintFieldType.DATE:
+                return FactSiteType.DATE
+            case ConceptStructureBlueprintFieldType.DATETIME:
+                return FactSiteType.DATETIME
+            case ConceptStructureBlueprintFieldType.TIME:
+                return FactSiteType.TIME
+            case (
+                ConceptStructureBlueprintFieldType.LIST
+                | ConceptStructureBlueprintFieldType.DICT
+                | ConceptStructureBlueprintFieldType.BOOLEAN
+                | ConceptStructureBlueprintFieldType.CONCEPT
+                | None
+            ):
+                return None
+
+    @property
+    def is_concept_typed(self) -> bool:
+        """Whether the field's value class is its concept's, decided once the library's concepts are known."""
+        match self.type:
+            case ConceptStructureBlueprintFieldType.CONCEPT:
+                return not self.choices
+            case (
+                ConceptStructureBlueprintFieldType.TEXT
+                | ConceptStructureBlueprintFieldType.LIST
+                | ConceptStructureBlueprintFieldType.DICT
+                | ConceptStructureBlueprintFieldType.INTEGER
+                | ConceptStructureBlueprintFieldType.BOOLEAN
+                | ConceptStructureBlueprintFieldType.NUMBER
+                | ConceptStructureBlueprintFieldType.DATE
+                | ConceptStructureBlueprintFieldType.DATETIME
+                | ConceptStructureBlueprintFieldType.TIME
+                | None
+            ):
+                return False
+
+    @field_validator("choices", mode="before")
+    @classmethod
+    def read_choice_options(cls, choices: Any) -> Any:
+        """Read the options into normal form, refusing a malformed option table (`parse_choices`)."""
+        return parse_choices(raw=choices)
 
     @field_validator("hints", mode="after")
     @classmethod
@@ -160,7 +238,8 @@ class ConceptStructureBlueprint(BaseModel):
         dumped: dict[str, Any] = handler(self)
         if dumped.get("hints") is None:
             dumped.pop("hints", None)
-        return dumped
+        # A contract fact the field does not author is an absent member too, so a library authoring none keeps its fingerprint.
+        return drop_absent_members(dumped=dumped, keys=CONTRACT_FACT_KEY_NAMES)
 
     @field_validator("item_type", "value_type", mode="after")
     @classmethod
@@ -278,11 +357,44 @@ class ConceptStructureBlueprint(BaseModel):
 
         # Check default_value is valid for choice fields
         if self.default_value is not None and self.type is None and self.choices:
-            if self.default_value not in self.choices:
-                msg = f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
+            if self.default_value not in choice_values(options=self.choices):
+                valid_choices = choice_values(options=self.choices)
+                msg = f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {valid_choices}"
                 raise ValueError(msg)
 
+        raise_first_finding(findings=self._contract_fact_findings())
         return self
+
+    def _contract_fact_findings(self) -> list[ContractFactFinding]:
+        """The faults of the field's contract facts that its blueprint alone can judge, in the order they are reported.
+
+        A field typed by a field type is judged in full: which facts apply to its value class, whether a bound on an
+        `integer` field is an integer, whether its facts contradict each other, and whether its examples and its default
+        are valid values of it. A `concept` field is judged on what holds whatever its concept's class: two lower or two
+        upper bounds, an empty range, and lengths that cross. A concept holds any number, never only integers.
+        """
+        facts = self.contract_facts
+        if not facts:
+            return []
+        if self.is_concept_typed:
+            return contradiction_findings(facts=facts, is_integer=False)
+        site_type = self.fact_site_type
+        findings = applicability_findings(facts=facts, value_class=site_type.value_class if site_type else None, is_slot=False, has_choices=False)
+        if findings or site_type is None:
+            return findings
+        if site_type.is_integer:
+            for key in NUMERIC_BOUND_KEYS:
+                bound = facts.get(key)
+                if bound is not None and not isinstance(bound, int):
+                    findings.append(
+                        ContractFactFinding(key, ContractFactReason.MALFORMED, f"'{key}' on an integer field must be an integer, got {bound!r}")
+                    )
+            if findings:
+                return findings
+        findings = contradiction_findings(facts=facts, is_integer=site_type.is_integer)
+        if findings:
+            return findings
+        return value_findings(facts=facts, site_type=site_type, default_value=self.default_value)
 
     def _validate_default_value_type(self) -> None:
         if self.type is None or self.default_value is None:

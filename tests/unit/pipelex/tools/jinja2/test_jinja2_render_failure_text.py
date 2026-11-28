@@ -174,6 +174,20 @@ class TestJinja2RenderFailureText:
                     "(TypeError, at line 1 of the template)"
                 ),
             ),
+            (
+                "a filter refusing a value with a ValueError",
+                "{{ lookup | wordwrap(0) }}",
+                {"lookup": _PAYLOAD},
+                Jinja2TemplateRenderError,
+                ("Jinja2 render — value error: a filter or a method refused the value it was given (ValueError, at line 1 of the template)"),
+            ),
+            (
+                "a format call refusing a value of the data",
+                "{{ '{:d}'.format(lookup) }}",
+                {"lookup": _PAYLOAD},
+                Jinja2TemplateRenderError,
+                ("Jinja2 render — value error: a filter or a method refused the value it was given (ValueError, at line 1 of the template)"),
+            ),
         ],
     )
     async def test_a_failure_on_the_run_s_data_quotes_none_of_it(

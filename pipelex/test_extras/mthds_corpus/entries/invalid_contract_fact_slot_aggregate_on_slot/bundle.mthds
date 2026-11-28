@@ -1,0 +1,10 @@
+domain      = "slots_aggregate_on_slot"
+description = "A note asking a slot to add up its values"
+main_pipe   = "write_note"
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "Number", aggregate = "sum" } }
+output      = "Text"
+prompt      = "Write a short note about $item"

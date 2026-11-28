@@ -45,6 +45,7 @@ class TestAgentRunCoreAbsentOutput:
             working_memory=memory,
             graph_spec=None,
             tokens_usages=None,
+            result_line=None,
         )
         runner_mock = mocker.MagicMock()
         runner_mock.execute = mocker.AsyncMock(return_value=SimpleNamespace(pipe_output=pipe_output))
@@ -89,6 +90,7 @@ class TestAgentRunCoreAbsentOutput:
             working_memory=memory,
             graph_spec=None,
             tokens_usages=None,
+            result_line=None,
         )
         runner_mock = mocker.MagicMock()
         runner_mock.execute = mocker.AsyncMock(return_value=SimpleNamespace(pipe_output=pipe_output))

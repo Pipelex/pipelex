@@ -139,6 +139,8 @@ class PipelexPipeRunOutput(BaseModel):
     # travels its description travels with it; pipe_io_artifacts_error mirrors graph_assembly_error.
     pipe_io_artifacts_dump: dict[str, Any] | None = None
     pipe_io_artifacts_error: str | None = None
+    # `PipeOutput.result_line`: the run's one line wording what it produced, evaluated where the run ended.
+    result_line: str | None = None
 
 
 class PipelexPipeDispatchAck(BaseModel):

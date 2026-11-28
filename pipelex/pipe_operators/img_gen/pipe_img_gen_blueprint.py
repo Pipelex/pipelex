@@ -63,8 +63,8 @@ class PipeImgGenBlueprint(PipeBlueprint):
             )
         check_inputs_match_variables(
             declared_inputs=declared_inputs,
-            variable_paths=variable_paths,
-            reader="prompt or negative_prompt",
+            variable_paths=variable_paths | self.output_filename_variable_paths(),
+            reader=self.reader_with_output_filename(reader="prompt or negative_prompt"),
         )
 
     @classmethod

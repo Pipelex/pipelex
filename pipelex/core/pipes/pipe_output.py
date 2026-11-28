@@ -42,6 +42,10 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     # usage_assembly_error mirrors graph_assembly_error.
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
+    # The run's result line (spec: manifest-format.md, "Result Line"): its main pipe's `result_line` rendered against the
+    # output, else the line derived from the output's `verdict` field; evaluated once, on the run's own output only, and
+    # None for a sub-pipe's output, a run whose output resolved absent, or an output with nothing to word it.
+    result_line: str | None = None
 
     # The job this output was produced under, when there was one.
     #

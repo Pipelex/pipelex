@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_reference_pattern"
+description = "A delivery card whose purchase order reference follows the PO pattern"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

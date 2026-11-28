@@ -59,6 +59,7 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
+from pipelex.tools.log.log_redaction import escape_control_characters
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
@@ -74,6 +75,10 @@ if TYPE_CHECKING:
 
 COMMAND = "run"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
+_RESULT_LINE_FILENAME = "result_line.txt"
+"""The file of a run's output folder holding its result line, when it has one."""
+_RUN_WRITTEN_FILENAMES = frozenset({_WORKING_MEMORY_FILENAME, _RESULT_LINE_FILENAME})
+"""The files a run writes into its output folder after the main output's own file, which that file never takes the name of."""
 
 
 def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_inputs: bool) -> None:
@@ -445,10 +450,29 @@ async def _execute_run(
             if not dry_run:
                 try:
                     saved_main_stuff_file = await save_main_stuff_file(
-                        content=main_stuff.content, output_dir=output_path, reserved_names=frozenset({_WORKING_MEMORY_FILENAME})
+                        content=main_stuff.content, output_dir=output_path, reserved_names=_RUN_WRITTEN_FILENAMES
                     )
                 except (PipelexError, OSError, ValueError) as file_exc:
                     typer.secho(f"Could not copy the main output's file into {output_path}: {file_exc}", fg=typer.colors.YELLOW, err=True)
+
+    # The run's result line, the one line wording what it produced (spec: manifest-format.md, "Result Line"), is
+    # kept beside the output's files and shown to the person who ran it.
+    # The file keeps the line as the run gave it; the terminal reads it with its control characters escaped, since the
+    # line words the method's output and an escape sequence in it would drive the terminal (colours, cursor moves, an OSC
+    # clipboard write). A dry run's line words mock values, so the terminal says so.
+    saved_result_line = False
+    if pipe_output.result_line is not None:
+        if output_path:
+            try:
+                (output_path / _RESULT_LINE_FILENAME).write_text(f"{pipe_output.result_line}\n", encoding="utf-8")
+                saved_result_line = True
+            except OSError as write_exc:
+                typer.secho(f"Could not save the result line into {output_path}: {write_exc}", fg=typer.colors.YELLOW, err=True)
+        shown_result_line = escape_control_characters(text=pipe_output.result_line)
+        if dry_run:
+            typer.secho(f"Result (dry run, from mock values): {shown_result_line}", fg=typer.colors.YELLOW, err=True)
+        else:
+            typer.secho(f"Result: {shown_result_line}", fg=typer.colors.GREEN, err=True)
 
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None
@@ -547,6 +571,8 @@ async def _execute_run(
             console.print(f"    [green]✓[/green] main_stuff: {', '.join(saved_main_stuff_formats)}")
         if saved_main_stuff_file:
             console.print(f"    [green]✓[/green] file: [bold magenta]{escape(str(saved_main_stuff_file))}[/bold magenta]")
+        if saved_result_line:
+            console.print(f"    [green]✓[/green] {_RESULT_LINE_FILENAME}")
         if working_memory_output_path:
             if Path(working_memory_output_path).is_relative_to(output_path):
                 console.print(f"    [green]✓[/green] {_WORKING_MEMORY_FILENAME}")

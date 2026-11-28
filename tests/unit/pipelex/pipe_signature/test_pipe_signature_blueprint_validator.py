@@ -56,3 +56,15 @@ class TestPipeSignatureBlueprintValidator:
         )
         assert blueprint.pipe_category is None
         assert "pipe_category" not in blueprint.model_dump()
+
+    @pytest.mark.parametrize(
+        ("field_name", "value", "output"),
+        [
+            ("activity", "Reading the lease", "Text"),
+            ("output_filename", "cover", "Image"),
+        ],
+    )
+    def test_blueprint_refuses_execution_words(self, field_name: str, value: str, output: str) -> None:
+        """A signature runs nothing and writes no file, so it carries neither `activity` nor `output_filename`."""
+        with pytest.raises(ValidationError, match=f"does not carry `{field_name}`"):
+            PipeSignatureBlueprint.model_validate({"description": "A contract", "output": output, field_name: value})

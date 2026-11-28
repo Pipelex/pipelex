@@ -1,0 +1,15 @@
+domain      = "grant_request"
+description = "Writing a grant request whose amount concept counts euros"
+main_pipe   = "estimate_grant"
+
+[concept.Amount]
+description = "An amount of money"
+refines     = "Number"
+unit        = "EUR"
+
+[pipe.estimate_grant]
+type        = "PipeLLM"
+description = "Estimate the grant to request"
+inputs      = { project = "Text" }
+output      = "Amount"
+prompt      = "Estimate the grant this project should request: $project"

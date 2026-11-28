@@ -1,0 +1,16 @@
+domain      = "facts_currency_unit"
+description = "A festival card whose budget is in euros"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+budget = { type = "number", description = "The budget", unit = "EUR" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

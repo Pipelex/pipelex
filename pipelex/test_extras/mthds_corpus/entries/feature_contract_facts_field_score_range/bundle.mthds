@@ -1,0 +1,16 @@
+domain      = "facts_score_range"
+description = "A cheese-tasting card whose score runs from one to five"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+score = { type = "integer", description = "The tasting score", minimum = 1, maximum = 5 }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

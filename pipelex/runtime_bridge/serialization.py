@@ -77,6 +77,7 @@ def serialize_completed_output(
         usage_assembly_error=pipe_output.usage_assembly_error,
         pipe_io_artifacts_dump=pipe_io_artifacts_dump,
         pipe_io_artifacts_error=pipe_output.pipe_io_artifacts_error,
+        result_line=pipe_output.result_line,
     )
 
 

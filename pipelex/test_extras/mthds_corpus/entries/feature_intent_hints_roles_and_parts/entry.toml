@@ -1,0 +1,10 @@
+name = "feature_intent_hints_roles_and_parts"
+description = "An NDA review whose inputs say their role and whose verdict fields say their part"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.intent_hints",
+]

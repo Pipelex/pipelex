@@ -88,16 +88,43 @@ You can specify multiple inputs by using a list of concepts. For example, `input
 
     An input name is a plain `snake_case` identifier, matching `[a-z][a-z0-9_]*`, and it names one whole value of the concept its slot declares. A dotted key such as `"invoice.total" = "Number"` does not declare a field of `invoice`: it is refused as `invalid_input_name`, on every pipe. A pipe that needs one field of a value declares the value with its whole concept, `invoice = "Invoice"`, and reads the field through it in its template, as `$invoice.total`. `pipelex fix bundle` deletes a dotted key whose root is declared beside it, since that root already supplies the field, unless the key, declared after its root, carries another presence marker or multiplicity than the root, such as `"data.text" = "Text!"` after `data = "Text?"`: deleting that key would change what the pipe requires, so the fix names only what differs, the multiplicity, the presence marker or both, with the edit that carries it onto the root (here, replace `?` with `!` on `data`), and is left for you to apply.
 
-    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
+    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can say more about the value it takes:
 
     ```toml
-    inputs = { topic = { concept = "Text", hints = { intent = "prose" } } }
+    [pipe.review_nda.inputs]
+    nda = { concept = "Document", description = "The signed NDA to review", hints = { role = "subject" } }
+    budget = { concept = "Number", minimum = 0, unit = "EUR", examples = [5000] }
+    tier = { concept = "Text", choices = [{ value = "strategic", label = "Strategic" }, "tactical"] }
+    names = { concept = "Text[]", max_length = 80 }
     ```
 
-    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). The table is closed — `concept` and `hints` are the only keys it accepts, and anything else is a validation error. A slot table with no hints is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints, so reach for the expanded form only when you have hints to attach.
+    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). Beside it the table accepts:
+
+    - `hints`, the slot's [intent hints](../concepts/intent-hints.md), including its `role`;
+    - `description`, a non-empty sentence a form shows in place of the concept's description;
+    - the [contract facts](../concepts/inline-structures.md#contract-facts) of the slot's value, when its concept is text-, number-, date- or time-valued, never `aggregate`; on a plural slot they apply to each item;
+    - `choices`, on a text-valued slot only, as on a [choice field](../concepts/inline-structures.md#choice-fields-enums); beside `choices` a slot takes no length, `pattern`, `format` or `examples`.
+
+    Anything else is a validation error, and a fact on a slot whose concept holds no plain value, a structured concept for instance, is refused with the reason `not_value_slot`. A slot's constraints and options are enforced on the value a caller sends to the run's entry pipe, a text given by URL or stored for being large included, which is read for the check and refused as `input.invalid` when it breaks one or cannot be read, and they are stated on the slot's input JSON Schema. A slot table carrying none of these keys is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints.
+
+*   **`activity`** (optional): A short phrase a person watching a run reads while the pipe works, such as `activity = "Reading the lease"`. It is one line, never empty, and a contract-only signature does not carry it. The run's graph carries it on the pipe's node as `activity`, beside its `description`, and so does the trace event that starts the node, so a timeline shows it in place of the description.
+
+*   **`output_filename`** (optional): On an operator whose output is an `Image` or a `Document`, a Jinja2 template naming the file the pipe writes, such as `output_filename = "{{ counterparty }} - NDA review"`. It reads only declared inputs, counts as reading them, and must guard every optional input it names with `{% if %}`. A controller writes no file of its own, so it does not carry one. See [Naming the files a step produces](#naming-the-files-a-step-produces).
 
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
+
+### Naming the Files a Step Produces
+
+When an operator stating `output_filename` has produced its output, the runtime renders the template once with the pipe's inputs, as they were before the step ran, so an output written under an input's name never stands in for that input, and gives each `Image` or `Document` of the output the name it builds, as the file's `filename`, the name a download and `pipelex run --save-main-stuff` use. The name is built in these steps:
+
+1. The rendered text is normalized to NFC, each run of white space becomes one space, each of `/ \ : * ? " < > |` and each control character becomes `-`, and white space and dots are trimmed from both ends. A name that is a device name Windows reserves, such as `CON` or `LPT1`, takes a trailing `_`.
+2. The name keeps the extension of the name the runtime would have given the file: an extension the template already wrote, in any letter case, is kept as written, and any other is appended.
+3. The whole name, extension and suffix included, is cut to 255 bytes of UTF-8, never inside a character. An extension so long that it leaves no room for the name is dropped, and a runtime name the file falls back to is capped the same way, so a name never passes 255 bytes.
+4. When the template fails to render, whatever the reason (an error in the template, a refusal of the template sandbox, a filter refusing this run's value, or an input held in storage that could not be loaded), or nothing is left before the extension, the file keeps the name the runtime would have given it, with a warning in the log. Naming a file never fails a run.
+5. On a plural output, such as `Image[3]`, the second and later files take ` (2)`, ` (3)` and so on before the extension.
+
+So `output_filename = "{{ client }} cover"` with the input `Acme/Corp` names two images `Acme-Corp cover.png` and `Acme-Corp cover (2).png`. A text input stored for its size is loaded before the template renders, as every template a step renders reads its stored inputs. The name never decides where a file is stored: the stored file and its URL are left as they were. A dry run names its placeholder files the same way.
 
 ### Multi-Step Methods
 

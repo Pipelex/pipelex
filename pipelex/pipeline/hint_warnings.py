@@ -13,26 +13,33 @@ refinement chains reaching `native.Text` / `native.Number` classify the refiner;
 judged per item). A site that is neither takes no word of this version.
 """
 
+from enum import StrEnum
+
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.language.intent_hints import (
     INTENT_HINT_KEY,
     KNOWN_HINT_KEYS,
+    PART_HINT_KEY,
+    ROLE_HINT_KEY,
+    FieldShape,
     HintSiteValueKind,
     IntentWord,
+    PartWord,
+    RoleWord,
+    intent_applicable_kinds,
     intent_word_applies,
     is_intent_word_known,
+    is_part_word_known,
+    is_role_word_known,
+    part_word_applies,
 )
+from pipelex.libraries.concept_value_kinds import CrateConceptKinds
 from pipelex.libraries.crate_qualification import QualifiedCrateContent
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.validation_error_types import HintLintErrorType
-
-_NATIVE_TEXT_REF = NativeConceptCode.TEXT.concept_ref
-_NATIVE_NUMBER_REF = NativeConceptCode.NUMBER.concept_ref
 
 MAX_HINT_FINDINGS_PER_SITE = 5
 """How many undefined hint keys one site reports individually before the rest collapse into a tail.
@@ -57,45 +64,6 @@ def elide_authored_token(*, token: str) -> str:
     return f"{token[:MAX_AUTHORED_TOKEN_LENGTH]}..."
 
 
-def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
-    """The value kind of a class-backed structure, by native-class identity.
-
-    Mirrors the deriver's `_class_backed_node` lookup: `TextContent` is the native Text payload and
-    `MarkdownContent` the native Markdown one, which refines Text (both text-valued, both `prose` in the
-    descriptor), `NumberContent` the native Number payload (number-valued). Every other class — the
-    remaining natives and registered project classes alike — is not a hint-applicable site. The verdict
-    natives `YesNo`, `Choice` and `Rating` are structured sites where no intent word applies, `Rating`
-    included despite its number-valued level.
-    One divergence is open (L-260930-173b03): the deriver reflects a registered `RootModel` over a
-    scalar as its root value, which this lookup still classifies as OTHER.
-    """
-    native_code = next((code for code in NativeConceptCode if code.structure_class_name == class_name), None)
-    match native_code:
-        case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
-            return HintSiteValueKind.TEXT_VALUED
-        case NativeConceptCode.NUMBER:
-            return HintSiteValueKind.NUMBER_VALUED
-        case (
-            NativeConceptCode.DYNAMIC
-            | NativeConceptCode.IMAGE
-            | NativeConceptCode.DOCUMENT
-            | NativeConceptCode.HTML
-            | NativeConceptCode.TEXT_AND_IMAGES
-            | NativeConceptCode.YES_NO
-            | NativeConceptCode.CHOICE
-            | NativeConceptCode.RATING
-            | NativeConceptCode.DATE
-            | NativeConceptCode.TIME
-            | NativeConceptCode.PAGE
-            | NativeConceptCode.JSON
-            | NativeConceptCode.SEARCH_RESULT
-            | NativeConceptCode.ANYTHING
-            | NativeConceptCode.COMPOSITE
-            | None
-        ):
-            return HintSiteValueKind.OTHER
-
-
 def build_hint_warnings(qualified: QualifiedCrateContent) -> list[ValidationErrorItem]:
     """Sweep the qualified crate's three hint sites and emit one advisory item per finding.
 
@@ -115,7 +83,7 @@ class _HintLinter:
     def __init__(self, *, qualified: QualifiedCrateContent) -> None:
         self._concepts = qualified.concepts
         self._pipes = qualified.pipes
-        self._concept_kind_cache: dict[str, HintSiteValueKind] = {}
+        self._kinds = CrateConceptKinds(concepts=qualified.concepts)
 
     def lint(self) -> list[ValidationErrorItem]:
         warnings: list[ValidationErrorItem] = []
@@ -129,22 +97,27 @@ class _HintLinter:
                     self._lint_hints(
                         hints=value.hints,
                         site_kind=self._concept_site_kind(concept_ref),
+                        site=_HintSite.CONCEPT,
                         site_desc=f"concept '{concept_ref}'",
                         domain_code=domain_code,
                         concept_code=concept_code,
                     )
                 )
             if isinstance(value.structure, dict):
+                part_holders: dict[PartWord, str] = {}
                 for field_name, field in value.structure.items():
                     if isinstance(field, ConceptStructureBlueprint) and field.hints:
                         warnings.extend(
                             self._lint_hints(
                                 hints=field.hints,
                                 site_kind=self._field_site_kind(field),
+                                site=_HintSite.FIELD,
+                                field_shape=self._field_shape(field=field),
                                 site_desc=f"field '{field_name}' of concept '{concept_ref}'",
                                 domain_code=domain_code,
                                 concept_code=concept_code,
                                 field_name=field_name,
+                                part_holders=part_holders,
                             )
                         )
         for pipe_ref in sorted(self._pipes):
@@ -158,6 +131,7 @@ class _HintLinter:
                         self._lint_hints(
                             hints=slot_value.hints,
                             site_kind=self._slot_site_kind(slot_value.concept),
+                            site=_HintSite.SLOT,
                             site_desc=f"input '{slot_name}' of pipe '{pipe_ref}'",
                             domain_code=domain_code,
                             pipe_code=pipe_code,
@@ -173,12 +147,15 @@ class _HintLinter:
         *,
         hints: dict[str, str],
         site_kind: HintSiteValueKind,
+        site: "_HintSite",
         site_desc: str,
         domain_code: str,
+        field_shape: FieldShape = FieldShape.OTHER,
         concept_code: str | None = None,
         pipe_code: str | None = None,
         field_name: str | None = None,
         variable_names: list[str] | None = None,
+        part_holders: dict[PartWord, str] | None = None,
     ) -> list[ValidationErrorItem]:
         # Each finding with the hint key it is about, elided as its message quotes it.
         findings: list[tuple[HintLintErrorType, str, str]] = []
@@ -203,20 +180,52 @@ class _HintLinter:
             if not is_intent_word_known(intent_word):
                 unknown_intent_message = (
                     f"Intent word '{elide_authored_token(token=intent_word)}' on {site_desc} is not in this version's vocabulary "
-                    f"(prose, label, rating, quantity). The entry is preserved; consumers ignore it."
+                    f"({', '.join(IntentWord)}). The entry is preserved; consumers ignore it."
                 )
                 findings.append((HintLintErrorType.HINT_UNKNOWN_INTENT, unknown_intent_message, INTENT_HINT_KEY))
             elif not intent_word_applies(known_word := IntentWord(intent_word), site_kind=site_kind):
-                match known_word:
-                    case IntentWord.PROSE | IntentWord.LABEL:
-                        needed_kind = "text"
-                    case IntentWord.RATING | IntentWord.QUANTITY:
-                        needed_kind = "number"
+                needed_kinds = " or ".join(sorted(kind.removesuffix("_valued") for kind in intent_applicable_kinds(word=known_word)))
                 inapplicable_message = (
                     f"Intent word '{elide_authored_token(token=intent_word)}' does not apply to {site_desc} (the site is not "
-                    f"{needed_kind}-valued). The entry is preserved; consumers ignore it there."
+                    f"{needed_kinds}-valued). The entry is preserved; consumers ignore it there."
                 )
                 findings.append((HintLintErrorType.HINT_INAPPLICABLE_INTENT, inapplicable_message, INTENT_HINT_KEY))
+        role_word = hints.get(ROLE_HINT_KEY)
+        if role_word is not None:
+            if not is_role_word_known(word=role_word):
+                unknown_role_message = (
+                    f"Role word '{elide_authored_token(token=role_word)}' on {site_desc} is not in this version's vocabulary "
+                    f"({', '.join(RoleWord)}). The entry is preserved; consumers ignore it."
+                )
+                findings.append((HintLintErrorType.HINT_UNKNOWN_ROLE, unknown_role_message, ROLE_HINT_KEY))
+            elif not site.takes_role:
+                inapplicable_role_message = (
+                    f"Role word '{elide_authored_token(token=role_word)}' does not apply to {site_desc}: a role is said of an input slot only. "
+                    "The entry is preserved; consumers ignore it there."
+                )
+                findings.append((HintLintErrorType.HINT_INAPPLICABLE_ROLE, inapplicable_role_message, ROLE_HINT_KEY))
+        part_word = hints.get(PART_HINT_KEY)
+        if part_word is not None:
+            if not is_part_word_known(word=part_word):
+                unknown_part_message = (
+                    f"Part word '{elide_authored_token(token=part_word)}' on {site_desc} is not in this version's vocabulary "
+                    f"({', '.join(PartWord)}). The entry is preserved; consumers ignore it."
+                )
+                findings.append((HintLintErrorType.HINT_UNKNOWN_PART, unknown_part_message, PART_HINT_KEY))
+            elif not site.takes_part or not part_word_applies(word=(known_part := PartWord(part_word)), site_kind=site_kind, field_shape=field_shape):
+                inapplicable_part_message = (
+                    f"Part word '{elide_authored_token(token=part_word)}' does not apply to {site_desc}. "
+                    "The entry is preserved; consumers ignore it there."
+                )
+                findings.append((HintLintErrorType.HINT_INAPPLICABLE_PART, inapplicable_part_message, PART_HINT_KEY))
+            elif known_part.is_held_once and part_holders is not None and field_name is not None:
+                first_holder = part_holders.setdefault(known_part, field_name)
+                if first_holder != field_name:
+                    duplicate_part_message = (
+                        f"Part word '{known_part}' on {site_desc} is already held by field '{first_holder}': one field of a structure "
+                        f"at most is its {known_part}. The entry is preserved."
+                    )
+                    findings.append((HintLintErrorType.HINT_DUPLICATE_PART, duplicate_part_message, PART_HINT_KEY))
         return [
             ValidationErrorItem(
                 category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
@@ -235,53 +244,34 @@ class _HintLinter:
     # ---- Site classification (spec: Applicability) ------------------------------------------------
 
     def _concept_site_kind(self, concept_ref: str) -> HintSiteValueKind:
-        if concept_ref in self._concept_kind_cache:
-            return self._concept_kind_cache[concept_ref]
-        kind = self._resolve_concept_kind(concept_ref, seen=set())
-        self._concept_kind_cache[concept_ref] = kind
-        return kind
+        # A concept the crate cannot see takes no word of this version, as before.
+        return self._kinds.kind_of(concept_ref=concept_ref) or HintSiteValueKind.OTHER
 
-    def _resolve_concept_kind(self, concept_ref: str, *, seen: set[str]) -> HintSiteValueKind:
-        # Iterative on purpose, like every other chain walker (`_resolve_refinement`,
-        # `_refines_chain`): a legal, arbitrarily deep refinement chain must not be able to
-        # RecursionError an advisory lint out of the validate call.
-        current_ref = concept_ref
-        while True:
-            if current_ref in seen:
-                return HintSiteValueKind.OTHER  # defensive: cycles are rejected upstream
-            seen.add(current_ref)
-            if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_ref):
-                native_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=current_ref)
-                refined_native = NativeConceptCode(QualifiedRef.parse(native_ref).local_code).refined_native
-                if refined_native is not None:
-                    # A native refining another (`Markdown` refines `Text`) classifies like the native it refines.
-                    current_ref = refined_native.concept_ref
-                    continue
-                if native_ref == _NATIVE_TEXT_REF:
-                    return HintSiteValueKind.TEXT_VALUED
-                if native_ref == _NATIVE_NUMBER_REF:
-                    return HintSiteValueKind.NUMBER_VALUED
-                return HintSiteValueKind.OTHER
-            value = self._concepts.get(current_ref)
-            if isinstance(value, str):
-                # String-described concept: description-only, hence text-valued.
-                return HintSiteValueKind.TEXT_VALUED
-            if not isinstance(value, ConceptBlueprint):
-                # Cross-package or unknown: not classifiable in-crate.
-                return HintSiteValueKind.OTHER
-            if value.refines:
-                current_ref = value.refines
-                continue
-            if value.structure is None:
-                # Description-only concepts are text-valued per the spec.
-                return HintSiteValueKind.TEXT_VALUED
-            if isinstance(value.structure, str):
-                # Class-backed: a native class name maps by identity to its native's value kind,
-                # mirroring the input-form deriver's judgment for resolvable sites. Any other
-                # registered class is classified OTHER, though the deriver reflects a `RootModel`
-                # over a scalar as its root value (L-260930-173b03).
-                return _native_class_value_kind(class_name=value.structure)
-            return HintSiteValueKind.OTHER
+    def _field_shape(self, *, field: ConceptStructureBlueprint) -> FieldShape:
+        """The shape of a field that decides where a `part` word applies, judged against the field, never a list's item."""
+        if field.choices:
+            return FieldShape.ENUMERATION
+        match field.type:
+            case ConceptStructureBlueprintFieldType.BOOLEAN:
+                return FieldShape.BOOLEAN
+            case ConceptStructureBlueprintFieldType.LIST:
+                return FieldShape.LIST
+            case ConceptStructureBlueprintFieldType.DICT:
+                return FieldShape.OTHER
+            case ConceptStructureBlueprintFieldType.CONCEPT:
+                if field.concept_ref and self._kinds.is_verdict(concept_ref=field.concept_ref):
+                    return FieldShape.VERDICT_NATIVE
+                return FieldShape.SCALAR
+            case (
+                ConceptStructureBlueprintFieldType.TEXT
+                | ConceptStructureBlueprintFieldType.INTEGER
+                | ConceptStructureBlueprintFieldType.NUMBER
+                | ConceptStructureBlueprintFieldType.DATE
+                | ConceptStructureBlueprintFieldType.DATETIME
+                | ConceptStructureBlueprintFieldType.TIME
+                | None
+            ):
+                return FieldShape.SCALAR
 
     def _field_site_kind(self, field: ConceptStructureBlueprint) -> HintSiteValueKind:
         if field.choices:
@@ -321,10 +311,33 @@ class _HintLinter:
     def _slot_site_kind(self, concept_spec: str) -> HintSiteValueKind:
         # Multiplicity is a plural site judged per item, and the item is the slot's concept —
         # so the markers simply strip away.
-        parsed = parse_concept_with_multiplicity(concept_spec)
-        return self._concept_site_kind(parsed.concept_ref_or_code)
+        return self._kinds.kind_of_slot(concept_spec=concept_spec) or HintSiteValueKind.OTHER
 
     @staticmethod
     def _split_ref(qualified_ref: str) -> tuple[str, str]:
         parsed = QualifiedRef.parse(qualified_ref)
         return parsed.domain_path or "", parsed.local_code
+
+
+class _HintSite(StrEnum):
+    """The three sites a hint attaches to, which decide where `role` and `part` apply."""
+
+    CONCEPT = "concept"
+    FIELD = "field"
+    SLOT = "slot"
+
+    @property
+    def takes_role(self) -> bool:
+        match self:
+            case _HintSite.SLOT:
+                return True
+            case _HintSite.CONCEPT | _HintSite.FIELD:
+                return False
+
+    @property
+    def takes_part(self) -> bool:
+        match self:
+            case _HintSite.FIELD:
+                return True
+            case _HintSite.CONCEPT | _HintSite.SLOT:
+                return False

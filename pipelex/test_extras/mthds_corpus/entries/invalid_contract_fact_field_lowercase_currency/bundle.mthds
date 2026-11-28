@@ -1,0 +1,16 @@
+domain      = "facts_lowercase_currency"
+description = "A festival card spelling its currency in lowercase"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+budget = { type = "number", description = "The budget", unit = "eur" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

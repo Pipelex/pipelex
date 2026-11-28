@@ -1,0 +1,11 @@
+name = "feature_contract_facts_slot_text_options"
+description = "A note about a tier picked among options"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+  "feature.choice_options",
+]

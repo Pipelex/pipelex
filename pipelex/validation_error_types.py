@@ -140,6 +140,21 @@ class PipeValidationErrorType(StrEnum):
     # is validated against the library, from the module's syntax tree, without running Python.
     PIPE_FUNC_FUNCTION_REFUSED = "pipe_func_function_refused"
 
+    # A contract fact or a choice option that is misplaced or invalid, on a structure field, an input slot or a concept:
+    # a fact whose value breaks its key's rules, a fact on a site of a value class it does not apply to, a fact on a slot
+    # holding no plain value, facts contradicting each other, an example or a default breaking the site's constraints, or
+    # two options sharing a value or a label. Detected at blueprint parse time where the site's class is known there, and
+    # once the library's concepts are known for a site typed by a concept. The item's `params` carry `fact`, `reason`
+    # and `field_path`, the parameters of the standard's `method.contract_fact_invalid`.
+    CONTRACT_FACT_INVALID = "contract_fact_invalid"
+
+    # Advisory-only (rides the validation report's `warnings` array, never raised as an error): a `choices` list holding
+    # an empty string option, or two string options sharing a value. Bundles written before option tables could hold such
+    # lists, so it never refuses one; the same fault in an option table is refused as CONTRACT_FACT_INVALID. The item's
+    # `params` carry `field_path` and `reason` (`empty_value` or `duplicate_value`), the standard's
+    # `method.choice_option_dubious`.
+    CHOICE_OPTION_DUBIOUS = "choice_option_dubious"
+
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
@@ -180,6 +195,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -218,6 +235,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -263,6 +282,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -302,6 +323,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -346,6 +369,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -390,6 +415,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -429,6 +456,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
+                | PipeValidationErrorType.CONTRACT_FACT_INVALID
+                | PipeValidationErrorType.CHOICE_OPTION_DUBIOUS
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -474,12 +503,22 @@ class HintLintErrorType(StrEnum):
     wrong home.
     """
 
-    # A hint key the pinned standard version does not define (only `intent` exists today).
+    # A hint key the pinned standard version does not define (it defines `intent`, `role` and `part`).
     HINT_UNKNOWN_KEY = "hint_unknown_key"
-    # An `intent` value outside the closed vocabulary (`prose`, `label`, `rating`, `quantity`).
+    # An `intent` value outside the closed vocabulary.
     HINT_UNKNOWN_INTENT = "hint_unknown_intent"
     # A known `intent` word on a site it does not apply to (e.g. `rating` on a text-valued site).
     HINT_INAPPLICABLE_INTENT = "hint_inapplicable_intent"
+    # A `role` value outside the closed vocabulary (`subject`, `context`, `guidance`, `reference`, `setting`).
+    HINT_UNKNOWN_ROLE = "hint_unknown_role"
+    # A `role` on a site other than an input slot: a concept or a structure field.
+    HINT_INAPPLICABLE_ROLE = "hint_inapplicable_role"
+    # A `part` value outside the closed vocabulary (`title`, `summary`, `verdict`, `metric`, `body`, `evidence`, `detail`).
+    HINT_UNKNOWN_PART = "hint_unknown_part"
+    # A `part` on a site other than a structure field, or on a field it does not apply to (`title` on a number field).
+    HINT_INAPPLICABLE_PART = "hint_inapplicable_part"
+    # A second field of one structure holding the `title`, the `summary` or the `verdict`, which one field at most should hold.
+    HINT_DUPLICATE_PART = "hint_duplicate_part"
 
 
 class TemplateCheckErrorType(StrEnum):

@@ -1,0 +1,16 @@
+domain      = "options_empty_string"
+description = "An account card with an empty plain option, which only warns"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A client account card"
+
+[concept.Card.structure]
+tier = { description = "The account tier", choices = ["", "tactical"] }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

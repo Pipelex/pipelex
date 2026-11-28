@@ -1,0 +1,16 @@
+domain      = "facts_format_on_number"
+description = "A volunteer card putting a text format on a number"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+site = { type = "integer", description = "The site", format = "uri" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

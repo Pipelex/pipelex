@@ -7,6 +7,7 @@ from pydantic_core.core_schema import CoreSchemaType
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.exceptions import ContractFactInvalidError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -62,9 +63,10 @@ def _extract_wrapped_value_error(error: ErrorDetails, *, error_class: type[_Wrap
     """Extract the typed ``ValueError`` of class ``error_class`` that a blueprint validator raised and pydantic wrapped, or ``None``.
 
     A blueprint validator raises a typed ``ValueError`` subclass, such as ``NativeConceptRedeclarationError`` from
-    ``validate_concept_keys``, ``InvalidPipeCodeSyntaxError`` from the ``main_pipe`` / ``pipe`` field validators or
-    ``MainPipeUnresolvedError`` from ``validate_main_pipe``, so pydantic reports a ``value_error`` and keeps the
-    original in ``ctx["error"]``, the same wrapping ``extract_wrapped_pipe_validation_error`` unwraps for pipe errors.
+    ``validate_concept_keys``, ``InvalidPipeCodeSyntaxError`` from the ``main_pipe`` / ``pipe`` field validators,
+    ``MainPipeUnresolvedError`` from ``validate_main_pipe`` or ``ContractFactInvalidError`` from the contract-fact and
+    choice-option validators, so pydantic reports a ``value_error`` and keeps the original in ``ctx["error"]``, the same
+    wrapping ``extract_wrapped_pipe_validation_error`` unwraps for pipe errors.
     Structural, never message-matched: the facts the item names ride the exception itself.
     """
     if error["type"] != "value_error":
@@ -75,6 +77,28 @@ def _extract_wrapped_value_error(error: ErrorDetails, *, error_class: type[_Wrap
         if isinstance(original_error, error_class):
             return original_error
     return None
+
+
+def _contract_fact_site_path(*, loc: tuple[int | str, ...], fact: str) -> str | None:
+    """The bundle-root path of the site a contract fact sits on: the pydantic ``loc``, its own elements and the key dropped.
+
+    A field validator's ``loc`` ends with the key (``concept.Review.structure.score.minimum``), a model validator's at the
+    site (``pipe.review.inputs.budget``); an option table's fault ends inside its list (``….choices.1``). So the trailing
+    list indices go first, then the last part only when it is the key: a field may be named like a fact (a field named
+    ``maximum`` whose ``maximum`` is malformed is the site ``concept.Review.structure.maximum``), so a part is never
+    dropped for its name anywhere else.
+    """
+    raw_parts = (_bundle_field_path(loc=loc, ends_with_authored_key=False) or "").split(".")
+    parts = [part for part in raw_parts if part and part not in _CONTRACT_FACT_INTERNAL_LOC_ELEMENTS]
+    while parts and parts[-1].isdigit():
+        parts.pop()
+    if parts and parts[-1] == fact:
+        parts.pop()
+    return ".".join(parts) or None
+
+
+_CONTRACT_FACT_INTERNAL_LOC_ELEMENTS = frozenset({"InputSlotBlueprint", "ConceptStructureBlueprint", "ChoiceOptionTable", "OutcomeTable"})
+"""The model names pydantic puts in a ``loc`` when it validates a union arm, which no author writes as a key."""
 
 
 def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, blueprint_dict: dict[str, Any]) -> bool:
@@ -360,6 +384,12 @@ def categorize_blueprint_validation_error(
     if len(loc) >= 2 and loc[0] == "pipe":
         pipe_code = str(loc[1])
 
+    # The union-branch noise of an input slot declared as `str | InputSlotBlueprint`: a slot written as a table that
+    # fails reports its fault through the table branch, and the `str` branch's "Input should be a valid string" adds
+    # nothing an author can act on.
+    if pipe_code is not None and error["type"] == "string_type" and "inputs" in loc and tuple(loc)[-1:] == ("str",):
+        return None
+
     # A blueprint-stage ``PipeValidationError`` (e.g. the PipeBatch ``input_item_name`` ==
     # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, the SubPipe
     # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``, or a
@@ -401,6 +431,24 @@ def categorize_blueprint_validation_error(
             dropped_input_marker=wrapped_pipe_error.dropped_input_marker,
             root_input_marker=wrapped_pipe_error.root_input_marker,
             redundant_input_unwalkable_reason=redundant_input_unwalkable_reason,
+        )
+
+    # A misplaced or invalid contract fact: a blueprint validator raised a typed ``ValueError`` carrying the key at fault and
+    # the reason, which the message cannot carry structurally. The site is the declaration the pydantic ``loc`` names, a
+    # structure field, an input slot or a concept, by its bundle-root path without the key itself.
+    wrapped_contract_fact = _extract_wrapped_value_error(error, error_class=ContractFactInvalidError)
+    if wrapped_contract_fact is not None:
+        site_path = _contract_fact_site_path(loc=loc, fact=wrapped_contract_fact.fact)
+        concept_code = str(loc[1]) if len(loc) >= 2 and loc[0] == "concept" else None
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.CONTRACT_FACT_INVALID,
+            domain_code=domain,
+            source=source,
+            pipe_code=pipe_code,
+            concept_code=concept_code,
+            field_path=site_path,
+            message=str(wrapped_contract_fact),
+            params={"fact": wrapped_contract_fact.fact, "reason": wrapped_contract_fact.reason, "field_path": site_path},
         )
 
     # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``

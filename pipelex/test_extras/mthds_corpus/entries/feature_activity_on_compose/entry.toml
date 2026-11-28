@@ -1,0 +1,10 @@
+name = "feature_activity_on_compose"
+description = "Assembling a street-works notice, whose activity is never displayed"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.activity",
+]

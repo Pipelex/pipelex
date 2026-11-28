@@ -1,0 +1,12 @@
+name = "invalid_output_filename_undeclared_input"
+description = "Drawing a cover whose file name reads an input the pipe does not declare"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.missing_input_variable",
+]
+
+expected_error = "missing_input_variable"

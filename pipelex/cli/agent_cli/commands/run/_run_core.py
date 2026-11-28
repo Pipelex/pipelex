@@ -198,6 +198,9 @@ async def run_pipeline_core(
     # The digest of the method tree the run read names the exact files of the method it ran.
     if method_tree is not None:
         side_effects["method_tree_digest"] = method_tree.digest
+    # The run's result line, the one line wording what it produced, when it has one (spec: manifest-format.md).
+    if pipe_output.result_line is not None:
+        side_effects["result_line"] = pipe_output.result_line
 
     # Cost report: best-effort structured `cost_report` object in the JSON output (machine-first; no Rich
     # table on stderr like the human CLI). build_cost_summary returns None for runs that did no reportable

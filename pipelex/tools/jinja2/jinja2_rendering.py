@@ -464,6 +464,7 @@ _RENDER_FAILURES: tuple[type[BaseException], ...] = (
     TemplateRuntimeError,
     ArithmeticError,
     TypeError,
+    ValueError,
 )
 
 
@@ -523,6 +524,12 @@ def _make_render_failure(
         # Often an iteration over a method, or an attribute reached the wrong way.
         description = "the template applied an operation to a value of a type that does not support it"
         msg = f"Jinja2 render — type error: {_describe_render_error(description=description, render_error=render_error)}"
+        return _make_data_render_error(msg=msg, template_owner=template_owner)
+    if isinstance(render_error, ValueError):
+        # A filter or a string method refusing this run's value (`wordwrap(0)`, `'{:d}'.format('a')`), or the template's own
+        # literal, which nothing here tells apart, so it is not the template's alone.
+        description = "a filter or a method refused the value it was given"
+        msg = f"Jinja2 render — value error: {_describe_render_error(description=description, render_error=render_error)}"
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     msg = f"Jinja2 render — {type(render_error).__name__} is not a failure the render translates"
     raise PipelexUnexpectedError(msg) from render_error

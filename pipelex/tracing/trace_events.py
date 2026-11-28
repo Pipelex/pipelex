@@ -282,6 +282,8 @@ class PipeStartEvent(TraceEvent):
     pipe_type: str
     node_kind: NodeKind
     description: str | None = None
+    activity: str | None = None
+    """The pipe's `activity`, the words a run view shows for the step in place of its description; None when it has none."""
     domain_code: str | None = None
     input_specs: list[IOSpec] = Field(default_factory=empty_list_factory_of(IOSpec))
     pipe_data: dict[str, Any] = Field(default_factory=dict)

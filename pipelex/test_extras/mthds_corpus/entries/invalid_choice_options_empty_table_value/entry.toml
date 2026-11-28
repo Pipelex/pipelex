@@ -1,0 +1,12 @@
+name = "invalid_choice_options_empty_table_value"
+description = "An account card whose option table's value is empty"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

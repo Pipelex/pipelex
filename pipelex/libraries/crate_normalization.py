@@ -56,6 +56,9 @@ _ConceptEntry = ConceptBlueprint | str
 class _RefinementResolution(NamedTuple):
     is_native_backed: bool
     effective_structure: dict[str, ConceptStructureBlueprint] | None
+    effective_unit: str | None = None
+    """The resolved ref's OWN effective unit — its authored `unit`, else the nearest base's (spec: library-crate.md step 3).
+    Position-specific like `effective_hints`."""
     effective_hints: dict[str, str] | None = None
     """The resolved ref's OWN effective hints — its authored hints merged over its bases', nearer
     winning (spec: intent-hints.md, Precedence and Inheritance). Position-specific: a cached
@@ -146,6 +149,10 @@ def _flatten_refinement(concepts: dict[str, _ConceptEntry]) -> None:
         effective_hints = merge_hints([resolution.effective_hints, value.hints])
         if effective_hints != value.hints:
             updates["hints"] = effective_hints
+        # The effective unit is assembled in the same walk, the nearest declaration winning.
+        effective_unit = value.unit or resolution.effective_unit
+        if effective_unit != value.unit:
+            updates["unit"] = effective_unit
         if not resolution.is_native_backed and resolution.effective_structure:
             updates["refines"] = None
             updates["structure"] = dict(resolution.effective_structure)
@@ -205,11 +212,14 @@ def _resolve_refinement(
     # above the structure-carrying base has that same effective structure), but hints accumulate:
     # each position's entry merges its own authored hints over everything below it, nearer winning.
     accumulated_hints = resolution.effective_hints
+    accumulated_unit = resolution.effective_unit
     for visited_ref in reversed(path):
         visited_value = concepts.get(visited_ref)
         own_hints = visited_value.hints if isinstance(visited_value, ConceptBlueprint) else None
+        own_unit = visited_value.unit if isinstance(visited_value, ConceptBlueprint) else None
         accumulated_hints = merge_hints([accumulated_hints, own_hints])
-        cache[visited_ref] = resolution._replace(effective_hints=accumulated_hints)
+        accumulated_unit = own_unit or accumulated_unit
+        cache[visited_ref] = resolution._replace(effective_hints=accumulated_hints, effective_unit=accumulated_unit)
     return cache[concept_ref]
 
 

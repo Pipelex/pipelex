@@ -1,0 +1,16 @@
+domain      = "facts_aggregate_on_text"
+description = "A collection card summing a text field"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+label = { type = "text", description = "The label", aggregate = "sum" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

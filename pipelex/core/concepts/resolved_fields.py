@@ -20,8 +20,9 @@ it produces neutral fields an emitter walks.
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.core.concepts.choice_options import choice_values
 from pipelex.core.concepts.concept_structure_blueprint import (
     ANY_NESTED_FIELD_TYPE,
     ConceptStructureBlueprint,
@@ -47,6 +48,26 @@ class ResolvedTypeKind(StrEnum):
     LIST = "list"
     DICT = "dict"
     ANY = "any"
+
+    @property
+    def is_concept(self) -> bool:
+        match self:
+            case ResolvedTypeKind.CONCEPT:
+                return True
+            case (
+                ResolvedTypeKind.TEXT
+                | ResolvedTypeKind.NUMBER
+                | ResolvedTypeKind.INTEGER
+                | ResolvedTypeKind.BOOLEAN
+                | ResolvedTypeKind.DATE
+                | ResolvedTypeKind.DATETIME
+                | ResolvedTypeKind.TIME
+                | ResolvedTypeKind.LITERAL
+                | ResolvedTypeKind.LIST
+                | ResolvedTypeKind.DICT
+                | ResolvedTypeKind.ANY
+            ):
+                return False
 
 
 class ResolvedType(BaseModel):
@@ -80,6 +101,9 @@ class ResolvedField(BaseModel):
     required: bool
     default_value: Any | None = None
     resolved_type: ResolvedType
+    contract_facts: dict[str, Any] = Field(default_factory=dict)
+    """The contract facts the field authors, by key in the standard's order (`pipelex.language.contract_facts`), empty when
+    it authors none. Each projection reads them from here: the constraints are enforced, the descriptions annotate."""
 
     @property
     def may_hold_nothing(self) -> bool:
@@ -125,13 +149,14 @@ def resolve_field(*, field_name: str, blueprint: ConceptStructureBlueprint, loca
         required=blueprint.required,
         default_value=blueprint.default_value,
         resolved_type=_resolve_type(blueprint, local_domain=local_domain),
+        contract_facts=blueprint.contract_facts,
     )
 
 
 def _resolve_type(blueprint: ConceptStructureBlueprint, *, local_domain: str | None) -> ResolvedType:
     # Inline choices win over `type` (a typed-choices field is still a literal set).
     if blueprint.choices:
-        return ResolvedType(kind=ResolvedTypeKind.LITERAL, choices=blueprint.choices)
+        return ResolvedType(kind=ResolvedTypeKind.LITERAL, choices=choice_values(options=blueprint.choices))
     if blueprint.type is None:
         # Validation guarantees `type is None` only alongside choices (handled above); this is a
         # defensive fallback matching the historical "assume text" behavior.

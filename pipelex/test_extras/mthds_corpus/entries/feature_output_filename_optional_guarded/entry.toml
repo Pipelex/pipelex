@@ -1,0 +1,11 @@
+name = "feature_output_filename_optional_guarded"
+description = "Drawing a cover whose file name names the client only when there is one"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.output_filename",
+  "feature.optionals",
+]

@@ -1,0 +1,16 @@
+domain      = "slots_described_concept"
+description = "A note about a signed agreement, whose slot says what it holds"
+main_pipe   = "write_note"
+
+[concept.Contract]
+description = "A signed agreement"
+
+[concept.Contract.structure]
+heading = { type = "text", description = "Its heading", required = true }
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "Contract", description = "The signed agreement" } }
+output      = "Text"
+prompt      = "Write a short note about $item"

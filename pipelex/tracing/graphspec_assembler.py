@@ -81,6 +81,7 @@ class _AssemblerNodeData:
         parent_node_id: str | None,
         input_specs: list[IOSpec] | None = None,
         description: str | None = None,
+        activity: str | None = None,
         domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
@@ -91,6 +92,7 @@ class _AssemblerNodeData:
         self.started_at = started_at
         self.parent_node_id = parent_node_id
         self.description = description
+        self.activity = activity
         self.domain_code = domain_code
         self.ended_at: datetime | None = None
         self.status: NodeStatus = NodeStatus.RUNNING
@@ -124,6 +126,7 @@ class _AssemblerNodeData:
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
             description=self.description,
+            activity=self.activity,
             domain_code=self.domain_code,
             status=self.status,
             skip_reason=self.skip_reason,
@@ -406,6 +409,7 @@ class _AssemblerState:
             parent_node_id=event.parent_node_id,
             input_specs=list(event.input_specs),
             description=event.description,
+            activity=event.activity,
             domain_code=event.domain_code,
         )
         self._nodes[event.node_id] = node_data

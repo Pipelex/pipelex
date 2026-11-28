@@ -96,6 +96,16 @@ class PipeIOValidReport(BaseModel):
         description="The qualified refs of every pipe of the closure still declared as a signature, exactly as on `/validate`.",
     )
     is_runnable: bool = Field(..., description="`not pending_signatures`, exactly as on `/validate`. No dry run backs it.")
+    examples: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The example inputs the method's manifest offers for its entry pipe (`default_pipe_ref`): the `examples` of its "
+            "`METHODS.toml`, each the tree path of a JSON file of flat inputs in stuff wire form, in the manifest's order. "
+            "Listed only when the described pipe (`pipe_ref`) is that entry pipe, since they fill its inputs and no other "
+            "pipe's. Empty when the manifest declares none, when the method has no manifest, when the request names "
+            "another pipe, or when a request naming its pipe sends a manifest that cannot be read."
+        ),
+    )
     # Never serialized from the model: the route attaches the echo itself, and only when asked, so the
     # field is absent — not empty, not null — otherwise. Declared here so the published schema names it.
     files: dict[str, str] = Field(
@@ -210,6 +220,8 @@ def _pipe_io_response(*, resolution: ResolvedMethod, request_data: PipeIORequest
         default_pipe_ref=default_pipe_ref,
         pending_signatures=pending_signatures,
         is_runnable=not pending_signatures,
+        # The examples fill the entry pipe's inputs, so they are offered only beside that pipe, as `pipelex-agent inputs` does.
+        examples=resolution.manifest_examples if manifest_readable and pipe_ref is not None and pipe_ref == default_pipe_ref else [],
     )
     # Dumped as `/validate` dumps its valid arm, never with `exclude_none`: that would strip the
     # contracts' `item_count: null` and break the byte equality with `/validate`'s maps.
