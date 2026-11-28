@@ -42,9 +42,9 @@ from pipelex.tools.jinja2.jinja2_required_variables import parse_jinja2_read_pat
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, mime_type_to_extension
 from pipelex.tools.misc.produced_file_name import build_produced_file_name
-from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageGcpError, StorageLocalError, StorageNotConfiguredError, StorageS3Error
 from pipelex.tools.uri.exceptions import UriReadRefusedError, UriTextNotUtf8Error, UriTextTooLargeError
 

@@ -44,8 +44,9 @@ async def build_inputs_for_pipe(
 
     Returns:
         Dictionary with ``success``, the resolved ``pipe_ref``, the ``inputs`` template, the manifest's
-        ``examples`` when the pipe is the main pipe of the bundle file's tree, and the internal ``concept_comments``. A pipe that declares no inputs answers with empty ``inputs``
-        and an internal ``no_inputs_message`` saying so.
+        ``examples`` when the pipe is the main pipe of the bundle file's tree, and the internal
+        ``concept_comments``. A pipe that declares no inputs answers with empty ``inputs`` and an
+        internal ``no_inputs_message`` saying so.
 
     Raises:
         ValidateBundleError: If bundle validation fails.

@@ -13,7 +13,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.contract_fact_projection import carried_field_name, contract_break
-from pipelex.language.contract_facts import PatternSearchBudget
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
@@ -32,6 +31,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.graph.node_problem import make_node_problem
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
+from pipelex.language.contract_facts import PatternSearchBudget
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.memory_writes import MemoryWrite
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags

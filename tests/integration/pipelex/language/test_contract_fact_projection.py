@@ -17,7 +17,6 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.problem import ProblemView
-from pipelex.language import contract_facts
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -25,6 +24,7 @@ from pipelex.interpreter_hub import (
     get_library_manager,
     set_current_library,
 )
+from pipelex.language import contract_facts
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.choice_option_warnings import build_choice_option_warnings
 from pipelex.pipeline.input_form import build_input_form, qualify_current_library_crate

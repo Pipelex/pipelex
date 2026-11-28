@@ -39,7 +39,11 @@ class TestContractFactMocks:
                 id="concept-number-integer-example-past-float-precision",
             ),
             pytest.param(
-                NumberContent, {"minimum": 9007199254740993, "maximum": 9007199254740993}, False, False, id="concept-number-one-integer-past-float-precision"
+                NumberContent,
+                {"minimum": 9007199254740993, "maximum": 9007199254740993},
+                False,
+                False,
+                id="concept-number-one-integer-past-float-precision",
             ),
             pytest.param(NumberContent, {"exclusive_minimum": 9007199254740993}, False, False, id="concept-number-exclusive-integer-bound"),
             pytest.param(TextContent, {"pattern": "^(?>a|ab)c$"}, False, False, id="concept-text-atomic-group"),

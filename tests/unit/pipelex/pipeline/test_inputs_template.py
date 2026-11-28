@@ -29,7 +29,9 @@ class TestBuildInputsForPipe:
         library_manager.open_library.return_value = ("lib_id", mocker.MagicMock())
         validate_result = SimpleNamespace(
             blueprints=[
-                SimpleNamespace(main_pipe="bundle_main", domain="demo_domain", tree_bundle=SimpleNamespace(tree="the bundle's tree"), pipe={"bundle_main": None})
+                SimpleNamespace(
+                    main_pipe="bundle_main", domain="demo_domain", tree_bundle=SimpleNamespace(tree="the bundle's tree"), pipe={"bundle_main": None}
+                )
             ]
         )
         return {

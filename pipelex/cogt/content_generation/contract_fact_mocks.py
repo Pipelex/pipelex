@@ -75,7 +75,11 @@ def _integer_draw(*, facts: Mapping[str, Any]) -> int | None:
 
     Drawn as an integer, so a bound past a float's precision is honoured exactly.
     """
-    bounds = [facts[key] for key in (ContractFactKey.MINIMUM, ContractFactKey.EXCLUSIVE_MINIMUM, ContractFactKey.MAXIMUM, ContractFactKey.EXCLUSIVE_MAXIMUM) if key in facts]
+    bounds = [
+        facts[key]
+        for key in (ContractFactKey.MINIMUM, ContractFactKey.EXCLUSIVE_MINIMUM, ContractFactKey.MAXIMUM, ContractFactKey.EXCLUSIVE_MAXIMUM)
+        if key in facts
+    ]
     if not bounds or not all(isinstance(bound, int) and not isinstance(bound, bool) for bound in bounds):
         return None
     lower_bounds: list[int] = []
