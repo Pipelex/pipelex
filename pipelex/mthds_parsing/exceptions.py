@@ -43,6 +43,25 @@ class InvalidPipeCodeSyntaxError(PipelexError, ValueError):
         super().__init__(message)
 
 
+class MainPipeUnresolvedError(PipelexError, ValueError):
+    """A bundle whose ``main_pipe`` names a pipe the bundle does not define.
+
+    Raised by the bundle blueprint's ``main_pipe`` model validator, carrying the name as the method writes it and
+    every pipe the bundle defines, as qualified ``domain.pipe_code`` refs, from which the categorizer orders the
+    item's candidates. Subclasses
+    ``ValueError`` so pydantic keeps it in ``ctx["error"]`` for the categorizer to unwrap structurally into a
+    ``method.pipe_unresolved`` item located at the ``main_pipe`` declaration, as a manifest's ``main_pipe`` that no
+    bundle defines is refused.
+    """
+
+    error_code = CoreCode.METHOD_PIPE_UNRESOLVED
+
+    def __init__(self, message: str, *, main_pipe: str, defined_pipe_refs: list[str]):
+        self.main_pipe = main_pipe
+        self.defined_pipe_refs = defined_pipe_refs
+        super().__init__(message)
+
+
 class MthdsParserError(PipelexError):
     """Raised when MthdsParser fails.
 

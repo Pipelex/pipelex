@@ -210,6 +210,7 @@ ListWhereSingularError | input.wrong_multiplicity
 LocalFileMissingError | input.reference_not_found
 LogSinkHeaderValueError | pipelex.config.invalid
 LogSinkVariableError | pipelex.config.variable_missing
+MainPipeUnresolvedError | method.pipe_unresolved
 MarkdownFormattingBudgetError | input.too_large
 MarkdownParserDependencyError | pipelex.config.dependency_missing
 MemoryTransportError | runtime.unexpected
