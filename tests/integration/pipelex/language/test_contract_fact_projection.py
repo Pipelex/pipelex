@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import TYPE_CHECKING, Any, cast
 
 import jsonschema
@@ -16,6 +17,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.problem import ProblemView
+from pipelex.language import contract_facts
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -73,6 +75,21 @@ mail = { concept = "Text?", format = "email" }
 price = "Amount"
 nda = { concept = "Document", description = "The NDA to review" }
 annex = "Document"
+"""
+
+
+_BACKTRACKING_MTHDS = """
+domain = "facts_budget_test"
+description = "A plural slot whose pattern backtracks before it matches"
+
+[pipe.list_codes]
+type = "PipeCompose"
+description = "List the codes"
+output = "Text"
+template = "$codes"
+
+[pipe.list_codes.inputs]
+codes = { concept = "Text[]", pattern = "^(?:(a|aa)+$|.*x)" }
 """
 
 
@@ -304,6 +321,33 @@ class TestContractFactProjection:
                     working_memory=working_memory, pipe_run_params=PipeRunParamsFactory.make_run_params(), job_metadata=job_metadata
                 )
             assert exc_info.value.resolve_error_code() == CoreCode.INPUT_INVALID
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+    async def test_the_values_of_one_input_share_one_pattern_search_budget(
+        self, mocker: MockerFixture, load_empty_library: Callable[[], str], job_metadata: JobMetadata
+    ) -> None:
+        """Values that each match only after a long backtrack, under the per-value limit, are refused once the input's
+        shared budget runs out, so a long list cannot spend the per-value limit once per item.
+        """
+        mocker.patch.object(contract_facts, "PATTERN_INPUT_SEARCH_BUDGET_SECONDS", 0.3)
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_BACKTRACKING_MTHDS])
+            pipe = next(pipe for pipe in result.pipes if pipe.code == "list_codes")
+            codes = ["a" * 26 + "bx"] * 40
+            assert contract_facts.search_pattern(text=codes[0], pattern="^(?:(a|aa)+$|.*x)") is True
+            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+                cast("PipelineInputs", {"codes": codes}), concept_provider=get_concept_library(), input_specs=pipe.inputs, read_scope=None
+            )
+            started = time.perf_counter()
+            with pytest.raises(PipeRunInputsError, match="could not be checked against the pattern") as exc_info:
+                await pipe.ensure_inputs_honour_their_contracts(
+                    working_memory=working_memory, pipe_run_params=PipeRunParamsFactory.make_run_params(), job_metadata=job_metadata
+                )
+            elapsed = time.perf_counter() - started
+            assert exc_info.value.resolve_error_code() == CoreCode.INPUT_INVALID
+            assert elapsed < 0.3 + 3 * contract_facts.PATTERN_SEARCH_TIMEOUT_SECONDS
         finally:
             _teardown_validation_library(outer_library_id)
 

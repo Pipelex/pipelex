@@ -29,6 +29,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime, time
 from enum import StrEnum
 from functools import lru_cache
+from time import monotonic
 from typing import Any, NamedTuple, cast
 from uuid import UUID
 
@@ -367,6 +368,34 @@ not checked. A pattern an author means runs in microseconds on any value a form 
 backtracks catastrophically reaches it, and the value it was searched in is then refused, never let through unchecked.
 """
 
+PATTERN_INPUT_SEARCH_BUDGET_SECONDS = 1.0
+"""The longest the searches of all the values of one input may take together, each search still stopped at
+`PATTERN_SEARCH_TIMEOUT_SECONDS`: a list of values that each fall just under the per-value limit would otherwise spend it
+once per item. A value searched once the budget is spent counts as not checked, and is refused.
+"""
+
+
+class PatternSearchBudget:
+    """One time budget that the pattern searches of several values share, such as the items of one input (spec: the input
+    gate, `PipeAbstract.ensure_inputs_honour_their_contracts`).
+    """
+
+    def __init__(self, *, seconds: float) -> None:
+        self._deadline = monotonic() + seconds
+
+    @classmethod
+    def for_input(cls) -> "PatternSearchBudget":
+        """The budget the values of one input share, `PATTERN_INPUT_SEARCH_BUDGET_SECONDS`."""
+        return cls(seconds=PATTERN_INPUT_SEARCH_BUDGET_SECONDS)
+
+    def search_timeout(self) -> float | None:
+        """How long the next search may take, never past `PATTERN_SEARCH_TIMEOUT_SECONDS`, or `None` once the budget is spent."""
+        remaining = self._deadline - monotonic()
+        if remaining <= 0:
+            return None
+        return min(remaining, PATTERN_SEARCH_TIMEOUT_SECONDS)
+
+
 _SHOWN_TEXT_MAX_CHARACTERS = 60
 """How much of a text a refusal quotes: a caller's value may be a long stored text, or hold what they would not see logged."""
 
@@ -493,14 +522,23 @@ def pattern_compile_error(*, pattern: str) -> str | None:
     return None
 
 
-def search_pattern(*, text: str, pattern: str) -> bool | None:
+@lru_cache(maxsize=1024)
+def _compiled_pattern(*, pattern: str) -> "regex.Pattern[str]":
+    """A compiling pattern compiled once by the `regex` engine, however many values it is searched in."""
+    return regex.compile(pattern)
+
+
+def search_pattern(*, text: str, pattern: str, budget: PatternSearchBudget | None = None) -> bool | None:
     """Whether a text matches a compiling pattern anywhere, as JSON Schema's `pattern` does (an anchored pattern matches the
-    whole text), or `None` when the search passed `PATTERN_SEARCH_TIMEOUT_SECONDS` and was stopped undecided.
+    whole text), or `None` when the search passed `PATTERN_SEARCH_TIMEOUT_SECONDS`, or what is left of a shared `budget`,
+    and was stopped undecided, or the budget was already spent.
     """
-    compiled: regex.Pattern[str] = regex.compile(pattern)
+    timeout = budget.search_timeout() if budget is not None else PATTERN_SEARCH_TIMEOUT_SECONDS
+    if timeout is None:
+        return None
     try:
         # The stubs type `timeout` with a `_typeshed` alias newer than the one pyright bundles, which it reads as unknown.
-        return compiled.search(text, timeout=PATTERN_SEARCH_TIMEOUT_SECONDS) is not None  # pyright: ignore[reportUnknownMemberType]
+        return _compiled_pattern(pattern=pattern).search(text, timeout=timeout) is not None  # pyright: ignore[reportUnknownMemberType]
     except TimeoutError:
         return None
 
@@ -717,11 +755,12 @@ def value_type_message(*, value: Any, site_type: FactSiteType) -> str | None:
     return f"{shown_value(value=value)} is not a value of a {str(site_type).replace('_', ' ')} site"
 
 
-def constraint_break_message(*, value: Any, facts: Mapping[str, Any]) -> str | None:
+def constraint_break_message(*, value: Any, facts: Mapping[str, Any], pattern_budget: PatternSearchBudget | None = None) -> str | None:
     """The first constraint of a site a value of the site's type breaks, as a sentence, or `None` when it breaks none.
 
-    The value is quoted cut short (`shown_value`). A text whose search for the site's `pattern` passes the time limit
-    breaks it: a value the runtime could not check is refused, never let through.
+    The value is quoted cut short (`shown_value`). A text whose search for the site's `pattern` passes the time limit, or
+    the `pattern_budget` it shares with other values, breaks it: a value the runtime could not check is refused, never let
+    through.
     """
     shown = shown_value(value=value)
     if is_plain_number(value=value):
@@ -746,11 +785,12 @@ def constraint_break_message(*, value: Any, facts: Mapping[str, Any]) -> str | N
             return f"{shown} holds more than {max_length} characters"
         pattern = facts.get(ContractFactKey.PATTERN)
         if isinstance(pattern, str) and pattern_compile_error(pattern=pattern) is None:
-            matches = search_pattern(text=value, pattern=pattern)
+            matches = search_pattern(text=value, pattern=pattern, budget=pattern_budget)
             if matches is None:
+                budget_words = f", or the {PATTERN_INPUT_SEARCH_BUDGET_SECONDS} s the values of one input share" if pattern_budget is not None else ""
                 return (
                     f"{shown} could not be checked against the pattern {pattern!r}: the search passed its time limit of "
-                    f"{PATTERN_SEARCH_TIMEOUT_SECONDS} s, as a pattern that backtracks catastrophically does"
+                    f"{PATTERN_SEARCH_TIMEOUT_SECONDS} s{budget_words}, as a pattern that backtracks catastrophically does"
                 )
             if not matches:
                 return f"{shown} does not match the pattern {pattern!r}"

@@ -24,7 +24,7 @@ from pydantic_core import CoreSchema
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.language.contract_facts import ContractFactKey, constraint_break_message, json_example, shown_value
+from pipelex.language.contract_facts import ContractFactKey, PatternSearchBudget, constraint_break_message, json_example, shown_value
 
 _JSON_SCHEMA_KEYWORDS: dict[ContractFactKey, str] = {
     ContractFactKey.MINIMUM: "minimum",
@@ -74,14 +74,19 @@ def carried_field_name(*, value: Any) -> str:
     return "text"
 
 
-def contract_break(*, value: Any, facts: Mapping[str, Any], choice_values: list[str] | None = None) -> str | None:
-    """Why a value breaks a site's constraints or options, as a sentence, or `None` when it breaks none."""
+def contract_break(
+    *, value: Any, facts: Mapping[str, Any], choice_values: list[str] | None = None, pattern_budget: PatternSearchBudget | None = None
+) -> str | None:
+    """Why a value breaks a site's constraints or options, as a sentence, or `None` when it breaks none.
+
+    A `pattern_budget` is the search time the value shares with the other values of its input (`PatternSearchBudget`).
+    """
     plain = carried_value(value=value)
     if plain is None:
         return None
     if choice_values is not None and isinstance(plain, str) and plain not in choice_values:
         return f"{shown_value(value=plain)} is not one of the options {choice_values}"
-    return constraint_break_message(value=plain, facts=facts)
+    return constraint_break_message(value=plain, facts=facts, pattern_budget=pattern_budget)
 
 
 @dataclass(frozen=True, eq=False)

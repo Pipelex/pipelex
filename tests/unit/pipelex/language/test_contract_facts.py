@@ -9,6 +9,7 @@ from pipelex.language.contract_facts import (
     ContractFactKey,
     ContractFactReason,
     FactSiteType,
+    PatternSearchBudget,
     ValueClass,
     ValueFormat,
     applicability_findings,
@@ -116,6 +117,18 @@ class TestContractFacts:
         assert message is not None
         assert "could not be checked against the pattern" in message
         assert elapsed < 20 * PATTERN_SEARCH_TIMEOUT_SECONDS
+
+    def test_a_spent_search_budget_refuses_the_next_value_without_searching_it(self) -> None:
+        """Values sharing a budget stop being searched once it is spent: the next one is refused as not checked, at once,
+        even when it would match, while a value with a budget left is searched as usual.
+        """
+        facts = {"pattern": "^[a-z]+$"}
+        assert constraint_break_message(value="fine", facts=facts, pattern_budget=PatternSearchBudget(seconds=10.0)) is None
+        spent = PatternSearchBudget(seconds=0.0)
+        message = constraint_break_message(value="fine", facts=facts, pattern_budget=spent)
+        assert message is not None
+        assert "could not be checked against the pattern" in message
+        assert "the values of one input share" in message
 
     def test_a_pattern_overrunning_on_its_own_example_is_refused_as_malformed(self) -> None:
         """An example the pattern cannot be searched in within the limit refuses the pattern, the fact to rewrite."""

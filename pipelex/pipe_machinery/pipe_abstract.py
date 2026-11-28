@@ -13,6 +13,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.contract_fact_projection import carried_field_name, contract_break
+from pipelex.language.contract_facts import PatternSearchBudget
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
@@ -725,12 +726,17 @@ class PipeAbstract(ABC, BaseModel):
             contents: list[Any] = (
                 list(cast("ListContent[StuffContent]", root_content).items) if isinstance(root_content, ListContent) else [root_content]
             )
+            # The values of one input share one search budget, so a long list of values that each fall just under the
+            # per-value limit cannot spend it once per item; the first value checked past it is refused.
+            pattern_budget = PatternSearchBudget.for_input()
             for content in contents:
                 message: str | None
                 if isinstance(content, StoredValueContent) and not content.is_loaded:
                     message = "its stored value could not be read to check it"
                 else:
-                    message = contract_break(value=content, facts=stuff_spec.contract_facts, choice_values=stuff_spec.choice_values)
+                    message = contract_break(
+                        value=content, facts=stuff_spec.contract_facts, choice_values=stuff_spec.choice_values, pattern_budget=pattern_budget
+                    )
                 if message is None:
                     continue
                 msg = f"Input '{variable_name}' of pipe '{self.code}' breaks its contract: {message}"
