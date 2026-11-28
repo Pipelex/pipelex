@@ -124,7 +124,7 @@ def presentation_words_fault(*, table: dict[str, Any], key_name: str, table_name
     for word_key in ("label", "description"):
         if word_key in table and (not isinstance(table[word_key], str) or not table[word_key]):
             return f"the '{word_key}' of {table_name} must be a non-empty string, got {table[word_key]!r}"
-    if "tone" in table and table["tone"] not in set(Tone):
+    if "tone" in table and (not isinstance(table["tone"], str) or table["tone"] not in set(Tone)):
         return f"the 'tone' of {table_name} must be one of {', '.join(Tone)}, got {table['tone']!r}"
     return None
 

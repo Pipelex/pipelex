@@ -375,7 +375,7 @@ def malformed_fact_message(*, key: ContractFactKey, value: Any) -> str | None:
             if compile_error is not None:
                 return f"'pattern' does not compile as a regular expression: {compile_error}"
         case ContractFactKey.FORMAT:
-            if value not in set(ValueFormat):
+            if not isinstance(value, str) or value not in set(ValueFormat):
                 return f"'format' must be one of {', '.join(ValueFormat)}, got {value!r}"
         case ContractFactKey.UNIT:
             if not isinstance(value, str) or not is_unit_identifier(unit=value):
@@ -384,7 +384,7 @@ def malformed_fact_message(*, key: ContractFactKey, value: Any) -> str | None:
                     f"{', '.join(sorted(UNITS_OF_MEASURE))}; got {value!r}"
                 )
         case ContractFactKey.AGGREGATE:
-            if value not in set(Aggregate):
+            if not isinstance(value, str) or value not in set(Aggregate):
                 return f"'aggregate' must be one of {', '.join(Aggregate)}, got {value!r}"
         case ContractFactKey.EXAMPLES:
             if not isinstance(value, list) or not value:
@@ -576,7 +576,11 @@ def constraint_break_message(*, value: Any, facts: Mapping[str, Any]) -> str | N
         if pattern is not None and pattern_compile_error(pattern=pattern) is None and not text_matches_pattern(text=value, pattern=pattern):
             return f"{value!r} does not match the pattern {pattern!r}"
         text_format = facts.get(ContractFactKey.FORMAT)
-        if text_format in set(ValueFormat) and not text_matches_format(text=value, text_format=ValueFormat(text_format)):
+        if (
+            isinstance(text_format, str)
+            and text_format in set(ValueFormat)
+            and not text_matches_format(text=value, text_format=ValueFormat(text_format))
+        ):
             return f"{value!r} is not well-formed as {text_format}"
     return None
 
@@ -601,14 +605,21 @@ def value_findings(*, facts: Mapping[str, Any], site_type: FactSiteType, default
     if default_value is not None:
         default_message = constraint_break_message(value=default_value, facts=facts)
         if default_message is not None:
-            broken_key = _first_constraint_key(facts=facts)
+            broken_key = broken_constraint_key(value=default_value, facts=facts)
             findings.append(ContractFactFinding(broken_key, ContractFactReason.VALUE_BREAKS_CONTRACT, f"the default_value {default_message}"))
     return findings
 
 
-def _first_constraint_key(*, facts: Mapping[str, Any]) -> str:
-    """The first constraint a site declares, which a refusal of its default names as the fact at fault."""
-    return next((key for key in CONTRACT_FACT_KEY_NAMES if key in facts and ContractFactKey(key).is_constraint), "default_value")
+def broken_constraint_key(*, value: Any, facts: Mapping[str, Any]) -> str:
+    """The first constraint of a site, in the standard's order, that a value breaks on its own: the fact a refusal names.
+
+    Each constraint is judged alone, so `{minimum: 0, maximum: 10}` refusing 20 names `maximum`, not the first key declared.
+    `default_value` stands in when no single constraint is broken alone, which `constraint_break_message` never lets happen.
+    """
+    for key in CONTRACT_FACT_KEY_NAMES:
+        if key in facts and ContractFactKey(key).is_constraint and constraint_break_message(value=value, facts={key: facts[key]}) is not None:
+            return key
+    return "default_value"
 
 
 def authored_facts(*, values: Mapping[str, Any]) -> dict[str, Any]:

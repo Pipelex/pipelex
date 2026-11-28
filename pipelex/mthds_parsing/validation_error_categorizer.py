@@ -107,13 +107,18 @@ def _contract_fact_site_path(*, loc: tuple[int | str, ...], fact: str) -> str | 
     """The bundle-root path of the site a contract fact sits on: the pydantic ``loc``, its own elements and the key dropped.
 
     A field validator's ``loc`` ends with the key (``concept.Review.structure.score.minimum``), a model validator's at the
-    site (``pipe.review.inputs.budget``); an option table's fault ends inside its list (``….choices.1``), so what follows
-    the key goes too.
+    site (``pipe.review.inputs.budget``); an option table's fault ends inside its list (``….choices.1``). So the trailing
+    list indices go first, then the last part only when it is the key: a field may be named like a fact (a field named
+    ``maximum`` whose ``maximum`` is malformed is the site ``concept.Review.structure.maximum``), so a part is never
+    dropped for its name anywhere else.
     """
-    parts = (_bundle_field_path(loc=loc, ends_with_authored_key=False) or "").split(".")
-    if fact in parts:
-        parts = parts[: parts.index(fact)]
-    return ".".join(part for part in parts if part not in _CONTRACT_FACT_INTERNAL_LOC_ELEMENTS) or None
+    raw_parts = (_bundle_field_path(loc=loc, ends_with_authored_key=False) or "").split(".")
+    parts = [part for part in raw_parts if part and part not in _CONTRACT_FACT_INTERNAL_LOC_ELEMENTS]
+    while parts and parts[-1].isdigit():
+        parts.pop()
+    if parts and parts[-1] == fact:
+        parts.pop()
+    return ".".join(parts) or None
 
 
 _CONTRACT_FACT_INTERNAL_LOC_ELEMENTS = frozenset({"InputSlotBlueprint", "ConceptStructureBlueprint", "ChoiceOption", "OutcomeTable"})

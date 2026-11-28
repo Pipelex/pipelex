@@ -5,6 +5,7 @@ import pytest
 from pipelex.language.contract_facts import (
     ContractFactKey,
     ContractFactReason,
+    FactSiteType,
     ValueClass,
     ValueFormat,
     applicability_findings,
@@ -13,6 +14,7 @@ from pipelex.language.contract_facts import (
     format_sample,
     is_unit_identifier,
     text_matches_format,
+    value_findings,
 )
 
 
@@ -81,3 +83,20 @@ class TestContractFacts:
         else:
             assert message is not None
             assert breaks in message
+
+    @pytest.mark.parametrize(
+        ("facts", "site_type", "default_value", "fact"),
+        [
+            ({"minimum": 0, "maximum": 10}, FactSiteType.NUMBER, 20, ContractFactKey.MAXIMUM),
+            ({"minimum": 0, "maximum": 10}, FactSiteType.NUMBER, -1, ContractFactKey.MINIMUM),
+            ({"min_length": 1, "pattern": "^a"}, FactSiteType.TEXT, "bcd", ContractFactKey.PATTERN),
+            ({"min_length": 4, "pattern": "^a"}, FactSiteType.TEXT, "abc", ContractFactKey.MIN_LENGTH),
+            ({"max_length": 20, "format": "email"}, FactSiteType.TEXT, "nope", ContractFactKey.FORMAT),
+        ],
+    )
+    def test_a_refused_default_names_the_constraint_it_breaks(
+        self, facts: dict[str, Any], site_type: FactSiteType, default_value: Any, fact: ContractFactKey
+    ) -> None:
+        """The fact named is the one the default breaks, never merely the first constraint declared."""
+        findings = value_findings(facts=facts, site_type=site_type, default_value=default_value)
+        assert [(finding.fact, finding.reason) for finding in findings] == [(fact, ContractFactReason.VALUE_BREAKS_CONTRACT)]
