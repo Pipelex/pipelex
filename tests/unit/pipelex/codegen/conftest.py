@@ -237,6 +237,26 @@ def every_type_kind_crate() -> LibraryCrate:
             ),
             # A structureless concept: emits the two-paragraph docstring (description + imprecision caveat).
             "lintcheck.Opaque": ConceptBlueprint(description="A structureless concept"),
+            # Contract facts, which `python-structures` writes as `Annotated[..., ContractFacts({...})]`: flat when the
+            # field's head fits, exploded otherwise, nullable and concept-typed (`carried`) too, with a date example.
+            "lintcheck.Constrained": ConceptBlueprint.model_validate(
+                {
+                    "description": "Contract facts in every rendering",
+                    "structure": {
+                        "code": {"description": "Code", "type": "text", "required": True, "max_length": 8},
+                        "reference": {
+                            "description": "Reference",
+                            "type": "text",
+                            "required": True,
+                            "min_length": 3,
+                            "pattern": "^PO-[0-9]+$",
+                            "examples": ["PO-001", "PO-002"],
+                        },
+                        "due_on": {"description": "Due date", "type": "date", "examples": [date(2026, 11, 28)]},
+                        "budget": {"description": "Budget", "type": "concept", "concept_ref": "Number", "minimum": 0, "unit": "EUR"},
+                    },
+                }
+            ),
             # Descriptions carrying characters the docstring renderer must not backslash-escape: a
             # double quote and a backslash both put a `\` in the docstring under naive escaping, which
             # ruff's D301 then auto-rewrites to an `r` prefix — changing the bytes and breaking the stamp.

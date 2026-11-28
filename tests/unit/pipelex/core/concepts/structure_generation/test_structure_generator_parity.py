@@ -1,7 +1,7 @@
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
@@ -62,3 +62,14 @@ class TestStructureGeneratorParity:
         assert built_class.__pydantic_complete__
         assert built_class.__bases__ == emitted_class.__bases__
         assert built_class.model_json_schema() == emitted_class.model_json_schema()
+
+    @pytest.mark.parametrize("change", StructureParityCases.CONSTRAINED_BREAKS)
+    def test_the_built_and_the_emitted_class_enforce_the_same_contract_facts(
+        self, change: dict[str, Any], emitted_classes: dict[str, type[BaseModel]], built_classes: dict[str, type[BaseModel]]
+    ):
+        """Both classes accept a value meeting every fact and refuse one breaking a fact, whichever class wrote it."""
+        concept_ref = "parity.Constrained"
+        for concept_class in (built_classes[concept_ref], emitted_classes[concept_ref]):
+            concept_class.model_validate(StructureParityCases.CONSTRAINED_VALID)
+            with pytest.raises(ValidationError):
+                concept_class.model_validate({**StructureParityCases.CONSTRAINED_VALID, **change})

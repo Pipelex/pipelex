@@ -251,4 +251,34 @@ class StructureParityCases:
             'A description that spans lines.\n\nIts second paragraph holds """ triple quotes.',
             padded=_field(type="text", description="  Padded with edge whitespace  "),
         ),
+        "parity.Constrained": _concept(
+            "Contract facts on every value class they apply to, enforced alike",
+            reference=_field(type="text", required=True, min_length=3, max_length=12, pattern="^PO-[0-9]+$", examples=["PO-001"]),
+            email=_field(type="text", format="email"),
+            quantity=_field(type="integer", required=True, minimum=1, maximum=99, unit="kg"),
+            ratio=_field(type="number", exclusive_minimum=0, exclusive_maximum=1, default_value=0.5),
+            budget=_field(type="concept", concept_ref="Number", minimum=0),
+            title=_field(type="concept", concept_ref="native.Text", max_length=40),
+        ),
     }
+
+    CONSTRAINED_VALID: ClassVar[dict[str, Any]] = {
+        "reference": "PO-001",
+        "email": "buyer@example.com",
+        "quantity": 3,
+        "ratio": 0.25,
+        "budget": {"number": 10},
+        "title": {"text": "A short title"},
+    }
+    """A value of `parity.Constrained` meeting every fact, which both classes accept."""
+
+    CONSTRAINED_BREAKS: ClassVar[list[dict[str, Any]]] = [
+        {"reference": "nope"},
+        {"reference": "PO-0000000000001"},
+        {"email": "not an email"},
+        {"quantity": 120},
+        {"ratio": 1},
+        {"budget": {"number": -1}},
+        {"title": {"text": "x" * 41}},
+    ]
+    """Changes to `CONSTRAINED_VALID`, each breaking one fact, which both classes refuse."""

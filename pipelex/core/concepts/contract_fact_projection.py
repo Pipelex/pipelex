@@ -17,8 +17,9 @@ import datetime
 from collections.abc import Mapping
 from typing import Annotated, Any, cast
 
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, Field, GetCoreSchemaHandler
 from pydantic.dataclasses import dataclass
+from pydantic_core import CoreSchema
 
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -97,9 +98,11 @@ class ContractFactsMetadata:
 
 
 def contract_facts_of(*, metadata: list[Any] | tuple[Any, ...]) -> dict[str, Any] | None:
-    """The facts a constrained annotation's metadata carries, or `None` when it carries none."""
+    """The facts a constrained annotation's metadata carries, or `None` when it carries none: the runtime class's
+    `ContractFactsMetadata`, or the `ContractFacts` a generated `python-structures` class spells them with.
+    """
     for item in metadata:
-        if isinstance(item, ContractFactsMetadata):
+        if isinstance(item, ContractFactsMetadata | ContractFacts):
             return item.facts
     return None
 
@@ -236,3 +239,24 @@ def slot_schema_with_facts(*, json_schema: dict[str, Any], facts: Mapping[str, A
             return projected
     return projected
 
+
+class ContractFacts:
+    """A field's contract facts as the `python-structures` codegen projection writes them: `Annotated[str, ContractFacts({...})]`.
+
+    The generated class validates and describes the field exactly as the class the runtime builds for the same concept
+    (`pipelex.core.concepts.structure_generation`), since pydantic builds the field from `constrained_annotation` over the
+    annotated type. `carried` is true on a field typed by a concept, whose facts constrain the value the concept carries
+    (the `number` of a `Number`, the `text` of a `Text`) rather than the field's own value.
+
+    A plain class, hashed by identity: `typing` hashes an annotation's metadata when it builds a union over it
+    (`Annotated[...] | None`), and the facts, a dict that may hold a list of examples, cannot be hashed.
+    """
+
+    __slots__ = ("carried", "facts")
+
+    def __init__(self, facts: dict[str, Any], *, carried: bool = False) -> None:
+        self.facts = dict(facts)
+        self.carried = carried
+
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:  # ruff: ignore[bad-dunder-method-name]
+        return handler.generate_schema(constrained_annotation(annotation=source_type, facts=self.facts, states_schema=not self.carried))
