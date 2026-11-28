@@ -175,7 +175,9 @@ def parse_choices(*, raw: Any) -> Any:
         if all_values.count(table_value) > 1:
             msg = f"an option table shares the value {table_value!r} with another option of its list"
             raise ContractFactInvalidError(msg, fact=CHOICES_KEY, reason=ContractFactReason.DUPLICATE_OPTION)
-    duplicate_label = duplicate_option_message(values=[], labels=[option.label if isinstance(option, ChoiceOptionTable) else None for option in options])
+    duplicate_label = duplicate_option_message(
+        values=[], labels=[option.label if isinstance(option, ChoiceOptionTable) else None for option in options]
+    )
     if duplicate_label is not None:
         raise ContractFactInvalidError(duplicate_label, fact=CHOICES_KEY, reason=ContractFactReason.DUPLICATE_OPTION)
     return options

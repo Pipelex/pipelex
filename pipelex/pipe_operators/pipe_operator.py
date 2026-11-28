@@ -12,6 +12,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_operators.produced_file_naming import name_produced_files
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 
@@ -79,6 +80,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
             pipe_output = await self._live_run_operator_pipe(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
+            await self._name_produced_files(pipe_output=pipe_output, working_memory=working_memory)
 
             main_stuff = pipe_output.main_stuff
             # Read the concept from main_stuff, not self.output: when the pipe declares
@@ -133,8 +135,21 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        return await self._dry_run_operator_pipe(
+        pipe_output = await self._dry_run_operator_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+        await self._name_produced_files(pipe_output=pipe_output, working_memory=working_memory)
+        return pipe_output
+
+    @final
+    async def _name_produced_files(self, *, pipe_output: PipeOutput, working_memory: WorkingMemory) -> None:
+        """Name the files this operator produced from its `output_filename`, rendered with its inputs, in a live run and a
+        dry run alike (spec: mthds-format.md, "Naming Produced Files").
+        """
+        if self.output_filename is None:
+            return
+        await name_produced_files(
+            output_filename=self.output_filename, main_stuff=pipe_output.main_stuff, working_memory=working_memory, pipe_code=self.code
         )
 
     @abstractmethod

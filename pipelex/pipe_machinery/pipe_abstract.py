@@ -164,6 +164,15 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain_code: str
     description: str
+    # What the pipe is doing, for a person watching a run (spec: mthds-format.md, "What a Run Shows"); a run view shows it
+    # in place of `description`. Plain text, never a template.
+    activity: str | None = None
+    # The Jinja2 template naming each file the pipe produces (spec: "Naming Produced Files"), set on an operator whose
+    # output is file-valued; `PipeOperator` renders it with the pipe's inputs once the output is produced.
+    output_filename: str | None = None
+    # The manifest's `result_line` template, set by the library load on the pipe its manifest names as `main_pipe`
+    # (spec: manifest-format.md, "Result Line"); a run starting at this pipe renders it against its output.
+    result_line: str | None = None
     inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
     output: StuffSpec
 
@@ -937,6 +946,7 @@ class PipeAbstract(ABC, BaseModel):
                     pipe_data=pipe_data,
                     concept_data=concept_data,
                     description=self.description,
+                    activity=self.activity,
                     domain_code=self.domain_code,
                     step_count=self.traced_step_count(),
                     branch_count=self.traced_branch_count(),

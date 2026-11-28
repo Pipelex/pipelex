@@ -152,4 +152,7 @@ class PipeFactory(Generic[PipeAbstractType]):
             output=parsed_output,
             blueprint=blueprint,
         )
+        # The presentation keys every pipe type carries alike are set here, once, rather than by each type's factory.
+        if blueprint.activity is not None or blueprint.output_filename is not None:
+            pipe = pipe.model_copy(update={"activity": blueprint.activity, "output_filename": blueprint.output_filename})
         return pipe
