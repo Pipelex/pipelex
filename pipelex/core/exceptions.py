@@ -70,6 +70,10 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # ``main_pipe`` value, which ``field_path`` (``main_pipe``) tells apart.
     identifier_name: str | None = None
 
+    # The pipe reference that names nothing, set on an ``unresolved_pipe_dependency`` error: the bundle's ``main_pipe``
+    # naming no pipe the bundle defines, which ``field_path`` (``main_pipe``) locates.
+    missing_pipe_code: str | None = None
+
     # The parameters of the item's code its raise site knows about this one item, by the registry's names, for an
     # error no ``error_type`` classifies, which takes the code of the refusal it rides: they take precedence over the
     # refusal's own, which describe its first fault. A refusal of several lines of a ``requirements.txt`` names each
