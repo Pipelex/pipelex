@@ -27,6 +27,9 @@
 ### Fixed
 
 - **A template failing on a value with a `ValueError` reports a render failure**: a method template whose filter or string method refuses the value it is given, such as `wordwrap(0)` or `'{:d}'.format('a')`, in a `PipeCompose`, a prompt or any other template a method writes, fails as `pipe.template_render_failed` naming the class and the line, never the value, where the raw `ValueError` escaped the render as an unexpected error.
+- **A bundle's `main_pipe` naming a pipe it does not define is refused as `method.pipe_unresolved`**: the validation verdict's item names the missing pipe as `params.missing`, the `main_pipe` declaration as `params.pipe` and as its `location.field`, and the bundle's pipes, those nearest the name first, as `params.candidates`, as a package manifest's `main_pipe` naming no pipe is already refused, where it was a `method.schema_violation` whose sentence was the code's title. Its `validation_errors` item is an `unresolved_pipe_dependency` carrying `field_path = "main_pipe"` and the `missing_pipe_code`.
+- **A `method.schema_violation` item says where the rule is broken and what was found**: a concept declaration that breaks a rule names its key path, such as `concept`, as its `field_path`, a pipe structured through a preliminary text whose step pipes cannot be added names that pipe, and an item about the bundle as a whole names its file, so the item reads "The declaration at '…' breaks a rule of the language (…)" where it read only the code's title.
+- **A `concept` that is not a table is an invalid verdict**: a bundle declaring `concept = 5`, or any other value that is not a table, is refused as a `method.schema_violation` item at `concept`, where validation crashed with a Python `TypeError` and produced no verdict.
 
 ## [v0.121.0] - 2026-11-28
 

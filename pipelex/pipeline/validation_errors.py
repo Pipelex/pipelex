@@ -116,6 +116,7 @@ def build_validation_error_items(
                 variable_names=blueprint_error.variable_names or None,
                 declared_concepts=blueprint_error.declared_concepts or None,
                 identifier_name=blueprint_error.identifier_name,
+                missing_pipe_code=blueprint_error.missing_pipe_code,
                 params=blueprint_error.params,
                 line=blueprint_error.line,
                 column=blueprint_error.column,
@@ -389,7 +390,7 @@ def _item_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
         "model": item.model_reference,
         "model_type": item.model_type,
         "suggestions": item.suggestions if item.suggestions is not None else _concept_suggestions(item=item),
-        "field_path": item.field_path or _declaration_path(item=item),
+        "field_path": item.field_path or _declaration_path(item=item) or item.source,
         "missing": item.missing_pipe_code,
         "finding": item.message,
     }
@@ -397,7 +398,11 @@ def _item_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
 
 
 def _declaration_path(*, item: ValidationErrorItem) -> str | None:
-    """The bundle-root dot path of the declaration an item is about when it names no field path: its pipe's, or its concept's."""
+    """The bundle-root dot path of the declaration an item is about when it names no field path: its pipe's, or its concept's.
+
+    An item about neither, such as a rule of the bundle as a whole, is about its file, which :func:`_item_facts` names in
+    their place, so a ``method.schema_violation`` item says where the rule is broken rather than falling back on its title.
+    """
     if item.pipe_code is not None:
         return f"pipe.{item.pipe_code}.{item.field_name}" if item.field_name else f"pipe.{item.pipe_code}"
     if item.concept_code is not None:

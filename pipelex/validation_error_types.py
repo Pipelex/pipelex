@@ -116,7 +116,9 @@ class PipeValidationErrorType(StrEnum):
     NATIVE_CONCEPT_REDECLARATION = "native_concept_redeclaration"
 
     # Wiring / reference-resolution failures, detected when validating a pipe's contract against the
-    # merged library (a referenced concept or dependency pipe does not resolve).
+    # merged library (a referenced concept or dependency pipe does not resolve). A bundle's `main_pipe` naming
+    # no pipe the bundle defines is an unresolved pipe too, found at blueprint parse time and told apart by its
+    # `field_path`, `main_pipe`.
     UNRESOLVED_CONCEPT = "unresolved_concept"
     UNRESOLVED_PIPE_DEPENDENCY = "unresolved_pipe_dependency"
     # A reference to a pipe of another method package, by its address, when the package cannot be resolved: not

@@ -13,7 +13,7 @@ from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.mthds_parsing.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
+from pipelex.mthds_parsing.exceptions import InvalidPipeCodeSyntaxError, MainPipeUnresolvedError, NativeConceptRedeclarationError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -189,11 +189,15 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("concept", mode="before")
     @classmethod
-    def validate_concept_keys(cls, concept: dict[str, ConceptBlueprint | str] | None) -> dict[str, ConceptBlueprint | str] | None:
+    def validate_concept_keys(cls, concept: Any) -> Any:
         if concept is None:
             return None
+        if not isinstance(concept, dict):
+            # Let the field type refuse a `concept` that is not a table, as an item of the verdict.
+            return concept
+        concept_table = cast("dict[str, Any]", concept)
         native_concept_codes = [native.value for native in NativeConceptCode.values_list()]
-        for concept_code in concept:
+        for concept_code in concept_table:
             if not is_concept_code_valid(concept_code=concept_code):
                 msg = f"Concept code '{concept_code}' is not a valid concept code"
                 raise ValueError(msg)
@@ -206,7 +210,7 @@ class PipelexBundleBlueprint(BaseModel):
                 # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
                 # blueprint categorizer recovers the offending code structurally for the fix planner.
                 raise NativeConceptRedeclarationError(msg, concept_code=concept_code)
-        return concept
+        return concept_table
 
     @field_validator("main_pipe", mode="before")
     @classmethod
@@ -255,9 +259,19 @@ class PipelexBundleBlueprint(BaseModel):
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":
+        """Refuse a ``main_pipe`` that names no pipe of the bundle, naming every pipe the bundle defines.
+
+        Raised typed so the categorizer turns it into a ``method.pipe_unresolved`` item located at ``main_pipe``, whose
+        candidates it orders from the pipes the error names.
+        """
         if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
-            msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
-            raise ValueError(msg)
+            where = f"the bundle at source '{self.source}'" if self.source else "the bundle"
+            msg = (
+                f"The main_pipe '{self.main_pipe}' names no pipe of {where} in domain '{self.domain}'. "
+                f"Its pipes: {', '.join(sorted(self.pipe or {})) or 'none'}."
+            )
+            defined_pipe_refs = sorted(f"{self.domain}.{pipe_code}" for pipe_code in self.pipe or {})
+            raise MainPipeUnresolvedError(msg, main_pipe=self.main_pipe, defined_pipe_refs=defined_pipe_refs)
         return self
 
     def get_elaboration_for(self, pipe_code: str) -> ElaborationMetadata | None:

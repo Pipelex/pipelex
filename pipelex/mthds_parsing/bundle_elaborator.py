@@ -120,7 +120,7 @@ class BundleElaborator:
                 f"Pipe '{pipe_code}': `structuring_method = preliminary_text` cannot be used with output `{pipe_blueprint.output}`. "
                 "The output must be a structured concept, not Text."
             )
-            raise BundleElaboratorError(msg)
+            raise BundleElaboratorError(msg).with_params(field_path=f"pipe.{pipe_code}", finding=msg)
 
         draft_text_code = f"{pipe_code}{_SYNTHETIC_DRAFT_TEXT_SUFFIX}"
         structure_code = f"{pipe_code}{_SYNTHETIC_STRUCTURE_SUFFIX}"
@@ -131,14 +131,14 @@ class BundleElaborator:
                 f"'{draft_text_code}' / '{structure_code}' are not valid snake_case pipe codes. "
                 "Shorten the original pipe code."
             )
-            raise BundleElaboratorError(msg)
+            raise BundleElaboratorError(msg).with_params(field_path=f"pipe.{pipe_code}", finding=msg)
 
         if draft_text_code in existing_codes or structure_code in existing_codes:
             msg = (
                 f"Pipe '{pipe_code}': cannot elaborate — synthetic pipe codes "
                 f"'{draft_text_code}' / '{structure_code}' collide with existing pipes in the bundle."
             )
-            raise BundleElaboratorError(msg)
+            raise BundleElaboratorError(msg).with_params(field_path=f"pipe.{pipe_code}", finding=msg)
 
         # --- step 1: PipeLLM that produces a single Text draft ---
         # Image variables on the original prompt naturally flow only here, since step-2's prompt
