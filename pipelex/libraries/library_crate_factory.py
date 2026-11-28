@@ -157,6 +157,9 @@ class LibraryCrateFactory:
                         else:
                             source_map.pop(pipe_ref, None)
                         if winner.blueprint is pipe_blueprint:
+                            # A result line recorded for the declaration this one beat words it no more: the winner's
+                            # own bundle records one below when its manifest has one.
+                            result_lines.pop(pipe_ref, None)
                             # The tree a step resolves the files it names in follows the winner too.
                             if tree_bundle_ref is not None:
                                 tree_bundles[pipe_ref] = tree_bundle_ref

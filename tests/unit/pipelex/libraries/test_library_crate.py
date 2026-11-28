@@ -6,7 +6,7 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import MainPipeResultLine, PipelexBundleBlueprint
 from tests.unit.pipelex.libraries.library_crate_cases import BlueprintSamples
 
 DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of a domain disagree on a field, and the first value is kept"
@@ -193,6 +193,18 @@ class TestLibraryCrate:
         # Deterministic tie-break: same surviving source and same fingerprint regardless of order.
         assert crate_ab.source_map["reconcile.summarize"] == crate_ba.source_map["reconcile.summarize"]
         assert crate_ab.fingerprint == crate_ba.fingerprint
+
+    def test_a_result_line_follows_the_declaration_that_won_its_pipe(self):
+        """A manifest's line recorded for a declaration that a later bundle's declaration then beats is not carried: the
+        crate's line, and so its fingerprint, follow the winner, which takes none here.
+        """
+        header = BlueprintSamples.SIG_SIGNATURE_BUNDLE.model_copy(deep=True)
+        header.attach_main_pipe_result_line(main_pipe_result_line=MainPipeResultLine(pipe_code="summarize", result_line="Header {{ output.text }}"))
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[header, BlueprintSamples.SIG_CONCRETE_BUNDLE])
+        assert crate.pipes["reconcile.summarize"].is_signature is False
+        assert crate.result_lines == {}
+        unworded = LibraryCrateFactory.make_from_blueprints(blueprints=[BlueprintSamples.SIG_SIGNATURE_BUNDLE, BlueprintSamples.SIG_CONCRETE_BUNDLE])
+        assert crate.fingerprint == unworded.fingerprint
 
     def test_signature_plus_signature_mismatched_raises(self):
         """Two signatures with differing contracts raise a PipeLibraryError."""
