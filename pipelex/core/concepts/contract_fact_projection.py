@@ -190,16 +190,21 @@ def _content_schema(*, schema: dict[str, Any]) -> dict[str, Any]:
     return target
 
 
-def _scalar_branch(*, value_schema: dict[str, Any]) -> dict[str, Any]:
-    """The branch of a value property that holds the value itself: its non-null `anyOf` arm when it may hold nothing (the
-    `text` of a stored `Text` is null), so the facts never refuse the null arm.
+def _value_branches(*, value_schema: dict[str, Any]) -> list[dict[str, Any]]:
+    """The branches of a value property that hold the value itself: every non-null `anyOf` arm when it has several, such as
+    the `integer` and `number` arms of a `Number`, so a value matching any arm meets the facts, and never the null arm (the
+    `text` of a stored `Text` is null), so the facts never refuse it. The property itself when it has no `anyOf`.
     """
     branches = value_schema.get("anyOf")
     if isinstance(branches, list):
-        for branch in cast("list[Any]", branches):
-            if isinstance(branch, dict) and cast("dict[str, Any]", branch).get("type") != "null":
-                return cast("dict[str, Any]", branch)
-    return value_schema
+        value_branches = [
+            cast("dict[str, Any]", branch)
+            for branch in cast("list[Any]", branches)
+            if isinstance(branch, dict) and cast("dict[str, Any]", branch).get("type") != "null"
+        ]
+        if value_branches:
+            return value_branches
+    return [value_schema]
 
 
 def slot_schema_with_facts(*, json_schema: dict[str, Any], facts: Mapping[str, Any], choice_values: list[str] | None) -> dict[str, Any]:
@@ -222,7 +227,8 @@ def slot_schema_with_facts(*, json_schema: dict[str, Any], facts: Mapping[str, A
     for property_name in ("number", "text"):
         value_schema = typed_properties.get(property_name)
         if isinstance(value_schema, dict):
-            _scalar_branch(value_schema=cast("dict[str, Any]", value_schema)).update(fact_json_schema(facts=facts, choice_values=choice_values))
+            for value_branch in _value_branches(value_schema=cast("dict[str, Any]", value_schema)):
+                value_branch.update(fact_json_schema(facts=facts, choice_values=choice_values))
             return projected
     for property_name in ("date", "time"):
         if property_name in typed_properties and isinstance(examples, list):

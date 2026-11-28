@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, cast
 
+import jsonschema
 import pytest
 from mthds.protocol.input_form import Aggregate, ChoiceOption, DocumentField, EnumField, ListField, NumberField, ObjectField, ProseField, ProseItem
 from mthds.protocol.problem.registry import CoreCode
@@ -83,13 +84,11 @@ def _teardown_validation_library(outer_library_id: str) -> None:
     clear_current_library()
 
 
-def _value_branch(schema: dict[str, Any], property_name: str) -> dict[str, Any]:
+def _value_branches(schema: dict[str, Any], property_name: str) -> list[dict[str, Any]]:
+    """Every arm of a value property that holds the value: each non-null `anyOf` arm, or the property itself."""
     value_schema: dict[str, Any] = schema["properties"][property_name]
-    branches: list[dict[str, Any]] = value_schema.get("anyOf", [])
-    for branch in branches:
-        if branch.get("type") != "null":
-            return branch
-    return value_schema
+    branches: list[dict[str, Any]] = [branch for branch in value_schema.get("anyOf", []) if branch.get("type") != "null"]
+    return branches or [value_schema]
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -114,15 +113,18 @@ class TestContractFactProjection:
             _teardown_validation_library(outer_library_id)
 
         contract = io_contracts["facts_projection_test.take_order"]
-        code_text = _value_branch(contract.inputs["code"].json_schema, "text")
-        assert code_text["minLength"] == 3
-        assert code_text["maxLength"] == 8
-        assert code_text["examples"] == ["ABC123"]
-        budget_number = _value_branch(contract.inputs["budget"].json_schema, "number")
-        assert budget_number["minimum"] == 0
-        assert budget_number["examples"] == [100]
-        tone_text = _value_branch(contract.inputs["tone"].json_schema, "text")
-        assert tone_text["enum"] == ["warm", "formal"]
+        code_texts = _value_branches(contract.inputs["code"].json_schema, "text")
+        assert [(branch["minLength"], branch["maxLength"], branch["examples"]) for branch in code_texts] == [(3, 8, ["ABC123"])]
+        # A number holds an integer or a float: each arm carries the facts, so a float out of bounds is refused too.
+        budget_schema = contract.inputs["budget"].json_schema
+        budget_numbers = _value_branches(budget_schema, "number")
+        assert [branch.get("type") for branch in budget_numbers] == ["integer", "number"]
+        assert all(branch["minimum"] == 0 and branch["examples"] == [100] for branch in budget_numbers)
+        assert not jsonschema.Draft202012Validator(budget_schema).is_valid({"number": -1.5})
+        assert not jsonschema.Draft202012Validator(budget_schema).is_valid({"number": -1})
+        assert jsonschema.Draft202012Validator(budget_schema).is_valid({"number": 2.5})
+        tone_texts = _value_branches(contract.inputs["tone"].json_schema, "text")
+        assert [branch["enum"] for branch in tone_texts] == [["warm", "formal"]]
         tags_schema = contract.inputs["tags"].json_schema
         assert "^[a-z]+$" in json.dumps(tags_schema)
         # The bare concept's schema stays shared and untouched: a slot without facts states none.
