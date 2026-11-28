@@ -126,8 +126,10 @@ def example_inputs_fault(*, example_path: str, file_text: str, inputs: Mapping[s
 
     try:
         payload: Any = json.loads(file_text)
-    except json.JSONDecodeError:
-        return invalid(message="is not JSON")
+    except (ValueError, RecursionError):
+        # `ValueError` covers a malformed document (`JSONDecodeError`) and an integer past Python's digit limit;
+        # `RecursionError` a document nested deeper than the decoder recurses.
+        return invalid(message="is not JSON this runtime can read")
     if not isinstance(payload, dict):
         return invalid(message="does not hold a JSON object of flat inputs")
     flat_inputs = cast("dict[str, Any]", payload)
@@ -141,8 +143,11 @@ def example_inputs_fault(*, example_path: str, file_text: str, inputs: Mapping[s
         if not isinstance(stuff, dict) or "concept" not in stuff or "content" not in stuff:
             return invalid(message=f"gives '{input_name}' a value that is not a stuff in wire form, with its `concept` and `content`")
         stuff_table = cast("dict[str, Any]", stuff)
-        if stuff_table["concept"] not in slot.accepted_concepts:
-            return invalid(message=f"gives '{input_name}' the concept '{stuff_table['concept']}', which its input does not accept")
+        stuff_concept: Any = stuff_table["concept"]
+        if not isinstance(stuff_concept, str):
+            return invalid(message=f"gives '{input_name}' a `concept` that is not a string")
+        if stuff_concept not in slot.accepted_concepts:
+            return invalid(message=f"gives '{input_name}' the concept '{stuff_concept}', which its input does not accept")
     missing = sorted(input_name for input_name, slot in inputs.items() if slot.required and input_name not in flat_inputs)
     if missing:
         return invalid(message=f"lacks the required input(s) {', '.join(repr(name) for name in missing)}")

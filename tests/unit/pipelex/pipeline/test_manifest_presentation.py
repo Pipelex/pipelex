@@ -63,6 +63,8 @@ class TestManifestPresentation:
             ({"nda": _NDA, "counterparty": "Acme Corp", "notes": []}, "not a stuff in wire form"),
             ({"nda": _NDA, "counterparty": {"concept": "native.Number", "content": {"number": 1}}, "notes": []}, "does not accept"),
             ({"nda": _NDA, "counterparty": _PARTY, "notes": [], "stranger": _PARTY}, "not an input of the main pipe"),
+            ({"nda": _NDA, "counterparty": {"concept": [], "content": {}}, "notes": []}, "a `concept` that is not a string"),
+            ({"nda": _NDA, "counterparty": {"concept": {"a": 1}, "content": {}}, "notes": []}, "a `concept` that is not a string"),
         ],
     )
     def test_example_inputs(self, payload: dict[str, object], invalid: str | None) -> None:
@@ -74,3 +76,18 @@ class TestManifestPresentation:
             assert fault is not None
             assert fault.reason == ManifestPackageReason.EXAMPLE_INVALID
             assert invalid in fault.message
+
+    @pytest.mark.parametrize(
+        "file_text",
+        [
+            "not json",
+            '{"counterparty": ' + "1" * 5000 + "}",
+            "[" * 100_000,
+        ],
+    )
+    def test_example_file_the_runtime_cannot_read_is_invalid(self, file_text: str) -> None:
+        """Malformed JSON, an integer past Python's digit limit and a document nested past the decoder's depth are each a fault, never a crash."""
+        fault = example_inputs_fault(example_path="examples/broken.json", file_text=file_text, inputs=_INPUTS)
+        assert fault is not None
+        assert fault.reason == ManifestPackageReason.EXAMPLE_INVALID
+        assert "is not JSON this runtime can read" in fault.message
