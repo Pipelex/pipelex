@@ -162,7 +162,7 @@ The JSON success envelope names the pipe the template was generated for as `pipe
 }
 ```
 
-When the pipe is the `main_pipe` of the `METHODS.toml` above the bundle and that manifest lists [example inputs](../../building-methods/packages.md#example-inputs), the envelope adds them as `examples`, their tree paths from the manifest's folder in the manifest's order; the key is absent otherwise, and a run on the hosted API does not carry it yet.
+When the command reads a bundle file, the pipe is the `main_pipe` of the `METHODS.toml` at the root of that bundle's method tree, defined by the bundle in its own domain (a pipe of the same code in another domain, or one reached through a dependency's alias, is not), and that manifest lists [example inputs](../../building-methods/packages.md#example-inputs), the envelope adds them as `examples`, their tree paths from the manifest's folder in the manifest's order; the key is absent otherwise, and a run on the hosted API does not carry it yet.
 
 A pipe that declares no inputs is not an error: the envelope carries `"inputs": {}` and the command exits `0`; under `--format toml` it prints the comment `# Pipe 'my_domain.main_pipe' declares no inputs.`
 

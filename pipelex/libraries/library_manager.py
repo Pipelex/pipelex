@@ -2535,7 +2535,7 @@ def attach_manifest_result_lines(*, blueprints: "Iterable[PipelexBundleBlueprint
         trees.setdefault(tree.digest, tree)
         blueprints_by_tree.setdefault(tree.digest, []).append(blueprint)
     for tree_digest, tree_blueprints in blueprints_by_tree.items():
-        manifest = _tree_root_manifest(tree=trees[tree_digest])
+        manifest = tree_root_manifest(tree=trees[tree_digest])
         if manifest is None or manifest.result_line is None or manifest.main_pipe is None:
             continue
         main_pipe = manifest.main_pipe
@@ -2546,7 +2546,7 @@ def attach_manifest_result_lines(*, blueprints: "Iterable[PipelexBundleBlueprint
             blueprint.attach_main_pipe_result_line(main_pipe_result_line=MainPipeResultLine(pipe_code=main_pipe, result_line=manifest.result_line))
 
 
-def _tree_root_manifest(*, tree: MethodTree) -> MethodsManifest | None:
+def tree_root_manifest(*, tree: MethodTree) -> MethodsManifest | None:
     """The `METHODS.toml` at the root of a tree this process holds, read as listed, or None when it holds none or it cannot be read."""
     if MANIFEST_NAME not in tree.members:
         return None

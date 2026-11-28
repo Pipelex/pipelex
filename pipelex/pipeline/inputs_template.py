@@ -5,12 +5,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from mthds.package.discovery import find_package_manifest
-from mthds.package.exceptions import ManifestError
-
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
+from pipelex.libraries.library_manager import tree_root_manifest
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, no_inputs_message, render_inputs
@@ -20,6 +18,8 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 
 async def build_inputs_for_pipe(
@@ -43,14 +43,16 @@ async def build_inputs_for_pipe(
         explicit: When True, emit the ceremonial envelope form; when False (default), the light shape.
 
     Returns:
-        Dictionary with ``success``, the resolved ``pipe_ref``, the ``inputs`` template and the
-        internal ``concept_comments``. A pipe that declares no inputs answers with empty ``inputs``
+        Dictionary with ``success``, the resolved ``pipe_ref``, the ``inputs`` template, the manifest's
+        ``examples`` when the pipe is the main pipe of the bundle file's tree, and the internal ``concept_comments``. A pipe that declares no inputs answers with empty ``inputs``
         and an internal ``no_inputs_message`` saying so.
 
     Raises:
         ValidateBundleError: If bundle validation fails.
         MethodEntryError: If no pipe code can be determined (``request.pipe_unspecified``).
     """
+    # The bundle file whose tree's manifest may offer example inputs: only a bundle named by its path is read in a tree.
+    examples_blueprint: PipelexBundleBlueprint | None = None
     if mthds_contents:
         # validate_bundle opens a library, loads blueprints, and sets it as current.
         # allow_signatures=True: rendering inputs only needs the pipes loaded, not a fully
@@ -68,6 +70,7 @@ async def build_inputs_for_pipe(
         # allow_signatures=True: see the mthds_contents branch — rendering inputs tolerates placeholders.
         validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs, allow_signatures=True)
         bundle_blueprint = validate_bundle_result.blueprints[0]
+        examples_blueprint = bundle_blueprint
         if not pipe_code:
             main_pipe_code = bundle_blueprint.main_pipe
             if not main_pipe_code:
@@ -121,24 +124,26 @@ async def build_inputs_for_pipe(
         "inputs": inputs_dict,
         "concept_comments": build_concept_comments(the_pipe.inputs),
     }
-    examples = manifest_examples_for(bundle_path=bundle_path, pipe_code=the_pipe.code)
+    examples = manifest_examples_for(bundle_blueprint=examples_blueprint, pipe_ref=pipe_ref)
     if examples:
         result["examples"] = examples
     return result
 
 
-def manifest_examples_for(*, bundle_path: Path | None, pipe_code: str) -> list[str]:
-    """The example input files the manifest above `bundle_path` offers, when its `main_pipe` is `pipe_code`, else none.
+def manifest_examples_for(*, bundle_blueprint: PipelexBundleBlueprint | None, pipe_ref: str) -> list[str]:
+    """The example input files the manifest of the bundle's own method tree offers, when `pipe_ref` is its main pipe, else none.
 
-    Each is a tree path from the manifest's folder, as the manifest writes it (spec: manifest-format.md, "Example
-    Inputs"). A manifest that cannot be read offers none here: refusing it is the validation's, which reports why.
+    The main pipe is the pipe of the manifest's `main_pipe` code that the bundle defines in its own domain, as the result
+    line reads it (`attach_manifest_result_lines`), so a pipe of the same code in another domain, or one reached through a
+    dependency's alias, is offered none, as `/v1/pipe-io` offers it none. Each example is a tree path from the manifest's
+    folder, as the manifest writes it (spec: manifest-format.md, "Example Inputs"). A manifest that cannot be read offers
+    none here: refusing it is the validation's, which reports why.
     """
-    if bundle_path is None:
+    if bundle_blueprint is None or bundle_blueprint.tree_bundle is None:
         return []
-    try:
-        manifest = find_package_manifest(bundle_path)
-    except ManifestError:
+    manifest = tree_root_manifest(tree=bundle_blueprint.tree_bundle.tree)
+    if manifest is None or manifest.main_pipe is None or manifest.main_pipe not in (bundle_blueprint.pipe or {}):
         return []
-    if manifest is None or manifest.main_pipe != pipe_code:
+    if pipe_ref != PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=manifest.main_pipe):
         return []
     return list(manifest.examples)

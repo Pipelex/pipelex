@@ -27,7 +27,11 @@ class TestBuildInputsForPipe:
         """Stub the library plumbing, bundle validation, pipe lookup and input rendering."""
         library_manager = mocker.MagicMock()
         library_manager.open_library.return_value = ("lib_id", mocker.MagicMock())
-        validate_result = SimpleNamespace(blueprints=[SimpleNamespace(main_pipe="bundle_main", domain="demo_domain")])
+        validate_result = SimpleNamespace(
+            blueprints=[
+                SimpleNamespace(main_pipe="bundle_main", domain="demo_domain", tree_bundle=SimpleNamespace(tree="the bundle's tree"), pipe={"bundle_main": None})
+            ]
+        )
         return {
             "library_manager": library_manager,
             "get_library_manager": mocker.patch(f"{MODULE}.get_library_manager", return_value=library_manager),
@@ -39,6 +43,7 @@ class TestBuildInputsForPipe:
                 return_value=SimpleNamespace(code="bundle_main", pipe_ref="demo_domain.bundle_main", inputs=SimpleNamespace(root={})),
             ),
             "render_inputs": mocker.patch(f"{MODULE}.render_inputs", return_value='{\n  "topic": "your topic"\n}'),
+            "tree_root_manifest": mocker.patch(f"{MODULE}.tree_root_manifest", return_value=None),
         }
 
     def test_mthds_contents_first_main_pipe_wins_domain_qualified(self, ops_mocks: dict[str, Any]) -> None:
@@ -216,25 +221,13 @@ class TestBuildInputsForPipe:
         [("bundle_main", ["examples/demo.json"]), ("another_pipe", None)],
         ids=["entry_pipe_is_main_pipe", "another_main_pipe"],
     )
-    @pytest.mark.usefixtures("ops_mocks")
     def test_the_manifest_examples_of_the_entry_pipe_are_offered(
-        self, tmp_path: Path, manifest_main_pipe: str, expected_examples: list[str] | None
+        self, tmp_path: Path, ops_mocks: dict[str, Any], manifest_main_pipe: str, expected_examples: list[str] | None
     ) -> None:
-        """The manifest above the bundle offers its examples for its main pipe, and for no other pipe."""
-        (tmp_path / "METHODS.toml").write_text(
-            "[package]\n"
-            'address = "github.com/pipelex-tests/demo"\n'
-            'version = "1.0.0"\n'
-            'description = "A demo"\n'
-            f'main_pipe = "{manifest_main_pipe}"\n'
-            'examples = ["examples/demo.json"]\n'
-            "\n[exports.demo_domain]\n"
-            f'pipes = ["{manifest_main_pipe}"]\n',
-            encoding="utf-8",
-        )
-        bundle_path = tmp_path / "demo.mthds"
-        bundle_path.write_text('domain = "demo_domain"\n', encoding="utf-8")
+        """The manifest of the bundle's tree offers its examples for its main pipe, and for no other pipe."""
+        ops_mocks["tree_root_manifest"].return_value = SimpleNamespace(main_pipe=manifest_main_pipe, examples=["examples/demo.json"])
 
-        result = asyncio.run(build_inputs_for_pipe(bundle_path=bundle_path))
+        result = asyncio.run(build_inputs_for_pipe(bundle_path=tmp_path / "demo.mthds"))
 
+        ops_mocks["tree_root_manifest"].assert_called_once_with(tree="the bundle's tree")
         assert result.get("examples") == expected_examples
