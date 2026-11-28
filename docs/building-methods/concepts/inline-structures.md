@@ -111,6 +111,12 @@ unit = "EUR"
 
 A fact that does not apply where it is written, two facts that contradict each other (an empty range, `minimum` beside `exclusive_minimum`, `min_length` above `max_length`), a pattern that does not compile, an unknown unit, format or aggregate, and an example or a default that breaks the field's constraints are all refused with the error type `contract_fact_invalid`, whose parameters name the `fact`, the `reason` and the `field_path`.
 
+A pattern runs against values a caller sends, so the runtime keeps it from holding a run:
+
+- **Each search has a time limit of a tenth of a second.** A pattern you mean answers in microseconds; only one that backtracks catastrophically, such as `^(a|aa)+$`, whose branches can match the same characters in many ways, reaches the limit. A value whose search is stopped is refused as breaking the pattern, never let through unchecked, and a pattern that cannot be searched in its own example or default within the limit is refused as `malformed`. Write each part so that a character can match only one way: `^a+$` rather than `^(a|aa)+$`.
+- **Counted repetitions are bounded.** A pattern whose counts, written out and multiplied through nested groups, pass 10,000 positions, such as `(ab){1000000}`, is refused as `malformed`: the engine that searches it would hold memory in proportion to the counts. `{0,1000000}` writes out nothing and is accepted.
+- **A dry run's mock text holds at most 100,000 characters.** A field whose `min_length` passes that bound has no mock that satisfies it, so its dry run refuses the mock as it would any value that breaks the field.
+
 ## All-Optional Structures and the `input_presence_vacuous` Lint
 
 `required` defaults to **`false`** in the long form, and this is the difference between the two spellings that is easiest to miss:

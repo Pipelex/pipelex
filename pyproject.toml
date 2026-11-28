@@ -52,6 +52,7 @@ dependencies = [
   "pydantic>=2.12.0,<3.0.0",
   "python-dotenv>=1.2.2",
   "PyYAML>=6.0.2",
+  "regex>=2024.11.6",                  # matches an authored contract-fact `pattern` with a time limit, which `re` lacks
   "reportlab>=4.0,<5",                 # the built-in PDF engine of PipeDocGen, and synthetic PDFs in tests
   "requests>=2.33.0",
   "semantic-version>=2.10.0",
@@ -147,6 +148,7 @@ dev = [
   "types-networkx>=3.3.0.20241020",
   "types-openpyxl>=3.1.5.20250306",
   "types-PyYAML>=6.0.12.20250326",
+  "types-regex>=2024.11.6.20241221",
 ]
 typesafe = [
   "typesafe-sdk>=0.7.0",

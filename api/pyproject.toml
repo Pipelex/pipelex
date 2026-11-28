@@ -57,6 +57,7 @@ dev = [
   "types-openpyxl>=3.1.5.20250306",
   "types-requests>=2.32.0.2024091",
   "types-PyYAML>=6.0.12.20250326",
+  "types-regex>=2024.11.6.20241221",
   "types-toml>=0.10.8.20240310",
 ]
 

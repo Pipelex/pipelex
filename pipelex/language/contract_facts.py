@@ -12,8 +12,14 @@ Two groups of facts, with different consequences:
   invalid, and the runtime enforces them wherever it validates the value's type.
 - **Descriptions**, `unit`, `aggregate` and `examples`: they describe a value and never make it invalid.
 
-Pure standard knowledge: stdlib only, no pydantic and no other `pipelex` import but the hints vocabulary, so every layer may
-read it.
+Pure standard knowledge: the stdlib and the `regex` engine only, no pydantic and no other `pipelex` import but the hints
+vocabulary, so every layer may read it.
+
+A `pattern` is an author's regular expression run against values a caller sends, so it is matched with a time limit
+(`search_pattern`): Python's `re` backtracks without bound, and a pattern such as `^(a|aa)+$` would hold a run, or a
+hosted validation, for minutes on a value of a few dozen characters. The `regex` engine reads the same dialect as `re`,
+guards many catastrophic shapes itself, and stops a search that passes `PATTERN_SEARCH_TIMEOUT_SECONDS`, which the
+judgments below read as a value they could not check.
 """
 
 import ipaddress
@@ -22,8 +28,11 @@ import re
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime, time
 from enum import StrEnum
+from functools import lru_cache
 from typing import Any, NamedTuple, cast
 from uuid import UUID
+
+import regex
 
 from pipelex.language.intent_hints import HintSiteValueKind
 
@@ -352,22 +361,161 @@ def text_matches_format(*, text: str, text_format: ValueFormat) -> bool:
             return True
 
 
+PATTERN_SEARCH_TIMEOUT_SECONDS = 0.1
+"""The longest one search of a value against an authored `pattern` may take before it is stopped and the value counts as
+not checked. A pattern an author means runs in microseconds on any value a form or a model writes; only a pattern that
+backtracks catastrophically reaches it, and the value it was searched in is then refused, never let through unchecked.
+"""
+
+_SHOWN_TEXT_MAX_CHARACTERS = 60
+"""How much of a text a refusal quotes: a caller's value may be a long stored text, or hold what they would not see logged."""
+
+
+def shown_value(*, value: Any) -> str:
+    """A value as a refusal quotes it: its `repr`, a text longer than `_SHOWN_TEXT_MAX_CHARACTERS` cut there and its length
+    stated, any other value cut likewise, so a message never carries a whole stored text.
+    """
+    if isinstance(value, str) and len(value) > _SHOWN_TEXT_MAX_CHARACTERS:
+        return f"{value[:_SHOWN_TEXT_MAX_CHARACTERS]!r}… ({len(value)} characters)"
+    shown = repr(value)
+    if len(shown) > 2 * _SHOWN_TEXT_MAX_CHARACTERS:
+        return f"{shown[: 2 * _SHOWN_TEXT_MAX_CHARACTERS]}…"
+    return shown
+
+
+MAX_PATTERN_EXPANDED_POSITIONS = 10_000
+"""The most positions a `pattern` may hold once its counted repetitions are written out at their lower counts.
+
+The `regex` engine that searches a pattern writes out a counted repetition when it compiles it, so `(ab){1000000}` holds
+half a gigabyte for a second before any value is read. No pattern a form or a record means comes near this bound, which
+also keeps a pattern within the counts RE2-based validators accept.
+"""
+
+_QUANTIFIER_COUNT = re.compile(r"\{(\d+)(?:,\d*)?\}")
+_MAX_COUNT_DIGITS = 7
+
+
+def _class_end(*, pattern: str, start: int) -> int:
+    """The index just past the character class opening at `start`, a `]` right after `[` or `[^` being a member."""
+    index = start + 1
+    if index < len(pattern) and pattern[index] == "^":
+        index += 1
+    if index < len(pattern) and pattern[index] == "]":
+        index += 1
+    while index < len(pattern) and pattern[index] != "]":
+        index += 2 if pattern[index] == "\\" else 1
+    return index + 1
+
+
+def _group_body_start(*, pattern: str, start: int) -> int:
+    """The index of the first character of the contents of the group opening at `start`, past a special group's prefix:
+    `?:`, `?=`, `?!`, `?<=`, `?<!`, a name (`?P<name>`, `?<name>`) or inline flags (`?i:`, while `?i)` stops at its `)`).
+    """
+    index = start + 1
+    if index >= len(pattern) or pattern[index] != "?":
+        return index
+    index += 1
+    while index < len(pattern) and pattern[index] not in ":=!>)":
+        index += 1
+    if index < len(pattern) and pattern[index] != ")":
+        index += 1
+    return index
+
+
+def pattern_expanded_positions(*, pattern: str) -> int:
+    """The positions a pattern holds once each counted repetition is written out at its lower count, or one past
+    `MAX_PATTERN_EXPANDED_POSITIONS` as soon as it passes it.
+
+    A position is one character, one escape or one character class; a group holds the positions of its contents; a count
+    `{n}`, `{n,}` or `{n,m}` repeats the position or group before it `n` times. Read lexically, of a pattern that compiles,
+    with a special group's prefix, such as `?:`, skipped; the few shapes a lexical reading takes for more positions, such as
+    a backreference's digits, only ever overestimate.
+    """
+    over_limit = MAX_PATTERN_EXPANDED_POSITIONS + 1
+    group_totals: list[int] = [0]
+    last_atom = 0
+    index = 0
+    while index < len(pattern):
+        character = pattern[index]
+        count_match = _QUANTIFIER_COUNT.match(pattern, index) if character == "{" and last_atom else None
+        if count_match is not None:
+            digits = count_match.group(1)
+            if len(digits) > _MAX_COUNT_DIGITS:
+                return over_limit
+            group_totals[-1] += last_atom * max(int(digits) - 1, 0)
+            last_atom = 0
+            index = count_match.end()
+        elif character == "(":
+            group_totals.append(0)
+            last_atom = 0
+            index = _group_body_start(pattern=pattern, start=index)
+            continue
+        elif character == ")" and len(group_totals) > 1:
+            last_atom = group_totals.pop()
+            group_totals[-1] += last_atom
+            index += 1
+        else:
+            if character == "\\":
+                index += 2
+            elif character == "[":
+                index = _class_end(pattern=pattern, start=index)
+            else:
+                index += 1
+            last_atom = 1
+            group_totals[-1] += 1
+        if group_totals[-1] > MAX_PATTERN_EXPANDED_POSITIONS:
+            return over_limit
+    return min(sum(group_totals), over_limit)
+
+
+@lru_cache(maxsize=1024)
 def pattern_compile_error(*, pattern: str) -> str | None:
     """Why a `pattern` does not compile, or `None` when it does.
 
-    The pattern is compiled as the runtime enforces it, with Python's `re`, which reads the interoperable subset of
-    ECMA-262 the standard has authors keep to alike.
+    The pattern is compiled with Python's `re`, which reads the interoperable subset of ECMA-262 the standard has authors
+    keep to alike, then with the `regex` engine that searches it (`search_pattern`), and a pattern either refuses is
+    refused. A pattern whose counted repetitions write out past `MAX_PATTERN_EXPANDED_POSITIONS` is refused before the
+    `regex` engine compiles it.
     """
     try:
         re.compile(pattern)
     except re.error as exc:
         return str(exc)
+    if pattern_expanded_positions(pattern=pattern) > MAX_PATTERN_EXPANDED_POSITIONS:
+        return (
+            f"its counted repetitions write out past {MAX_PATTERN_EXPANDED_POSITIONS} positions, "
+            "which no pattern a value is checked against needs: lower the counts"
+        )
+    try:
+        regex.compile(pattern)
+    except regex.error as exc:
+        return str(exc)
     return None
 
 
-def text_matches_pattern(*, text: str, pattern: str) -> bool:
-    """Whether a text matches a pattern anywhere, as JSON Schema's `pattern` does: an anchored pattern matches the whole text."""
-    return re.search(pattern, text) is not None
+def search_pattern(*, text: str, pattern: str) -> bool | None:
+    """Whether a text matches a compiling pattern anywhere, as JSON Schema's `pattern` does (an anchored pattern matches the
+    whole text), or `None` when the search passed `PATTERN_SEARCH_TIMEOUT_SECONDS` and was stopped undecided.
+    """
+    compiled: regex.Pattern[str] = regex.compile(pattern)
+    try:
+        # The stubs type `timeout` with a `_typeshed` alias newer than the one pyright bundles, which it reads as unknown.
+        return compiled.search(text, timeout=PATTERN_SEARCH_TIMEOUT_SECONDS) is not None  # pyright: ignore[reportUnknownMemberType]
+    except TimeoutError:
+        return None
+
+
+def pattern_search_overruns(*, value: Any, facts: Mapping[str, Any]) -> bool:
+    """Whether searching a text for the site's compiling `pattern` passes the time limit, which only a pattern that
+    backtracks catastrophically does.
+    """
+    pattern = facts.get(ContractFactKey.PATTERN)
+    return (
+        isinstance(value, str)
+        and isinstance(pattern, str)
+        and pattern_compile_error(pattern=pattern) is None
+        and search_pattern(text=value, pattern=pattern) is None
+    )
 
 
 # ---- Shapes -------------------------------------------------------------------------------------------------------------
@@ -383,31 +531,31 @@ def malformed_fact_message(*, key: ContractFactKey, value: Any) -> str | None:
     match key:
         case ContractFactKey.MINIMUM | ContractFactKey.MAXIMUM | ContractFactKey.EXCLUSIVE_MINIMUM | ContractFactKey.EXCLUSIVE_MAXIMUM:
             if not is_plain_number(value=value) or not math.isfinite(value):
-                return f"'{key}' must be a finite number, got {value!r}"
+                return f"'{key}' must be a finite number, got {shown_value(value=value)}"
         case ContractFactKey.MIN_LENGTH | ContractFactKey.MAX_LENGTH:
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-                return f"'{key}' must be an integer of at least 0, got {value!r}"
+                return f"'{key}' must be an integer of at least 0, got {shown_value(value=value)}"
         case ContractFactKey.PATTERN:
             if not isinstance(value, str):
-                return f"'pattern' must be a string, got {value!r}"
+                return f"'pattern' must be a string, got {shown_value(value=value)}"
             compile_error = pattern_compile_error(pattern=value)
             if compile_error is not None:
                 return f"'pattern' does not compile as a regular expression: {compile_error}"
         case ContractFactKey.FORMAT:
             if not isinstance(value, str) or value not in set(ValueFormat):
-                return f"'format' must be one of {', '.join(ValueFormat)}, got {value!r}"
+                return f"'format' must be one of {', '.join(ValueFormat)}, got {shown_value(value=value)}"
         case ContractFactKey.UNIT:
             if not isinstance(value, str) or not is_unit_identifier(unit=value):
                 return (
                     f"'unit' must be a unit identifier: three uppercase letters naming a currency, 'percent', or one of "
-                    f"{', '.join(sorted(UNITS_OF_MEASURE))}; got {value!r}"
+                    f"{', '.join(sorted(UNITS_OF_MEASURE))}; got {shown_value(value=value)}"
                 )
         case ContractFactKey.AGGREGATE:
             if not isinstance(value, str) or value not in set(AggregateWord):
-                return f"'aggregate' must be one of {', '.join(AggregateWord)}, got {value!r}"
+                return f"'aggregate' must be one of {', '.join(AggregateWord)}, got {shown_value(value=value)}"
         case ContractFactKey.EXAMPLES:
             if not isinstance(value, list) or not value:
-                return f"'examples' must be a non-empty array, got {value!r}"
+                return f"'examples' must be a non-empty array, got {shown_value(value=value)}"
     return None
 
 
@@ -566,41 +714,53 @@ def value_type_message(*, value: Any, site_type: FactSiteType) -> str | None:
             valid = isinstance(value, time)
     if valid:
         return None
-    return f"{value!r} is not a value of a {str(site_type).replace('_', ' ')} site"
+    return f"{shown_value(value=value)} is not a value of a {str(site_type).replace('_', ' ')} site"
 
 
 def constraint_break_message(*, value: Any, facts: Mapping[str, Any]) -> str | None:
-    """The first constraint of a site a value of the site's type breaks, as a sentence, or `None` when it breaks none."""
+    """The first constraint of a site a value of the site's type breaks, as a sentence, or `None` when it breaks none.
+
+    The value is quoted cut short (`shown_value`). A text whose search for the site's `pattern` passes the time limit
+    breaks it: a value the runtime could not check is refused, never let through.
+    """
+    shown = shown_value(value=value)
     if is_plain_number(value=value):
         minimum = facts.get(ContractFactKey.MINIMUM)
         if minimum is not None and value < minimum:
-            return f"{value!r} is below the minimum {minimum!r}"
+            return f"{shown} is below the minimum {minimum!r}"
         maximum = facts.get(ContractFactKey.MAXIMUM)
         if maximum is not None and value > maximum:
-            return f"{value!r} is above the maximum {maximum!r}"
+            return f"{shown} is above the maximum {maximum!r}"
         exclusive_minimum = facts.get(ContractFactKey.EXCLUSIVE_MINIMUM)
         if exclusive_minimum is not None and value <= exclusive_minimum:
-            return f"{value!r} is not above the exclusive minimum {exclusive_minimum!r}"
+            return f"{shown} is not above the exclusive minimum {exclusive_minimum!r}"
         exclusive_maximum = facts.get(ContractFactKey.EXCLUSIVE_MAXIMUM)
         if exclusive_maximum is not None and value >= exclusive_maximum:
-            return f"{value!r} is not below the exclusive maximum {exclusive_maximum!r}"
+            return f"{shown} is not below the exclusive maximum {exclusive_maximum!r}"
     if isinstance(value, str):
         min_length = facts.get(ContractFactKey.MIN_LENGTH)
         if min_length is not None and len(value) < min_length:
-            return f"{value!r} holds fewer than {min_length} characters"
+            return f"{shown} holds fewer than {min_length} characters"
         max_length = facts.get(ContractFactKey.MAX_LENGTH)
         if max_length is not None and len(value) > max_length:
-            return f"{value!r} holds more than {max_length} characters"
+            return f"{shown} holds more than {max_length} characters"
         pattern = facts.get(ContractFactKey.PATTERN)
-        if pattern is not None and pattern_compile_error(pattern=pattern) is None and not text_matches_pattern(text=value, pattern=pattern):
-            return f"{value!r} does not match the pattern {pattern!r}"
+        if isinstance(pattern, str) and pattern_compile_error(pattern=pattern) is None:
+            matches = search_pattern(text=value, pattern=pattern)
+            if matches is None:
+                return (
+                    f"{shown} could not be checked against the pattern {pattern!r}: the search passed its time limit of "
+                    f"{PATTERN_SEARCH_TIMEOUT_SECONDS} s, as a pattern that backtracks catastrophically does"
+                )
+            if not matches:
+                return f"{shown} does not match the pattern {pattern!r}"
         text_format = facts.get(ContractFactKey.FORMAT)
         if (
             isinstance(text_format, str)
             and text_format in set(ValueFormat)
             and not text_matches_format(text=value, text_format=ValueFormat(text_format))
         ):
-            return f"{value!r} is not well-formed as {text_format}"
+            return f"{shown} is not well-formed as {text_format}"
     return None
 
 
@@ -615,18 +775,35 @@ def value_findings(*, facts: Mapping[str, Any], site_type: FactSiteType, default
     examples = facts.get(ContractFactKey.EXAMPLES)
     if isinstance(examples, list):
         for example in cast("list[Any]", examples):
+            if pattern_search_overruns(value=example, facts=facts):
+                findings.append(_overrunning_pattern_finding(value_name="an example"))
+                break
             example_message = value_type_message(value=example, site_type=site_type) or constraint_break_message(value=example, facts=facts)
             if example_message is not None:
                 findings.append(
                     ContractFactFinding(ContractFactKey.EXAMPLES, ContractFactReason.VALUE_BREAKS_CONTRACT, f"the example {example_message}")
                 )
                 break
-    if default_value is not None:
+    if default_value is not None and pattern_search_overruns(value=default_value, facts=facts):
+        findings.append(_overrunning_pattern_finding(value_name="the default_value"))
+    elif default_value is not None:
         default_message = constraint_break_message(value=default_value, facts=facts)
         if default_message is not None:
             broken_key = broken_constraint_key(value=default_value, facts=facts)
             findings.append(ContractFactFinding(broken_key, ContractFactReason.VALUE_BREAKS_CONTRACT, f"the default_value {default_message}"))
     return findings
+
+
+def _overrunning_pattern_finding(*, value_name: str) -> ContractFactFinding:
+    """The refusal of a `pattern` whose search in the site's own example or default passes the time limit: the pattern
+    backtracks catastrophically, and it would hold every run whose input it checks.
+    """
+    return ContractFactFinding(
+        ContractFactKey.PATTERN,
+        ContractFactReason.MALFORMED,
+        f"'pattern' could not be searched in {value_name} within {PATTERN_SEARCH_TIMEOUT_SECONDS} s: it backtracks catastrophically "
+        "(a quantified group whose branches overlap, such as '(a|aa)+'); rewrite it so each character can match one way",
+    )
 
 
 def broken_constraint_key(*, value: Any, facts: Mapping[str, Any]) -> str:

@@ -104,7 +104,7 @@ class TestContractFactProjection:
             order_class = pipe.inputs.root["order"].concept
             structure_class = get_concept_library().get_structure_class(concept=order_class)
             order_schema = structure_class.model_json_schema()
-            with pytest.raises(ValueError, match="should match pattern"):
+            with pytest.raises(ValueError, match="does not match the pattern"):
                 structure_class.model_validate({"reference": "nope", "quantity": 3})
             with pytest.raises(ValueError, match="less than or equal to 99"):
                 structure_class.model_validate({"reference": "PO-001", "quantity": 120})
@@ -289,7 +289,7 @@ class TestContractFactProjection:
         self, mocker: MockerFixture, load_empty_library: Callable[[], str], job_metadata: JobMetadata
     ) -> None:
         """A stored value the gate cannot read is refused, never let through unchecked."""
-        mocker.patch("pipelex.pipe_operators.pipe_operator.load_stored_values_through_leaf", return_value=0)
+        mocker.patch("pipelex.pipe_machinery.pipe_reading_stored_inputs.load_stored_values_through_leaf", return_value=0)
         outer_library_id = load_empty_library()
         try:
             result = await validate_bundle(mthds_contents=[_FACTS_MTHDS])

@@ -3502,6 +3502,7 @@ dependencies = [
     { name = "pypdfium2" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
+    { name = "regex" },
     { name = "reportlab" },
     { name = "requests" },
     { name = "semantic-version" },
@@ -3549,6 +3550,7 @@ dev = [
     { name = "types-networkx" },
     { name = "types-openpyxl" },
     { name = "types-pyyaml" },
+    { name = "types-regex" },
 ]
 docling = [
     { name = "docling" },
@@ -3685,6 +3687,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.6.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "regex", specifier = ">=2024.11.6" },
     { name = "reportlab", specifier = ">=4.0,<5" },
     { name = "requests", specifier = ">=2.33.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.8.1" },
@@ -3700,6 +3703,7 @@ requires-dist = [
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5.20250306" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
+    { name = "types-regex", marker = "extra == 'dev'", specifier = ">=2024.11.6.20241221" },
     { name = "typesafe-sdk", marker = "extra == 'typesafe'", specifier = ">=0.7.0" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "urllib3", specifier = ">=2.7.0" },
@@ -3738,6 +3742,7 @@ dev = [
     { name = "types-networkx" },
     { name = "types-openpyxl" },
     { name = "types-pyyaml" },
+    { name = "types-regex" },
     { name = "types-requests" },
     { name = "types-toml" },
 ]
@@ -3767,6 +3772,7 @@ requires-dist = [
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5.20250306" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
+    { name = "types-regex", marker = "extra == 'dev'", specifier = ">=2024.11.6.20241221" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.32.0.2024091" },
     { name = "types-toml", marker = "extra == 'dev'", specifier = ">=0.10.8.20240310" },
     { name = "uvicorn", specifier = ">=0.37.0" },
@@ -5795,6 +5801,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/74/73/b759b1e413c31034cc01ecdfb96b38115d0ab4db55a752a3929f0cd449fd/types_pyyaml-6.0.12.20260408.tar.gz", hash = "sha256:92a73f2b8d7f39ef392a38131f76b970f8c66e4c42b3125ae872b7c93b556307", size = 17735, upload-time = "2026-04-08T04:30:50.974Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/f0/c391068b86abb708882c6d75a08cd7d25b2c7227dab527b3a3685a3c635b/types_pyyaml-6.0.12.20260408-py3-none-any.whl", hash = "sha256:fbc42037d12159d9c801ebfcc79ebd28335a7c13b08a4cfbc6916df78fee9384", size = 20339, upload-time = "2026-04-08T04:30:50.113Z" },
+]
+
+[[package]]
+name = "types-regex"
+version = "2026.11.25.20261127"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/93/7df09fdaa5b34e9bf5bd6ec8787f5dc8035b5d1183b7217ef5ace815bdd7/types_regex-2026.11.25.20261127.tar.gz", hash = "sha256:d3af64aaab09e0db9651c8e5a06693ee2b39ee3c92ba188f0bf1ea9fad1fb636", size = 14647, upload-time = "2026-11-27T10:13:39.154Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/51/2f25db022c8c1b3882655665e4bcc85b33638e1d9d44b72c61d87116869e/types_regex-2026.11.25.20261127-py3-none-any.whl", hash = "sha256:9cd942da2996e65225c963d9812734f7cb45f979577d11576452c8212d8e065f", size = 11235, upload-time = "2026-11-27T10:13:38.131Z" },
 ]
 
 [[package]]

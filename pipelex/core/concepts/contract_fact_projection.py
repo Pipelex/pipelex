@@ -14,7 +14,6 @@ Two projections of the same facts:
 
 import copy
 import datetime
-import re
 from collections.abc import Mapping
 from typing import Annotated, Any, cast
 
@@ -24,7 +23,7 @@ from pydantic.dataclasses import dataclass
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.language.contract_facts import ContractFactKey, constraint_break_message, json_example
+from pipelex.language.contract_facts import ContractFactKey, constraint_break_message, json_example, shown_value
 
 _JSON_SCHEMA_KEYWORDS: dict[ContractFactKey, str] = {
     ContractFactKey.MINIMUM: "minimum",
@@ -80,7 +79,7 @@ def contract_break(*, value: Any, facts: Mapping[str, Any], choice_values: list[
     if plain is None:
         return None
     if choice_values is not None and isinstance(plain, str) and plain not in choice_values:
-        return f"{plain!r} is not one of the options {choice_values}"
+        return f"{shown_value(value=plain)} is not one of the options {choice_values}"
     return constraint_break_message(value=plain, facts=facts)
 
 
@@ -110,9 +109,10 @@ def constrained_annotation(*, annotation: Any, facts: Mapping[str, Any], states_
 
     Returned unchanged for a site authoring no fact, so a structure with none builds the class it built before. A site
     typed by a field type takes pydantic's own constraints, which its JSON Schema states and the dry run's mock factory
-    honours: the bounds, the lengths, and the pattern compiled with Python's `re`, the engine the language check compiles
-    it with, which pydantic then searches with, as JSON Schema does. `format` has no pydantic constraint, so a validator
-    asserts it and the schema carries the keyword; the examples ride the field's own `examples`.
+    honours: the bounds and the lengths. `pattern` and `format` are asserted by a validator, with the judgment the input
+    gate applies (`constraint_break_message`), and the schema carries both keywords: a pattern is searched with a time
+    limit (`search_pattern`), which pydantic's own `pattern` constraint, searched with Python's `re` without bound, would
+    not keep. The examples ride the field's own `examples`.
 
     A site typed by a concept (`states_schema` false) enforces its facts on the value its concept carries, while its
     schema stays the concept's reference: the facts go onto the value's own property where a slot's schema is assembled
@@ -141,27 +141,27 @@ def constrained_annotation(*, annotation: Any, facts: Mapping[str, Any], states_
         "min_length": frozen_facts.get(ContractFactKey.MIN_LENGTH),
         "max_length": frozen_facts.get(ContractFactKey.MAX_LENGTH),
     }
-    pattern = frozen_facts.get(ContractFactKey.PATTERN)
-    if isinstance(pattern, str):
-        constraints["pattern"] = re.compile(pattern)
     examples = frozen_facts.get(ContractFactKey.EXAMPLES)
     if isinstance(examples, list):
         constraints["examples"] = [json_example(value=example) for example in cast("list[Any]", examples)]
-    text_format = frozen_facts.get(ContractFactKey.FORMAT)
     field_info = Field(**{key: value for key, value in constraints.items() if value is not None})
-    if text_format is None:
+    # The facts a validator asserts, after pydantic's own bounds and lengths, in the standard's order: `pattern`, `format`.
+    asserted_facts: dict[str, Any] = {
+        key: frozen_facts[key] for key in (ContractFactKey.PATTERN, ContractFactKey.FORMAT) if frozen_facts.get(key) is not None
+    }
+    if not asserted_facts:
         return Annotated[annotation, field_info, facts_metadata]
-    format_facts: dict[str, Any] = {ContractFactKey.FORMAT: text_format}
 
-    def enforce_format(  # kw-only: ignore (pydantic calls an AfterValidator positionally)
+    def enforce_asserted(  # kw-only: ignore (pydantic calls an AfterValidator positionally)
         value: Any,
     ) -> Any:
-        message = contract_break(value=value, facts=format_facts)
+        message = contract_break(value=value, facts=asserted_facts)
         if message is not None:
             raise ValueError(message)
         return value
 
-    return Annotated[annotation, field_info, AfterValidator(enforce_format), Field(json_schema_extra={"format": str(text_format)}), facts_metadata]
+    stated_keywords: dict[str, Any] = {_JSON_SCHEMA_KEYWORDS[ContractFactKey(key)]: str(value) for key, value in asserted_facts.items()}
+    return Annotated[annotation, field_info, AfterValidator(enforce_asserted), Field(json_schema_extra=stated_keywords), facts_metadata]
 
 
 def _example_as_object(*, example: Any, property_name: str) -> Any:
@@ -235,3 +235,4 @@ def slot_schema_with_facts(*, json_schema: dict[str, Any], facts: Mapping[str, A
             content["examples"] = [_example_as_object(example=example, property_name=property_name) for example in cast("list[Any]", examples)]
             return projected
     return projected
+
