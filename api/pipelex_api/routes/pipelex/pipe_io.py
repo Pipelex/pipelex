@@ -101,8 +101,9 @@ class PipeIOValidReport(BaseModel):
         description=(
             "The example inputs the method's manifest offers for its entry pipe (`default_pipe_ref`): the `examples` of its "
             "`METHODS.toml`, each the tree path of a JSON file of flat inputs in stuff wire form, in the manifest's order. "
-            "Empty when the manifest declares none, when the method has no manifest, or when a request naming its pipe "
-            "sends a manifest that cannot be read."
+            "Listed only when the described pipe (`pipe_ref`) is that entry pipe, since they fill its inputs and no other "
+            "pipe's. Empty when the manifest declares none, when the method has no manifest, when the request names "
+            "another pipe, or when a request naming its pipe sends a manifest that cannot be read."
         ),
     )
     # Never serialized from the model: the route attaches the echo itself, and only when asked, so the
@@ -219,7 +220,8 @@ def _pipe_io_response(*, resolution: ResolvedMethod, request_data: PipeIORequest
         default_pipe_ref=default_pipe_ref,
         pending_signatures=pending_signatures,
         is_runnable=not pending_signatures,
-        examples=resolution.manifest_examples if manifest_readable else [],
+        # The examples fill the entry pipe's inputs, so they are offered only beside that pipe, as `pipelex-agent inputs` does.
+        examples=resolution.manifest_examples if manifest_readable and pipe_ref is not None and pipe_ref == default_pipe_ref else [],
     )
     # Dumped as `/validate` dumps its valid arm, never with `exclude_none`: that would strip the
     # contracts' `item_count: null` and break the byte equality with `/validate`'s maps.

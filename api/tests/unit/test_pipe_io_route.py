@@ -340,7 +340,21 @@ class TestPipeIoRoute:
         example = '{"text": {"concept": "native.Text", "content": {"text": "hello"}}}'
         files = {"METHODS.toml": manifest, "documents.mthds": NO_MAIN_PIPE_MTHDS, "examples/hello.json": example}
         assert _valid_arm(client, {"files": files})["examples"] == ["examples/hello.json"]
+        assert _valid_arm(client, {"files": files, "pipe_ref": "nomain.echo", "all_pipes": True})["examples"] == ["examples/hello.json"]
         assert _valid_arm(client, {"files": _files(VALID_MTHDS)})["examples"] == []
+
+    @pytest.mark.parametrize("all_pipes", [False, True])
+    def test_the_manifest_examples_are_not_offered_beside_another_pipe(self, all_pipes: bool):
+        """The examples fill the entry pipe's inputs: a request describing a helper pipe is offered none."""
+        client = _build_client()
+        manifest = STUB_METHOD_MANIFEST_NOMAIN_ENTRY.replace('main_pipe = "echo"\n', 'main_pipe = "echo"\nexamples = ["examples/hello.json"]\n')
+        helper = '\n[pipe.shout]\ntype = "PipeLLM"\ndescription = "Shout"\ninputs = { text = "Text" }\noutput = "Text"\nprompt = "@text"\n'
+        example = '{"text": {"concept": "native.Text", "content": {"text": "hello"}}}'
+        files = {"METHODS.toml": manifest, "documents.mthds": NO_MAIN_PIPE_MTHDS + helper, "examples/hello.json": example}
+        body = _valid_arm(client, {"files": files, "pipe_ref": "nomain.shout", "all_pipes": all_pipes})
+        assert body["pipe_ref"] == "nomain.shout"
+        assert body["default_pipe_ref"] == "nomain.echo"
+        assert body["examples"] == []
 
     @pytest.mark.parametrize("all_pipes", [False, True])
     def test_a_manifest_that_does_not_parse_refuses_only_a_request_naming_no_pipe(self, all_pipes: bool):
