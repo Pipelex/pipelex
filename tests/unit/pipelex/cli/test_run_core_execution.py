@@ -373,6 +373,25 @@ class TestRunCoreExecution:
         assert "main_stuff: json, md, html, html_viewer" in console.export_text()
 
     @pytest.mark.usefixtures("config_mock")
+    def test_the_main_output_file_never_takes_the_name_of_a_file_the_run_writes(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The produced file is kept off `result_line.txt` and `working_memory.json`, which the run writes beside it."""
+        main_stuff = mocker.MagicMock()
+        main_stuff.content.rendered_json_async = mocker.AsyncMock(return_value="{}")
+        main_stuff.content.rendered_markdown_async = mocker.AsyncMock(return_value="")
+        main_stuff.content.rendered_html_async = mocker.AsyncMock(return_value="")
+        mocker.patch("pipelex.cli.commands.run._run_core.render_stuff_viewer", new=mocker.AsyncMock(return_value=""))
+        save_file = mocker.patch("pipelex.cli.commands.run._run_core.save_main_stuff_file", new=mocker.AsyncMock(return_value=None))
+        pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
+        pipe_output.result_line = "3 approved"
+        self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(save_main_stuff=True, output_dir=str(tmp_path)))
+
+        assert save_file.call_args.kwargs["reserved_names"] == frozenset({"working_memory.json", "result_line.txt"})
+        saved_dir = next(tmp_path.iterdir())
+        assert (saved_dir / "result_line.txt").read_text(encoding="utf-8") == "3 approved\n"
+
+    @pytest.mark.usefixtures("config_mock")
     def test_working_memory_saved(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
         """--save-working-memory dumps the working memory as JSON in the output dir."""
         pipe_output = self._make_pipe_output(mocker)

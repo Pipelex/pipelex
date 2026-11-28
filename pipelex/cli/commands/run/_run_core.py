@@ -76,6 +76,8 @@ COMMAND = "run"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
 _RESULT_LINE_FILENAME = "result_line.txt"
 """The file of a run's output folder holding its result line, when it has one."""
+_RUN_WRITTEN_FILENAMES = frozenset({_WORKING_MEMORY_FILENAME, _RESULT_LINE_FILENAME})
+"""The files a run writes into its output folder after the main output's own file, which that file never takes the name of."""
 
 
 def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_inputs: bool) -> None:
@@ -447,7 +449,7 @@ async def _execute_run(
             if not dry_run:
                 try:
                     saved_main_stuff_file = await save_main_stuff_file(
-                        content=main_stuff.content, output_dir=output_path, reserved_names=frozenset({_WORKING_MEMORY_FILENAME})
+                        content=main_stuff.content, output_dir=output_path, reserved_names=_RUN_WRITTEN_FILENAMES
                     )
                 except (PipelexError, OSError, ValueError) as file_exc:
                     typer.secho(f"Could not copy the main output's file into {output_path}: {file_exc}", fg=typer.colors.YELLOW, err=True)
