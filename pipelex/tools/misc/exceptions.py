@@ -40,12 +40,18 @@ class FileTypeError(ToolError):
     error_code = ErrorCodeSet(default=CoreCode.INPUT_FILE_TYPE_UNSUPPORTED, others=(CoreCode.PROVIDER_RESPONSE_INVALID,))
 
 
-class DeclaredMediaTypeError(ValueError):
+class DeclaredMediaTypeError(ToolError):
     """Raised when a declared media type is not one media type: a bare `type/subtype` with optional `;` parameters.
 
-    A low-level validation error of `declared_media_type`: the input boundary turns it into the caller's error, naming the
-    input and the field that declared it. The message never quotes the declared value, which is a caller's content.
+    A validation error of `declared_media_type`: the input boundary turns it into the caller's error, naming the input
+    and the field that declared it. The message never quotes the declared value, which is a caller's content.
     """
+
+    error_code = CoreCode.INPUT_FILE_UNREADABLE
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": "its declared media type is not one media type", "input": None, "file_type": None}
 
 
 class ContextProviderError(ToolError):
