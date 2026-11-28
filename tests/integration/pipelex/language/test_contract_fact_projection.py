@@ -120,9 +120,11 @@ class TestContractFactProjection:
         budget_numbers = _value_branches(budget_schema, "number")
         assert [branch.get("type") for branch in budget_numbers] == ["integer", "number"]
         assert all(branch["minimum"] == 0 and branch["examples"] == [100] for branch in budget_numbers)
-        assert not jsonschema.Draft202012Validator(budget_schema).is_valid({"number": -1.5})
-        assert not jsonschema.Draft202012Validator(budget_schema).is_valid({"number": -1})
-        assert jsonschema.Draft202012Validator(budget_schema).is_valid({"number": 2.5})
+        budget_validator = jsonschema.Draft202012Validator(budget_schema)
+        # The stubs leave the overload's second argument unknown, as in `test_anything_schema_agreement`.
+        assert not budget_validator.is_valid({"number": -1.5})  # pyright: ignore[reportUnknownMemberType]
+        assert not budget_validator.is_valid({"number": -1})  # pyright: ignore[reportUnknownMemberType]
+        assert budget_validator.is_valid({"number": 2.5})  # pyright: ignore[reportUnknownMemberType]
         tone_texts = _value_branches(contract.inputs["tone"].json_schema, "text")
         assert [branch["enum"] for branch in tone_texts] == [["warm", "formal"]]
         tags_schema = contract.inputs["tags"].json_schema

@@ -111,7 +111,9 @@ class TestStructureFieldHints:
         concepts: dict[str, ConceptBlueprint | str] = {
             "docs.Slot": ConceptBlueprint(
                 description="a slot",
-                structure={"at": ConceptStructureBlueprint(description="the time", type=ConceptStructureBlueprintFieldType.TIME, hints={"intent": "prose"})},
+                structure={
+                    "at": ConceptStructureBlueprint(description="the time", type=ConceptStructureBlueprintFieldType.TIME, hints={"intent": "prose"})
+                },
             )
         }
         slot = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="slot", concept_ref="docs.Slot")
