@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.121.0] - 2026-11-28
+
+### Changed
+
+- **A `PipeBatch` runs its branches through a sliding window**: at most `max_concurrency` branches still run at once, but the next one starts as soon as any running branch ends, where the batch used to wait for a whole group of `max_concurrency` branches to end before starting the next group, so one slow item no longer leaves the other places idle. When a branch fails, no further branch starts, the running ones finish, and the batch fails with the error of the failed branch that comes first in the list. Each finished branch now keeps only its result, so a batch no longer holds every branch's working memory until it aggregates. `gather_bounded` in `pipelex.tools.misc.async_utils` runs every caller this way, the stored-value reads and writes included.
+
+### Fixed
+
+- **Data URL inputs**: a data URL's declared media type is stored as its bare type, its header read up to its first comma, and a `data:` input that is not a base64 data URL, or a file input whose declared type is not one media type, is refused as `input.file_unreadable` naming the input, with `location.field` at its `url` or its `mime_type`. The `data:` scheme is recognised in any case wherever an input is read, and a fetched image whose `Content-Type` is not one media type is stored under the type known otherwise.
+- **A data URL a step produced is reported as unreadable**: a `data:` URL that is not a base64 data URL, or a declared media type that is not one media type, reports `input.file_unreadable` wherever it is read, in content a step produced too, where it failed as `runtime.unexpected`.
+
 ## [v0.120.0] - 2026-11-27
 
 ### Added

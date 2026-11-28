@@ -3,11 +3,12 @@ from pydantic import HttpUrl, TypeAdapter, ValidationError
 from pipelex.tools.misc.exceptions import LocalFileMissingError, UrlSyntaxError
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
+from pipelex.tools.uri.data_url import is_data_url
 
 URL_MAX_LENGTH = 2048
 
-# URI schemes that are handled internally and should not be validated
-_SKIP_VALIDATION_PREFIXES = ("data:", "pipelex-storage://")
+# URI schemes that are handled internally and should not be validated, besides a data URL, whose scheme matches in any case
+_SKIP_VALIDATION_PREFIXES = ("pipelex-storage://",)
 
 # The syntax of an http(s) URL, as pydantic reads it: scheme, host, no whitespace, a length bound.
 _HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
@@ -59,7 +60,7 @@ def validate_url_resource_exists(url: str) -> None:
     Raises:
         LocalFileMissingError: If a local file path does not exist.
     """
-    if url.startswith(_SKIP_VALIDATION_PREFIXES):
+    if is_data_url(uri=url) or url.startswith(_SKIP_VALIDATION_PREFIXES):
         return
 
     if url.startswith(("http://", "https://")):

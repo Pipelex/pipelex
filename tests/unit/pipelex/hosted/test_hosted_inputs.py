@@ -57,6 +57,12 @@ class TestHostedInputs:
                 [],
             ),
             (
+                "a data URL is no local file, its scheme in any case",
+                {"document": "DATA:application/pdf;base64,aGVsbG8=", "pages": ["Data:image/png;base64,aGVsbG8="]},
+                {"document": "DATA:application/pdf;base64,aGVsbG8=", "pages": ["Data:image/png;base64,aGVsbG8="]},
+                [],
+            ),
+            (
                 "a text that reads like a file name is not a file position",
                 {"notes": "invoice.pdf"},
                 {"notes": "invoice.pdf"},

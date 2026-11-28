@@ -3,6 +3,7 @@ import os
 import pytest
 
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.uri.data_url_exceptions import DataUrlError
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -226,6 +227,25 @@ class TestResolveUriBase64DataUrl:
         assert resolved_uri.mime_type == "application/pdf"
         assert resolved_uri.base64_data == base64_content
 
+    @pytest.mark.parametrize(
+        ("topic", "uri", "expected_mime_type", "expected_base64_data"),
+        [
+            ("header with a charset", "data:text/plain;charset=utf-8;base64,aGVsbG8=", "text/plain;charset=utf-8", "aGVsbG8="),
+            ("uppercase scheme and marker", "DATA:text/plain;BASE64,aGVsbG8=", "text/plain", "aGVsbG8="),
+            ("empty header", "data:;base64,aGVsbG8=", None, "aGVsbG8="),
+            ("payload holding a comma", "data:text/plain;base64,aGVs,bG8=", "text/plain", "aGVs,bG8="),
+        ],
+    )
+    def test_resolve_base64_data_url_reads_the_header_up_to_the_first_comma(
+        self, topic: str, uri: str, expected_mime_type: str | None, expected_base64_data: str
+    ) -> None:
+        resolved_uri = resolve_uri(uri)
+
+        assert isinstance(resolved_uri, ResolvedBase64DataUrl), topic
+        assert resolved_uri.mime_type == expected_mime_type, topic
+        assert resolved_uri.base64_data == expected_base64_data, topic
+        assert resolved_uri.original == uri
+
     def test_resolve_base64_data_url_webp(self) -> None:
         """Test base64 data URL with WebP mime type."""
         base64_content = "UklGRhYAAABXRUJQVlA4TAoAAAAvAAAAABPpAA=="
@@ -270,15 +290,18 @@ class TestResolveUriEdgeCases:
         assert resolved_uri.kind == UriKind.HTTP_URL
         assert isinstance(resolved_uri, ResolvedHttpUrl)
 
-    def test_data_url_without_base64_is_not_base64_data_url(self) -> None:
-        """Test that data: URLs without ;base64, are treated as local paths."""
-        uri = "data:text/plain,Hello%20World"
-
-        resolved_uri = resolve_uri(uri)
-
-        # Without ;base64, this is not a base64 data URL
-        # It should fall through to local path (has no path separator)
-        assert resolved_uri.kind == UriKind.LOCAL_PATH
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "data:text/plain,Hello%20World",
+            "data:application/pdf;,text/plain;base64,aGVsbG8=",
+            "data:image/png;base64aGVsbG8=",
+        ],
+    )
+    def test_data_url_that_is_not_base64_is_refused(self, uri: str) -> None:
+        """A data URL that is not base64, its header ending at its first comma, resolves to nothing: no reader takes it."""
+        with pytest.raises(DataUrlError):
+            resolve_uri(uri)
 
 
 class TestUriKindEnum:

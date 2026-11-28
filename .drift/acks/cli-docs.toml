@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:35d3c025a160d05e72070cabf7ad486f7ac23a99591d91b516ad4b6005d6390f"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-11-21T15:53:53Z"
-rationale = "clean-pass: re-ack after merging dev; the merged doctor telemetry row keeps dev's pipe_id_key placeholder handling and adds this branch's span destinations to its message, and docs/tools/cli/doctor.md describes the row's finding, not its message text, so nothing is stale"
+digest = "sha256:d4aaa86bbeb7839b401064b05b9165d7db481315d13e605d90634a30d1f11373"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-11-25T23:05:51Z"
+rationale = "clean-pass: the main output copy now recognises a data URL through the shared data URL parser, in any case of its scheme; the CLI docs describe the copied file's name, not how a data URL is detected, so nothing is stale"
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -110,7 +110,7 @@ rationale = "clean-pass: re-ack after merging dev; the merged doctor telemetry r
 "pipelex/cli/commands/run/_hosted_sources.py" = "blob:2a5a8066e28bdb7c1990a53e780956b7dff4c2d9"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:8039ca6b29f4f9091d0ea7406c8b8a4590848131"
 "pipelex/cli/commands/run/_inputs_path_resolver.py" = "blob:c8ec89d98718e18af7aaaded44c9f545be60adab"
-"pipelex/cli/commands/run/_main_stuff_file.py" = "blob:ca806e55085aa2e5748492751521296ce1f42960"
+"pipelex/cli/commands/run/_main_stuff_file.py" = "blob:e663aaa7d0564115266f34cef6c045f9b0561b12"
 "pipelex/cli/commands/run/_run_core.py" = "blob:781f5ca36419158cfb856d30f236a4fed59580e6"
 "pipelex/cli/commands/run/_run_hosted.py" = "blob:cf2298c0ff154a9c1c6a09c115f3bc3c3ed1bef9"
 "pipelex/cli/commands/run/_run_output_folder.py" = "blob:6f3b237849d9b6498a4dbf5cb81ceea948c91782"

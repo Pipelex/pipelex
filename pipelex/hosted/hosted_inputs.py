@@ -42,15 +42,17 @@ from pipelex_sdk.crate_models import CrateInvalidReport, PipeIORequest
 from pipelex_sdk.upload import UploadRecord
 
 from pipelex.hosted.exceptions import HostedLocalFileUploadUnavailableError, HostedMethodInvalidError
+from pipelex.tools.uri.data_url import is_data_url
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 #: An `http(s)://` URL, which the hosted API fetches itself. Matched as the SDK matches it, whatever the case of the
 #: scheme.
 _HTTP_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
-#: The other source forms that are not files on this machine, matched as the SDK matches them, case included: a storage
-#: URI, and a data URL, which carries its bytes and reaches the run as it is.
-_NOT_LOCAL_PREFIXES: tuple[str, ...] = ("pipelex-storage://", "data:")
+#: The other source forms that are not files on this machine: a storage URI, matched as the SDK matches it, case
+#: included, and a data URL (`is_data_url`), which carries its bytes, reaches the run as it is, and whose scheme matches
+#: in any case, as the runtime reads it.
+_NOT_LOCAL_PREFIXES: tuple[str, ...] = ("pipelex-storage://",)
 #: A `file://` URI, which a local run reads as the local path it names.
 _FILE_URI_PREFIX = "file://"
 
@@ -83,7 +85,7 @@ def _local_path_reference(*, source: str, base_dir: Path | None) -> str | None:
     A `file://` URI is decoded to its path, as a local run decodes it, and `~` is expanded, leaving a `~user` whose
     home is unknown as it is rather than failing.
     """
-    if source.startswith(_NOT_LOCAL_PREFIXES) or _HTTP_URL_PATTERN.match(source):
+    if source.startswith(_NOT_LOCAL_PREFIXES) or is_data_url(uri=source) or _HTTP_URL_PATTERN.match(source):
         return None
     if source.startswith(_FILE_URI_PREFIX):
         resolved = resolve_uri(source)

@@ -13,8 +13,9 @@ On a run that carries a read scope:
   segment, and none of its segments is empty, ``.`` or ``..``;
 - a bare path or a ``file://`` URI is never read, and neither is anything ``resolve_uri`` takes
   for a local path, such as a URL in a scheme it does not know;
-- ``https://``, ``http://`` and ``data:`` are untouched: a data URL carries its own bytes, and an
-  outbound fetch is the SSRF guard's concern.
+- ``https://``, ``http://`` and a base64 ``data:`` URL are untouched: a data URL carries its own bytes,
+  and an outbound fetch is the SSRF guard's concern. A ``data:`` URL that is not base64 is refused as
+  a URL in a form the runtime does not read.
 
 A run without a read scope reads exactly as it always did.
 
@@ -25,6 +26,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pipelex.system.storage_scope import is_key_within_read_scope
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.uri.data_url_exceptions import DataUrlError
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath, ResolvedPipelexStorage
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -66,7 +68,14 @@ def authorize_uri_read(*, uri: str, read_scope: str | None, position: str, input
     """
     if read_scope is None:
         return
-    resolved_uri = resolve_uri(uri)
+    reason: UriReadRefusalReason
+    try:
+        resolved_uri = resolve_uri(uri)
+    except DataUrlError as exc:
+        # A data URL no reader takes, such as one that is not base64, is a URL in a form this runtime does not read.
+        reason = UriReadRefusalReason.LOCAL_PATH
+        msg = f"Refused to read {position}: {reason.desc}. Pass the file as an input of the run, or upload it first."
+        raise UriReadRefusedError(msg, reason=reason, input_name=input_name, field=field) from exc
     match resolved_uri:
         case ResolvedHttpUrl() | ResolvedBase64DataUrl():
             return

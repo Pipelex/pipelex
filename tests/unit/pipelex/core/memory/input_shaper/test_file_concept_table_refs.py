@@ -168,3 +168,22 @@ class TestFileConceptTableRefs:
             )
 
         assert exc_info.value.given_params.get("reason") == REMOTE_TABLE_UNSUPPORTED_REASON
+
+    @pytest.mark.parametrize(
+        ("topic", "url"),
+        [
+            ("a data URL that is not base64", "data:text/csv,name%0Ahello.csv"),
+            ("a data URL in upper case", "DATA:text/csv,name%0Ahello.xlsx"),
+        ],
+    )
+    def test_a_list_of_rows_concept_refuses_a_data_url_table_as_a_remote_one(self, topic: str, url: str):
+        concept_library = get_concept_library()
+        concept = concept_library.get_required_concept(concept_ref="shaper_test.ShaperPerson")
+
+        for read_scope in (None, "org_test"):
+            with pytest.raises(CsvError) as exc_info:
+                StuffFactory.try_make_csv_list_content(
+                    concept, concept_provider=concept_library, content={"url": url}, name="people", read_scope=read_scope
+                )
+
+            assert exc_info.value.given_params.get("reason") == REMOTE_TABLE_UNSUPPORTED_REASON, topic

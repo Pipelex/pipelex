@@ -116,6 +116,7 @@ class TestBase64Utils:
             "data:image/png,raw_data",  # No ;base64,
             "",
             "base64,something",  # Missing data: prefix
+            "data:application/pdf;,text/plain;base64,aGVsbG8=",  # The header ends at its first comma
         ],
     )
     def test_is_prefixed_base64_url_returns_false(self, url: str) -> None:
@@ -202,6 +203,17 @@ class TestBase64Utils:
         result = extract_base64_str_from_base64_url_if_possible(url)
 
         assert result is None
+
+    def test_returns_none_for_a_header_holding_a_comma(self) -> None:
+        """The header ends at its first comma, so a marker after it does not make the URL base64."""
+        result = extract_base64_str_from_base64_url_if_possible("data:application/pdf;,text/plain;base64,aGVsbG8=")
+
+        assert result is None
+
+    def test_extract_keeps_the_header_parameters(self) -> None:
+        result = extract_base64_str_from_base64_url_if_possible("DATA:text/plain;charset=utf-8;BASE64,aGVsbG8=")
+
+        assert result == ("aGVsbG8=", "text/plain;charset=utf-8")
 
     def test_returns_none_for_empty_string(self) -> None:
         """Test that empty string returns None."""
