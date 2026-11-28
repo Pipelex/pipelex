@@ -1,12 +1,11 @@
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Literal, final
+from typing import TYPE_CHECKING, Literal, final
 
 from typing_extensions import override
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
-from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_reading_stored_inputs import PipeReadingStoredInputs
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 
@@ -14,18 +13,12 @@ if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
 
 
-class PipeController(PipeAbstract):
+class PipeController(PipeReadingStoredInputs):
     pipe_category: Literal["PipeController"] = "PipeController"
 
     @property
     def class_name(self) -> str:
         return self.__class__.__name__
-
-    @override
-    async def _load_stored_input_values(self, *, roots: dict[str, Any], job_metadata: JobMetadata, pipe_run_params: PipeRunParams) -> None:
-        await load_stored_values_through_leaf(
-            roots=roots, read_paths=None, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
-        )
 
     @override
     @abstractmethod

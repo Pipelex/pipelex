@@ -748,11 +748,11 @@ class PipeAbstract(ABC, BaseModel):
     async def _load_stored_input_values(self, *, roots: dict[str, Any], job_metadata: JobMetadata, pipe_run_params: PipeRunParams) -> None:
         """Load the stored values under the given input contents through the content generator's leaf, for the input gate.
 
-        The bases below this class (`PipeOperator`, `PipeController`, `PipeSignature`) override it with
-        `pipelex.kernel.stored_value_ops.load_stored_values_through_leaf`, which this module cannot import: the loader
-        reaches `runtime_hub`, whose chain comes back here through `orchestrator_registry` and `pipe_job`, a cycle pyright
-        reports (see `_make_single_concept_data_for_registry`). This body loads nothing, so a pipe class that does not
-        override it fails closed: the gate refuses a stored value it cannot read.
+        Implemented once, by `pipelex.pipe_machinery.pipe_reading_stored_inputs.PipeReadingStoredInputs`, the base of
+        `PipeOperator`, `PipeController` and `PipeSignature`, since the loader cannot be imported here: it reaches
+        `runtime_hub`, whose chain comes back here through `orchestrator_registry` and `pipe_job`, a cycle pyright reports
+        (see `_make_single_concept_data_for_registry`). This body loads nothing, so a pipe class that does not derive
+        from that base fails closed: the gate refuses a stored value it cannot read.
         """
 
     @abstractmethod
