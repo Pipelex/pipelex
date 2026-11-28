@@ -22,7 +22,8 @@ from typing import Any, NamedTuple, Self, cast
 from mthds.method_tree.discovery import BUNDLE_SUFFIX, MANIFEST_NAME
 from mthds.method_tree.models import MethodTree
 from mthds.package.discovery import read_package_manifest_at
-from mthds.package.exceptions import ManifestError
+from mthds.package.exceptions import ManifestError, ManifestValidationError
+from mthds.package.manifest.package_reason import ManifestPackageReason
 from mthds.package.manifest.schema import MethodsManifest
 from mthds.protocol.problem.registry import CoreCode
 
@@ -150,6 +151,13 @@ def read_method_candidates(*, tree: MethodTree) -> list[EntryCandidate]:
     ]
 
 
+def manifest_refusal_reason(*, error: ManifestError) -> ManifestPackageReason | MethodPackageReason:
+    """The `method.package_invalid` reason of a manifest that does not parse: the rule the format names, else `manifest_invalid`."""
+    if isinstance(error, ManifestValidationError) and error.reason is not None:
+        return error.reason
+    return MethodPackageReason.MANIFEST_INVALID
+
+
 def read_method_manifest(*, tree: MethodTree) -> MethodsManifest | None:
     """The `METHODS.toml` at the root of a method tree listed from this host's disk, or None when it holds none there.
 
@@ -171,7 +179,7 @@ def read_method_manifest(*, tree: MethodTree) -> MethodsManifest | None:
         raise (
             MethodEntryError(msg)
             .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
-            .with_params(reason=MethodPackageReason.MANIFEST_INVALID, path=MANIFEST_NAME)
+            .with_params(reason=manifest_refusal_reason(error=exc), path=MANIFEST_NAME)
         ) from exc
     if manifest is None:
         msg = f"The method {method_label} lists a {MANIFEST_NAME} at its root that could not be read back."

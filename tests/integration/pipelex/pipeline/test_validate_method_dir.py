@@ -6,6 +6,7 @@ from mthds.method_tree.digest import digest_of_contents
 from mthds.method_tree.models import MethodTree
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.errors.problem import ProblemView
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -49,6 +50,22 @@ categories = ["human-resources", "general"]
 [exports.greeting]
 pipes = ["greet"]
 """
+
+
+_PRESENTING_MANIFEST = """\
+[package]
+address = "github.com/pipelex-tests/greeting"
+version = "1.0.0"
+description = "A method wording its result and offering examples"
+main_pipe = "greet"
+result_line = "{result_line}"
+examples = [{examples}]
+
+[exports.greeting]
+pipes = ["greet"]
+"""
+_GOOD_EXAMPLE = b'{"text": {"concept": "native.Text", "content": {"text": "Ada"}}}'
+_STRAY_EXAMPLE = b'{"name": {"concept": "native.Text", "content": {"text": "Ada"}}}'
 
 
 @pytest.fixture(name="held_tree")
@@ -165,3 +182,52 @@ class TestValidateMethodDir:
 
         with pytest.raises(PipelexUnexpectedError, match="only the caller's own directories load beside method_dir"):
             await validate_bundle(method_dir=tmp_path, library_dirs=[library_dir])
+
+    @pytest.mark.parametrize(
+        ("result_line", "examples", "files", "expected"),
+        [
+            ("{{ output.text }}", '"examples/ada.json"', {"examples/ada.json": _GOOD_EXAMPLE}, None),
+            (
+                "{{ text }}",
+                "",
+                {},
+                ("method.package_invalid", {"reason": "result_line_invalid"}),
+            ),
+            (
+                "{{ output.text }}",
+                '"examples/missing.json"',
+                {},
+                ("method.resource_missing", {"file": "examples/missing.json", "reason": "not_in_tree"}),
+            ),
+            (
+                "{{ output.text }}",
+                '"examples/stray.json"',
+                {"examples/stray.json": _STRAY_EXAMPLE},
+                ("method.package_invalid", {"reason": "example_invalid", "path": "examples/stray.json"}),
+            ),
+            (
+                " ",
+                "",
+                {},
+                ("method.package_invalid", {"reason": "result_line_invalid", "path": "METHODS.toml"}),
+            ),
+        ],
+        ids=["accepted", "line_reads_an_input", "example_not_in_tree", "example_names_no_input", "empty_line"],
+    )
+    async def test_the_manifest_presentation_keys_are_judged_against_the_method(
+        self, tmp_path: Path, result_line: str, examples: str, files: dict[str, bytes], expected: tuple[str, dict[str, str]] | None
+    ) -> None:
+        """A result line reading anything but `output`, an example naming no file of the tree, or one filling no input of
+        the main pipe, refuses the method under the code and reason the manifest format names.
+        """
+        manifest = _PRESENTING_MANIFEST.format(result_line=result_line, examples=examples).encode("utf-8")
+        tree, method_dir = _written(tmp_path=tmp_path, contents={"METHODS.toml": manifest, "greet.mthds": _GREET_MTHDS, **files})
+        with WRITTEN_METHOD_TREES.holding(tree=tree):
+            if expected is None:
+                result = await validate_bundle(method_dir=method_dir)
+                assert [pipe.code for pipe in result.pipes] == ["greet"]
+                return
+            with pytest.raises(ValidateBundleError) as exc_info:
+                await validate_bundle(method_dir=method_dir)
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert [(item.code, item.params.as_wire() if item.params is not None else None) for item in problem.errors or []] == [expected]

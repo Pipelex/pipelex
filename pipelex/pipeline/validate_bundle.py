@@ -4,7 +4,9 @@ from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Sequence
 
+from mthds.method_tree.discovery import MANIFEST_NAME
 from mthds.method_tree.models import MethodTree
+from mthds.package.exceptions import ManifestValidationError
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
@@ -34,7 +36,9 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
-from pipelex.pipeline.exceptions import TreePythonSyntaxError, ValidateBundleError
+from pipelex.pipeline.exceptions import ManifestPresentationError, MethodEntryError, TreePythonSyntaxError, ValidateBundleError
+from pipelex.pipeline.manifest_presentation import manifest_presentation_faults
+from pipelex.pipeline.method_entry import read_method_manifest
 from pipelex.pipeline.validate_bundle_translation import (
     reporting_host_library_faults,
     translate_to_validate_bundle_error,
@@ -567,6 +571,7 @@ async def _validate_method_dir(
         if not blueprints:
             msg = "The method holds no .mthds bundle, so it has nothing to validate."
             raise ValidateBundleError(message=msg)
+        _check_manifest_presentation(tree=tree, member_pipes=loaded_pipes)
         dry_run_results = await BundleValidator().validate_pipes(
             pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
             library_id=library_id,
@@ -582,6 +587,38 @@ async def _validate_method_dir(
         dry_run_result=dry_run_results,
         pending_signatures=build_pending_signatures(library.pipe_library.get_pipes_dict()),
     )
+
+
+def _check_manifest_presentation(*, tree: MethodTree, member_pipes: list[PipeAbstract]) -> None:
+    """Refuse a manifest whose `result_line` or `examples` break a rule only the loaded method can judge.
+
+    The first fault is raised, and the translation around the validation makes it the verdict's item.
+
+    Raises:
+        ManifestPresentationError: The result line does not parse or reads something other than `output`, an example
+            names no file of the tree, or an example file is not a set of inputs for the main pipe.
+        MethodEntryError: The tree's manifest breaks one of the format's own `result_line` or `examples` rules.
+    """
+    try:
+        manifest = read_method_manifest(tree=tree)
+    except MethodEntryError as exc:
+        # The load only warns about a manifest that does not parse, so the validation keeps judging such a method by its
+        # bundles; a manifest refused for one of its `result_line` or `examples` rules is refused here, under its reason.
+        cause = exc.__cause__
+        if isinstance(cause, ManifestValidationError) and cause.reason is not None:
+            raise
+        return
+    if manifest is None or (manifest.result_line is None and not manifest.examples):
+        return
+    main_pipes = [pipe for pipe in member_pipes if manifest.main_pipe is not None and pipe.code == manifest.main_pipe]
+    # A main pipe several bundles define is the entry rule's refusal, never this one's: its examples are then not judged.
+    main_pipe = main_pipes[0] if len(main_pipes) == 1 else None
+    faults = manifest_presentation_faults(manifest=manifest, tree=tree, main_pipe=main_pipe)
+    if not faults:
+        return
+    fault = faults[0]
+    msg = f"The {MANIFEST_NAME} of the method is refused: {fault.message}."
+    raise ManifestPresentationError(msg).with_error_code(fault.code).with_params(**fault.problem_params())
 
 
 def _list_directory_bundle_files(*, directory: Path, tree_listing: MethodTreeListing) -> list[LibraryBundleFile]:

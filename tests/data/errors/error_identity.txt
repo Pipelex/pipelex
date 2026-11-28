@@ -211,6 +211,7 @@ ListWhereSingularError | input.wrong_multiplicity
 LocalFileMissingError | input.reference_not_found
 LogSinkHeaderValueError | pipelex.config.invalid
 LogSinkVariableError | pipelex.config.variable_missing
+ManifestPresentationError | one of method.package_invalid, method.resource_missing
 MarkdownFormattingBudgetError | input.too_large
 MarkdownParserDependencyError | pipelex.config.dependency_missing
 MemoryTransportError | runtime.unexpected

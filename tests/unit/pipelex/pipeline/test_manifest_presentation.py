@@ -1,10 +1,11 @@
 import json
 
 import pytest
+from mthds.package.manifest.package_reason import ManifestPackageReason
+from mthds.protocol.problem.registry import MethodResourceMissingReason
 
 from pipelex.pipeline.manifest_presentation import (
     ExampleInputSlot,
-    ManifestPresentationReason,
     example_inputs_fault,
     examples_faults,
     result_line_fault,
@@ -25,14 +26,14 @@ class TestManifestPresentation:
         ("result_line", "has_main_pipe", "reason"),
         [
             ("{{ output.total }} due", True, None),
-            ("{{ output.total }} due", False, ManifestPresentationReason.RESULT_LINE_WITHOUT_MAIN_PIPE),
-            ("{{ output.total ", True, ManifestPresentationReason.RESULT_LINE_INVALID),
+            ("{{ output.total }} due", False, ManifestPackageReason.RESULT_LINE_WITHOUT_MAIN_PIPE),
+            ("{{ output.total ", True, ManifestPackageReason.RESULT_LINE_INVALID),
             ("{% for c in output.clauses %}{{ c.heading }} {% endfor %}", True, None),
-            ("{{ counterparty }}", True, ManifestPresentationReason.RESULT_LINE_INVALID),
-            ("", True, ManifestPresentationReason.RESULT_LINE_INVALID),
+            ("{{ counterparty }}", True, ManifestPackageReason.RESULT_LINE_INVALID),
+            ("", True, ManifestPackageReason.RESULT_LINE_INVALID),
         ],
     )
-    def test_result_line(self, result_line: str, has_main_pipe: bool, reason: ManifestPresentationReason | None) -> None:
+    def test_result_line(self, result_line: str, has_main_pipe: bool, reason: ManifestPackageReason | None) -> None:
         """The verdicts of manifest-format.md's result-line table."""
         fault = result_line_fault(result_line=result_line, has_main_pipe=has_main_pipe)
         assert (fault.reason if fault is not None else None) == reason
@@ -41,12 +42,14 @@ class TestManifestPresentation:
         ("examples", "has_main_pipe", "reasons"),
         [
             (["examples/mutual-nda.json"], True, []),
-            (["examples/mutual-nda.json"], False, [ManifestPresentationReason.EXAMPLES_WITHOUT_MAIN_PIPE]),
-            (["examples/missing.json"], True, [ManifestPresentationReason.EXAMPLE_FILE_MISSING]),
-            (["inputs.json"], True, [ManifestPresentationReason.EXAMPLE_FILE_MISSING]),
+            (["examples/mutual-nda.json"], False, [ManifestPackageReason.EXAMPLES_WITHOUT_MAIN_PIPE]),
+            (["examples/missing.json"], True, [MethodResourceMissingReason.NOT_IN_TREE]),
+            (["inputs.json"], True, [MethodResourceMissingReason.NOT_IN_TREE]),
         ],
     )
-    def test_examples_list(self, examples: list[str], has_main_pipe: bool, reasons: list[ManifestPresentationReason]) -> None:
+    def test_examples_list(
+        self, examples: list[str], has_main_pipe: bool, reasons: list[ManifestPackageReason | MethodResourceMissingReason]
+    ) -> None:
         """The verdicts of manifest-format.md's examples table, `inputs.json` never being a file of the tree."""
         faults = examples_faults(examples=examples, has_main_pipe=has_main_pipe, tree_paths=frozenset({"examples/mutual-nda.json", "inputs.json"}))
         assert [fault.reason for fault in faults] == reasons
@@ -69,5 +72,5 @@ class TestManifestPresentation:
             assert fault is None
         else:
             assert fault is not None
-            assert fault.reason == ManifestPresentationReason.EXAMPLE_INVALID
+            assert fault.reason == ManifestPackageReason.EXAMPLE_INVALID
             assert invalid in fault.message
