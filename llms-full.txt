@@ -3098,11 +3098,12 @@ Each field can specify:
 - **description**: Human-readable description
 - **required**: Whether the field must be present in the payload (defaults to `false`)
 - **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation. A defaulted field never holds nothing: a value that sets it to `null` is refused, so leave the key out to get the default
-- **choices**: For `enum`-like fields, a list of valid values
+- **choices**: For `enum`-like fields, a list of valid values, each a string or an option table — see [Choice Fields](#choice-fields-enums)
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
 - **concept_ref** and **item_concept_ref**: For `concept` fields (and `list` fields whose items are concepts), the concept being referenced
 - **hints**: Non-normative presentation intent for this field — see [Intent Hints](intent-hints.md)
+- **minimum**, **maximum**, **exclusive_minimum**, **exclusive_maximum**, **min_length**, **max_length**, **pattern**, **format**, **unit**, **aggregate** and **examples**: The field's contract facts — see [Contract Facts](#contract-facts)
 
 `item_type` and `value_type` take one of the field types above (`text`, `integer`, `number`, `boolean`, `date`, `datetime`, `time`, `list`, `dict`, `concept`) or `Any`, for values whose type is genuinely unspecified. Any other name is refused when the method loads, a concept's name included: a list of concepts is `item_type = "concept"` with its `item_concept_ref`.
 
@@ -3112,9 +3113,50 @@ A field may share its name with a Python type or with a name the generated class
 
 !!! warning "The key set is closed"
 
-    The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful constraint the language does not carry (`minimum = 0`, `unit = "kg"`), or a misspelled `hints` all fail the bundle instead of being dropped.
+    The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful key the language does not carry (`placeholder`, `step`), or a misspelled `hints` all fail the bundle instead of being dropped.
 
-    This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. If you need a numeric bound or another constraint, express it on a Python class instead — see [Python Classes](python-classes.md), whose pydantic `Field(...)` metadata is read as an authored fact. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
+    This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
+
+## Contract Facts
+
+A field may state facts about its value. The **constraints** refuse a value that breaks them: the runtime enforces them on every value of the field, the field's JSON Schema states them, and a dry run's mock values satisfy them. The **descriptions** never refuse a value: they tell a reader or a renderer what the value means.
+
+```toml
+[concept.Invoice.structure]
+reference = { type = "text", description = "The invoice reference", pattern = "^INV-[0-9]{6}$", examples = ["INV-000123"] }
+quantity = { type = "integer", description = "How many units", minimum = 1, maximum = 999 }
+share = { type = "number", description = "The discount", unit = "percent", exclusive_minimum = 0, maximum = 100 }
+amount = { type = "number", description = "The line amount", unit = "EUR", aggregate = "sum" }
+contact = { type = "text", description = "Who to write to", format = "email" }
+```
+
+| Fact | Kind | Applies to |
+|---|---|---|
+| `minimum`, `maximum`, `exclusive_minimum`, `exclusive_maximum` | constraint | number-valued fields (`integer`, `number`); a bound on an `integer` field is an integer |
+| `min_length`, `max_length` | constraint | text-valued fields, counted in characters |
+| `pattern` | constraint | text-valued fields: a regular expression searched in the value, as JSON Schema does, so anchor it with `^` and `$` to match the whole value |
+| `format` | constraint | text-valued fields: `email`, `uri`, `date-time`, `uuid`, `hostname`, `ipv4` or `ipv6` |
+| `unit` | description | number-valued fields: an ISO 4217-shaped currency code such as `EUR`, `percent`, or a unit of measure such as `m`, `kg` or `h` |
+| `aggregate` | description | number-valued fields: `sum` or `average`, how the values of a column of records combine |
+| `examples` | description | any value class (text, number, date, time): a list of values of the field, each satisfying its constraints |
+
+A list, a dict, a boolean and an enumeration field belong to no value class and take no fact. A `concept` field takes the value class of its concept: a field typed `Number` takes the number facts, one typed `Text` the text facts, and one typed by a structured concept none. A concept refining `Number` may state a `unit` itself, which its refinements inherit and a field may override:
+
+```toml
+[concept.Amount]
+description = "An amount of money"
+refines = "Number"
+unit = "EUR"
+```
+
+A fact that does not apply where it is written, two facts that contradict each other (an empty range, `minimum` beside `exclusive_minimum`, `min_length` above `max_length`), a pattern that does not compile, an unknown unit, format or aggregate, and an example or a default that breaks the field's constraints are all refused with the error type `contract_fact_invalid`, whose parameters name the `fact`, the `reason` and the `field_path`.
+
+A pattern runs against values a caller sends, so the runtime keeps it from holding a run:
+
+- **Each search has a time limit of a tenth of a second.** A pattern you mean answers in microseconds; only one that backtracks catastrophically, such as `^(a|aa)+$`, whose branches can match the same characters in many ways, reaches the limit. A value whose search is stopped is refused as breaking the pattern, never let through unchecked, and a pattern that cannot be searched in its own example or default within the limit is refused as `malformed`. Write each part so that a character can match only one way: `^a+$` rather than `^(a|aa)+$`. The values a caller sends for one input, the items of a list included, share one second of search time at the run's entry pipe, so a long list of values that each take just under the limit is refused once that second is spent rather than holding the run for as many tenths of a second as it has items.
+- **Counted repetitions are bounded.** A pattern whose counts, written out and multiplied through nested groups, pass 10,000 positions, such as `(ab){1000000}`, is refused as `malformed`: the engine that searches it would hold memory in proportion to the counts. `{0,1000000}` writes out nothing and is accepted.
+- **A dry run's mock text holds at most 100,000 characters.** A field whose `min_length` passes that bound has no mock that satisfies it, so its dry run refuses the mock as it would any value that breaks the field.
+- **A dry run mocks a text from its `examples`, else by drawing from its `pattern`.** The draw reads atomic groups and possessive repeats in their plain form and checks each draw against the pattern; a pattern it cannot draw from, such as one holding a conditional `(?(1)…|…)`, is mocked from the field's `examples`, so give such a field an example, or its dry run reports `method.mock_unsatisfiable`. A number mock keeps integers exact, so an integer bound or example past a float's precision is honoured.
 
 ## All-Optional Structures and the `input_presence_vacuous` Lint
 
@@ -3330,6 +3372,19 @@ title = "Task title"
 priority = { choices = ["low", "medium", "high"], description = "Task priority level" }
 status = { choices = ["todo", "in_progress", "done"], description = "Current status", default_value = "todo" }
 ```
+
+An option may be a table giving its value the words a person reads in its place: a `label`, a `description` and a `tone`, one of `positive`, `caution`, `negative` and `neutral`. Plain strings and tables mix freely, and a table carrying `value` alone is the same option as its string:
+
+```toml
+[concept.Review.structure]
+decision = { description = "What to do with the contract", choices = [
+  { value = "sign", label = "Sign it", tone = "positive" },
+  { value = "negotiate", label = "Negotiate first", tone = "caution", description = "Some clauses need changes" },
+  "reject",
+] }
+```
+
+An option table needs a non-empty `value`, shares neither its value nor its label with another option, and carries no other key; a `choices` list needs at least one option. A list of plain strings that repeats a value or holds an empty one is accepted with a `choice_option_dubious` warning. An enumeration field takes no contract fact.
 
 ## Required Fields
 
@@ -4760,14 +4815,42 @@ Intent hints let a method author state, in the method itself, how a value is *me
 
 ## Authoring
 
-A `hints` table is a flat table of string keys to string values. This version of the standard defines one key, `intent`, with a closed vocabulary:
+A `hints` table is a flat table of string keys to string values. The standard defines three keys, each with a closed vocabulary: `intent` says what kind of value a site holds, `role` what an input is to the method, and `part` what a field is to its record.
 
 | `intent` | Applies to | Declares |
 |---|---|---|
 | `prose` | text-valued sites | Flowing natural language, written and read as running text. |
 | `label` | text-valued sites | A short designation — a name, a title; a few words on one line. |
+| `code` | text-valued sites | Source code or another formal text a machine reads, where every character counts. |
+| `identifier` | text-valued sites | A short reference that names one thing exactly, such as an order number, copied rather than written. |
+| `question` | text-valued sites | A request addressed to the method, in the person's own words. |
 | `rating` | number-valued sites | A subjective score on a scale — a judgment, not a measurement. |
 | `quantity` | number-valued sites | An amount — a count or a measured magnitude. |
+| `photo` | image-valued sites | A picture taken of the world with a camera. |
+| `screenshot` | image-valued sites | A capture of a screen. |
+| `scan` | image-valued and document-valued sites | A paper document captured by a scanner or a camera. |
+
+`role` sits on an input slot and says how often a person changes that input:
+
+| `role` | The input is |
+|---|---|
+| `subject` | the material the method works on, given on every run |
+| `context` | a fact about this case, such as the counterparty's name |
+| `guidance` | how the person wants the work done, such as "focus on liability" |
+| `reference` | the yardstick the method applies, set once and reused: a playbook, a checklist |
+| `setting` | a choice with a sensible default, such as the output language |
+
+`part` sits on a structure field and says what the field is to the record a reader looks at:
+
+| `part` | The field is | Applies to |
+|---|---|---|
+| `title` | the words that name the record | a text-valued field, held once per record |
+| `summary` | the record in one or two sentences | a text-valued field, held once per record |
+| `verdict` | the answer the reader came for | an enumeration, `boolean` or number-valued field, or a `YesNo`, `Choice` or `Rating` concept field, held once per record |
+| `metric` | a headline number that is not the verdict | a number-valued field |
+| `body` | the main content to read | any field |
+| `evidence` | what supports the verdict | any field |
+| `detail` | anything else worth showing | any field |
 
 Hints attach at three sites:
 
@@ -4798,13 +4881,13 @@ output = "Review"
 prompt = "Write a review of @topic"
 ```
 
-A slot table with no `hints` is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints and hash identically in the crate.
+A slot table with no `hints`, `description`, contract fact or `choices` is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints and hash identically in the crate.
 
 ## Shape is strict, content is lenient
 
-The *shape* of a `hints` table is enforced: it must be a flat string-to-string table, and the expanded slot form admits only `concept` and `hints` — anything else (a non-table `hints`, a number value, a nested table, an unknown slot-table key like `description`) is a structural validation error.
+The *shape* of a `hints` table is enforced: it must be a flat string-to-string table, and the expanded slot form admits only `concept`, `hints`, `description`, the [contract facts](inline-structures.md#contract-facts) and `choices` — anything else (a non-table `hints`, a number value, a nested table, an unknown slot-table key like `placeholder`) is a structural validation error.
 
-The *content* is lenient: an unknown hint key or an unknown `intent` word parses, is preserved through the crate and onto the descriptor, and is only **warned** about. Validation emits advisory warnings (never errors) on the report's `warnings` array for three findings, each naming its site: an unknown hint key (`hint_unknown_key`), an unknown `intent` word (`hint_unknown_intent`), and a known word on a site it does not apply to (`hint_inapplicable_intent`) — for example `rating` on a text field. This is what lets the vocabulary grow between standard versions without breaking older validators.
+The *content* is lenient: an unknown hint key or an unknown `intent` word parses, is preserved through the crate and onto the descriptor, and is only **warned** about. Validation emits advisory warnings (never errors) on the report's `warnings` array, each naming its site: an unknown hint key (`hint_unknown_key`), an unknown `intent`, `role` or `part` word (`hint_unknown_intent`, `hint_unknown_role`, `hint_unknown_part`), a known word on a site it does not apply to (`hint_inapplicable_intent`, `hint_inapplicable_role`, `hint_inapplicable_part`) — for example `rating` on a text field, or `role` on a structure field — and a `part` held once per record (`title`, `summary`, `verdict`) that two fields of one structure claim (`hint_duplicate_part`). This is what lets the vocabulary grow between standard versions without breaking older validators.
 
 ## Precedence and inheritance
 
@@ -4926,16 +5009,43 @@ You can specify multiple inputs by using a list of concepts. For example, `input
 
     An input name is a plain `snake_case` identifier, matching `[a-z][a-z0-9_]*`, and it names one whole value of the concept its slot declares. A dotted key such as `"invoice.total" = "Number"` does not declare a field of `invoice`: it is refused as `invalid_input_name`, on every pipe. A pipe that needs one field of a value declares the value with its whole concept, `invoice = "Invoice"`, and reads the field through it in its template, as `$invoice.total`. `pipelex fix bundle` deletes a dotted key whose root is declared beside it, since that root already supplies the field, unless the key, declared after its root, carries another presence marker or multiplicity than the root, such as `"data.text" = "Text!"` after `data = "Text?"`: deleting that key would change what the pipe requires, so the fix names only what differs, the multiplicity, the presence marker or both, with the edit that carries it onto the root (here, replace `?` with `!` on `data`), and is left for you to apply.
 
-    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
+    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can say more about the value it takes:
 
     ```toml
-    inputs = { topic = { concept = "Text", hints = { intent = "prose" } } }
+    [pipe.review_nda.inputs]
+    nda = { concept = "Document", description = "The signed NDA to review", hints = { role = "subject" } }
+    budget = { concept = "Number", minimum = 0, unit = "EUR", examples = [5000] }
+    tier = { concept = "Text", choices = [{ value = "strategic", label = "Strategic" }, "tactical"] }
+    names = { concept = "Text[]", max_length = 80 }
     ```
 
-    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). The table is closed — `concept` and `hints` are the only keys it accepts, and anything else is a validation error. A slot table with no hints is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints, so reach for the expanded form only when you have hints to attach.
+    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). Beside it the table accepts:
+
+    - `hints`, the slot's [intent hints](../concepts/intent-hints.md), including its `role`;
+    - `description`, a non-empty sentence a form shows in place of the concept's description;
+    - the [contract facts](../concepts/inline-structures.md#contract-facts) of the slot's value, when its concept is text-, number-, date- or time-valued, never `aggregate`; on a plural slot they apply to each item;
+    - `choices`, on a text-valued slot only, as on a [choice field](../concepts/inline-structures.md#choice-fields-enums); beside `choices` a slot takes no length, `pattern`, `format` or `examples`.
+
+    Anything else is a validation error, and a fact on a slot whose concept holds no plain value, a structured concept for instance, is refused with the reason `not_value_slot`. A slot's constraints and options are enforced on the value a caller sends to the run's entry pipe, a text given by URL or stored for being large included, which is read for the check and refused as `input.invalid` when it breaks one or cannot be read, and they are stated on the slot's input JSON Schema. A slot table carrying none of these keys is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints.
+
+*   **`activity`** (optional): A short phrase a person watching a run reads while the pipe works, such as `activity = "Reading the lease"`. It is one line, never empty, and a contract-only signature does not carry it. The run's graph carries it on the pipe's node as `activity`, beside its `description`, and so does the trace event that starts the node, so a timeline shows it in place of the description.
+
+*   **`output_filename`** (optional): On an operator whose output is an `Image` or a `Document`, a Jinja2 template naming the file the pipe writes, such as `output_filename = "{{ counterparty }} - NDA review"`. It reads only declared inputs, counts as reading them, and must guard every optional input it names with `{% if %}`. A controller writes no file of its own, so it does not carry one. See [Naming the files a step produces](#naming-the-files-a-step-produces).
 
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
+
+### Naming the Files a Step Produces
+
+When an operator stating `output_filename` has produced its output, the runtime renders the template once with the pipe's inputs, as they were before the step ran, so an output written under an input's name never stands in for that input, and gives each `Image` or `Document` of the output the name it builds, as the file's `filename`, the name a download and `pipelex run --save-main-stuff` use. The name is built in these steps:
+
+1. The rendered text is normalized to NFC, each run of white space becomes one space, each of `/ \ : * ? " < > |` and each control character becomes `-`, and white space and dots are trimmed from both ends. A name that is a device name Windows reserves, such as `CON` or `LPT1`, takes a trailing `_`.
+2. The name keeps the extension of the name the runtime would have given the file: an extension the template already wrote, in any letter case, is kept as written, and any other is appended.
+3. The whole name, extension and suffix included, is cut to 255 bytes of UTF-8, never inside a character. An extension so long that it leaves no room for the name is dropped, and a runtime name the file falls back to is capped the same way, so a name never passes 255 bytes.
+4. When the template fails to render, whatever the reason (an error in the template, a refusal of the template sandbox, a filter refusing this run's value, or an input held in storage that could not be loaded), or nothing is left before the extension, the file keeps the name the runtime would have given it, with a warning in the log. Naming a file never fails a run.
+5. On a plural output, such as `Image[3]`, the second and later files take ` (2)`, ` (3)` and so on before the extension.
+
+So `output_filename = "{{ client }} cover"` with the input `Acme/Corp` names two images `Acme-Corp cover.png` and `Acme-Corp cover (2).png`. A text input stored for its size is loaded before the template renders, as every template a step renders reads its stored inputs. The name never decides where a file is stored: the stored file and its URL are left as they were. A dry run names its placeholder files the same way.
 
 ### Multi-Step Methods
 
@@ -5291,6 +5401,20 @@ pipes = ["compute_weighted_score"]
 | `main_pipe` | No | Optional main pipe code |
 | `mthds_version` | No | Required MTHDS version constraint |
 | `categories` | No | The categories a catalog can offer the method under, like tags, as lowercase slugs such as `human-resources`. An entry that does not match `^[a-z0-9]+(-[a-z0-9]+)*$` refuses the manifest, while a value no catalog knows never does |
+| `result_line` | No | A Jinja2 template wording a finished run of the main pipe in one line; requires `main_pipe` (see [Result line](#result-line)) |
+| `examples` | No | Tree paths of JSON files of example inputs for the main pipe; requires `main_pipe` (see [Example inputs](#example-inputs)) |
+
+### Result Line
+
+`result_line` words what a run produced in one line, such as `result_line = "{{ output.clauses | length }} clauses, {{ output.verdict }}"`. Its only variable is `output`, the main pipe's output as the wire carries it: an object, or an array for a plural output. A field always wins over a name Python's dictionaries answer with, so `{{ output.items }}` reads a field named `items`; without a field of that name, `output.items()`, `keys()`, `values()` and `get()` work as on a dictionary. A template that does not parse, or reads any other variable, refuses the method as `method.package_invalid` with the reason `result_line_invalid`, and so does an empty one; a `result_line` without `main_pipe` gives the reason `result_line_without_main_pipe`.
+
+At the end of a run that starts at the main pipe and ends with a value, the runtime renders the template against the output and collapses its white space into one line. When the template fails to render, whatever the reason, a refusal of the template sandbox or a filter refusing this run's value included, or gives nothing, or the manifest writes none, the line is derived from the output's field marked with the `verdict` [part hint](concepts/intent-hints.md) that holds a choice: its label, else its value, or, for a list of such records, the count of each, joined with ` · `, such as `3 Approved · 1 reject`. A run with neither has no line. A result line never fails a run: a failure is a warning in the log. The line is the manifest's however the method is loaded: from its folder, as a bundle file run alone under it, as bundles sent with the method's files, or rebuilt in a worker from the library the runner loaded, and a load holding several packages words each package's main pipe with its own manifest. The line rides the run's output as `result_line`: on the API's run response, in `pipelex-agent run`'s output file, and in `result_line.txt` in `pipelex run`'s output folder, which also prints it.
+
+### Example Inputs
+
+`examples` lists files of the method's tree, each a JSON object of flat inputs for the main pipe in stuff wire form, such as `{"nda": {"concept": "legal.Nda", "content": {"url": "examples/mutual-nda.pdf"}}}`. Validating the method checks them: an entry naming no file of the tree, or `inputs.json`, is `method.resource_missing` with the reason `not_in_tree`, and a file that is not such a set of inputs, naming an input the main pipe lacks, a concept its input does not accept, or lacking a required input, is `method.package_invalid` with the reason `example_invalid` and its path. Whether each content satisfies its input's schema is checked when the example is run. `examples` without `main_pipe` gives the reason `examples_without_main_pipe`.
+
+The examples are offered where the method is described: `pipelex-agent inputs` adds them to its envelope as `examples` when it describes the manifest's main pipe, and the API's `POST /v1/pipe-io` lists them as `examples` beside `default_pipe_ref`.
 
 ## Exports and Visibility
 
@@ -7056,7 +7180,7 @@ Here a caller may provide only `topic`. The `enrich_hint` step (which consumes `
 
 ## Guarding Templates Over Optional Inputs
 
-A template that renders an optional input must guard the reference — otherwise validation rejects it (`optional_input_unguarded`). Three guard idioms are recognized:
+A template that renders an optional input must guard the reference — otherwise validation rejects it, as the error type `optional_input_unguarded` under the code `method.optional_unhandled`, its `site` being `template`. Three guard idioms are recognized:
 
 - **The optional block sigil `@?`** — inserts the input's content when present, renders nothing when absent:
 
@@ -7101,7 +7225,7 @@ You never discover an unhandled absence at run time. Validation walks every cont
 | `optional_marker_invalid` | Grammar misuse: a marker combined with multiplicity, or `!` on an output. |
 | `optional_not_handled` | A maybe-absent value escapes through a non-optional boundary. The message names the absence origin, the propagation path, and the fixes. |
 | `optional_output_required` | A `continue`-reachable PipeCondition without a `?` output. |
-| `optional_input_unguarded` | An unguarded template reference to a declared-optional input. |
+| `optional_input_unguarded` | An unguarded template reference to a declared-optional input, an `output_filename` included, under the code `method.optional_unhandled`. |
 | `optional_branch_required_field` | A maybe-absent parallel branch feeding a required structure field. |
 
 Two more facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API) — the first about optionality, the second a mixed bag of advisories that the same report carries:
@@ -7111,7 +7235,8 @@ Two more facts surface on the **valid** report (`pipelex validate`, the agent CL
 
     - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
     - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).
-    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent` — the intent-hints lints: a hint key this version of the standard does not define, an `intent` word outside the vocabulary, and a known word on a site it does not apply to. Hints are non-normative, so the entry is preserved and only named.
+    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`, `hint_unknown_role`, `hint_inapplicable_role`, `hint_unknown_part`, `hint_inapplicable_part`, `hint_duplicate_part` — the intent-hints lints: a hint key this version of the standard does not define, an `intent`, `role` or `part` word outside its vocabulary, a known word on a site it does not apply to, and a part held once per record that two fields claim. Hints are non-normative, so the entry is preserved and only named.
+    - `choice_option_dubious` — a list of plain `choices` that repeats a value or holds an empty one, which a person could not tell apart or pick.
 
 ## Best Practices
 
@@ -8971,6 +9096,8 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 
 ### The file's name
 
+A step names its file either with its own `filename`, described here, or with the standard's [`output_filename`](../index.md#naming-the-files-a-step-produces), never both: the two would name one file twice, and a step carrying both is refused. `output_filename` names the file a download reads and leaves the stored file under the step's own name; `filename` names both.
+
 The document is stored, and downloaded, under its `filename` plus the format's suffix. A storage URI names it, and the hosted API serves a stored file only when its name is ASCII letters, digits, hyphens and underscores, one dot and the suffix, so the step makes every rendered name into one of those before it stores the file:
 
 - **Letters are spelled in ASCII where they can be.** Accents are dropped (`Bäckerei Müller` gives `Backerei-Muller`, `İstanbul` gives `Istanbul`), and the letters that carry no accent to drop are spelled as a reader would type them: `ø` as `o`, `æ` as `ae`, `œ` as `oe`, `ł` as `l`, `đ` and `ð` as `d`, `þ` as `th`, `ß` as `ss`, `ı` as `i`.
@@ -9903,8 +10030,8 @@ An expression that does not parse, whether written as `expression` or as `expres
 | `output`                       | string         | The output concept produced by the selected pipe.                                                | Yes                            |
 | `expression`                   | string         | A simple Jinja2 expression. `{{ ... }}` are automatically added. Good for simple variable access like `"my_var.category"`.                                | Yes (or `expression_template`)   |
 | `expression_template`            | string         | A full Jinja2 template string. Use this for more complex logic, like `{% if my_var.value > 10 %}high{% else %}low{% endif %}`.                           | Yes (or `expression`)          |
-| `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail`.                                  | Yes                            |
-| `default_outcome`            | string         | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`.                                                             | Yes                             |
+| `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail` — each a string or an [outcome table](#outcome-labels).                                  | Yes                            |
+| `default_outcome`            | string or table | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`, or an [outcome table](#outcome-labels).                                                             | Yes                             |
 | `add_alias_from_expression_to` | string         | An advanced feature. If provided, an alias named after the string result of the expression evaluation is added to the working memory, pointing to the existing entry named by this value (which must already be in the working memory).               | No                             |
 
 !!! important "Output Concept Matching"
@@ -10080,6 +10207,19 @@ default_outcome = "process_unknown"
 ```
 
 - Fallback pipe when no match is found
+
+### Outcome Labels
+
+An outcome, or the `default_outcome`, may be a table giving its route the words a person reads in a run's timeline: a `label`, a `description` and a `tone` (`positive`, `caution`, `negative` or `neutral`) beside the `pipe` it routes to.
+
+```toml
+outcomes = { high = { pipe = "detailed_check", label = "Detailed check", tone = "caution" }, low = "quick_note" }
+default_outcome = { pipe = "continue", label = "No check needed" }
+```
+
+A table must carry `pipe` and no key other than those three, and no two outcomes of one condition, the default included, share a label. A table carrying `pipe` alone is the same outcome as its string.
+
+When a live run takes an outcome written as a table, the condition's node in the run's graph records its words beside the value the expression rendered and the outcome selected: `selected_outcome_label`, `selected_outcome_description` and `selected_outcome_tone` in the node's `execution_data`, each present only when the table gives it. The default outcome's words are recorded when the run falls through to it.
 
 ### Expression Aliasing
 ```toml
@@ -12101,7 +12241,7 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 ### The results directory
 
-Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on), named after the pipe's own code even when it was named as `domain.pipe_code` or through a dependency's alias, on a hosted run too. The directory holds a `.gitignore` ignoring everything in it, so a run started from inside a method's folder never adds its outputs to the method's tree. A local run of a bundle or a folder also writes `method_tree.json` there, the record of the [method tree](../../building-methods/method-trees.md#limits-and-the-tree-digest) it read: its digest, its root on this machine, its entry and each file's path, hash and size. With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer. When the main output is a Document or an Image, `--save-main-stuff` also copies the file itself into the directory under its own name, so a PDF that a [`PipeDocGen`](../../building-methods/pipes/pipe-operators/PipeDocGen.md) step produced lands as `invoice-INV-2026-0142.pdf` and opens with a double-click, and the run prints its path. It never replaces a file the run writes in the directory: a file whose name is taken, such as a document passed through from an earlier run as `main_stuff.json`, is saved as `main_stuff-1.json`. A dry run produces no file, so it copies nothing. In `working_memory.json` each stuff names its concept by ref — `{"stuff_code": …, "stuff_name": …, "concept": "<domain>.<Code>", "content": …}` — and carries no concept definition; see [Working Memory](../../building-methods/pipes/working-memory.md#in-memory-and-on-the-wire).
+Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on), named after the pipe's own code even when it was named as `domain.pipe_code` or through a dependency's alias, on a hosted run too. The directory holds a `.gitignore` ignoring everything in it, so a run started from inside a method's folder never adds its outputs to the method's tree. A local run of a bundle or a folder also writes `method_tree.json` there, the record of the [method tree](../../building-methods/method-trees.md#limits-and-the-tree-digest) it read: its digest, its root on this machine, its entry and each file's path, hash and size. With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer. When the main output is a Document or an Image, `--save-main-stuff` also copies the file itself into the directory under its own name, so a PDF that a [`PipeDocGen`](../../building-methods/pipes/pipe-operators/PipeDocGen.md) step produced lands as `invoice-INV-2026-0142.pdf` and opens with a double-click, and the run prints its path. It never replaces a file the run writes in the directory: a file whose name is taken, such as a document passed through from an earlier run as `main_stuff.json`, is saved as `main_stuff-1.json`. A dry run produces no file, so it copies nothing. A file a step names with [`output_filename`](../../building-methods/pipes/index.md#naming-the-files-a-step-produces) is copied under that name. When the run has a [result line](../../building-methods/packages.md#result-line), the one line wording what it produced, the run prints it on stderr as `Result: <line>`, with any control character escaped (`\x1b` for an escape byte) since the line words the method's output, and writes it as it is to `result_line.txt` in the directory when the run saves anything, listed with the saved files, or warns when the directory refuses it; a dry run computes the line from its mock values and prints it as `Result (dry run, from mock values): <line>`; a main output file is never saved under that name, nor as `working_memory.json`. In `working_memory.json` each stuff names its concept by ref — `{"stuff_code": …, "stuff_name": …, "concept": "<domain>.<Code>", "content": …}` — and carries no concept definition; see [Working Memory](../../building-methods/pipes/working-memory.md#in-memory-and-on-the-wire).
 
 Beside `graphspec.json`, and gated by the same `graphspec_json` flag, the run writes the three files that describe the data the graph carries:
 
@@ -13123,7 +13263,7 @@ pipelex-agent run method <NAME> [OPTIONS]
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
-`run bundle` reads its method through its [method tree](../../building-methods/method-trees.md), as `pipelex run bundle` does. A folder is the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and with no `--pipe` the run starts at the manifest's `main_pipe`, or, with no manifest, at the one `main_pipe` its bundles declare; none or several is refused with the problem `request.pipe_unspecified`, whose message names each bundle by its path in the tree and whose `params.candidates` names the declared ones when there are several, with no `errors`, since the method may be valid and only the pipe to start at is missing: pass `--pipe`. A bundle file named alone starts at its own `main_pipe`, and with no `METHODS.toml` at or above its folder its method is that one file, so a step naming a file beside it, such as a `template_file`, is refused with the advice to run the folder or to add a `METHODS.toml`. The run's output file (`live_run.json` or `dry_run.json`, in the run's output folder) carries `method_tree_digest`, the digest of the tree the run read, and so does the output under `--with-memory`: the tree is listed once, before its bundle is read, and the run loads the tree that listing returned, so the digest is the digest of the files the run loaded. A file of the tree edited after that listing is refused as an invalid method whose item names the file, rather than loaded.
+`run bundle` reads its method through its [method tree](../../building-methods/method-trees.md), as `pipelex run bundle` does. A folder is the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and with no `--pipe` the run starts at the manifest's `main_pipe`, or, with no manifest, at the one `main_pipe` its bundles declare; none or several is refused with the problem `request.pipe_unspecified`, whose message names each bundle by its path in the tree and whose `params.candidates` names the declared ones when there are several, with no `errors`, since the method may be valid and only the pipe to start at is missing: pass `--pipe`. A bundle file named alone starts at its own `main_pipe`, and with no `METHODS.toml` at or above its folder its method is that one file, so a step naming a file beside it, such as a `template_file`, is refused with the advice to run the folder or to add a `METHODS.toml`. The run's output file (`live_run.json` or `dry_run.json`, in the run's output folder) carries `method_tree_digest`, the digest of the tree the run read, and so does the output under `--with-memory`: the tree is listed once, before its bundle is read, and the run loads the tree that listing returned, so the digest is the digest of the files the run loaded. A file of the tree edited after that listing is refused as an invalid method whose item names the file, rather than loaded. When the run has a [result line](../../building-methods/packages.md#result-line), the one line wording what it produced, the output file and the `--with-memory` output carry it as `result_line`; the compact output stays the content alone.
 
 #### Running on the hosted API
 
@@ -13233,6 +13373,8 @@ The JSON success envelope names the pipe the template was generated for as `pipe
   "inputs": { ... }
 }
 ```
+
+When the command reads a bundle file, the pipe is the `main_pipe` of the `METHODS.toml` at the root of that bundle's method tree, defined by the bundle in its own domain (a pipe of the same code in another domain, or one reached through a dependency's alias, is not), and that manifest lists [example inputs](../../building-methods/packages.md#example-inputs), the envelope adds them as `examples`, their tree paths from the manifest's folder in the manifest's order; the key is absent otherwise, and a run on the hosted API does not carry it yet.
 
 A pipe that declares no inputs is not an error: the envelope carries `"inputs": {}` and the command exits `0`; under `--format toml` it prints the comment `# Pipe 'my_domain.main_pipe' declares no inputs.`
 
@@ -18459,9 +18601,11 @@ An emitter then walks the `ResolvedLibrary` and renders text. Emitters live in `
 
 The `types` projection ranges over the crate's concept set: one type per qualified concept, and a second one, its wire shape, for a concept reaching a value the runtime may store (see [Stored values](#stored-values-the-loaded-shape-and-the-wire-shape)). Three targets ship today:
 
-- **`python-structures`** — Pipelex runtime `StuffContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted. Each concept lands on the same content class the runtime would resolve it to: a structured concept on `StructuredContent`, a concept refining a native on that native's content class, a structureless one on `TextContent`.
+- **`python-structures`** — Pipelex runtime `StuffContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted. Each concept lands on the same content class the runtime would resolve it to: a structured concept on `StructuredContent`, a concept refining a native on that native's content class, a structureless one on `TextContent`. A field's [contract facts](../building-methods/concepts/inline-structures.md#contract-facts) are written as `Annotated[str, ContractFacts({...})]`, so the class enforces and states them exactly as the runtime's own class does; a field typed by a concept marks them `carried=True`, as they constrain the value its concept carries.
 - **`python-pydantic`** — plain `pydantic.BaseModel` types with no Pipelex imports. Every concept is emitted uniformly, including the materialized natives, so the module depends only on `pydantic` and the standard library.
 - **`ts-zod`** — a pure TypeScript + Zod types file (`types.ts`, imports only `zod`) plus a `binder.ts` companion. `types.ts` holds Zod schemas and their inferred types; type names are the concept codes; **field keys are the crate's snake_case wire names verbatim**. Concept references use `z.lazy(() => XSchema)` so declaration order is irrelevant and cycles are handled.
+
+The `python-pydantic` and `ts-zod` targets do not carry contract facts yet: their types accept a value breaking a field's constraints, which the runtime refuses when the value reaches it.
 
 ### The ts-zod types file and its binder
 
@@ -18635,7 +18779,7 @@ where `normalized_description` is the authored description with each line's trai
 
 Exact bytes survive wherever they are consumed programmatically rather than read as prose — `Field(description=...)` keeps the description verbatim, and so does the crate.
 
-The runtime structure generator, which builds the class of a concept with a `structure` when a bundle loads, writes no source at all. It builds the class from data with `pydantic.create_model`: the concept's fields are resolved through the same resolved-field layer the emitters read, each resolved type is mapped to an annotation object (a Python type, `Literal[...]`, a native content class, or a domain-qualified class name that the library resolves as a forward reference once every class of the load is built), and each field becomes a `Field` carrying its description and default as values. Its docstring is held to the same contract: it is set to the value `class_doc_value` returns, which `inspect.cleandoc`, the call pydantic makes when it writes the schema's `description`, reads back as `normalized_docstring_text(description)`. So authored text never reaches Python source on the runtime side, and a field named like a type or a helper (`date`, `str`, `Field`) shadows nothing. The one name that still matters is that of a referenced class, which pydantic resolves against the class namespace where every field is bound: a field named like the class of a concept the structure refers to is refused, with a finding naming the field and the concept. A class pydantic refuses to build is a `ConceptStructureGeneratorError` whose cause is pydantic's exception. For a concept with a structure table, the class the runtime builds and the class the `python-structures` target writes from the same crate have the same bases and the same `model_json_schema()`, which `test_structure_generator_parity.py` checks over structures covering every field type, native content classes, defaults, self-reference and mutual reference. The two are not the same class elsewhere, and the test does not cover these cases: a structureless concept (`Note = "A note"`) is a plain subclass of its native base documented by its description on the runtime side, where the emitter writes an `extra="allow"` class with an imprecision line in its docstring; a class-backed concept (`structure = "ClassName"`) is the named class at runtime, where the emitter writes an empty `extra="allow"` placeholder that fields referencing the concept point at; a refinement of a concept outside the crate, from `PIPELEXPATH` or a dependency, resolves to that concept's class at runtime but to `Any` in the emitted module; and a `native.Anything` field is an open value at runtime but is written as `StructuredContent` by the emitter.
+The runtime structure generator, which builds the class of a concept with a `structure` when a bundle loads, writes no source at all. It builds the class from data with `pydantic.create_model`: the concept's fields are resolved through the same resolved-field layer the emitters read, each resolved type is mapped to an annotation object (a Python type, `Literal[...]`, a native content class, or a domain-qualified class name that the library resolves as a forward reference once every class of the load is built), and each field becomes a `Field` carrying its description and default as values. Its docstring is held to the same contract: it is set to the value `class_doc_value` returns, which `inspect.cleandoc`, the call pydantic makes when it writes the schema's `description`, reads back as `normalized_docstring_text(description)`. So authored text never reaches Python source on the runtime side, and a field named like a type or a helper (`date`, `str`, `Field`) shadows nothing. The one name that still matters is that of a referenced class, which pydantic resolves against the class namespace where every field is bound: a field named like the class of a concept the structure refers to is refused, with a finding naming the field and the concept. A class pydantic refuses to build is a `ConceptStructureGeneratorError` whose cause is pydantic's exception. For a concept with a structure table, the class the runtime builds and the class the `python-structures` target writes from the same crate have the same bases and the same `model_json_schema()`, which `test_structure_generator_parity.py` checks over structures covering every field type, native content classes, defaults, self-reference, mutual reference and contract facts, which both classes also enforce alike. The two are not the same class elsewhere, and the test does not cover these cases: a structureless concept (`Note = "A note"`) is a plain subclass of its native base documented by its description on the runtime side, where the emitter writes an `extra="allow"` class with an imprecision line in its docstring; a class-backed concept (`structure = "ClassName"`) is the named class at runtime, where the emitter writes an empty `extra="allow"` placeholder that fields referencing the concept point at; a refinement of a concept outside the crate, from `PIPELEXPATH` or a dependency, resolves to that concept's class at runtime but to `Any` in the emitted module; and a `native.Anything` field is an open value at runtime but is written as `StructuredContent` by the emitter.
 
 #### TypeScript assumes Prettier's defaults
 
@@ -18735,9 +18879,10 @@ The report always carries the field. Whether it travels on the HTTP wire is the 
 
 ## Fact sources
 
-The derivation reads two things and nothing else:
+The derivation reads three things and nothing else:
 
 - **Slot facts** from the loaded pipes' `StuffSpec`s: the authored input order, the three-valued presence marker (`plain` / `optional` / `force`), and the multiplicity including a fixed `[N]` count. Iterating the same loaded pipes as `build_pipe_io_contracts` — `PipeSignature` placeholders included — is what makes the two key sets equal by construction.
+- **Slot meaning** from the expanded slot table in the qualified crate: the slot's `description`, which replaces the concept's on the slot's node, its [contract facts](../building-methods/concepts/inline-structures.md#contract-facts), stated on the value node (on a plural slot, on its `item`), and its `choices`, which turn a text-valued node into an `enum` node. A structure field's contract facts are stated the same way on its node. Every fact the node's kind has a member for is stated, examples as JSON values: a `number` node carries the slot's or field's `unit` and `aggregate`, and an `enum` node carries `options`, each option's value with its `label`, `description` and `tone`, when at least one option has words.
 - **Concept facts** from the *qualified* library crate built from the parsed blueprints: descriptions, refinement links, structure fields with their defaults, choices, required-ness and nested concept refs. Qualified, not normalized: normalization flattens in-crate refinement, and the descriptor must report the `refines` chain as a list. Native concepts contribute their pinned blueprints; class-backed concepts (`structure = "ClassName"`) are reflected from the class registry, which is why the derivation must run while the validation library is still loaded.
 
 The derivation is total. A node it cannot map honestly reports `kind: "unknown"`, the renderer's raw escape hatch against the sibling `json_schema`; nothing raises.
@@ -25809,7 +25954,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.121.1` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.122.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -29744,6 +29889,7 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `pipe_output` (object): Result of the pipeline execution. Contains `working_memory` with `root` (every named stuff produced during the run) and `aliases` (built-in name mappings such as `main_stuff`).
 - `pipe_output.tokens_usages` (array | null): Per-inference-call token usage in the client wire shape (`TokensUsageRecord`): `model_type`, model name/id, `pipe_code`, job-kind fields, `nb_tokens_by_category`, computed USD `cost` (`null` when the model has no rate table), and ISO timestamps. `null` when usage assembly was off for the run, `[]` when no inference happened. `pipe_output.usage_assembly_error` (string | null) is non-null when usage assembly failed. See the pipelex runtime's [TokensUsage Wire Records](https://docs.pipelex.com/under-the-hood/tokens-usage-wire-records/) for the full field reference.
 - `pipe_output.graph_spec` (object | null): Best-effort execution graph of the run — the nodes and edges the run actually traversed. `null` when graph generation was off for the run, which is the `interpreter.pipeline_execution.is_generate_graph` setting (`true` in the packaged config); it does not depend on `runtime.tracing`, whose `is_enabled` selects a trace-emission backend rather than gating assembly. `pipe_output.graph_assembly_error` (string | null) is non-null when assembly ran and failed, which is what distinguishes a failed assembly from generation having been off.
+- `pipe_output.result_line` (string | null): the run's [result line](../building-methods/packages.md#result-line), the one line wording what it produced: the `result_line` of the method's manifest rendered against the output, else the line derived from the output's `verdict` field, else `null`. It is evaluated where the run ran and carried back with its output, so a runner of an older release answers no line.
 - `pipe_output.pipe_io_artifacts` (object | null): The I/O artifacts describing the graph's data, carried beside `graph_spec` so that wherever the graph travels its description travels with it. It groups the same artifacts `/validate` produces — `pipe_io_contracts`, `input_form` and `output_form` — each keyed by namespaced `pipe_ref`, over the **run library's own pipes**: a dependency package's pipes are keyed by alias in the library but by bare `pipe_ref` in the artifacts, where they would collide with the host's, so they are left out and a graph node contributed by a dependency has no entry here. Holding it with the graph is what lets a viewer show a data node's value rather than only its shape. It is built only when the run generated a graph **and** `interpreter.pipeline_execution.graph.graphs_inclusion.graphspec_json` is on (both default to `true`), and only when `graph_spec` itself came out non-null — so a run with `graphspec_json = false` returns a graph with no artifacts beside it and no error, which is the one case where the two fields disagree. `pipe_output.pipe_io_artifacts_error` (string | null) is non-null when the build ran and failed. See [Pipe Validate](pipe-validate.md) for the artifacts' own field reference.
 - `method_provenance` (object, only on `method_ref` runs): `{address, tag, commit_sha, tree_digest, display_name}` — the package's resolved full address, the requested tag (`null` for a bare address), the commit SHA that was actually fetched, the digest of the method tree the run loaded, and the `display_name` the package's `METHODS.toml` declares (`null` when it declares none). Absent for runs from inline source or a bundle. See [Running a method by address](#running-a-method-by-address-method_ref).
 
@@ -30653,7 +30799,7 @@ The 200 body is one of two arms, discriminated on the mandatory `is_valid` field
 - `pipe_io_contracts` (object): per-pipe input/output contracts, keyed by the namespaced `pipe_ref` (`domain.code`). Each input carries its `concept_ref`, `presence`, `multiplicity` (`single` | `variable` | `fixed`), `item_count` and the JSON Schema of its content; the output carries its fully qualified `concept_ref`, `multiplicity`, `item_count`, `optional` and the JSON Schema of its payload. `item_count` is the exact count on `fixed`, always greater than one since `Concept[1]` reads as `single`, and `null` otherwise, so an output declared `Text[3]` reports `"multiplicity": "fixed", "item_count": 3`
 - `graph_spec` (object, optional): best-effort execution graph of the pipe a selector-less run of this request would execute — the pipe [`default_pipe_ref`](#the-effective-entry-pipe) names — dry-run against the validated library; absent when no entry pipe is determined or the graph dry-run degrades
 - `validated_pipes` (list): per-pipe sweep outcomes — `{pipe_ref, status}` entries with status `SUCCESS` | `FAILURE` | `SKIPPED`
-- `warnings` (list): advisory findings that never flip `is_valid`, each a problem item with the same shape as an item of the invalid arm's `errors`, so one parser reads both. Four families, always in this order: the useless-`!` lint (`method.optional_force_redundant`), the entry-pipe vacuous-presence lint (`method.input_presence_vacuous`), the intent-hint lints (`method.hint_invalid`, whose `reason` is `unknown_key`, `unknown_intent` or `inapplicable_intent`, whose `hint` names the hint, and whose `location` names the declaration the hint is on: `field` `concept.<Concept>` for a concept, `concept.<Concept>.structure.<field>` for a field of its structure, `pipe` and `input` for a pipe's input), and the warnings a `PipeDocGen` step's template check found in its office template file during the dry run (`pipelex.docgen.template_warning`, whose `template` names the file and `finding` says what the check found, located at the step by its `pipe`). A member an item does not have is absent, never `null`. Empty when there is nothing to report
+- `warnings` (list): advisory findings that never flip `is_valid`, each a problem item with the same shape as an item of the invalid arm's `errors`, so one parser reads both. Five families, always in this order: the useless-`!` lint (`method.optional_force_redundant`), the entry-pipe vacuous-presence lint (`method.input_presence_vacuous`), the intent-hint lints (`method.hint_invalid`, whose `reason` is `unknown_key`, `unknown_intent`, `inapplicable_intent`, `unknown_role`, `inapplicable_role`, `unknown_part`, `inapplicable_part` or `duplicate_part`, whose `hint` names the hint, and whose `location` names the declaration the hint is on: `field` `concept.<Concept>` for a concept, `concept.<Concept>.structure.<field>` for a field of its structure, `pipe` and `input` for a pipe's input), the dubious plain choice options (`method.choice_option_dubious`, an empty or repeated option of a plain `choices` list, whose `reason` says which), and the warnings a `PipeDocGen` step's template check found in its office template file during the dry run (`pipelex.docgen.template_warning`, whose `template` names the file and `finding` says what the check found, located at the step by its `pipe`). A member an item does not have is absent, never `null`. Empty when there is nothing to report
 - `pending_signatures` (list[str]): namespaced refs of pipes still declared as signatures (contract-only pipes — `inputs`/`output` with no `type` and no implementation) in the assembled library — what remains to implement
 - `is_runnable` (boolean): `pending_signatures` is empty — whether the validated library is complete enough to run
 - `tree_files_read` (object): per step, the files of the method's tree it reads, keyed by the same namespaced `pipe_ref` as `pipe_io_contracts`. Each entry is a list of `{tree_path, use}` items, `tree_path` being the file's path from the root of the method's tree with forward slashes, never a path on the server, and `use` one of `template` (a `PipeDocGen` step's `template_file`), `template_asset` (a file an HTML template names by a literal relative URL, such as an image, a stylesheet or a font, or a file a stylesheet it names refers to) and `python_module` (the module holding a `PipeFunc` step's function, `module.py` or a package's `__init__.py`). A step that reads no file, a controller or a step whose template is written inline with no asset, has an empty list, and so does a `PipeFunc` whose function is found on the runtime's import path rather than in the tree. See [Validating a method tree](#validating-a-method-tree)
@@ -30899,6 +31045,7 @@ A bare `pipe_ref` that matches one pipe (`echo` where `smoke.echo` is meant) is 
 - `pipe_ref` (string | null): the qualified ref the selection resolved, read off the resolved pipe and never echoed from the request. `null` only under `all_pipes` when nothing resolves.
 - `pipe_io_contracts`, `input_form`, `output_form` (objects keyed by qualified `pipe_ref`): the three artifacts, sharing one key set — the resolved `pipe_ref` alone by default, every pipe the closure loads under `all_pipes`.
 - `default_pipe_ref` (string | null): the method's own entry pipe, the selection chain without the request's `pipe_ref`. A request that omits `pipe_ref` therefore always answers `pipe_ref == default_pipe_ref`. When the request named a pipe, or asked for `all_pipes`, and the chain finds no entry pipe or several, the field is a stated `null`, as it is when the request named a pipe and the root `METHODS.toml` cannot be read.
+- `examples` (list of strings): the [example inputs](../building-methods/packages.md#example-inputs) the `METHODS.toml` at the tree's root lists for its `main_pipe`, each the tree path of a JSON file of flat inputs in stuff wire form, in the manifest's order. Listed only when the described pipe, `pipe_ref`, is that `main_pipe`, since the examples fill its inputs and no other pipe's. Empty when the method has no manifest or its manifest lists none, when the request named another pipe, and when the request named its pipe and the manifest cannot be read.
 - `pending_signatures` (list of strings) and `is_runnable` (boolean): exactly what they mean on `/v1/validate` — the qualified refs of the pipes still declared as signatures, and `not pending_signatures`. Both come from the loaded library with no dry run, so a method whose dry run would fail is still reported runnable here.
 - `files` (object, only with `include_files: true`): the text of each `.mthds` bundle of the method's own tree, keyed by its tree path. For a tree sent in `files`, it is the request's bundles, whatever entry form carried them; for a `method_ref`, the fetched package's bundles, each keyed by its path from the package root. The tree's other files and the bundles of its dependencies are never included. Without `include_files` the field is absent, not empty.
 
