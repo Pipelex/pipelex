@@ -299,6 +299,25 @@ def format_sample(*, text_format: ValueFormat) -> str:
             return "2001:db8::1"
 
 
+def format_short_sample(*, text_format: ValueFormat) -> str:
+    """The shortest well-formed text of a format a mock tries when the site's `max_length` leaves no room for `format_sample`."""
+    match text_format:
+        case ValueFormat.EMAIL:
+            return "a@b.co"
+        case ValueFormat.URI:
+            return "https://a.co"
+        case ValueFormat.DATE_TIME:
+            return "2026-01-01T09:00:00Z"
+        case ValueFormat.UUID:
+            return "123e4567-e89b-42d3-a456-426614174000"
+        case ValueFormat.HOSTNAME:
+            return "a.co"
+        case ValueFormat.IPV4:
+            return "1.1.1.1"
+        case ValueFormat.IPV6:
+            return "::1"
+
+
 def text_matches_format(*, text: str, text_format: ValueFormat) -> bool:
     """Whether a text is well-formed in a format. The runtime asserts every format, whatever a schema validator does by default."""
     match text_format:

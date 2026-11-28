@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from typing import Annotated, Any, cast
 
 from pydantic import AfterValidator, Field
+from pydantic.dataclasses import dataclass
 
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -82,6 +83,27 @@ def contract_break(*, value: Any, facts: Mapping[str, Any], choice_values: list[
     return constraint_break_message(value=plain, facts=facts)
 
 
+@dataclass(frozen=True, eq=False)
+class ContractFactsMetadata:
+    """The facts of a constrained annotation, carried in its metadata for what builds a value of it rather than validates one:
+    the dry run's mock factory reads them to make a value that honours them (`pipelex.cogt.content_generation.contract_fact_mocks`).
+    Pydantic ignores metadata it does not know, so carrying them changes neither validation nor the JSON Schema.
+
+    `eq=False` keeps identity equality and hashing: `typing` hashes an annotation's metadata when it builds a union over it
+    (`Annotated[...] | None`), and the facts, a dict that may hold a list of examples, cannot be hashed.
+    """
+
+    facts: dict[str, Any]
+
+
+def contract_facts_of(*, metadata: list[Any] | tuple[Any, ...]) -> dict[str, Any] | None:
+    """The facts a constrained annotation's metadata carries, or `None` when it carries none."""
+    for item in metadata:
+        if isinstance(item, ContractFactsMetadata):
+            return item.facts
+    return None
+
+
 def constrained_annotation(*, annotation: Any, facts: Mapping[str, Any], states_schema: bool = True) -> Any:
     """An annotation whose validation enforces the site's constraints and whose JSON Schema states every fact.
 
@@ -107,8 +129,9 @@ def constrained_annotation(*, annotation: Any, facts: Mapping[str, Any], states_
             raise ValueError(message)
         return value
 
+    facts_metadata = ContractFactsMetadata(facts=frozen_facts)
     if not states_schema:
-        return Annotated[annotation, AfterValidator(enforce)]
+        return Annotated[annotation, AfterValidator(enforce), facts_metadata]
     constraints: dict[str, Any] = {
         "ge": frozen_facts.get(ContractFactKey.MINIMUM),
         "le": frozen_facts.get(ContractFactKey.MAXIMUM),
@@ -126,7 +149,7 @@ def constrained_annotation(*, annotation: Any, facts: Mapping[str, Any], states_
     text_format = frozen_facts.get(ContractFactKey.FORMAT)
     field_info = Field(**{key: value for key, value in constraints.items() if value is not None})
     if text_format is None:
-        return Annotated[annotation, field_info]
+        return Annotated[annotation, field_info, facts_metadata]
     format_facts: dict[str, Any] = {ContractFactKey.FORMAT: text_format}
 
     def enforce_format(  # kw-only: ignore (pydantic calls an AfterValidator positionally)
@@ -137,7 +160,7 @@ def constrained_annotation(*, annotation: Any, facts: Mapping[str, Any], states_
             raise ValueError(message)
         return value
 
-    return Annotated[annotation, field_info, AfterValidator(enforce_format), Field(json_schema_extra={"format": str(text_format)})]
+    return Annotated[annotation, field_info, AfterValidator(enforce_format), Field(json_schema_extra={"format": str(text_format)}), facts_metadata]
 
 
 def _example_as_object(*, example: Any, property_name: str) -> Any:
