@@ -224,6 +224,8 @@ default_outcome = { pipe = "continue", label = "No check needed" }
 
 A table must carry `pipe` and no key other than those three, and no two outcomes of one condition, the default included, share a label. A table carrying `pipe` alone is the same outcome as its string.
 
+When a live run takes an outcome written as a table, the condition's node in the run's graph records its words beside the value the expression rendered and the outcome selected: `selected_outcome_label`, `selected_outcome_description` and `selected_outcome_tone` in the node's `execution_data`, each present only when the table gives it. The default outcome's words are recorded when the run falls through to it.
+
 ### Expression Aliasing
 ```toml
 add_alias_from_expression_to = "category_type"

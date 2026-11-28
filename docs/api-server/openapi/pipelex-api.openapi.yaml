@@ -5730,6 +5730,11 @@ components:
           - type: string
           - type: 'null'
           title: Description
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
         domain_code:
           anyOf:
           - type: string
@@ -7094,6 +7099,15 @@ components:
           type: boolean
           title: Is Runnable
           description: '`not pending_signatures`, exactly as on `/validate`. No dry run backs it.'
+        examples:
+          items:
+            type: string
+          type: array
+          title: Examples
+          description: 'The example inputs the method''s manifest offers for its entry pipe (`default_pipe_ref`): the `examples`
+            of its `METHODS.toml`, each the tree path of a JSON file of flat inputs in stuff wire form, in the manifest''s
+            order. Empty when the manifest declares none, when the method has no manifest, or when a request naming its pipe
+            sends a manifest that cannot be read.'
         files:
           additionalProperties:
             type: string
@@ -7639,6 +7653,11 @@ components:
           - type: string
           - type: 'null'
           title: Usage Assembly Error
+        result_line:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Line
       additionalProperties: false
       type: object
       title: PipeOutputWire

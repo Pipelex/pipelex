@@ -107,12 +107,24 @@ You can specify multiple inputs by using a list of concepts. For example, `input
 
     Anything else is a validation error, and a fact on a slot whose concept holds no plain value, a structured concept for instance, is refused with the reason `not_value_slot`. A slot's constraints and options are enforced on the value a caller sends to the run's entry pipe, a text given by URL or stored for being large included, which is read for the check and refused as `input.invalid` when it breaks one or cannot be read, and they are stated on the slot's input JSON Schema. A slot table carrying none of these keys is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints.
 
-*   **`activity`** (optional): A short phrase a person watching a run reads while the pipe works, such as `activity = "Reading the lease"`. It is one line, never empty, and a contract-only signature does not carry it.
+*   **`activity`** (optional): A short phrase a person watching a run reads while the pipe works, such as `activity = "Reading the lease"`. It is one line, never empty, and a contract-only signature does not carry it. The run's graph carries it on the pipe's node as `activity`, beside its `description`, and so does the trace event that starts the node, so a timeline shows it in place of the description.
 
-*   **`output_filename`** (optional): On an operator whose output is an `Image` or a `Document`, a Jinja2 template naming the file the pipe writes, such as `output_filename = "{{ counterparty }} - NDA review"`. It reads only declared inputs, counts as reading them, and must guard every optional input it names with `{% if %}`. A controller writes no file of its own, so it does not carry one.
+*   **`output_filename`** (optional): On an operator whose output is an `Image` or a `Document`, a Jinja2 template naming the file the pipe writes, such as `output_filename = "{{ counterparty }} - NDA review"`. It reads only declared inputs, counts as reading them, and must guard every optional input it names with `{% if %}`. A controller writes no file of its own, so it does not carry one. See [Naming the files a step produces](#naming-the-files-a-step-produces).
 
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
+
+### Naming the Files a Step Produces
+
+When an operator stating `output_filename` has produced its output, the runtime renders the template once with the pipe's inputs and gives each `Image` or `Document` of the output the name it builds, as the file's `filename`, the name a download and `pipelex run --save-main-stuff` use. The name is built in these steps:
+
+1. The rendered text is normalized to NFC, each run of white space becomes one space, each of `/ \ : * ? " < > |` and each control character becomes `-`, and white space and dots are trimmed from both ends. A name that is a device name Windows reserves, such as `CON` or `LPT1`, takes a trailing `_`.
+2. The name keeps the extension of the name the runtime would have given the file: an extension the template already wrote, in any letter case, is kept as written, and any other is appended.
+3. The whole name, extension included, is cut to 255 bytes of UTF-8, never inside a character.
+4. When the template fails to render, or nothing is left before the extension, the file keeps the name the runtime would have given it, with a warning in the log. Naming a file never fails a run.
+5. On a plural output, such as `Image[3]`, the second and later files take ` (2)`, ` (3)` and so on before the extension.
+
+So `output_filename = "{{ client }} cover"` with the input `Acme/Corp` names two images `Acme-Corp cover.png` and `Acme-Corp cover (2).png`. The name never decides where a file is stored: the stored file and its URL are left as they were. A dry run names its placeholder files the same way.
 
 ### Multi-Step Methods
 

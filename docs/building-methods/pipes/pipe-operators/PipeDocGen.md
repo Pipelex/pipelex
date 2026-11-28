@@ -94,6 +94,8 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 
 ### The file's name
 
+A step names its file either with its own `filename`, described here, or with the standard's [`output_filename`](../index.md#naming-the-files-a-step-produces), never both: the two would name one file twice, and a step carrying both is refused. `output_filename` names the file a download reads and leaves the stored file under the step's own name; `filename` names both.
+
 The document is stored, and downloaded, under its `filename` plus the format's suffix. A storage URI names it, and the hosted API serves a stored file only when its name is ASCII letters, digits, hyphens and underscores, one dot and the suffix, so the step makes every rendered name into one of those before it stores the file:
 
 - **Letters are spelled in ASCII where they can be.** Accents are dropped (`Bäckerei Müller` gives `Backerei-Muller`, `İstanbul` gives `Istanbul`), and the letters that carry no accent to drop are spelled as a reader would type them: `ø` as `o`, `æ` as `ae`, `œ` as `oe`, `ł` as `l`, `đ` and `ð` as `d`, `þ` as `th`, `ß` as `ss`, `ı` as `i`.

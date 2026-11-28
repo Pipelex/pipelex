@@ -51,6 +51,20 @@ pipes = ["compute_weighted_score"]
 | `main_pipe` | No | Optional main pipe code |
 | `mthds_version` | No | Required MTHDS version constraint |
 | `categories` | No | The categories a catalog can offer the method under, like tags, as lowercase slugs such as `human-resources`. An entry that does not match `^[a-z0-9]+(-[a-z0-9]+)*$` refuses the manifest, while a value no catalog knows never does |
+| `result_line` | No | A Jinja2 template wording a finished run of the main pipe in one line; requires `main_pipe` (see [Result line](#result-line)) |
+| `examples` | No | Tree paths of JSON files of example inputs for the main pipe; requires `main_pipe` (see [Example inputs](#example-inputs)) |
+
+### Result Line
+
+`result_line` words what a run produced in one line, such as `result_line = "{{ output.clauses | length }} clauses, {{ output.verdict }}"`. Its only variable is `output`, the main pipe's output as the wire carries it: an object, or an array for a plural output. A template that does not parse, or reads any other variable, refuses the method as `method.package_invalid` with the reason `result_line_invalid`, and so does an empty one; a `result_line` without `main_pipe` gives the reason `result_line_without_main_pipe`.
+
+At the end of a run that starts at the main pipe and ends with a value, the runtime renders the template against the output and collapses its white space into one line. When the template fails to render or gives nothing, or the manifest writes none, the line is derived from the output's field marked with the `verdict` [part hint](concepts/intent-hints.md) that holds a choice: its label, else its value, or, for a list of such records, the count of each, joined with ` · `, such as `3 Approved · 1 reject`. A run with neither has no line. The line rides the run's output as `result_line`: on the API's run response, in `pipelex-agent run`'s output file, and in `result_line.txt` in `pipelex run`'s output folder, which also prints it.
+
+### Example Inputs
+
+`examples` lists files of the method's tree, each a JSON object of flat inputs for the main pipe in stuff wire form, such as `{"nda": {"concept": "legal.Nda", "content": {"url": "examples/mutual-nda.pdf"}}}`. Validating the method checks them: an entry naming no file of the tree, or `inputs.json`, is `method.resource_missing` with the reason `not_in_tree`, and a file that is not such a set of inputs, naming an input the main pipe lacks, a concept its input does not accept, or lacking a required input, is `method.package_invalid` with the reason `example_invalid` and its path. Whether each content satisfies its input's schema is checked when the example is run. `examples` without `main_pipe` gives the reason `examples_without_main_pipe`.
+
+The examples are offered where the method is described: `pipelex-agent inputs` adds them to its envelope as `examples` when it describes the manifest's main pipe, and the API's `POST /v1/pipe-io` lists them as `examples` beside `default_pipe_ref`.
 
 ## Exports and Visibility
 
