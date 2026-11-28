@@ -17,7 +17,7 @@ from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.unit.pipelex.graph.conftest import make_trace_context
-from tests.unit.pipelex.pipe_controllers.binding.test_data import INVOICE, RESOLVER, SupplierRecord, make_invoice_record
+from tests.unit.pipelex.pipe_controllers.binding.cases import INVOICE, RESOLVER, SupplierRecord, make_invoice_record
 
 _INVOICE_CONCEPT = Concept(domain_code="billing", code="Invoice", description="An invoice", structure_class_name="InvoiceRecord")
 _SUPPLIER_CONCEPT = Concept(domain_code="billing", code="Supplier", description="A supplier", structure_class_name="SupplierRecord")

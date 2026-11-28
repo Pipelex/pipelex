@@ -6,8 +6,8 @@ from pytest import CaptureFixture
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.pretty import pretty_print
+from tests.unit.pipelex.tools.misc.cases import ImageData
 from tests.unit.pipelex.tools.misc.conftest import ComplexUser
-from tests.unit.pipelex.tools.misc.test_data import ImageData
 
 
 def remove_ansi_escape_codes(text: str) -> str:

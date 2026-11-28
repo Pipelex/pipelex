@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex.core.stuffs.html_content import HtmlContent
-from tests.unit.pipelex.core.stuffs.html_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.html_content.cases import HtmlContentCases
 
 
 class TestHtmlContentSmartDump:
@@ -11,15 +11,15 @@ class TestHtmlContentSmartDump:
 
     def test_smart_dump_returns_dict(self):
         """Verify smart_dump always returns a dict with inner_html and css_class."""
-        content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML, css_class=TestData.SAMPLE_CSS_CLASS)
+        content = HtmlContent(inner_html=HtmlContentCases.SAMPLE_INNER_HTML, css_class=HtmlContentCases.SAMPLE_CSS_CLASS)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP
+        assert result == HtmlContentCases.EXPECTED_SMART_DUMP
         assert isinstance(result, dict)
 
     def test_smart_dump_without_css_class(self):
         """An unset optional css_class dumps as None — the field stays in the payload, unset."""
-        content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML)
-        assert content.smart_dump() == TestData.EXPECTED_SMART_DUMP_NO_CLASS
+        content = HtmlContent(inner_html=HtmlContentCases.SAMPLE_INNER_HTML)
+        assert content.smart_dump() == HtmlContentCases.EXPECTED_SMART_DUMP_NO_CLASS
 
     @pytest.mark.parametrize(
         ("inner_html", "css_class", "expected_output"),

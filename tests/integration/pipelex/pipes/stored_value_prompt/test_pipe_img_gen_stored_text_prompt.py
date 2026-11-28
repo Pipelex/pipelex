@@ -10,6 +10,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.system.job_metadata import JobMetadata
+from tests.integration.pipelex.pipes.stored_value_prompt.cases import STORED_TEXT, STORED_TEXT_URL
 from tests.integration.pipelex.pipes.stored_value_prompt.conftest import (
     RecordingContentGenerator,
     make_text_memory,
@@ -17,7 +18,6 @@ from tests.integration.pipelex.pipes.stored_value_prompt.conftest import (
     stored_pages,
     text_inputs_read_by,
 )
-from tests.integration.pipelex.pipes.stored_value_prompt.test_data import STORED_TEXT, STORED_TEXT_URL
 
 _SUBJECT = "a lighthouse at dusk"
 

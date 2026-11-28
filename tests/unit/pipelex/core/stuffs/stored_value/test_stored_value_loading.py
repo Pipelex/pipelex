@@ -20,7 +20,7 @@ from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProv
 from pipelex.tools.storage.storage_provider_abstract import StoredData
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError, UriTextNotUtf8Error, UriTextTooLargeError
 from pipelex.tools.uri.uri_bytes import MAX_CONCURRENT_URI_READS
-from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
+from tests.unit.pipelex.core.stuffs.stored_value.cases import (
     FOREIGN_URL,
     HTML_KEY,
     JSON_KEY,
@@ -30,7 +30,7 @@ from tests.unit.pipelex.core.stuffs.stored_value.test_data import (
     STORED_JSON_OBJ,
     STORED_TEXT,
     TEXT_KEY,
-    StoredValueTestData,
+    StoredValueCases,
 )
 
 
@@ -67,22 +67,22 @@ def _storage_holding_every_value() -> InMemoryStorageProvider:
 @pytest.mark.asyncio(loop_scope="class")
 class TestStoredValueLoading:
     async def test_a_stored_text_loads_its_value_and_keeps_the_reference(self):
-        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        content = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
 
         await load_stored_value(content, read_scope=READ_SCOPE, position="the text input 'pages'", storage_provider=_storage_holding_every_value())
 
         assert content.require_text() == STORED_TEXT
         assert content.rendered_plain() == STORED_TEXT
         # The loaded value is never written back onto the model: the dump is the reference it was.
-        assert content.smart_dump() == StoredValueTestData.TEXT_REFERENCE
+        assert content.smart_dump() == StoredValueCases.TEXT_REFERENCE
         assert STORED_TEXT not in content.model_dump_json()
         assert '"text"' not in content.model_dump_json()
 
     @pytest.mark.parametrize(
         ("content", "expected_value"),
         [
-            (MarkdownContent.model_validate(StoredValueTestData.MARKDOWN_REFERENCE), STORED_TEXT),
-            (HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE), STORED_HTML),
+            (MarkdownContent.model_validate(StoredValueCases.MARKDOWN_REFERENCE), STORED_TEXT),
+            (HtmlContent.model_validate(StoredValueCases.HTML_REFERENCE), STORED_HTML),
         ],
     )
     async def test_markdown_and_html_load_their_text(self, content: MarkdownContent | HtmlContent, expected_value: str):
@@ -90,17 +90,17 @@ class TestStoredValueLoading:
         assert content.rendered_plain() == expected_value
 
     async def test_a_stored_json_is_decoded_back_into_its_object_by_its_mime_type(self):
-        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+        content = JSONContent.model_validate(StoredValueCases.JSON_REFERENCE)
 
         await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=_storage_holding_every_value())
 
         assert content.require_json_obj() == STORED_JSON_OBJ
-        assert content.smart_dump() == StoredValueTestData.JSON_REFERENCE
+        assert content.smart_dump() == StoredValueCases.JSON_REFERENCE
 
     async def test_a_stored_json_that_is_not_an_object_is_refused(self):
         storage = InMemoryStorageProvider()
         storage.root[JSON_KEY] = b"[1, 2, 3]"
-        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+        content = JSONContent.model_validate(StoredValueCases.JSON_REFERENCE)
 
         with pytest.raises(StoredValueUnreadableError):
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
@@ -120,7 +120,7 @@ class TestStoredValueLoading:
         """JSON has no NaN nor infinities: an inline `json_obj` holding one is refused, and so is a stored one."""
         storage = InMemoryStorageProvider()
         storage.root[JSON_KEY] = stored_json.encode("utf-8")
-        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+        content = JSONContent.model_validate(StoredValueCases.JSON_REFERENCE)
 
         with pytest.raises(StoredValueUnreadableError) as exc_info:
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
@@ -131,7 +131,7 @@ class TestStoredValueLoading:
     async def test_a_stored_text_that_is_not_utf8_is_refused(self):
         storage = InMemoryStorageProvider()
         storage.root[TEXT_KEY] = b"\xff\xfe\xfa not utf-8"
-        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        content = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
 
         with pytest.raises(UriTextNotUtf8Error):
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
@@ -151,7 +151,7 @@ class TestStoredValueLoading:
     async def test_a_second_load_reads_nothing(self, mocker: MockerFixture):
         storage = _storage_holding_every_value()
         load_spy = mocker.spy(InMemoryStorageProvider, "load_with_metadata")
-        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        content = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
 
         await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
         await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
@@ -171,7 +171,7 @@ class TestStoredValueLoading:
 
     @pytest.mark.parametrize(
         "reference",
-        [StoredValueTestData.TEXT_REFERENCE],
+        [StoredValueCases.TEXT_REFERENCE],
     )
     async def test_a_copy_keeps_no_loaded_value_in_its_dump(self, reference: dict[str, Any]):
         content = TextContent.model_validate(reference)
@@ -186,7 +186,7 @@ class TestStoredValueLoading:
         """Bytes that are not a text are a URL pointed at the wrong file: `input.file_unreadable`, naming the input."""
         storage = InMemoryStorageProvider()
         storage.root[TEXT_KEY] = b"\xff\xfe\xfa not utf-8"
-        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        content = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
 
         with pytest.raises(UriTextNotUtf8Error) as exc_info:
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage, input_name="pages")
@@ -197,7 +197,7 @@ class TestStoredValueLoading:
     async def test_a_stored_json_that_is_not_an_object_is_the_caller_s_unreadable_input(self):
         storage = InMemoryStorageProvider()
         storage.root[JSON_KEY] = b"[1, 2, 3]"
-        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+        content = JSONContent.model_validate(StoredValueCases.JSON_REFERENCE)
 
         with pytest.raises(StoredValueUnreadableError) as exc_info:
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage, input_name="report")
@@ -210,7 +210,7 @@ class TestStoredValueLoading:
         mocker.patch("pipelex.tools.uri.uri_text.fetch_max_bytes", return_value=16)
         storage = _storage_holding_every_value()
         load_spy = mocker.spy(InMemoryStorageProvider, "load_with_metadata")
-        content = TextContent.model_validate(StoredValueTestData.TEXT_REFERENCE)
+        content = TextContent.model_validate(StoredValueCases.TEXT_REFERENCE)
 
         with pytest.raises(UriTextTooLargeError) as exc_info:
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage, input_name="pages")

@@ -21,7 +21,7 @@ from pipelex.pipe_operators.compose.exceptions import (
 )
 
 
-class ConstructFieldBlueprintTestData:
+class ConstructFieldBlueprintCases:
     """Test data for ConstructFieldBlueprint tests."""
 
     # Fixed value cases: (test_id, raw_input, expected_method, expected_value)
@@ -162,7 +162,7 @@ class TestConstructFieldBlueprint:
 
     @pytest.mark.parametrize(
         ("test_id", "raw_input", "expected_method", "expected_value"),
-        ConstructFieldBlueprintTestData.FIXED_VALUE_CASES,
+        ConstructFieldBlueprintCases.FIXED_VALUE_CASES,
     )
     def test_fixed_value_detection(
         self,
@@ -182,7 +182,7 @@ class TestConstructFieldBlueprint:
 
     @pytest.mark.parametrize(
         ("test_id", "raw_input", "expected_method", "expected_path"),
-        ConstructFieldBlueprintTestData.VAR_REF_CASES,
+        ConstructFieldBlueprintCases.VAR_REF_CASES,
     )
     def test_var_ref_detection(
         self,
@@ -202,7 +202,7 @@ class TestConstructFieldBlueprint:
 
     @pytest.mark.parametrize(
         ("test_id", "raw_input", "expected_method", "expected_template"),
-        ConstructFieldBlueprintTestData.TEMPLATE_CASES,
+        ConstructFieldBlueprintCases.TEMPLATE_CASES,
     )
     def test_template_detection(
         self,
@@ -222,7 +222,7 @@ class TestConstructFieldBlueprint:
 
     @pytest.mark.parametrize(
         ("test_id", "raw_input", "expected_method"),
-        ConstructFieldBlueprintTestData.NESTED_CASES,
+        ConstructFieldBlueprintCases.NESTED_CASES,
     )
     def test_nested_detection(
         self,
@@ -266,7 +266,7 @@ class TestConstructFieldBlueprint:
 
     def test_fixed_list_value_detection(self):
         """Test that list values are correctly detected as FIXED method."""
-        test_id, raw_input, expected_method, expected_value = ConstructFieldBlueprintTestData.FIXED_LIST
+        test_id, raw_input, expected_method, expected_value = ConstructFieldBlueprintCases.FIXED_LIST
         blueprint = ConstructFieldBlueprint.make_from_raw(raw_input)
 
         assert blueprint.method == expected_method, f"Failed for {test_id}"
@@ -277,7 +277,7 @@ class TestConstructFieldBlueprint:
 
     def test_from_with_list_to_dict_keyed_by(self):
         """Test variable reference with list_to_dict_keyed_by modifier."""
-        test_id, raw_input, expected_method, expected_path, expected_key_attr = ConstructFieldBlueprintTestData.VAR_REF_LIST_TO_DICT
+        test_id, raw_input, expected_method, expected_path, expected_key_attr = ConstructFieldBlueprintCases.VAR_REF_LIST_TO_DICT
         blueprint = ConstructFieldBlueprint.make_from_raw(raw_input)
 
         assert blueprint.method == expected_method, f"Failed for {test_id}"

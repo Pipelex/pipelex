@@ -15,7 +15,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.linkup.linkup_extract_worker import LinkupExtractWorker
 from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker
-from tests.unit.pipelex.providers.linkup.test_data import LinkupExtractErrorHandlingTestData, LinkupSearchErrorHandlingTestData
+from tests.unit.pipelex.providers.linkup.cases import LinkupExtractErrorHandlingCases, LinkupSearchErrorHandlingCases
 
 
 def _make_linkup_extract_worker(mocker: MockerFixture) -> LinkupExtractWorker:
@@ -96,7 +96,7 @@ class TestLinkupWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
-        LinkupExtractErrorHandlingTestData.EXTRACT_ERROR_CASES,
+        LinkupExtractErrorHandlingCases.EXTRACT_ERROR_CASES,
     )
     async def test_extract_error_categorization(
         self,
@@ -124,7 +124,7 @@ class TestLinkupWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "exception_class", "exception_message", "expected_category", "expected_user_action_kind"),
-        LinkupSearchErrorHandlingTestData.SEARCH_ERROR_CASES,
+        LinkupSearchErrorHandlingCases.SEARCH_ERROR_CASES,
     )
     async def test_search_error_categorization(
         self,

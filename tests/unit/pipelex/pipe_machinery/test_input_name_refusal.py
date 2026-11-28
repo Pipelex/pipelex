@@ -13,9 +13,9 @@ from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.unit.pipelex.pipe_machinery.test_data import InputNameRefusalTestData
+from tests.unit.pipelex.pipe_machinery.cases import InputNameRefusalCases
 
-_PIPE_TABLES = InputNameRefusalTestData.PIPE_TABLES
+_PIPE_TABLES = InputNameRefusalCases.PIPE_TABLES
 _SIGNATURE_ID = "PipeSignature"
 
 
@@ -23,7 +23,7 @@ def _bundle(*, pipe_table: str, added_input: str | None = None) -> str:
     """A bundle holding one pipe, `the_pipe`, with an input entry written first in its `inputs` when given."""
     if added_input is not None:
         pipe_table = pipe_table.replace("inputs = { ", f"inputs = {{ {added_input}, ", 1)
-    return InputNameRefusalTestData.BUNDLE_HEADER + pipe_table
+    return InputNameRefusalCases.BUNDLE_HEADER + pipe_table
 
 
 def _parse_errors(mthds_content: str) -> list[PipelexBundleBlueprintValidationErrorData]:
@@ -40,7 +40,7 @@ def _the_one_error(mthds_content: str) -> PipelexBundleBlueprintValidationErrorD
 
 def _pipe_table(table_id: str) -> str:
     if table_id == _SIGNATURE_ID:
-        return InputNameRefusalTestData.SIGNATURE_TABLE
+        return InputNameRefusalCases.SIGNATURE_TABLE
     return _PIPE_TABLES[PipeType(table_id)]
 
 
@@ -111,7 +111,7 @@ class TestInputNameRefusal:
 
     def test_a_dotted_batch_list_name_is_refused(self) -> None:
         """`input_list_name` is a plain input name, so a path into a field of a declared input is refused."""
-        batch_table = InputNameRefusalTestData.BATCH_OVER_A_FIELD_TABLE
+        batch_table = InputNameRefusalCases.BATCH_OVER_A_FIELD_TABLE
         error = _the_one_error(_bundle(pipe_table=batch_table))
 
         assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME

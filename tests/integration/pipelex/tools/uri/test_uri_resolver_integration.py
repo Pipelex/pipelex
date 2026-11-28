@@ -5,7 +5,7 @@ import pytest
 from pipelex.tools.uri.resolved_uri import ResolvedHttpUrl, ResolvedLocalPath, UriKind
 from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri, make_base64_url_from_http_url
 from pipelex.tools.uri.uri_resolver import resolve_uri
-from tests.cases import ImageTestCases, TestURLs
+from tests.cases import ImageTestCases, URLCases
 
 
 @pytest.mark.codex_disabled
@@ -13,7 +13,7 @@ from tests.cases import ImageTestCases, TestURLs
 class TestUriResolverIntegration:
     """Integration tests for URI resolution with real network calls."""
 
-    @pytest.mark.parametrize("url", TestURLs.PUBLIC_URLS)
+    @pytest.mark.parametrize("url", URLCases.PUBLIC_URLS)
     async def test_make_base64_url_from_http_url_async_real_network(self, url: str) -> None:
         """Test fetching and converting real HTTP URLs to base64 data URLs."""
         result = await make_base64_url_from_http_url(url=url)
@@ -28,7 +28,7 @@ class TestUriResolverIntegration:
         # Should have some content
         assert len(decoded) > 0
 
-    @pytest.mark.parametrize("url", TestURLs.PUBLIC_URLS)
+    @pytest.mark.parametrize("url", URLCases.PUBLIC_URLS)
     async def test_make_base64_url_from_uri_async_with_http_url(self, url: str) -> None:
         """Test full URI resolution workflow with HTTP URLs."""
         # First verify the URL resolves correctly
@@ -79,7 +79,7 @@ class TestUriResolverIntegration:
 
     async def test_gcp_public_url_returns_png(self) -> None:
         """Test that GCP public URL returns a valid PNG image."""
-        url = TestURLs.GCP_PUBLIC
+        url = URLCases.GCP_PUBLIC
 
         result = await make_base64_url_from_any_uri(url)
 
@@ -91,7 +91,7 @@ class TestUriResolverIntegration:
 
     async def test_aws_cloudfront_url_returns_jpeg(self) -> None:
         """Test that AWS CloudFront URL returns a valid JPEG image."""
-        url = TestURLs.AWS_CLOUDFRONT
+        url = URLCases.AWS_CLOUDFRONT
 
         result = await make_base64_url_from_any_uri(url)
 

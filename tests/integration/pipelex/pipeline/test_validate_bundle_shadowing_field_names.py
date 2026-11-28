@@ -12,7 +12,7 @@ from pipelex.interpreter_hub import clear_current_library, get_current_library_i
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.integration.pipelex.pipeline.test_data import ShadowingFieldNamesTestData
+from tests.integration.pipelex.pipeline.cases import ShadowingFieldNamesCases
 
 
 @contextmanager
@@ -45,17 +45,17 @@ class TestValidateBundleShadowingFieldNames:
     async def test_a_field_named_date_typed_date_validates_and_its_class_holds_a_date(self):
         """The bundle the hosted `/v1/validate` answered with an internal error validates, and its class holds a date."""
         with _validated_library():
-            result = await validate_bundle(mthds_contents=[ShadowingFieldNamesTestData.DATE_FIELD_MTHDS])
+            result = await validate_bundle(mthds_contents=[ShadowingFieldNamesCases.DATE_FIELD_MTHDS])
 
-            assert result.dry_run_result[f"{ShadowingFieldNamesTestData.DATE_FIELD_DOMAIN}.read_day"].status.is_success
-            day_class = _structure_class(ShadowingFieldNamesTestData.DATE_FIELD_CLASS_NAME)
+            assert result.dry_run_result[f"{ShadowingFieldNamesCases.DATE_FIELD_DOMAIN}.read_day"].status.is_success
+            day_class = _structure_class(ShadowingFieldNamesCases.DATE_FIELD_CLASS_NAME)
             instance = _assert_round_trips(structure_class=day_class, payload={"date": "2026-09-27"})
             assert instance.model_dump() == {"date": date(2026, 9, 27)}
 
     async def test_fields_shadowing_several_names_validate_and_their_class_holds_their_values(self):
         """Fields named like builtins, `Field`, `datetime` and a native content class validate together."""
         with _validated_library():
-            result = await validate_bundle(mthds_contents=[ShadowingFieldNamesTestData.SEVERAL_NAMES_MTHDS])
+            result = await validate_bundle(mthds_contents=[ShadowingFieldNamesCases.SEVERAL_NAMES_MTHDS])
 
             assert result.dry_run_result["shadowing_names.read_entry"].status.is_success
             entry_class = _structure_class("shadowing_names__Entry")
@@ -79,15 +79,15 @@ class TestValidateBundleShadowingFieldNames:
     async def test_a_field_named_like_a_class_its_structure_refers_to_is_a_verdict_naming_the_concept_and_the_field(self):
         """The one name no alias can stand for is refused as an invalid verdict, never as an internal error."""
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_contents=[ShadowingFieldNamesTestData.FORWARD_REF_FIELD_MTHDS])
+            await validate_bundle(mthds_contents=[ShadowingFieldNamesCases.FORWARD_REF_FIELD_MTHDS])
 
         problem = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert problem.code == "method.invalid"
         items = problem.errors or []
         assert len(items) == 1
         item = items[0]
-        concept = ShadowingFieldNamesTestData.FORWARD_REF_FIELD_CONCEPT
-        finding = ShadowingFieldNamesTestData.FORWARD_REF_FIELD_FINDING
+        concept = ShadowingFieldNamesCases.FORWARD_REF_FIELD_CONCEPT
+        finding = ShadowingFieldNamesCases.FORWARD_REF_FIELD_FINDING
         assert item.code == "method.concept_invalid"
         assert item.params is not None
         assert item.params.as_wire() == {"concept": concept, "finding": finding}

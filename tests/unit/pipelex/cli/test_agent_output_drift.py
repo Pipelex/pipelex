@@ -15,7 +15,7 @@ from pipelex.errors.problem import PipelexProblem
 from pipelex.hosted.error_rendering import PROBLEM_PARTS as READ_PROBLEM_PARTS
 from pipelex.hosted.error_rendering import hosted_failure_problem
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError
-from tests.unit.pipelex.cli.agent_cli.test_data import GatewayAnswers, OperatorViewAnswers, PipeIoItems, StoredRunReports, UndeclaredMembers
+from tests.unit.pipelex.cli.agent_cli.cases import GatewayAnswers, OperatorViewAnswers, PipeIoItems, StoredRunReports, UndeclaredMembers
 
 # The functions that report a problem and take the command's own members as keyword arguments.
 _PROBLEM_REPORTERS: frozenset[str] = frozenset({"agent_error", "agent_argument_error", "agent_file_error"})

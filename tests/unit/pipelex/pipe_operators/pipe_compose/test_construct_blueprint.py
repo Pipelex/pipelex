@@ -10,7 +10,7 @@ import pytest
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldMethod
 
 
-class ConstructBlueprintTestData:
+class ConstructBlueprintCases:
     """Test data for ConstructBlueprint tests."""
 
     # Simple flat construct (all fixed values)
@@ -76,7 +76,7 @@ class TestConstructBlueprintParsing:
 
     @pytest.mark.parametrize(
         ("test_id", "raw_construct"),
-        ConstructBlueprintTestData.ALL_CASES,
+        ConstructBlueprintCases.ALL_CASES,
     )
     def test_make_from_raw_succeeds(
         self,
@@ -91,7 +91,7 @@ class TestConstructBlueprintParsing:
 
     def test_flat_fixed_only_has_correct_fields(self):
         """Test flat construct with only fixed values has correct field blueprints."""
-        raw = ConstructBlueprintTestData.FLAT_FIXED_ONLY[1]
+        raw = ConstructBlueprintCases.FLAT_FIXED_ONLY[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         assert blueprint.fields["title"].method == ConstructFieldMethod.FIXED
@@ -105,7 +105,7 @@ class TestConstructBlueprintParsing:
 
     def test_flat_mixed_has_correct_field_methods(self):
         """Test flat construct with mixed methods has correct field types."""
-        raw = ConstructBlueprintTestData.FLAT_MIXED[1]
+        raw = ConstructBlueprintCases.FLAT_MIXED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         assert blueprint.fields["report_title"].method == ConstructFieldMethod.FIXED
@@ -115,7 +115,7 @@ class TestConstructBlueprintParsing:
 
     def test_with_nested_has_nested_blueprint(self):
         """Test construct with nested structure has nested blueprint."""
-        raw = ConstructBlueprintTestData.WITH_NESTED[1]
+        raw = ConstructBlueprintCases.WITH_NESTED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         assert blueprint.fields["invoice_number"].method == ConstructFieldMethod.TEMPLATE
@@ -133,7 +133,7 @@ class TestConstructBlueprintParsing:
 
     def test_deeply_nested_parses_correctly(self):
         """Test deeply nested construct parses all levels."""
-        raw = ConstructBlueprintTestData.DEEPLY_NESTED[1]
+        raw = ConstructBlueprintCases.DEEPLY_NESTED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         # Level 1
@@ -159,7 +159,7 @@ class TestConstructBlueprintFieldAccess:
 
     def test_get_required_variables_flat(self):
         """Test extraction of required variables from flat construct returns root names only."""
-        raw = ConstructBlueprintTestData.FLAT_MIXED[1]
+        raw = ConstructBlueprintCases.FLAT_MIXED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         required_vars = blueprint.get_required_variables()
@@ -172,7 +172,7 @@ class TestConstructBlueprintFieldAccess:
 
     def test_get_required_variables_nested(self):
         """Test extraction of required variables includes nested constructs with root names only."""
-        raw = ConstructBlueprintTestData.WITH_NESTED[1]
+        raw = ConstructBlueprintCases.WITH_NESTED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         required_vars = blueprint.get_required_variables()
@@ -188,7 +188,7 @@ class TestConstructBlueprintFieldAccess:
 
     def test_field_names_returns_all_top_level_fields(self):
         """Test that field_names returns all top-level field names."""
-        raw = ConstructBlueprintTestData.WITH_NESTED[1]
+        raw = ConstructBlueprintCases.WITH_NESTED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         field_names = blueprint.field_names

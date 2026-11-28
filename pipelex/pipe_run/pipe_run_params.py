@@ -180,11 +180,11 @@ class PipeRunParams(BaseModel):
     # "never written" indistinguishable from "authored unbounded" — and would point the omission
     # at the dangerous direction, launching every branch at once. An omission must fail loud.
     #
-    # Frozen and payload-borne rather than read live at fan-out time: the bound is PipeBatch's
-    # chunk size, and chunk size determines where a distributed backend's task boundaries fall
-    # between branch dispatches. Read from live worker config, a redeploy that changed the
-    # setting mid-run would make a replay emit a different command grouping than the recorded
-    # history. Carried in the payload, the fan-out shape is a pure function of the run.
+    # Frozen and payload-borne rather than read live at fan-out time: the bound is the width of
+    # PipeBatch's sliding window, and that width decides which branch dispatches a distributed
+    # backend issues at each of its task boundaries. Read from live worker config, a redeploy that
+    # changed the setting mid-run would make a replay start branches in a different order than the
+    # recorded history. Carried in the payload, the fan-out shape is a pure function of the run.
     batch_max_concurrency: int | None = Field(frozen=True)
 
     final_stuff_code: str | None = None

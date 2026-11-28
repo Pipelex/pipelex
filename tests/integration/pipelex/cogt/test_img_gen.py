@@ -7,9 +7,9 @@ from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.runtime_hub import get_img_gen_worker
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
+from tests.integration.pipelex.cases import ImageGenTestCases
 from tests.integration.pipelex.fixtures.img_gen_fixtures import skip_if_img_gen_params_unsupported
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
-from tests.integration.pipelex.test_data import ImageGenTestCases
 
 PRIMARY_ID = "id_1"
 SECONDARY_ID = "id_2"

@@ -907,7 +907,7 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, st
 ]
 
 
-class RenderedHtmlTestData:
+class RenderedHtmlCases:
     HTML_INNER_HTML = "<h1>Title</h1><p>Hi <strong>there</strong>.</p>"
     HTML_CSS_CLASS = 'report-content x" onclick="alert(1)'
     HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{HTML_INNER_HTML}</div>'
@@ -947,7 +947,7 @@ class RenderedHtmlTestData:
     ]
 
 
-class StuffViewerTestData:
+class StuffViewerCases:
     """Test data for render_stuff_viewer tests."""
 
     # Tab label test cases: (content_type, expected_label)
@@ -989,7 +989,7 @@ class StuffViewerTestData:
             stuff_code="txt01",
             stuff_name="test_text",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-            content=StuffViewerTestData.TEXT_CONTENT,
+            content=StuffViewerCases.TEXT_CONTENT,
         )
 
     @staticmethod
@@ -1004,7 +1004,7 @@ class StuffViewerTestData:
                 description="HTML content",
                 structure_class_name="HtmlContent",
             ),
-            content=StuffViewerTestData.HTML_CONTENT,
+            content=StuffViewerCases.HTML_CONTENT,
         )
 
     @staticmethod
@@ -1014,7 +1014,7 @@ class StuffViewerTestData:
             stuff_code="img01",
             stuff_name="test_image",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
-            content=StuffViewerTestData.IMAGE_CONTENT,
+            content=StuffViewerCases.IMAGE_CONTENT,
         )
 
     @staticmethod
@@ -1024,7 +1024,7 @@ class StuffViewerTestData:
             stuff_code="pdf01",
             stuff_name="test_pdf",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
-            content=StuffViewerTestData.PDF_CONTENT,
+            content=StuffViewerCases.PDF_CONTENT,
         )
 
     @staticmethod
@@ -1039,7 +1039,7 @@ class StuffViewerTestData:
                 description="Mermaid diagram content",
                 structure_class_name="MermaidContent",
             ),
-            content=StuffViewerTestData.MERMAID_CONTENT,
+            content=StuffViewerCases.MERMAID_CONTENT,
         )
 
     @staticmethod
@@ -1049,5 +1049,5 @@ class StuffViewerTestData:
             stuff_code="spc01",
             stuff_name="test_special",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-            content=StuffViewerTestData.SPECIAL_CHARS_CONTENT,
+            content=StuffViewerCases.SPECIAL_CHARS_CONTENT,
         )

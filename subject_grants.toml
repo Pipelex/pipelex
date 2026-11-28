@@ -5800,10 +5800,6 @@ rationale = "Transforms the node_id; single operand."
 param = "func"
 rationale = "Verb-object: runs the given callable in one of the pool's threads, forwarding its own arguments as asyncio.to_thread does; positional-only, so no keyword of the callable is shadowed."
 
-["pipelex/tools/misc/async_utils.py::_invoke"]
-param = "factory"
-rationale = "Operates on the factory; single operand (qualifiers keyword-only)."
-
 ["pipelex/tools/misc/async_utils.py::gather_bounded"]
 param = "task_factories"
 rationale = "Operates on the task_factories; single operand (qualifiers keyword-only)."

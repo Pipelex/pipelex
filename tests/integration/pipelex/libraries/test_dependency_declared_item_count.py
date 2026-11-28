@@ -8,16 +8,16 @@ from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import DeclaredItemCountLimitError
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
+from tests.integration.pipelex.libraries.cases import ProbePackageCases
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, vendor_probe
-from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 # The probe package exporting a pipe that produces five texts, beside its unreachable `orphan` declaring far more, which
 # no load builds.
-_DECLARING_MANIFEST = ProbePackageTestData.MANIFEST_EXPORTING_EVERYTHING.replace(
+_DECLARING_MANIFEST = ProbePackageCases.MANIFEST_EXPORTING_EVERYTHING.replace(
     'pipes = ["entry", "helper"]', 'pipes = ["entry", "helper", "make_five"]'
 )
 _DECLARING_BUNDLE = (
-    ProbePackageTestData.DEP_BUNDLE.replace('output      = "Text"\nmodel', 'output      = "Text[900]"\nmodel')
+    ProbePackageCases.DEP_BUNDLE.replace('output      = "Text"\nmodel', 'output      = "Text[900]"\nmodel')
     + """
 [pipe.make_five]
 type        = "PipeLLM"
@@ -36,7 +36,7 @@ def _load_consumer_with_the_package(*, tmp_path: Path, mocker: MockerFixture) ->
     library_manager = get_library_manager()
     library_id, _library = library_manager.open_library()
     try:
-        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageCases.CONSUMER_BUNDLE)
         library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint], methods_dirs=[methods_dir])
     finally:
         library_manager.teardown(library_id=library_id)

@@ -1,7 +1,8 @@
 """`batch_max_concurrency`: required, resolved from config once at run-params construction, then frozen.
 
-The bound is PipeBatch's fan-out chunk size. Read live at fan-out time it would let a config
-redeploy reshape an in-flight run's dispatch grouping; carried in the payload it cannot. These
+The bound is the width of PipeBatch's sliding window. Read live at fan-out time it would let a
+config redeploy change the order in which an in-flight run starts its branches; carried in the
+payload it cannot. These
 tests pin the resolution table, the write-once discipline, and the no-default rule. (The field is
 `frozen=True`, so a post-construction write is a *type* error — no runtime test needed for what the
 checkers block.)

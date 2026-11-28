@@ -12,7 +12,7 @@ import random
 import pytest
 
 from pipelex.tools.misc.python_literals import class_docstring, normalized_docstring_text
-from tests.unit.pipelex.tools.misc.test_data import PythonLiteralsTestData
+from tests.unit.pipelex.tools.misc.cases import PythonLiteralsCases
 
 
 def _class_source(description: str) -> str:
@@ -125,7 +125,7 @@ class TestClassDocstring:
         assert "\\" not in rendered
         assert _rendered_docstring(description) == description
 
-    @pytest.mark.parametrize("character", PythonLiteralsTestData.SPLITLINES_ONLY_BREAKS)
+    @pytest.mark.parametrize("character", PythonLiteralsCases.SPLITLINES_ONLY_BREAKS)
     def test_characters_other_than_newline_read_back_unchanged(self, character: str):
         description = f"before{character}after\nsecond line{character}"
 
@@ -134,5 +134,5 @@ class TestClassDocstring:
     def test_randomized_descriptions_render_as_a_lone_docstring_that_reads_back(self):
         generator = random.Random(20261116)
         for _ in range(3000):
-            description = "".join(generator.choice(PythonLiteralsTestData.RANDOM_ALPHABET) for _ in range(generator.randint(0, 24)))
+            description = "".join(generator.choice(PythonLiteralsCases.RANDOM_ALPHABET) for _ in range(generator.randint(0, 24)))
             assert _rendered_docstring(description) == normalized_docstring_text(description), repr(description)

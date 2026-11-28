@@ -40,7 +40,7 @@ class _PermissiveValue:
         return "value"
 
 
-class TestData:
+class RequiredVariablesCases:
     """Test data for detect_jinja2_required_variables tests.
 
     Note: The function returns ONLY the leaf (full) paths, not intermediate paths.
@@ -441,7 +441,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.SIMPLE_VARIABLES,
+        RequiredVariablesCases.SIMPLE_VARIABLES,
     )
     def test_simple_variables(
         self,
@@ -458,7 +458,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.MULTIPLE_VARIABLES,
+        RequiredVariablesCases.MULTIPLE_VARIABLES,
     )
     def test_multiple_variables(
         self,
@@ -475,7 +475,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.NESTED_VARIABLES,
+        RequiredVariablesCases.NESTED_VARIABLES,
     )
     def test_nested_variables(
         self,
@@ -492,7 +492,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.VARIABLES_WITH_FILTERS,
+        RequiredVariablesCases.VARIABLES_WITH_FILTERS,
     )
     def test_variables_with_filters(
         self,
@@ -509,7 +509,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.CONTROL_STRUCTURES,
+        RequiredVariablesCases.CONTROL_STRUCTURES,
     )
     def test_control_structures(
         self,
@@ -526,7 +526,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.COMPLEX_REAL_WORLD,
+        RequiredVariablesCases.COMPLEX_REAL_WORLD,
     )
     def test_complex_real_world_templates(
         self,
@@ -543,7 +543,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.OPTIONAL_VARIABLES,
+        RequiredVariablesCases.OPTIONAL_VARIABLES,
     )
     def test_optional_variables(
         self,
@@ -560,7 +560,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_paths"),
-        TestData.MTHDS_STYLE_TEMPLATES,
+        RequiredVariablesCases.MTHDS_STYLE_TEMPLATES,
     )
     def test_mthds_style_templates(
         self,
@@ -575,7 +575,7 @@ class TestDetectJinja2Variables:
         )
         assert result == expected_paths, f"Failed for topic: {topic}"
 
-    @pytest.mark.parametrize("template_category", TestData.TEMPLATE_CATEGORIES)
+    @pytest.mark.parametrize("template_category", RequiredVariablesCases.TEMPLATE_CATEGORIES)
     def test_different_template_categories(
         self,
         template_category: TemplateCategory,
@@ -608,7 +608,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source"),
-        TestData.SYNTAX_ERRORS,
+        RequiredVariablesCases.SYNTAX_ERRORS,
     )
     def test_syntax_errors_raise_exception(
         self,
@@ -773,7 +773,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.CHAINED_ACCESS,
+        RequiredVariablesCases.CHAINED_ACCESS,
     )
     def test_chained_access(
         self,
@@ -790,7 +790,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.ASSIGNMENT_ORDER,
+        RequiredVariablesCases.ASSIGNMENT_ORDER,
     )
     def test_assignment_order(
         self,
@@ -807,7 +807,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.JINJA_SCOPE_RULES,
+        RequiredVariablesCases.JINJA_SCOPE_RULES,
     )
     def test_jinja_scope_rules(
         self,
@@ -824,7 +824,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.JINJA_SCOPE_RULES,
+        RequiredVariablesCases.JINJA_SCOPE_RULES,
     )
     @pytest.mark.parametrize("is_truthy", [True, False])
     def test_jinja_reads_nothing_beyond_the_required_variables(
@@ -852,7 +852,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.SCOPES,
+        RequiredVariablesCases.SCOPES,
     )
     def test_scopes(
         self,
@@ -869,7 +869,7 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_variables"),
-        TestData.GLOBAL_NAMES_AS_INPUTS,
+        RequiredVariablesCases.GLOBAL_NAMES_AS_INPUTS,
     )
     def test_global_names_as_inputs(
         self,
@@ -1030,7 +1030,7 @@ class TestDetectJinja2VariableReferences:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_paths"),
-        TestData.REFERENCE_SCOPES + TestData.JINJA_SCOPE_RULES,
+        RequiredVariablesCases.REFERENCE_SCOPES + RequiredVariablesCases.JINJA_SCOPE_RULES,
     )
     def test_scopes_match_required_variables(
         self,

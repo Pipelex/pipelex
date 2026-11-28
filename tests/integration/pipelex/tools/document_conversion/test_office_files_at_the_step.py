@@ -14,7 +14,7 @@ from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.document_conversion.document_converter_protocol import DocumentConverterProtocol
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin, ReadablePdf
-from tests.integration.pipelex.tools.document_conversion.test_data import DocumentConversionTestData, OfficeFileCase
+from tests.integration.pipelex.tools.document_conversion.cases import DocumentConversionCases, OfficeFileCase
 
 _OFFICE_FILES_MTHDS = """
 domain = "office_files_at_the_step"
@@ -46,14 +46,14 @@ _STORAGE_SCOPE = "test/office-files-at-the-step"
 
 def _data_url(*, office_file: OfficeFileCase) -> str:
     """The file inline, with no type declared: run setup sniffs its format, as it does a caller's upload."""
-    raw_bytes = (Path(DocumentConversionTestData.DOCUMENTS_DIR) / office_file.file_name).read_bytes()
+    raw_bytes = (Path(DocumentConversionCases.DOCUMENTS_DIR) / office_file.file_name).read_bytes()
     return f"data:application/octet-stream;base64,{base64.b64encode(raw_bytes).decode('ascii')}"
 
 
 @pytest.mark.document_conversion
 @pytest.mark.asyncio(loop_scope="class")
 class TestOfficeFilesAtTheStep:
-    @pytest.mark.parametrize("office_file", DocumentConversionTestData.OFFICE_FILES, ids=lambda case: case.file_name)
+    @pytest.mark.parametrize("office_file", DocumentConversionCases.OFFICE_FILES, ids=lambda case: case.file_name)
     async def test_an_extraction_with_page_views_reads_the_office_file_as_its_pdf(
         self, mocker: MockerFixture, runtime_document_converter: DocumentConverterProtocol, office_file: OfficeFileCase
     ) -> None:
@@ -62,7 +62,7 @@ class TestOfficeFilesAtTheStep:
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
         # The file uploaded once, under a key of its own, so that no earlier session's PDF stands beside it.
         source_key = f"{_STORAGE_SCOPE}/assets/{uuid.uuid4().hex}/{office_file.file_name}"
-        source_bytes = (Path(DocumentConversionTestData.DOCUMENTS_DIR) / office_file.file_name).read_bytes()
+        source_bytes = (Path(DocumentConversionCases.DOCUMENTS_DIR) / office_file.file_name).read_bytes()
         await get_storage_provider().store(data=source_bytes, key=source_key)
 
         readable_pdfs: list[ReadablePdf] = []
@@ -109,7 +109,7 @@ class TestOfficeFilesAtTheStep:
             pytest.skip("a dry run converts nothing")
         read_document_as_pdf = mocker.spy(document_conversion_ops, "read_document_as_pdf")
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
-        cv = next(office_file for office_file in DocumentConversionTestData.OFFICE_FILES if office_file.format_key == "docx")
+        cv = next(office_file for office_file in DocumentConversionCases.OFFICE_FILES if office_file.format_key == "docx")
 
         pipe_job, _pipeline_run_id, _ = await pipeline_run_setup(
             storage_scope="test/office-files-at-the-step",

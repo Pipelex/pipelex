@@ -12,7 +12,7 @@ from pipelex.cogt.usage.cost_registry import CostRegistry, ModelUsageKey
 from pipelex.graph.graphspec import ModelUsageSpec
 from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
 from pipelex.tracing.usage_attribution import make_self_contained_spec
-from tests.unit.pipelex.cogt.usage.test_data import RATED_NB_TOKENS, RATED_UNIT_COSTS, UsageFixtures
+from tests.unit.pipelex.cogt.usage.cases import RATED_NB_TOKENS, RATED_UNIT_COSTS, UsageFixtures
 
 TWIN_HANDLE = "gpt-6-luna"
 

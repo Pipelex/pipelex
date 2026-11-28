@@ -19,7 +19,7 @@ from pipelex.system.error_tracking.error_tracking import installed_error_tracker
 from pipelex.system.error_tracking.error_tracking_config import ErrorTrackerMethod
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.test_extras.recording_error_tracker import RecordingErrorTracker
-from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureCases
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -97,9 +97,7 @@ class TestErrorTrackerExternalPlugin:
         assert installed_error_trackers() == (tracker,)
 
         with pytest.raises(PipelineExecutionError) as exc_info:
-            await PipelexMTHDSProtocol().execute(
-                pipe_code="two_steps", mthds_contents=[LocatedRunFailureTestData.MODEL_MTHDS], inputs={"topic": "cats"}
-            )
+            await PipelexMTHDSProtocol().execute(pipe_code="two_steps", mthds_contents=[LocatedRunFailureCases.MODEL_MTHDS], inputs={"topic": "cats"})
         assert exc_info.value.to_problem(view=ProblemView.OPERATOR).code == CoreCode.MODEL_UNKNOWN
         assert tracker.reports == []
 

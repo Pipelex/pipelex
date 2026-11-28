@@ -8,7 +8,7 @@ from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
-from tests.integration.pipelex.cogt.test_data import SearchTestCases
+from tests.integration.pipelex.cogt.cases import SearchTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

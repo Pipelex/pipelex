@@ -16,7 +16,7 @@ from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_image_inputs impor
     ImageListAnalysisE2E,
     PageDescriptionE2E,
 )
-from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
+from tests.integration.pipelex.cogt.cases import LLMVisionTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators"]
 

@@ -13,7 +13,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.fal.fal_img_gen_worker import FalImgGenWorker
-from tests.unit.pipelex.providers.fal.test_data import FalErrorHandlingTestData
+from tests.unit.pipelex.providers.fal.cases import FalErrorHandlingCases
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -78,7 +78,7 @@ class TestFalWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "status_code", "message", "expected_category", "expected_user_action_kind"),
-        FalErrorHandlingTestData.HTTP_ERROR_CASES,
+        FalErrorHandlingCases.HTTP_ERROR_CASES,
     )
     async def test_http_error_categorization(
         self,
@@ -110,7 +110,7 @@ class TestFalWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "expected_category", "expected_user_action_kind"),
-        FalErrorHandlingTestData.MISSING_CREDENTIALS_CASES,
+        FalErrorHandlingCases.MISSING_CREDENTIALS_CASES,
     )
     async def test_missing_credentials_is_configuration(
         self,
@@ -140,7 +140,7 @@ class TestFalWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "expected_category", "expected_user_action_kind"),
-        FalErrorHandlingTestData.TIMEOUT_CASES,
+        FalErrorHandlingCases.TIMEOUT_CASES,
     )
     async def test_timeout_error_is_an_unknown_outcome(
         self,
@@ -170,7 +170,7 @@ class TestFalWorkerErrorHandling:
 
     @pytest.mark.parametrize(
         ("_topic", "expected_category", "expected_user_action_kind"),
-        FalErrorHandlingTestData.GENERIC_CLIENT_ERROR_CASES,
+        FalErrorHandlingCases.GENERIC_CLIENT_ERROR_CASES,
     )
     async def test_generic_client_error_is_an_unknown_outcome(
         self,

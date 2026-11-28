@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from pipelex.cli.commands.run._run_core import _execute_run  # pyright: ignore[reportPrivateUsage]
-from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
+from tests.integration.pipelex.pipeline.cases import LocatedRunFailureCases
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,7 +28,7 @@ class TestRunLocatedFailurePanel:
         mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=console)
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=console)
         bundle_path = tmp_path / "located_failure_model.mthds"
-        bundle_path.write_text(LocatedRunFailureTestData.MODEL_MTHDS, encoding="utf-8")
+        bundle_path.write_text(LocatedRunFailureCases.MODEL_MTHDS, encoding="utf-8")
 
         with pytest.raises(typer.Exit) as exit_info:
             await _execute_run(
@@ -52,12 +52,12 @@ class TestRunLocatedFailurePanel:
         panel = console.export_text()
         assert "Pipe run failed because a model wasn't available" in panel
         assert "Pipe:       'summarize' (PipeLLM)" in panel
-        assert f"Model:      '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}'" in panel
+        assert f"Model:      '{LocatedRunFailureCases.UNSERVED_MODEL_HANDLE}'" in panel
         assert "Pipe Stack: two_steps → summarize" in panel
-        assert f"Error: Model handle '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' was not found in the model deck." in panel
+        assert f"Error: Model handle '{LocatedRunFailureCases.UNSERVED_MODEL_HANDLE}' was not found in the model deck." in panel
         # The step names a model no entry of the deck names: the tip gives the caller's next step first,
         # then the local-deck remedy, which lives in the panel's tip and nowhere in the error's own message.
-        assert f"💡 Tip: Change the model '{LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE}' to an LLM the model deck serves." in panel
+        assert f"💡 Tip: Change the model '{LocatedRunFailureCases.UNSERVED_MODEL_HANDLE}' to an LLM the model deck serves." in panel
         assert "Your local model deck may be out of date" in panel
         assert "run 'pipelex init inference'" in panel
         # The one-line fallback naming the entry pipe is not printed.

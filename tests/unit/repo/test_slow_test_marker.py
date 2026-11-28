@@ -5,7 +5,7 @@ import pytest
 from pytest_mock import MockerFixture, MockType
 
 from tests.helpers.slow_tests import DURATIONS_FILE_NAME, SLOW_MARKER_NAME, SLOW_TEST_SECONDS_OPTION, apply_slow_marker, mark_slow_tests
-from tests.unit.repo.test_data import SlowTestMarkerTestData
+from tests.unit.repo.cases import SlowTestMarkerCases
 
 
 def _make_item(*, mocker: MockerFixture, node_id: str) -> MockType:
@@ -29,10 +29,10 @@ class TestSlowTestMarker:
     @pytest.mark.parametrize(
         ("node_id", "expected_markers"),
         [
-            (SlowTestMarkerTestData.ABOVE_NODE_ID, [SLOW_MARKER_NAME]),
-            (SlowTestMarkerTestData.AT_NODE_ID, [SLOW_MARKER_NAME]),
-            (SlowTestMarkerTestData.BELOW_NODE_ID, []),
-            (SlowTestMarkerTestData.MISSING_NODE_ID, []),
+            (SlowTestMarkerCases.ABOVE_NODE_ID, [SLOW_MARKER_NAME]),
+            (SlowTestMarkerCases.AT_NODE_ID, [SLOW_MARKER_NAME]),
+            (SlowTestMarkerCases.BELOW_NODE_ID, []),
+            (SlowTestMarkerCases.MISSING_NODE_ID, []),
         ],
     )
     def test_marks_only_tests_recorded_at_or_above_the_threshold(self, mocker: MockerFixture, node_id: str, expected_markers: list[str]) -> None:
@@ -40,38 +40,38 @@ class TestSlowTestMarker:
         item = _make_item(mocker=mocker, node_id=node_id)
         marked_count = mark_slow_tests(
             items=[item],
-            durations=SlowTestMarkerTestData.DURATIONS,
-            threshold_seconds=SlowTestMarkerTestData.THRESHOLD_SECONDS,
+            durations=SlowTestMarkerCases.DURATIONS,
+            threshold_seconds=SlowTestMarkerCases.THRESHOLD_SECONDS,
         )
         assert _added_marker_names(item) == expected_markers
         assert marked_count == len(expected_markers)
 
     def test_reads_the_committed_map_at_the_root_and_marks_through_the_option(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """The hook body reads `.test_durations` under the root directory and marks every slow item in one pass."""
-        (tmp_path / DURATIONS_FILE_NAME).write_text(json.dumps(SlowTestMarkerTestData.DURATIONS), encoding="utf-8")
-        config = _make_config(mocker=mocker, threshold_seconds=SlowTestMarkerTestData.THRESHOLD_SECONDS, root=tmp_path)
+        (tmp_path / DURATIONS_FILE_NAME).write_text(json.dumps(SlowTestMarkerCases.DURATIONS), encoding="utf-8")
+        config = _make_config(mocker=mocker, threshold_seconds=SlowTestMarkerCases.THRESHOLD_SECONDS, root=tmp_path)
         items = {
             node_id: _make_item(mocker=mocker, node_id=node_id)
             for node_id in (
-                SlowTestMarkerTestData.ABOVE_NODE_ID,
-                SlowTestMarkerTestData.AT_NODE_ID,
-                SlowTestMarkerTestData.BELOW_NODE_ID,
-                SlowTestMarkerTestData.MISSING_NODE_ID,
+                SlowTestMarkerCases.ABOVE_NODE_ID,
+                SlowTestMarkerCases.AT_NODE_ID,
+                SlowTestMarkerCases.BELOW_NODE_ID,
+                SlowTestMarkerCases.MISSING_NODE_ID,
             )
         }
         marked_count = apply_slow_marker(config=config, items=list(items.values()))
         config.getoption.assert_called_once_with(SLOW_TEST_SECONDS_OPTION)
         assert marked_count == 2
-        assert _added_marker_names(items[SlowTestMarkerTestData.ABOVE_NODE_ID]) == [SLOW_MARKER_NAME]
-        assert _added_marker_names(items[SlowTestMarkerTestData.AT_NODE_ID]) == [SLOW_MARKER_NAME]
-        assert _added_marker_names(items[SlowTestMarkerTestData.BELOW_NODE_ID]) == []
-        assert _added_marker_names(items[SlowTestMarkerTestData.MISSING_NODE_ID]) == []
+        assert _added_marker_names(items[SlowTestMarkerCases.ABOVE_NODE_ID]) == [SLOW_MARKER_NAME]
+        assert _added_marker_names(items[SlowTestMarkerCases.AT_NODE_ID]) == [SLOW_MARKER_NAME]
+        assert _added_marker_names(items[SlowTestMarkerCases.BELOW_NODE_ID]) == []
+        assert _added_marker_names(items[SlowTestMarkerCases.MISSING_NODE_ID]) == []
 
     def test_no_threshold_marks_nothing(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Without `--slow-test-seconds` nothing is marked, and the map is not even read."""
         load_spy = mocker.patch("tests.helpers.slow_tests.load_duration_map")
         config = _make_config(mocker=mocker, threshold_seconds=None, root=tmp_path)
-        item = _make_item(mocker=mocker, node_id=SlowTestMarkerTestData.ABOVE_NODE_ID)
+        item = _make_item(mocker=mocker, node_id=SlowTestMarkerCases.ABOVE_NODE_ID)
         assert apply_slow_marker(config=config, items=[item]) == 0
         assert _added_marker_names(item) == []
         load_spy.assert_not_called()

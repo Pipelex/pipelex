@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex.core.stuffs.number_content import NumberContent
-from tests.unit.pipelex.core.stuffs.number_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.number_content.cases import NumberContentCases
 
 
 class TestNumberContentSmartDump:
@@ -11,16 +11,16 @@ class TestNumberContentSmartDump:
 
     def test_smart_dump_returns_dict_for_int(self):
         """Verify smart_dump returns a dict for integer values."""
-        content = NumberContent(number=TestData.SAMPLE_INT)
+        content = NumberContent(number=NumberContentCases.SAMPLE_INT)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP_INT
+        assert result == NumberContentCases.EXPECTED_SMART_DUMP_INT
         assert isinstance(result, dict)
 
     def test_smart_dump_returns_dict_for_float(self):
         """Verify smart_dump returns a dict for float values."""
-        content = NumberContent(number=TestData.SAMPLE_FLOAT)
+        content = NumberContent(number=NumberContentCases.SAMPLE_FLOAT)
         result = content.smart_dump()
-        assert result == TestData.EXPECTED_SMART_DUMP_FLOAT
+        assert result == NumberContentCases.EXPECTED_SMART_DUMP_FLOAT
         assert isinstance(result, dict)
 
     @pytest.mark.parametrize(

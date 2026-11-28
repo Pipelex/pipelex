@@ -2,9 +2,26 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A `PipeBatch` runs its branches through a sliding window**: at most `max_concurrency` branches still run at once, but the next one starts as soon as any running branch ends, where the batch used to wait for a whole group of `max_concurrency` branches to end before starting the next group, so one slow item no longer leaves the other places idle. When a branch fails, no further branch starts, the running ones finish, and the batch fails with the error of the failed branch that comes first in the list. Each finished branch now keeps only its result, so a batch no longer holds every branch's working memory until it aggregates. `gather_bounded` in `pipelex.tools.misc.async_utils` runs every caller this way, the stored-value reads and writes included.
+
 ### Fixed
 
 - **Data URL inputs**: a data URL's declared media type is stored as its bare type, its header read up to its first comma, and a `data:` input that is not a base64 data URL, or a file input whose declared type is not one media type, is refused as `input.file_unreadable` naming the input, with `location.field` at its `url` or its `mime_type`. The `data:` scheme is recognised in any case wherever an input is read, and a fetched image whose `Content-Type` is not one media type is stored under the type known otherwise.
+
+## [v0.120.0] - 2026-11-27
+
+### Added
+
+- **A router gives the advice on a large `PipeBatch`, `PipeRouterProtocol.advise_on_batch`**: a live `PipeBatch` hands its router its width and the run's concurrency bound once, before any branch starts, and the default body logs the large-batch warning advising a durable execution backend past 100 items, as `PipeBatch` did itself, and in a live run only, where `PipeBatch` also logged it in a dry run; a durable router overrides it, so that a run it already executes durably is not told to use durable execution. The advisory and its threshold moved from `pipelex.pipe_controllers.batch.pipe_batch` to `pipelex.pipe_run.large_batch_advisory`.
+
+## [v0.119.0] - 2026-11-26
+
+### Changed
+
+- **The pytest agent rule puts test data in `cases.py`**: the kit's pytest standards told agents to keep test data in `test_data.py`, a name pytest collects as a test module, inside classes such as `TestData`, which it collects as test classes. The rule now names `cases.py` and data classes ending in `Cases`, and no data module or data class in this repository's tests carries a `test_` or `Test` prefix any more.
+- **The parity fixtures in `pipelex.test_extras.problem_parity` end in `Cases` (Breaking)**: `ProblemParityTestData`, `SearchProblemParityTestData` and `JudgeProblemParityTestData` are now `ProblemParityCases`, `SearchProblemParityCases` and `JudgeProblemParityCases`, so a distributed executor's tests import them under the new names.
 
 ## [v0.118.0] - 2026-11-25
 

@@ -26,7 +26,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
-from tests.integration.pipelex.cogt.test_data import JudgmentPromptShapeCase, JudgmentPromptShapeCases
+from tests.integration.pipelex.cogt.cases import JudgmentPromptShapeCase, JudgmentPromptShapeCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

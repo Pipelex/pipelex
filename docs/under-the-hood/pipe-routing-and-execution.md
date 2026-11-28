@@ -167,6 +167,18 @@ def check_batch_fits(self, *, pipe_code: str, input_list_label: str, item_count:
 
 In-process routers keep the default: every batch fits. A durable router may estimate what the whole batch would write into its run's history and refuse by raising `PipeBatchTooWideError` (`pipelex/pipe_controllers/exceptions.py`), which fails the `PipeBatch` located at it, with no fan-out recorded and no branch started. The error takes the batch's figures as keyword arguments (the pipe code, the list's label, the item count, the estimated bytes and events, the bytes and events left, the largest item count that fits, and, for a batch stopped during its fan-out rather than refused before it, the number of items started) and builds its message from them, so the wording is Pipelex's whichever backend raises it. Its problem is `input.too_large`, whose `input` is the list's label, `size` the item count and `limit` the largest count that fits. When that count is zero, no shorter list would run: the problem withholds `limit`, so the code's sentence for a withheld limit applies, and the message and the advice ask for smaller items.
 
+### The batch-advisory hook
+
+A batch over a large list runs very differently on an in-process router and on a durable one, and only the router knows which it is. So `PipeRouterProtocol` carries a third batch entry point, synchronous, which gives the run the router's advice on a batch's width:
+
+```python
+def advise_on_batch(self, *, pipe_code: str, item_count: int, max_concurrency: int | None) -> None: ...
+```
+
+`PipeBatch` calls it once per live batch, after the batch fits and has recorded its fan-out, before any branch starts; a dry run, which runs through the same method, never calls it. `max_concurrency` is the run's frozen bound (`PipeRunParams.batch_max_concurrency`), `None` when the configuration's `"unbounded"` set none.
+
+The default body is the behavior for in-process routers, whose bounded fan-out is backpressure rather than durable execution: past `LARGE_BATCH_ADVISORY_THRESHOLD` items (`pipelex/pipe_run/large_batch_advisory.py`) it logs the warning "A PipeBatch fans out over a large list without durable execution", with a `user_action` pointing at a durable execution backend. A durable router overrides it, since its run is durable already and the advice would be false, and it may log there what is true of a wide batch on its backend instead; a batch too wide for its run's history it refuses earlier, through `check_batch_fits`.
+
 ---
 
 ## Pipe Controllers
@@ -176,7 +188,7 @@ Controllers are pipes that orchestrate the execution of other pipes. They resolv
 | Controller | Behavior |
 |------------|----------|
 | **PipeSequence** | Executes `sequential_sub_pipes` one after another. Each step receives working memory with outputs from previous steps. |
-| **PipeBatch** | Iterates over a `ListContent` input. For each item, loads `branch_pipe` and executes it on a working memory of its own, holding a deep copy of its item and of what `branch_pipe` reads (`WorkingMemory.make_deep_copy_of`, over the names `names_read_by_branch` works out once per batch), never a copy of the whole memory and its list. Items run concurrently via asyncio, in chunks of `batch_max_concurrency`. |
+| **PipeBatch** | Iterates over a `ListContent` input. For each item, loads `branch_pipe` and executes it on a working memory of its own, holding a deep copy of its item and of what `branch_pipe` reads (`WorkingMemory.make_deep_copy_of`, over the names `names_read_by_branch` works out once per batch), never a copy of the whole memory and its list. Items run concurrently via asyncio, through a sliding window of `batch_max_concurrency` (`gather_bounded`): a branch starts as soon as a running one ends. Each branch keeps only its resolved main stuff or its recorded absence, never the working memory it ran in. |
 | **PipeCondition** | Evaluates a Jinja2 `expression` against working memory, after loading through the content generator's `load_stored_texts` leaf any stored text the expression reads, maps the result via `outcome_map` to a pipe code, and executes that pipe. |
 | **PipeParallel** | Loads multiple child pipes and executes them concurrently, each with its own working memory copy. |
 

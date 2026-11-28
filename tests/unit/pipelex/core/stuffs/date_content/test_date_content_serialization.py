@@ -4,7 +4,7 @@ from kajson import kajson
 
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.runtime_hub import get_class_registry
-from tests.unit.pipelex.core.stuffs.date_content.test_data import TestData
+from tests.unit.pipelex.core.stuffs.date_content.cases import DateContentCases
 
 
 class TestDateContentSerialization:
@@ -27,19 +27,19 @@ class TestDateContentSerialization:
         assert registry.get_class(name="DateContent") is DateContent
 
     def test_round_trip_date_only(self):
-        restored = self._round_trip(DateContent(date=TestData.SAMPLE_DATE))
-        assert restored.date == TestData.SAMPLE_DATE
+        restored = self._round_trip(DateContent(date=DateContentCases.SAMPLE_DATE))
+        assert restored.date == DateContentCases.SAMPLE_DATE
         assert isinstance(restored.date, datetime.date)
         assert restored.time is None
 
     def test_round_trip_naive_time(self):
-        restored = self._round_trip(DateContent(date=TestData.SAMPLE_DATE, time=TestData.SAMPLE_TIME_NAIVE))
-        assert restored.time == TestData.SAMPLE_TIME_NAIVE
+        restored = self._round_trip(DateContent(date=DateContentCases.SAMPLE_DATE, time=DateContentCases.SAMPLE_TIME_NAIVE))
+        assert restored.time == DateContentCases.SAMPLE_TIME_NAIVE
         assert isinstance(restored.time, datetime.time)
         assert restored.time.tzinfo is None
 
     def test_round_trip_offset_time_preserves_offset(self):
-        restored = self._round_trip(DateContent(date=TestData.SAMPLE_DATE, time=TestData.SAMPLE_TIME_OFFSET))
+        restored = self._round_trip(DateContent(date=DateContentCases.SAMPLE_DATE, time=DateContentCases.SAMPLE_TIME_OFFSET))
         assert restored.time is not None
         assert restored.time.utcoffset() == datetime.timedelta(hours=2)
-        assert restored.time == TestData.SAMPLE_TIME_OFFSET
+        assert restored.time == DateContentCases.SAMPLE_TIME_OFFSET

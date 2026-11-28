@@ -13,6 +13,7 @@ from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX, RenderedDocu
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.cases import PipeDocGenCases
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
     RecordingMethodFileStore,
@@ -24,7 +25,6 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     refusal_messages,
     write_bundle,
 )
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _CSS_URL = re.compile(r"""url\(\s*['"]?([^'")\s]+)['"]?\s*\)""")
 _DATA_IMAGE = "data:image/png;base64,iVBORw0KGgo="
@@ -130,7 +130,7 @@ def _write_method(*, method_dir: Path, template: str = _TEMPLATE) -> Path:
 
 async def _run_from_its_folder(*, bundle_path: Path) -> None:
     await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)]).execute(
-        mthds_contents=[bundle_path.read_text(encoding="utf-8")], inputs=PipeDocGenTestData.INVOICE_INPUTS
+        mthds_contents=[bundle_path.read_text(encoding="utf-8")], inputs=PipeDocGenCases.INVOICE_INPUTS
     )
 
 
@@ -242,7 +242,7 @@ class TestPipeDocGenTemplateAssets:
         tag = '<img src="{{ invoice.customer }}">' if element == "img" else '<a rel="attachment" href="{{ invoice.customer }}">terms</a>'
         bundle_path = _write_method(method_dir=method_dir, template=f"{tag}<h1>{{{{ invoice.number }}}}</h1>")
         _write_files_no_template_may_read(method_dir=method_dir, outside_dir=tmp_path)
-        inputs = copy.deepcopy(PipeDocGenTestData.INVOICE_INPUTS)
+        inputs = copy.deepcopy(PipeDocGenCases.INVOICE_INPUTS)
         inputs["invoice"]["content"]["customer"] = reference
 
         with pytest.raises(PipelexError) as exc_info:
@@ -274,18 +274,18 @@ class TestPipeDocGenTemplateAssets:
         step_fields = "format = \"pdf\"\ntemplate = '''<img src=\"logo.png\"><h1>{{ invoice.number }}</h1>'''"
 
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
+            await validate_bundle(mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)])
 
         assert "belongs to no method tree" in refusal_messages(exc_info.value)
         assert engine.jobs == []
 
     async def test_a_url_a_run_s_input_supplies_names_no_file_when_the_template_has_no_method_tree(self, engine: _AssetReadingEngine) -> None:
         step_fields = "format = \"pdf\"\ntemplate = '''<img src=\"{{ invoice.customer }}\"><h1>{{ invoice.number }}</h1>'''"
-        inputs = copy.deepcopy(PipeDocGenTestData.INVOICE_INPUTS)
+        inputs = copy.deepcopy(PipeDocGenCases.INVOICE_INPUTS)
         inputs["invoice"]["content"]["customer"] = "logo.png"
 
         with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol().execute(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)], inputs=inputs)
+            await PipelexMTHDSProtocol().execute(mthds_contents=[PipeDocGenCases.bundle(step_fields=step_fields)], inputs=inputs)
 
         assert TemplateUrlRefusedError.__name__ in diagnosed_error_classes(exc_info.value)
         assert "belongs to no method's folder" in refusal_messages(exc_info.value)

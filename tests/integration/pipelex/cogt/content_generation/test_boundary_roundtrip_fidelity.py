@@ -35,7 +35,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
-from tests.unit.pipelex.cogt.content_generation.test_data import FactoryDefaults, SchemaRebuildTestData
+from tests.unit.pipelex.cogt.content_generation.cases import FactoryDefaults, SchemaRebuildCases
 
 
 class ShadowingNames(StructuredContent):
@@ -126,7 +126,7 @@ class TestBoundaryRoundtripFidelity:
         assert result.model_dump(mode="json") == original.model_validate(values).model_dump(mode="json")
 
     @pytest.mark.parametrize("dump_mode", ["python", "json"])
-    @pytest.mark.parametrize(("original", "values"), SchemaRebuildTestData.ROUND_TRIP_CASES)
+    @pytest.mark.parametrize(("original", "values"), SchemaRebuildCases.ROUND_TRIP_CASES)
     def test_every_supported_shape_round_trips_without_loss(
         self, original: type[BaseModel], values: dict[str, Any], dump_mode: Literal["json", "python"]
     ) -> None:

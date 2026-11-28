@@ -4,10 +4,10 @@ from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
-from tests.integration.pipelex.pipes.operator.pipe_llm.test_data import LLMSettingCheckTestData
+from tests.integration.pipelex.pipes.operator.pipe_llm.cases import LLMSettingCheckCases
 
-_WITHOUT_THINKING = LLMSettingCheckTestData.MODEL_WITHOUT_THINKING
-_WITH_EFFORT = LLMSettingCheckTestData.MODEL_WITH_EFFORT
+_WITHOUT_THINKING = LLMSettingCheckCases.MODEL_WITHOUT_THINKING
+_WITH_EFFORT = LLMSettingCheckCases.MODEL_WITH_EFFORT
 
 
 async def _the_refusal(bundle: str) -> ValidationErrorItem:
@@ -31,7 +31,7 @@ class TestPipeLLMSettingRefusals:
         ],
     )
     async def test_a_reasoning_effort_on_a_model_without_thinking_is_refused_on_its_field(self, output: str, output_desc: str) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output=output,
             model_fields=f'model = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "high" }}',
         )
@@ -45,7 +45,7 @@ class TestPipeLLMSettingRefusals:
         assert "Backend" not in item.message
 
     async def test_a_reasoning_budget_on_a_model_taking_an_effort_is_refused(self) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output="Verdict",
             model_fields=f'model = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_budget = 2048 }}',
         )
@@ -53,7 +53,7 @@ class TestPipeLLMSettingRefusals:
         assert "does not support reasoning_budget; OpenAI uses reasoning_effort instead" in item.message
 
     async def test_the_structuring_setting_is_checked_on_model_to_structure(self) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output="Verdict",
             model_fields=(
                 f'model = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "high" }}\n'
@@ -65,7 +65,7 @@ class TestPipeLLMSettingRefusals:
         assert item.field_path == "pipe.answer_it.model_to_structure"
 
     async def test_a_text_output_is_not_checked_against_its_structuring_setting(self) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output="Text",
             model_fields=(
                 f'model = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "high" }}\n'
@@ -75,7 +75,7 @@ class TestPipeLLMSettingRefusals:
         await validate_bundle(mthds_contents=[bundle])
 
     async def test_a_list_of_dynamic_outputs_is_checked_against_its_structuring_setting(self) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output="Dynamic[]",
             model_fields=(
                 f'model = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "high" }}\n'
@@ -88,7 +88,7 @@ class TestPipeLLMSettingRefusals:
 
     @pytest.mark.parametrize("output", ["Dynamic", "Text"])
     async def test_a_single_dynamic_or_text_output_is_checked_against_its_text_setting(self, output: str) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output=output,
             model_fields=(
                 f'model = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "high" }}\n'
@@ -100,7 +100,7 @@ class TestPipeLLMSettingRefusals:
         assert "PipeLLM 'answer_it' generates text" in item.message
 
     async def test_a_list_of_dynamic_outputs_is_not_checked_against_its_text_setting(self) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output="Dynamic[]",
             model_fields=(
                 f'model = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "high" }}\n'
@@ -111,14 +111,14 @@ class TestPipeLLMSettingRefusals:
 
     @pytest.mark.parametrize("output", ["Verdict", "Text"])
     async def test_a_reasoning_effort_the_model_takes_validates(self, output: str) -> None:
-        bundle = LLMSettingCheckTestData.pipe_llm_bundle(
+        bundle = LLMSettingCheckCases.pipe_llm_bundle(
             output=output,
             model_fields=f'model = {{ model = "{_WITH_EFFORT}", temperature = 1, reasoning_effort = "high" }}',
         )
         await validate_bundle(mthds_contents=[bundle])
 
     async def test_a_pipe_structure_setting_is_refused_on_its_field(self) -> None:
-        bundle = LLMSettingCheckTestData.pipe_structure_bundle(
+        bundle = LLMSettingCheckCases.pipe_structure_bundle(
             model_fields=f'model = {{ model = "{_WITHOUT_THINKING}", temperature = 1, reasoning_effort = "medium" }}',
         )
         item = await _the_refusal(bundle)

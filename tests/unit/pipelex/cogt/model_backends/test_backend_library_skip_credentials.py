@@ -17,7 +17,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.providers.openai.vertexai_factory import VertexAIFactory
 from tests.helpers.backend_library_loading import load_library, required_backend
 from tests.helpers.recording_secrets_provider import RecordingSecretsProvider
-from tests.unit.pipelex.cogt.model_backends.test_data import ABSENT_VAR, BackendLibraryTomls
+from tests.unit.pipelex.cogt.model_backends.cases import ABSENT_VAR, BackendLibraryTomls
 
 
 class TestSkipKeepsEveryBackendAndResolvesNothing:

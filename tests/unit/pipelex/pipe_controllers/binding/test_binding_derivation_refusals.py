@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.pipe_controllers.binding.binding_derivation import BindingRoot, derive_binding
 from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
-from tests.unit.pipelex.pipe_controllers.binding.test_data import INVOICE, RESOLVER, make_root
+from tests.unit.pipelex.pipe_controllers.binding.cases import INVOICE, RESOLVER, make_root
 
 
 class TestBindingDerivationRefusals:

@@ -7,7 +7,7 @@ from pipelex.codegen.emission import StampedProjection, WriteReport, build_stamp
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
 from pipelex.codegen.exceptions import CodegenError, CodegenLockError
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, validate_artifact_path
-from tests.unit.pipelex.codegen.test_data import ArtifactPathCases
+from tests.unit.pipelex.codegen.cases import ArtifactPathCases
 
 _FILES = [EmittedFile(filename="models.py", content="class Model:\n    pass\n")]
 

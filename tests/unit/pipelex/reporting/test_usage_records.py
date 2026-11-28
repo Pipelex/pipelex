@@ -10,7 +10,7 @@ from pipelex.reporting.usage_records import (
     dump_tokens_usage_records,
     make_tokens_usage_record,
 )
-from tests.unit.pipelex.cogt.usage.test_data import RATED_EXPECTED_COST, UsageFixtures
+from tests.unit.pipelex.cogt.usage.cases import RATED_EXPECTED_COST, UsageFixtures
 
 WIRE_FIELDS = {
     "model_type",

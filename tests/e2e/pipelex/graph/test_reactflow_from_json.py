@@ -14,7 +14,7 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, load_text_from_path
 from tests.conftest import TEST_OUTPUTS_DIR
-from tests.e2e.pipelex.graph.test_data import GraphTestData
+from tests.e2e.pipelex.graph.cases import GraphCases
 
 
 def _get_next_output_folder() -> Path:
@@ -32,7 +32,7 @@ class TestReactFlowFromJson:
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),
-        GraphTestData.GRAPH_JSON_TEST_CASES,
+        GraphCases.GRAPH_JSON_TEST_CASES,
     )
     async def test_reactflow_html_from_json_graph(self, topic: str, graph_json_path: str) -> None:
         """Test generating ReactFlow HTML from a JSON graph file.
@@ -86,7 +86,7 @@ class TestReactFlowFromJson:
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),
-        GraphTestData.GRAPH_JSON_TEST_CASES,
+        GraphCases.GRAPH_JSON_TEST_CASES,
     )
     async def test_reactflow_html_graphspec_structure(self, topic: str, graph_json_path: str) -> None:
         """Test that GraphSpec is correctly embedded in HTML."""
