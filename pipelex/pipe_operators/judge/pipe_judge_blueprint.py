@@ -254,7 +254,11 @@ class PipeJudgeBlueprint(PipeBlueprint):
             variable_paths |= _template_variable_paths(
                 template_source=question, template_category=TemplateCategory.BASIC, declared_inputs=declared_inputs, field_name="question"
             )
-            check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="prompt or question")
+            check_inputs_match_variables(
+                declared_inputs=declared_inputs,
+                variable_paths=variable_paths | self.output_filename_variable_paths(),
+                reader=self.reader_with_output_filename(reader="prompt or question"),
+            )
             return
         for question_name, question_blueprint in self.questions.items():
             variable_paths |= _template_variable_paths(
@@ -263,7 +267,11 @@ class PipeJudgeBlueprint(PipeBlueprint):
                 declared_inputs=declared_inputs,
                 field_name=f"question '{question_name}'",
             )
-        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="prompt or questions")
+        check_inputs_match_variables(
+            declared_inputs=declared_inputs,
+            variable_paths=variable_paths | self.output_filename_variable_paths(),
+            reader=self.reader_with_output_filename(reader="prompt or questions"),
+        )
 
     @override
     def validate_output(self):

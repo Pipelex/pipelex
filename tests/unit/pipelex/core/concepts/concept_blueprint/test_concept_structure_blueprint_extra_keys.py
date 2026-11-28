@@ -13,10 +13,9 @@ class TestConceptStructureBlueprintExtraKeys:
     @pytest.mark.parametrize(
         ("extra_key", "extra_value"),
         [
-            ("minimum", 0),
-            ("maximum", 100),
-            ("examples", [1, 2]),
-            ("unit", "items"),
+            ("placeholder", "Type a count"),
+            ("step", 5),
+            ("multiple_of", 2),
             ("hint", {"intent": "label"}),
             ("defalt_value", "typo'd default"),
         ],
@@ -33,7 +32,7 @@ class TestConceptStructureBlueprintExtraKeys:
             ConceptBlueprint.model_validate(
                 {
                     "description": "a concept",
-                    "structure": {"count": {"type": "integer", "description": "a count", "minimum": 0}},
+                    "structure": {"count": {"type": "integer", "description": "a count", "placeholder": "Type a count"}},
                 }
             )
 

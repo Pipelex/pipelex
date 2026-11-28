@@ -1,0 +1,11 @@
+domain      = "filename_on_img_gen"
+description = "Drawing a booklet cover named after its topic"
+main_pipe   = "draw_cover"
+
+[pipe.draw_cover]
+type            = "PipeImgGen"
+description     = "Draw the cover for the topic"
+inputs          = { topic = "Text" }
+output          = "Image"
+prompt          = "A warm watercolour cover about $topic"
+output_filename = "cover-{{ topic }}"

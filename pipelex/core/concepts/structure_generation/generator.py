@@ -17,6 +17,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, create_model
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.contract_fact_projection import constrained_annotation
 from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code, make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
@@ -172,6 +173,13 @@ class StructureGenerator:
     def _field_definition(self, resolved_field: ResolvedField) -> tuple[Any, Any]:
         """The annotation and the `Field` of one resolved field, as `create_model` takes them."""
         annotation = self._annotation(resolved_field.resolved_type)
+        # The field's contract facts: its constraints are enforced where its value is validated, and every fact reaches
+        # the class's JSON Schema, which a slot holding the structure carries (`contract_fact_projection`).
+        annotation = constrained_annotation(
+            annotation=annotation,
+            facts=resolved_field.contract_facts,
+            states_schema=not resolved_field.resolved_type.kind.is_concept,
+        )
 
         # Only a field that may hold nothing admits `None`: by the standard's rule, one that is neither required nor
         # defaulted. A binding step reading a field derives its absence from that rule alone, so a required or

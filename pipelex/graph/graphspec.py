@@ -437,6 +437,9 @@ class NodeSpec(BaseModel):
     pipe_code: str | None = None
     pipe_type: str | None = None
     description: str | None = None
+    # The pipe's `activity`: the present-tense words a person watching the run reads for this step, shown in place of
+    # `description` (spec: mthds-format.md, "What a Run Shows"); None when the pipe states none.
+    activity: str | None = None
     domain_code: str | None = None
     status: NodeStatus = Field(strict=False)
     # Why a `skipped` node was lifted (names the absent input); None for every other status.

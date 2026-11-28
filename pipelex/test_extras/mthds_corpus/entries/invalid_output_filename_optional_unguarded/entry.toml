@@ -1,0 +1,12 @@
+name = "invalid_output_filename_optional_unguarded"
+description = "Drawing a cover whose file name reads an optional client without allowing for its absence"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_input_unguarded",
+]
+
+expected_error = "optional_input_unguarded"

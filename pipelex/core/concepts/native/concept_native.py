@@ -21,6 +21,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
+from pipelex.language.intent_hints import HintSiteValueKind
 
 
 class NativeConceptCode(StrEnum):
@@ -71,6 +72,68 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
                 | NativeConceptCode.ANYTHING
+            ):
+                return False
+
+    @property
+    def site_value_kind(self) -> HintSiteValueKind:
+        """What a value of this native is, for intent-hint applicability and the contract facts' value classes.
+
+        `Text` and `Markdown` (which refines it) are text-valued, `Number` number-valued, `Date` date-valued and `Time`
+        time-valued, the standard's value classes. `Image` is image-valued and `Document` document-valued, which only the
+        intent words `photo`, `screenshot` and `scan` and a file-valued output care about. Every other native is a
+        structured site holding no plain value, the verdict natives `YesNo`, `Choice` and `Rating` included.
+        """
+        match self:
+            case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
+                return HintSiteValueKind.TEXT_VALUED
+            case NativeConceptCode.NUMBER:
+                return HintSiteValueKind.NUMBER_VALUED
+            case NativeConceptCode.DATE:
+                return HintSiteValueKind.DATE_VALUED
+            case NativeConceptCode.TIME:
+                return HintSiteValueKind.TIME_VALUED
+            case NativeConceptCode.IMAGE:
+                return HintSiteValueKind.IMAGE_VALUED
+            case NativeConceptCode.DOCUMENT:
+                return HintSiteValueKind.DOCUMENT_VALUED
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+                | NativeConceptCode.COMPOSITE
+            ):
+                return HintSiteValueKind.OTHER
+
+    @property
+    def is_verdict_native(self) -> bool:
+        """Whether a field typed by this native holds a verdict: `YesNo`, `Choice` or `Rating`, which a `part = "verdict"` takes."""
+        match self:
+            case NativeConceptCode.YES_NO | NativeConceptCode.CHOICE | NativeConceptCode.RATING:
+                return True
+            case (
+                NativeConceptCode.TEXT
+                | NativeConceptCode.MARKDOWN
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.DYNAMIC
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+                | NativeConceptCode.COMPOSITE
             ):
                 return False
 
@@ -404,3 +467,8 @@ class NativeConceptCode(StrEnum):
             return concept_ref_or_code
         else:
             return f"{SpecialDomain.NATIVE}.{concept_ref_or_code}"
+
+
+def is_file_valued_native(*, native_ref: str) -> bool:
+    """Whether a native concept ref (`Image`, `native.Document`) names a file-valued concept: an Image or a Document."""
+    return NativeConceptCode(QualifiedRef.parse(native_ref).local_code).site_value_kind.is_file_valued

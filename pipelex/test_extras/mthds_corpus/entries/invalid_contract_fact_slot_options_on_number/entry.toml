@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_slot_options_on_number"
+description = "A note offering text options on a number slot"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

@@ -91,7 +91,9 @@ def _mocked_client(
 ) -> MagicMock:
     """A client whose handshake names `version`, whose start is acknowledged as `RUN_ID`, and whose run completes."""
     client: MagicMock = mocker.create_autospec(PipelexAPIClient, instance=True)
+    # Instance attributes the client sets in `__init__`, which an autospec of the class cannot see.
     client.base_url = "https://hosted.test"
+    client.origin_url = "https://hosted.test"
     client.version.return_value = VersionInfo.model_validate_json(version)
     client.start.return_value = PipelexRunResultStart(pipeline_run_id=RUN_ID)
     client.wait_for_result.return_value = DONE

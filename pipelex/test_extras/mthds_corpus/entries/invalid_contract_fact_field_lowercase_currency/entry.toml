@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_lowercase_currency"
+description = "A festival card spelling its currency in lowercase"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from mthds.package.dependency_resolver import ResolvedDependency
-from mthds.package.manifest.schema import MethodsManifest
+from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
 from pytest_mock import MockerFixture
 
 from pipelex.libraries.library_factory import LibraryFactory
@@ -46,6 +46,19 @@ class TestMthdsVersionWarning:
         )
 
         mock_log.warning.assert_not_called()
+
+    def test_the_runtime_implements_mthds_9_2_0(self, mocker: MockerFixture) -> None:
+        """The runtime's own standard version is 9.2.0, so a package requiring `>=9.2.0`, as the standard's examples do, gets no warning."""
+        mock_log = mocker.patch("pipelex.libraries.library_manager.log")
+
+        manager = LibraryManager()
+        manager._warn_if_mthds_version_unsatisfied(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            mthds_version_constraint=">=9.2.0",
+            package_address="github.com/org/pkg",
+        )
+
+        mock_log.warning.assert_not_called()
+        assert MTHDS_STANDARD_VERSION == "9.2.0"
 
     def test_warning_on_unparseable_constraint(self, mocker: MockerFixture) -> None:
         """Warning emitted when the constraint is not parseable by the semver engine."""

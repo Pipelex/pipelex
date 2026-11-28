@@ -1,0 +1,12 @@
+name = "invalid_choice_options_table_shares_value"
+description = "An account card whose option table repeats another option's value"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

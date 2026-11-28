@@ -37,7 +37,7 @@ class PipeRunInputsError(PipeRunError):
 
     error_code = ErrorCodeSet(
         default=CoreCode.PIPE_INPUT_UNRESOLVED,
-        others=(CoreCode.INPUT_MISSING, CoreCode.INPUT_REFERENCE_NOT_FOUND, CoreCode.METHOD_WIRING_INVALID),
+        others=(CoreCode.INPUT_MISSING, CoreCode.INPUT_INVALID, CoreCode.INPUT_REFERENCE_NOT_FOUND, CoreCode.METHOD_WIRING_INVALID),
     )
 
     def __init__(

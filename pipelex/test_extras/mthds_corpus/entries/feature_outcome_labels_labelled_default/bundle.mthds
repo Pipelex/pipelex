@@ -1,0 +1,35 @@
+domain      = "outcomes_labelled_default"
+description = "Routing a claim, with words for the default route"
+main_pipe   = "route_claim"
+
+[concept.Claim]
+description = "An insurance claim"
+
+[concept.Claim.structure]
+severity = { description = "How severe the claim is", choices = [
+  "high",
+  "low",
+], required = true }
+
+[pipe.route_claim]
+type            = "PipeCondition"
+description     = "Route the claim by severity"
+inputs          = { claim = "Claim" }
+output          = "Text"
+expression      = "claim.severity"
+outcomes        = { high = "detailed_check" }
+default_outcome = { pipe = "quick_note", label = "No check needed" }
+
+[pipe.detailed_check]
+type        = "PipeLLM"
+description = "Check the claim in detail"
+inputs      = { claim = "Claim" }
+output      = "Text"
+prompt      = "Check this claim in detail: $claim"
+
+[pipe.quick_note]
+type        = "PipeLLM"
+description = "Write a quick note on the claim"
+inputs      = { claim = "Claim" }
+output      = "Text"
+prompt      = "Write a quick note on this claim: $claim"

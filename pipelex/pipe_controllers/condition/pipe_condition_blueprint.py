@@ -1,9 +1,11 @@
-from typing import Annotated, Literal, Self
+from collections.abc import Mapping
+from typing import Annotated, Any, Literal, Self, cast
 
 from jinja2 import TemplateSyntaxError
 from pydantic import Field, WithJsonSchema, field_validator, model_validator
 from typing_extensions import override
 
+from pipelex.core.concepts.choice_options import OutcomeTable, OutcomeValue, PresentationWords, outcome_pipe, parse_outcome
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import TEMPLATE_NESTING_ERRORS, TEMPLATE_NESTING_FAULT, Jinja2DetectVariablesError
@@ -17,6 +19,23 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 ConditionExpressionField = Literal["expression_template", "expression"]
 
 OutcomeMap = dict[str, str]
+"""Expression result -> pipe reference (or special outcome), the words of every outcome table set aside."""
+AuthoredOutcomeMap = Mapping[str, OutcomeValue]
+"""Expression result -> outcome, as authored: a pipe reference, or an outcome table carrying words beside it."""
+
+
+OUTCOME_TABLE_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "pipe": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "tone": {"type": "string", "enum": ["positive", "caution", "negative", "neutral"]},
+    },
+    "required": ["pipe"],
+    "additionalProperties": False,
+}
+"""An outcome table as the JSON Schema of the language states it, inline so the published schema needs no definition of it."""
 
 
 class PipeConditionBlueprint(PipeBlueprint):
@@ -25,17 +44,63 @@ class PipeConditionBlueprint(PipeBlueprint):
     expression_template: str | None = None
     expression: str | None = None
     outcomes: Annotated[
-        OutcomeMap,
+        AuthoredOutcomeMap,
         WithJsonSchema(
             {
-                "additionalProperties": {"type": "string"},
+                "additionalProperties": {"anyOf": [{"type": "string"}, OUTCOME_TABLE_JSON_SCHEMA]},
                 "type": "object",
                 "x-schema-required": True,
             }
         ),
-    ] = Field(default_factory=OutcomeMap)
-    default_outcome: str | SpecialOutcome
+    ] = Field(default_factory=dict)
+    default_outcome: str | SpecialOutcome | OutcomeTable
     add_alias_from_expression_to: str | None = None
+
+    @field_validator("outcomes", mode="before")
+    @classmethod
+    def read_outcome_tables(cls, outcomes: Any) -> Any:
+        """Read each outcome table into normal form: one carrying `pipe` alone is its pipe's string (`parse_outcome`)."""
+        if not isinstance(outcomes, dict):
+            return outcomes
+        authored = cast("dict[Any, Any]", outcomes)
+        return {key: parse_outcome(raw=value) for key, value in authored.items()}
+
+    @field_validator("default_outcome", mode="before")
+    @classmethod
+    def read_default_outcome_table(cls, default_outcome: Any) -> Any:
+        return parse_outcome(raw=default_outcome)
+
+    @model_validator(mode="after")
+    def refuse_shared_outcome_labels(self) -> Self:
+        """No two outcomes of one PipeCondition, its default included, carry the same label."""
+        labels = [outcome.label for outcome in [*self.outcomes.values(), self.default_outcome] if isinstance(outcome, OutcomeTable) and outcome.label]
+        seen_labels: set[str] = set()
+        for label in labels:
+            if label in seen_labels:
+                msg = f"Two outcomes of this PipeCondition share the label '{label}': give each outcome its own label"
+                raise ValueError(msg)
+            seen_labels.add(label)
+        return self
+
+    @property
+    def outcome_pipes(self) -> OutcomeMap:
+        """Expression result -> pipe reference (or special outcome), whichever form each outcome was written in."""
+        return {key: outcome_pipe(outcome=outcome) for key, outcome in self.outcomes.items()}
+
+    @property
+    def outcome_words(self) -> dict[str, PresentationWords]:
+        """Expression result -> the words its outcome table gives people, for each outcome written as a table."""
+        return {key: _words_of(outcome=outcome) for key, outcome in self.outcomes.items() if isinstance(outcome, OutcomeTable)}
+
+    @property
+    def default_outcome_words(self) -> PresentationWords | None:
+        """The words the default outcome's table gives people, or None when it is written as a pipe name."""
+        return _words_of(outcome=self.default_outcome) if isinstance(self.default_outcome, OutcomeTable) else None
+
+    @property
+    def default_outcome_pipe(self) -> str:
+        """The pipe reference (or special outcome) the default outcome names, whichever form wrote it."""
+        return outcome_pipe(outcome=self.default_outcome)
 
     @property
     @override
@@ -44,9 +109,9 @@ class PipeConditionBlueprint(PipeBlueprint):
 
         Excludes special pipe codes like 'continue'.
         """
-        pipe_codes = set(self.outcomes.values())
-        if self.default_outcome:
-            pipe_codes.add(self.default_outcome)
+        pipe_codes = set(self.outcome_pipes.values())
+        if self.default_outcome_pipe:
+            pipe_codes.add(self.default_outcome_pipe)
         return pipe_codes - set(SpecialOutcome.value_list())
 
     @property
@@ -72,7 +137,7 @@ class PipeConditionBlueprint(PipeBlueprint):
 
     @field_validator("outcomes", mode="after")
     @classmethod
-    def validate_outcome_map(cls, outcomes: OutcomeMap) -> OutcomeMap:
+    def validate_outcome_map(cls, outcomes: AuthoredOutcomeMap) -> AuthoredOutcomeMap:
         if not outcomes:
             msg = f"PipeConditionBlueprint must have at least one mapping in outcomes, got: {outcomes}"
             raise ValueError(msg)
@@ -146,3 +211,8 @@ def describe_expression_parse_failure(*, error: Jinja2DetectVariablesError) -> s
             return f"does not parse at line {cause.lineno} of that expression"
         cause = cause.__cause__
     return "does not parse"
+
+
+def _words_of(*, outcome: OutcomeTable) -> PresentationWords:
+    """An outcome table's words, without the pipe it names."""
+    return PresentationWords(label=outcome.label, description=outcome.description, tone=outcome.tone)

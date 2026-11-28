@@ -1,9 +1,13 @@
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint, PipeType
+
+SIGNATURE_REFUSED_FIELDS: tuple[str, ...] = ("activity", "output_filename")
+"""The base pipe fields a signature does not carry: it runs nothing, so it has no activity to show and writes no file. The
+published schema leaves them off the signature arm (`pipelex.language.mthds_schema_generator`)."""
 
 
 class PipeSignatureBlueprint(PipeBlueprint):
@@ -29,6 +33,18 @@ class PipeSignatureBlueprint(PipeBlueprint):
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
     )
+
+    @model_validator(mode="after")
+    def refuse_execution_words(self) -> Self:
+        """Refuse `activity` and `output_filename` on a signature, which describe a run and a file a contract never makes."""
+        authored = [field_name for field_name in SIGNATURE_REFUSED_FIELDS if getattr(self, field_name) is not None]
+        if authored:
+            msg = (
+                f"A signature (a pipe with no `type`) runs nothing, so it does not carry {', '.join(f'`{name}`' for name in authored)}: "
+                "set it on the pipe that implements the signature"
+            )
+            raise ValueError(msg)
+        return self
 
     @property
     @override

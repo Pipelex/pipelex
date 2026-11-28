@@ -16,7 +16,7 @@ from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint, PipeBluepr
 
 _DATA_DIR = Path(__file__).parents[3] / "data" / "input_semantics"
 _HINTED_BUNDLE_PATH = _DATA_DIR / "hinted_bundle.mthds"
-_REJECTED_SLOT_KEY_PATH = _DATA_DIR / "rejected" / "per_input_description.mthds_invalid"
+_REJECTED_SLOT_KEY_PATH = _DATA_DIR / "rejected" / "per_input_placeholder.mthds_invalid"
 
 
 def _parse_hinted_bundle() -> PipelexBundleBlueprint:
@@ -75,7 +75,7 @@ class TestHintedBundleParsing:
 
 
 class TestRejectedSlotTableKey:
-    def test_per_input_description_fails_as_unknown_slot_table_key(self):
+    def test_per_input_placeholder_fails_as_unknown_slot_table_key(self):
         with pytest.raises(MthdsParserError) as exc_info:
             MthdsParser.make_pipelex_bundle_blueprint(bundle_path=_REJECTED_SLOT_KEY_PATH)
         assert "extra" in str(exc_info.value).lower()

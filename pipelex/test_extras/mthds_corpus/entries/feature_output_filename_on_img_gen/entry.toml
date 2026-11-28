@@ -1,0 +1,10 @@
+name = "feature_output_filename_on_img_gen"
+description = "Drawing a booklet cover named after its topic"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.output_filename",
+]

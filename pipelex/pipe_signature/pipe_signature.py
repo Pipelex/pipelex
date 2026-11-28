@@ -6,8 +6,8 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
+from pipelex.pipe_machinery.pipe_reading_stored_inputs import PipeReadingStoredInputs
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.system.job_metadata import JobMetadata
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
 
 
-class PipeSignature(PipeAbstract):
+class PipeSignature(PipeReadingStoredInputs):
     """Runtime pipe for a contract-only `PipeSignatureBlueprint`.
 
     Dry-run mints a mock output via the declared `StuffSpec`. Live-run raises

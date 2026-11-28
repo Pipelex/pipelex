@@ -1,0 +1,10 @@
+name = "feature_contract_facts_concept_unit"
+description = "A grant request whose amount concept counts euros"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

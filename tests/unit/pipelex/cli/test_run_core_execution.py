@@ -114,6 +114,7 @@ class TestRunCoreExecution:
             graph_spec=graph_spec,
             pipe_io_artifacts=None,
             working_memory=working_memory,
+            result_line=None,
         )
 
     def _make_absent_main_pipe_output(self) -> Any:
@@ -130,7 +131,7 @@ class TestRunCoreExecution:
                 producing_pipe="summarize",
             )
         )
-        return SimpleNamespace(graph_spec=None, pipe_io_artifacts=None, working_memory=memory)
+        return SimpleNamespace(graph_spec=None, pipe_io_artifacts=None, working_memory=memory, result_line=None)
 
     @pytest.mark.usefixtures("config_mock")
     def test_absent_main_output_prints_absence_and_saves_artifact(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
@@ -370,6 +371,74 @@ class TestRunCoreExecution:
         assert (saved_dir / "main_stuff.html").read_text(encoding="utf-8") == "<p>42</p>"
         assert (saved_dir / "main_stuff_viewer.html").read_text(encoding="utf-8") == "<html>viewer</html>"
         assert "main_stuff: json, md, html, html_viewer" in console.export_text()
+
+    @pytest.mark.usefixtures("config_mock")
+    def test_the_main_output_file_never_takes_the_name_of_a_file_the_run_writes(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The produced file is kept off `result_line.txt` and `working_memory.json`, which the run writes beside it."""
+        main_stuff = mocker.MagicMock()
+        main_stuff.content.rendered_json_async = mocker.AsyncMock(return_value="{}")
+        main_stuff.content.rendered_markdown_async = mocker.AsyncMock(return_value="")
+        main_stuff.content.rendered_html_async = mocker.AsyncMock(return_value="")
+        mocker.patch("pipelex.cli.commands.run._run_core.render_stuff_viewer", new=mocker.AsyncMock(return_value=""))
+        save_file = mocker.patch("pipelex.cli.commands.run._run_core.save_main_stuff_file", new=mocker.AsyncMock(return_value=None))
+        pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
+        pipe_output.result_line = "3 approved"
+        self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(save_main_stuff=True, output_dir=str(tmp_path)))
+
+        assert save_file.call_args.kwargs["reserved_names"] == frozenset({"working_memory.json", "result_line.txt"})
+        saved_dir = next(tmp_path.iterdir())
+        assert (saved_dir / "result_line.txt").read_text(encoding="utf-8") == "3 approved\n"
+
+    @pytest.mark.usefixtures("config_mock")
+    def test_the_result_line_reaches_the_terminal_with_its_control_characters_escaped(
+        self, mocker: MockerFixture, console: Console, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A line a method's output words may hold terminal controls: the terminal reads them escaped, the file keeps the line."""
+        pipe_output = self._make_pipe_output(mocker)
+        pipe_output.result_line = "3 approved\x1b]52;c;cHduZWQ=\x07\x9b2J"
+        self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(save_working_memory=True, output_dir=str(tmp_path)))
+
+        stderr = capsys.readouterr().err
+        assert "Result: 3 approved\\x1b]52;c;cHduZWQ=\\x07\\x9b2J" in stderr
+        assert "\x1b" not in stderr.replace("\x1b[", "")
+        saved_dir = next(tmp_path.iterdir())
+        assert (saved_dir / "result_line.txt").read_text(encoding="utf-8") == "3 approved\x1b]52;c;cHduZWQ=\x07\x9b2J\n"
+        assert "result_line.txt" in console.export_text()
+
+    @pytest.mark.usefixtures("config_mock")
+    def test_a_result_line_that_cannot_be_saved_is_warned_and_still_shown(
+        self, mocker: MockerFixture, console: Console, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The run succeeded: a result line the output folder refuses is warned about, never a crash."""
+        pipe_output = self._make_pipe_output(mocker)
+        pipe_output.result_line = "3 approved"
+        self._mock_runner(mocker, pipe_output)
+        output_folder = tmp_path / "run_output"
+        # A directory where the line's file would go: writing it fails as a read-only or full disk would.
+        (output_folder / "result_line.txt").mkdir(parents=True)
+        mocker.patch("pipelex.cli.commands.run._run_core.make_run_output_folder", return_value=output_folder)
+
+        _run_async(_call_execute_run(save_working_memory=True, output_dir=str(tmp_path)))
+
+        stderr = capsys.readouterr().err
+        assert "Could not save the result line" in stderr
+        assert "Result: 3 approved" in stderr
+        assert "result_line.txt" not in console.export_text()
+
+    @pytest.mark.usefixtures("config_mock")
+    def test_a_dry_run_labels_its_result_line(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A dry run's line words mock values, so the terminal says so; the file is written as a dry run writes its outputs."""
+        pipe_output = self._make_pipe_output(mocker)
+        pipe_output.result_line = "3 approved"
+        self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(output_dir=str(tmp_path), dry_run=True))
+
+        assert "Result (dry run, from mock values): 3 approved" in capsys.readouterr().err
 
     @pytest.mark.usefixtures("config_mock")
     def test_working_memory_saved(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:

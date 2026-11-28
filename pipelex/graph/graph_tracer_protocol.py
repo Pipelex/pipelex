@@ -105,6 +105,7 @@ class GraphTracerProtocol(Protocol):
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
+        activity: str | None = None,
         domain_code: str | None = None,
         step_count: int | None = None,
         branch_count: int | None = None,
@@ -123,6 +124,7 @@ class GraphTracerProtocol(Protocol):
             pipe_data: Optional serialized pipe instance for the pipe registry.
             concept_data: Optional list of serialized concept dicts for the concept registry.
             description: Optional human-readable pipe description (mirrored onto NodeSpec).
+            activity: The pipe's `activity`, the words a run view shows for it in place of its description (mirrored onto NodeSpec).
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
             step_count: On a PipeSequence, the number of steps its author wrote.
             branch_count: On a PipeParallel, the number of its branches.
@@ -438,6 +440,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
+        activity: str | None = None,
         domain_code: str | None = None,
         step_count: int | None = None,
         branch_count: int | None = None,

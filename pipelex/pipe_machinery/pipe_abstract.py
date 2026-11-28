@@ -1,7 +1,7 @@
 import traceback
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, final
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast, final
 
 import shortuuid
 from mthds.protocol.problem.registry import CoreCode
@@ -12,6 +12,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.contract_fact_projection import carried_field_name, contract_break
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
@@ -24,11 +25,13 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.graph.node_problem import make_node_problem
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
+from pipelex.language.contract_facts import PatternSearchBudget
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.memory_writes import MemoryWrite
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
@@ -162,6 +165,15 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain_code: str
     description: str
+    # What the pipe is doing, for a person watching a run (spec: mthds-format.md, "What a Run Shows"); a run view shows it
+    # in place of `description`. Plain text, never a template.
+    activity: str | None = None
+    # The Jinja2 template naming each file the pipe produces (spec: "Naming Produced Files"), set on an operator whose
+    # output is file-valued; `PipeOperator` renders it with the pipe's inputs once the output is produced.
+    output_filename: str | None = None
+    # The manifest's `result_line` template, set by the library load on the pipe its manifest names as `main_pipe`
+    # (spec: manifest-format.md, "Result Line"); a run starting at this pipe renders it against its output.
+    result_line: str | None = None
     inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
     output: StuffSpec
 
@@ -675,11 +687,79 @@ class PipeAbstract(ABC, BaseModel):
                             variable_name=variable_name,
                         ).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
 
+        # The input gate's contract check: the caller's value of a slot declaring contract facts or options must satisfy
+        # them. Only at the run's entry pipe, whose inputs are the caller's, and never on a dry run's mock values.
+        if not pipe_run_params.run_mode.is_dry and len(pipe_run_params.pipe_stack) <= 1:
+            await self.ensure_inputs_honour_their_contracts(working_memory=working_memory, pipe_run_params=pipe_run_params, job_metadata=job_metadata)
+
         # Specific pipe validation function
         await self._validate_before_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
         return presence_scan
+
+    async def ensure_inputs_honour_their_contracts(
+        self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, job_metadata: JobMetadata
+    ) -> None:
+        """Refuse a caller's input that breaks its slot's contract facts or options, as `input.invalid`.
+
+        The check reads the real value: a text past the inline threshold, which the input normalizer stored, or one the
+        caller gave by URL, travels as a reference, so the stored values of the slots declaring facts are loaded first,
+        through the content generator's leaf, which authorizes each read against the run's read scope. A value that
+        still cannot be read is refused rather than let through unchecked.
+        """
+        constrained_specs = {
+            variable_name: stuff_spec
+            for variable_name, stuff_spec in self.inputs.root.items()
+            if stuff_spec.contract_facts or stuff_spec.choice_values is not None
+        }
+        roots: dict[str, Any] = {}
+        for variable_name in constrained_specs:
+            stuff = working_memory.get_optional_stuff(variable_name)
+            if stuff is not None:
+                roots[variable_name] = stuff.content
+        if not roots:
+            return
+        await self._load_stored_input_values(roots=roots, job_metadata=job_metadata, pipe_run_params=pipe_run_params)
+        for variable_name, root_content in roots.items():
+            stuff_spec = constrained_specs[variable_name]
+            contents: list[Any] = (
+                list(cast("ListContent[StuffContent]", root_content).items) if isinstance(root_content, ListContent) else [root_content]
+            )
+            # The values of one input share one search budget, so a long list of values that each fall just under the
+            # per-value limit cannot spend it once per item; the first value checked past it is refused.
+            pattern_budget = PatternSearchBudget.for_input()
+            for content in contents:
+                message: str | None
+                if isinstance(content, StoredValueContent) and not content.is_loaded:
+                    message = "its stored value could not be read to check it"
+                else:
+                    message = contract_break(
+                        value=content, facts=stuff_spec.contract_facts, choice_values=stuff_spec.choice_values, pattern_budget=pattern_budget
+                    )
+                if message is None:
+                    continue
+                msg = f"Input '{variable_name}' of pipe '{self.code}' breaks its contract: {message}"
+                raise (
+                    PipeRunInputsError(
+                        message=msg,
+                        run_mode=pipe_run_params.run_mode,
+                        pipe_code=self.code,
+                        variable_name=variable_name,
+                    )
+                    .with_error_code(CoreCode.INPUT_INVALID)
+                    .with_params(input=variable_name, field=carried_field_name(value=content))
+                )
+
+    async def _load_stored_input_values(self, *, roots: dict[str, Any], job_metadata: JobMetadata, pipe_run_params: PipeRunParams) -> None:
+        """Load the stored values under the given input contents through the content generator's leaf, for the input gate.
+
+        Implemented once, by `pipelex.pipe_machinery.pipe_reading_stored_inputs.PipeReadingStoredInputs`, the base of
+        `PipeOperator`, `PipeController` and `PipeSignature`, since the loader cannot be imported here: it reaches
+        `runtime_hub`, whose chain comes back here through `orchestrator_registry` and `pipe_job`, a cycle pyright reports
+        (see `_make_single_concept_data_for_registry`). This body loads nothing, so a pipe class that does not derive
+        from that base fails closed: the gate refuses a stored value it cannot read.
+        """
 
     @abstractmethod
     async def _validate_before_run(
@@ -872,6 +952,7 @@ class PipeAbstract(ABC, BaseModel):
                     pipe_data=pipe_data,
                     concept_data=concept_data,
                     description=self.description,
+                    activity=self.activity,
                     domain_code=self.domain_code,
                     step_count=self.traced_step_count(),
                     branch_count=self.traced_branch_count(),

@@ -1,0 +1,10 @@
+name = "feature_activity_on_extract"
+description = "Reading a lease, saying what the step is doing while it runs"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.activity",
+]

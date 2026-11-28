@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_slot_aggregate_on_slot"
+description = "A note asking a slot to add up its values"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

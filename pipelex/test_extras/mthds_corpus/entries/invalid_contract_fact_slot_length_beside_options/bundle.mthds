@@ -1,0 +1,13 @@
+domain      = "slots_length_beside_options"
+description = "A note bounding the length of a slot that offers options"
+main_pipe   = "write_note"
+
+[pipe.write_note]
+type = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs = { item = { concept = "Text", choices = [
+  "strategic",
+  "tactical",
+], max_length = 20 } }
+output = "Text"
+prompt = "Write a short note about $item"

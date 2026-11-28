@@ -1,0 +1,10 @@
+domain      = "slots_bounded_budget"
+description = "A note about a budget that is never negative and counts euros"
+main_pipe   = "write_note"
+
+[pipe.write_note]
+type        = "PipeLLM"
+description = "Write the note from what the caller gives"
+inputs      = { item = { concept = "Number", minimum = 0, unit = "EUR" } }
+output      = "Text"
+prompt      = "Write a short note about $item"

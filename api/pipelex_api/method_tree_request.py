@@ -67,7 +67,7 @@ from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import MethodEntryError
-from pipelex.pipeline.method_entry import EntryCandidate, MethodEntry, select_entry
+from pipelex.pipeline.method_entry import EntryCandidate, MethodEntry, manifest_refusal_reason, select_entry
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 from pipelex_api.blob_store import RunnerBlobStore
@@ -576,7 +576,7 @@ def manifest_of(*, tree: RequestTree, label: str, root: str) -> MethodsManifest 
         raise (
             MethodEntryError(msg)
             .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
-            .with_params(reason=MethodPackageReason.MANIFEST_INVALID, path=f"{root}{MANIFEST_NAME}")
+            .with_params(reason=manifest_refusal_reason(error=exc), path=f"{root}{MANIFEST_NAME}")
         ) from exc
 
 

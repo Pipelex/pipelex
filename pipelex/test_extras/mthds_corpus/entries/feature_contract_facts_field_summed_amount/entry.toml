@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_summed_amount"
+description = "A collection card whose amounts add up across cards"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

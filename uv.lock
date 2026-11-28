@@ -2660,7 +2660,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.28.0"
+version = "0.29.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2669,9 +2669,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/a4/ff32c5545d5d83b164475fd62172b40ee11c7bbbf61dd12903f8320699ea/mthds-0.28.0.tar.gz", hash = "sha256:31aef63653d76818a896754cc3f378c671878b65c636c02adbc18fb7022d8db0", size = 529455, upload-time = "2026-11-15T19:41:59.476Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/db/5651c39e0fb88596fbdce4cb6b439700eeb8dc7efb28c850991969fa65be/mthds-0.29.0.tar.gz", hash = "sha256:3992d8cc0bef02bfff49d6b0b514237c3298d2773124a4a77156e768a0eb2b0d", size = 553761, upload-time = "2026-11-28T12:11:29.373Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/34/c538d7f2865d329ea3fa24e95cfde944edbe624a8d03899c306392db6639/mthds-0.28.0-py3-none-any.whl", hash = "sha256:40fe32830afc1c9b2767aed878c96c2dde60f462e569759103230a60bab635f7", size = 211138, upload-time = "2026-11-15T19:41:57.935Z" },
+    { url = "https://files.pythonhosted.org/packages/76/44/34d9af148b3474f356567d89fccc44aced5a7a0f00844d8f7cf2b74cc8d0/mthds-0.29.0-py3-none-any.whl", hash = "sha256:3a9bb95ba86770fdf1283fbdf94ea6868b80713fb692b48b63e047e5beeaab2c", size = 220307, upload-time = "2026-11-28T12:11:27.548Z" },
 ]
 
 [[package]]
@@ -3501,6 +3501,7 @@ dependencies = [
     { name = "pypdfium2" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
+    { name = "regex" },
     { name = "reportlab" },
     { name = "requests" },
     { name = "semantic-version" },
@@ -3548,6 +3549,7 @@ dev = [
     { name = "types-networkx" },
     { name = "types-openpyxl" },
     { name = "types-pyyaml" },
+    { name = "types-regex" },
 ]
 docling = [
     { name = "docling" },
@@ -3650,7 +3652,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.28.0" },
+    { name = "mthds", specifier = "==0.29.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
@@ -3661,7 +3663,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=13.0.0" },
-    { name = "pipelex-sdk", specifier = "==0.69.0" },
+    { name = "pipelex-sdk", specifier = "==0.72.0" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3684,6 +3686,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.6.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "regex", specifier = ">=2024.11.6" },
     { name = "reportlab", specifier = ">=4.0,<5" },
     { name = "requests", specifier = ">=2.33.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.8.1" },
@@ -3699,6 +3702,7 @@ requires-dist = [
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5.20250306" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
+    { name = "types-regex", marker = "extra == 'dev'", specifier = ">=2024.11.6.20241221" },
     { name = "typesafe-sdk", marker = "extra == 'typesafe'", specifier = ">=0.7.0" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "urllib3", specifier = ">=2.7.0" },
@@ -3737,6 +3741,7 @@ dev = [
     { name = "types-networkx" },
     { name = "types-openpyxl" },
     { name = "types-pyyaml" },
+    { name = "types-regex" },
     { name = "types-requests" },
     { name = "types-toml" },
 ]
@@ -3766,6 +3771,7 @@ requires-dist = [
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5.20250306" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
+    { name = "types-regex", marker = "extra == 'dev'", specifier = ">=2024.11.6.20241221" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.32.0.2024091" },
     { name = "types-toml", marker = "extra == 'dev'", specifier = ">=0.10.8.20240310" },
     { name = "uvicorn", specifier = ">=0.37.0" },
@@ -3774,7 +3780,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pipelex-sdk"
-version = "0.69.0"
+version = "0.72.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -3782,9 +3788,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/f0/61baf9ee1e9b2d33b2e80731ec85d13aca9581ecb70cf3fd5a8a3fac7904/pipelex_sdk-0.69.0.tar.gz", hash = "sha256:aebec15d254b4c3065b5c77640f2de260a39efd1920ae61cdcad4acee5c6931c", size = 906151, upload-time = "2026-11-16T13:14:11.884Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/62/0fd46f635ba1d9df51f3aec2ad80966ae936eb37213ef3b57c63413b8c0e/pipelex_sdk-0.72.0.tar.gz", hash = "sha256:3151df88334d6b8b2b5de8fbfe28a5007cd0a6226bd9157191b45f7cddb9bd8b", size = 922047, upload-time = "2026-11-28T14:15:18.389Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/5e/d177222687fd7c82e64f5ad6d79d114ba9b346fa96d5dbc1b67fddac7abe/pipelex_sdk-0.69.0-py3-none-any.whl", hash = "sha256:f9d6f1bd94b754870ddfd62200405345585008097d60d5b5cb2cda4c2789e45c", size = 342463, upload-time = "2026-11-16T13:14:09.977Z" },
+    { url = "https://files.pythonhosted.org/packages/44/e0/2d7f684df9a31ac91e50b71cfe91eba5ea9cd5b96d6903bd636591f3016c/pipelex_sdk-0.72.0-py3-none-any.whl", hash = "sha256:b2e04d953fa08eb39eb0e03f70dbdf12e8ce37b2d54a4f9a0473489189825376", size = 349855, upload-time = "2026-11-28T14:15:17.024Z" },
 ]
 
 [[package]]
@@ -5794,6 +5800,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/74/73/b759b1e413c31034cc01ecdfb96b38115d0ab4db55a752a3929f0cd449fd/types_pyyaml-6.0.12.20260408.tar.gz", hash = "sha256:92a73f2b8d7f39ef392a38131f76b970f8c66e4c42b3125ae872b7c93b556307", size = 17735, upload-time = "2026-04-08T04:30:50.974Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/f0/c391068b86abb708882c6d75a08cd7d25b2c7227dab527b3a3685a3c635b/types_pyyaml-6.0.12.20260408-py3-none-any.whl", hash = "sha256:fbc42037d12159d9c801ebfcc79ebd28335a7c13b08a4cfbc6916df78fee9384", size = 20339, upload-time = "2026-04-08T04:30:50.113Z" },
+]
+
+[[package]]
+name = "types-regex"
+version = "2026.11.25.20261127"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/93/7df09fdaa5b34e9bf5bd6ec8787f5dc8035b5d1183b7217ef5ace815bdd7/types_regex-2026.11.25.20261127.tar.gz", hash = "sha256:d3af64aaab09e0db9651c8e5a06693ee2b39ee3c92ba188f0bf1ea9fad1fb636", size = 14647, upload-time = "2026-11-27T10:13:39.154Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/51/2f25db022c8c1b3882655665e4bcc85b33638e1d9d44b72c61d87116869e/types_regex-2026.11.25.20261127-py3-none-any.whl", hash = "sha256:9cd942da2996e65225c963d9812734f7cb45f979577d11576452c8212d8e065f", size = 11235, upload-time = "2026-11-27T10:13:38.131Z" },
 ]
 
 [[package]]

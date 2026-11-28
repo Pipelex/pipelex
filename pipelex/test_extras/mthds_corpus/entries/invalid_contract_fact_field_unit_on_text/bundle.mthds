@@ -1,0 +1,16 @@
+domain      = "facts_unit_on_text"
+description = "A parcel card putting a unit on a text field"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+name = { type = "text", description = "The name", unit = "m" }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

@@ -281,6 +281,7 @@ def _pipe_output_from_run_output(run_output: PipelexPipeRunOutput) -> PipeOutput
             "pipe_io_artifacts_error": run_output.pipe_io_artifacts_error,
             "tokens_usages": run_output.tokens_usages_dump,
             "usage_assembly_error": run_output.usage_assembly_error,
+            "result_line": run_output.result_line,
         },
         strict=False,
     )

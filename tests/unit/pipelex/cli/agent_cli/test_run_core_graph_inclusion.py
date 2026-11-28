@@ -48,7 +48,7 @@ class TestAgentRunCoreGraphInclusion:
         memory.record_new_main_absence(
             AbsenceRecord(variable_name="answer", kind=AbsenceKind.DECLARED_ABSENT, reason="not the point of this test", producing_pipe="answer")
         )
-        pipe_output = SimpleNamespace(working_memory=memory, graph_spec=None, tokens_usages=None)
+        pipe_output = SimpleNamespace(working_memory=memory, graph_spec=None, tokens_usages=None, result_line=None)
         runner_mock = mocker.MagicMock()
         runner_mock.execute = mocker.AsyncMock(return_value=SimpleNamespace(pipe_output=pipe_output))
         runner_class = mocker.patch(f"{_RUN_CORE_MODULE}.PipelexMTHDSProtocol", return_value=runner_mock)

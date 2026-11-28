@@ -1,0 +1,10 @@
+name = "feature_contract_facts_slot_names_lengths"
+description = "A note about a list of names, each at most eighty characters"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

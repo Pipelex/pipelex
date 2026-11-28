@@ -41,12 +41,14 @@ registry, and bundle-defined classes are only reliably current while their libra
 
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import Any, get_origin
+from typing import Any, cast, get_origin
 
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from mthds.protocol.input_form import (
+    Aggregate,
     BooleanField,
     BooleanItem,
+    ContractFormat,
     DateField,
     DateItem,
     DocumentField,
@@ -66,6 +68,7 @@ from mthds.protocol.input_form import (
     NumberItem,
     ObjectField,
     ObjectItem,
+    OptionTone,
     PipeInputFormDescriptor,
     ProseField,
     ProseItem,
@@ -75,6 +78,7 @@ from mthds.protocol.input_form import (
     UnknownField,
     UnknownItem,
 )
+from mthds.protocol.input_form import ChoiceOption as DescriptorChoiceOption
 from mthds.protocol.output_form import OutputForm, PipeOutputFormDescriptor
 from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -88,6 +92,7 @@ from pipelex.core.concepts.annotation_shapes import (
     scalar_field_type,
     strip_optional,
 )
+from pipelex.core.concepts.choice_options import ChoiceOptionTable, ChoiceOptionValue, choice_values, options_carry_words
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -95,6 +100,7 @@ from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_va
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
+from pipelex.language.contract_facts import ContractFactKey, json_example
 from pipelex.language.intent_hints import HintSiteValueKind, IntentWord, applicable_intent, merge_hints
 from pipelex.libraries.crate_qualification import QualifiedCrateContent, qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
@@ -180,10 +186,17 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifie
         # (the fallback path) derives with no hints.
         blueprint = qualified.pipes.get(pipe.pipe_ref)
         blueprint_inputs: Mapping[str, str | InputSlotBlueprint] = blueprint.inputs if blueprint is not None and blueprint.inputs else {}
-        fields = [
-            deriver.derive_slot(name=var_name, stuff_spec=stuff_spec, slot_hints=_slot_hints_of(blueprint_inputs.get(var_name)))
-            for var_name, stuff_spec in pipe.inputs.root.items()
-        ]
+        fields: list[InputFormField] = []
+        for var_name, stuff_spec in pipe.inputs.root.items():
+            slot_value = blueprint_inputs.get(var_name)
+            fields.append(
+                deriver.derive_slot(
+                    name=var_name,
+                    stuff_spec=stuff_spec,
+                    slot_hints=_slot_hints_of(slot_value),
+                    slot=slot_value if isinstance(slot_value, InputSlotBlueprint) else None,
+                )
+            )
         input_form[pipe.pipe_ref] = PipeInputFormDescriptor(fields=fields)
     return input_form
 
@@ -287,13 +300,25 @@ class InputFormDeriver:
 
     # ---- Pipe slots -------------------------------------------------------------------------------
 
-    def derive_slot(self, *, name: str, stuff_spec: StuffSpec, slot_hints: dict[str, str] | None = None) -> InputFormField:
+    def derive_slot(
+        self,
+        *,
+        name: str,
+        stuff_spec: StuffSpec,
+        slot_hints: dict[str, str] | None = None,
+        slot: InputSlotBlueprint | None = None,
+    ) -> InputFormField:
         """A top-level field: the concept node, list-wrapped when multiple, stamped with slot facts.
 
         `slot_hints` are the slot's authored hints from the qualified blueprint; the site-over-concept
-        merge happens here (the concept node already carries the concept's effective hints).
+        merge happens here (the concept node already carries the concept's effective hints). `slot` is
+        the expanded slot table, whose description replaces the concept's (L-261107-df1c70), whose
+        contract facts are stated on the value node (a plural slot's `item`), and whose `choices` make
+        a text-valued node an `enum`.
         """
         node = self._concept_node(name=name, concept_ref=stuff_spec.concept.concept_ref, seen=frozenset())
+        if slot is not None:
+            node = _with_slot_meaning(node=node, slot=slot)
         effective_hints = merge_hints([node.hints, slot_hints])
         if stuff_spec.is_multiple():
             item_count = fixed_item_count(multiplicity=stuff_spec.multiplicity)
@@ -343,6 +368,10 @@ class InputFormDeriver:
     def _blueprint_node(self, *, name: str, concept_ref: str, blueprint: ConceptBlueprint, seen: frozenset[str]) -> InputFormField:
         chain = self._refines_chain(concept_ref=concept_ref)
         node = self._blueprint_node_for_chain(name=name, concept_ref=concept_ref, blueprint=blueprint, chain=chain, seen=seen)
+        if blueprint.unit is not None and isinstance(node, NumberItem):
+            # The qualified crate carries a concept's unit inherited along refinement, so this is the concept's effective
+            # unit, which a field's or a slot's own `unit` replaces when the site states one (`_with_contract_facts`).
+            node = node.model_copy(update={"unit": blueprint.unit})
         # The concept's effective hints: its refinement chain merged nearer-wins, computed with the
         # same `_refines_chain` walk the structure merge uses. Carried on the node WITHOUT feeding
         # `kind` yet: this node may still receive a site layer (a slot's or a field's hints), and
@@ -426,7 +455,7 @@ class InputFormDeriver:
                         # A producer may report a probability beside the verdict: the pinned object.
                         return self._pinned_object_node(name=name, node_ref=node_ref, refines=refines, description=text, pinned=pinned, seen=seen)
             case NativeConceptCode.TIME:
-                return TextField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, format="time")
+                return TextField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, format=ContractFormat.TIME)
             case NativeConceptCode.DOCUMENT:
                 return DocumentField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case NativeConceptCode.IMAGE:
@@ -663,7 +692,8 @@ class InputFormDeriver:
                 name=name,
                 description=field.description,
                 required=field.required,
-                choices=list(field.choices),
+                choices=choice_values(options=field.choices),
+                options=descriptor_options(options=field.choices),
                 default_value=field.default_value,
             )
             return _with_effective_hints(node=enum_node, hints=field.hints)
@@ -673,6 +703,7 @@ class InputFormDeriver:
                     return _unknown_node(name=name, description=field.description, required=field.required)
                 node = self._concept_node(name=name, concept_ref=field.concept_ref, seen=seen)
                 node = _with_effective_hints(node=node, hints=merge_hints([node.hints, field.hints]))
+                node = _with_contract_facts(node=node, facts=field.contract_facts)
                 return node.model_copy(update={"description": field.description, "required": field.required})
             case ConceptStructureBlueprintFieldType.LIST:
                 item = self._list_item(name=name, field=field, seen=seen)
@@ -704,6 +735,7 @@ class InputFormDeriver:
                 scalar = _scalar_field(
                     field_type=field.type, name=name, description=field.description, required=field.required, default_value=field.default_value
                 )
+                scalar = _with_contract_facts(node=scalar, facts=field.contract_facts)
                 return _with_effective_hints(node=scalar, hints=field.hints)
 
     def _list_item(self, *, name: str, field: ConceptStructureBlueprint, seen: frozenset[str]) -> InputFormField:
@@ -775,11 +807,13 @@ def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None)
     if not hints:
         return node
     match applicable_intent(hints, site_kind=_node_site_kind(node)):
-        case IntentWord.PROSE:
+        case IntentWord.PROSE | IntentWord.CODE | IntentWord.QUESTION:
+            # A passage, a code block and a question each take several lines to write.
             return _recast_text_kind(node=node, hints=hints, to_prose=True)
-        case IntentWord.LABEL:
+        case IntentWord.LABEL | IntentWord.IDENTIFIER:
             return _recast_text_kind(node=node, hints=hints, to_prose=False)
-        case IntentWord.RATING | IntentWord.QUANTITY | None:
+        case IntentWord.RATING | IntentWord.QUANTITY | IntentWord.PHOTO | IntentWord.SCREENSHOT | IntentWord.SCAN | None:
+            # A number keeps its kind, and an image or a document its own: the word rides as a hint for the consumer.
             return node.model_copy(update={"hints": hints})
 
 
@@ -815,6 +849,79 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
     )
 
 
+def _with_contract_facts(*, node: InputFormField, facts: Mapping[str, Any]) -> InputFormField:
+    """The node with every contract fact its descriptor kind has a member for, examples as JSON values.
+
+    A `number` node carries `unit` and `aggregate` (spec: input-form-descriptor.md), a site's own `unit` replacing the one
+    its concept gave the node; a `text` node carries `format` as the descriptor's `ContractFormat`.
+    """
+    if not facts:
+        return node
+    members = type(node).model_fields
+    update: dict[str, Any] = {}
+    for key, value in facts.items():
+        if key not in members:
+            continue
+        match ContractFactKey(key):
+            case ContractFactKey.EXAMPLES:
+                update[key] = [json_example(value=example) for example in cast("list[Any]", value)]
+            case ContractFactKey.FORMAT:
+                update[key] = ContractFormat(str(value))
+            case ContractFactKey.AGGREGATE:
+                update[key] = Aggregate(str(value))
+            case (
+                ContractFactKey.MINIMUM
+                | ContractFactKey.MAXIMUM
+                | ContractFactKey.EXCLUSIVE_MINIMUM
+                | ContractFactKey.EXCLUSIVE_MAXIMUM
+                | ContractFactKey.MIN_LENGTH
+                | ContractFactKey.MAX_LENGTH
+                | ContractFactKey.PATTERN
+                | ContractFactKey.UNIT
+            ):
+                update[key] = value
+    return node.model_copy(update=update) if update else node
+
+
+def descriptor_options(*, options: Sequence[ChoiceOptionValue]) -> list[DescriptorChoiceOption] | None:
+    """The `options` of an `enum` node: one entry per choice, in order, present only when an option carries a word.
+
+    A string option is its value alone; an option table gives its label, description and tone (spec:
+    input-form-descriptor.md, "Choice options"). A list whose options carry no word has no `options` member.
+    """
+    if not options_carry_words(options=options):
+        return None
+    entries: list[DescriptorChoiceOption] = []
+    for option in options:
+        match option:
+            case str():
+                entries.append(DescriptorChoiceOption(value=option))
+            case ChoiceOptionTable():
+                tone = OptionTone(option.tone) if option.tone is not None else None
+                entries.append(DescriptorChoiceOption(value=option.value, label=option.label, description=option.description, tone=tone))
+    return entries
+
+
+def _with_slot_meaning(*, node: InputFormField, slot: InputSlotBlueprint) -> InputFormField:
+    """A slot's concept node with the slot's own description, contract facts and options stated on it."""
+    if slot.description is not None:
+        node = node.model_copy(update={"description": slot.description})
+    option_values = slot.choice_values
+    if option_values is not None and isinstance(node, TextValuedItemBase):
+        node = EnumField(
+            name=node.name,
+            title=node.title,
+            concept_ref=node.concept_ref,
+            refines=node.refines,
+            description=node.description,
+            required=node.required,
+            hints=node.hints,
+            choices=option_values,
+            options=descriptor_options(options=slot.choices or []),
+        )
+    return _with_contract_facts(node=node, facts=slot.contract_facts)
+
+
 def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
 
@@ -829,10 +936,18 @@ def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
         case NumberField():
             return HintSiteValueKind.NUMBER_VALUED
         case TextField() | ProseField():
-            if node.format is not None:
-                return HintSiteValueKind.OTHER
+            # A time-formatted text (`type = "time"`, `native.Time`) is time-valued; any other format (an email, a URI) is
+            # a constraint on a text, which stays text-valued.
+            if node.format is not None and node.format.is_time:
+                return HintSiteValueKind.TIME_VALUED
             return HintSiteValueKind.TEXT_VALUED
-        case DateField() | BooleanField() | EnumField() | DocumentField() | ImageField() | ObjectField() | ListField() | UnknownField():
+        case DateField():
+            return HintSiteValueKind.DATE_VALUED
+        case ImageField():
+            return HintSiteValueKind.IMAGE_VALUED
+        case DocumentField():
+            return HintSiteValueKind.DOCUMENT_VALUED
+        case BooleanField() | EnumField() | ObjectField() | ListField() | UnknownField():
             return HintSiteValueKind.OTHER
 
 
@@ -859,7 +974,7 @@ def _scalar_field(
         case ConceptStructureBlueprintFieldType.DATETIME:
             return DateField(name=name, description=description, required=required, default_value=default_value, datetime=True)
         case ConceptStructureBlueprintFieldType.TIME:
-            return TextField(name=name, description=description, required=required, default_value=default_value, format="time")
+            return TextField(name=name, description=description, required=required, default_value=default_value, format=ContractFormat.TIME)
         case ConceptStructureBlueprintFieldType.LIST | ConceptStructureBlueprintFieldType.DICT | ConceptStructureBlueprintFieldType.CONCEPT:
             return UnknownField(name=name, description=description, required=required, default_value=default_value)
 

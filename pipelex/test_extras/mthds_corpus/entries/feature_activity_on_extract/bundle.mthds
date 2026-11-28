@@ -1,0 +1,10 @@
+domain      = "activity_on_extract"
+description = "Reading a lease, saying what the step is doing while it runs"
+main_pipe   = "read_lease"
+
+[pipe.read_lease]
+type        = "PipeExtract"
+description = "Read the lease's pages"
+inputs      = { lease = "Document" }
+output      = "Page[]"
+activity    = "Reading the lease"

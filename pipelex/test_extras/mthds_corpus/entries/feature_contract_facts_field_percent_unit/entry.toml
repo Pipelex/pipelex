@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_percent_unit"
+description = "A festival card whose share is a percentage"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

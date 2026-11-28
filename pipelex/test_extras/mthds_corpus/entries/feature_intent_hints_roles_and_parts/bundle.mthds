@@ -1,0 +1,33 @@
+domain      = "nda_review_roles"
+description = "Reviewing an NDA, with each input's role and each output field's part stated for a form"
+main_pipe   = "review_nda"
+
+[concept.NdaReview]
+description = "The review of a non-disclosure agreement"
+
+[concept.NdaReview.structure]
+headline = { type = "text", description = "The review's headline", required = true, hints = { part = "title", intent = "label" } }
+decision = { description = "Whether to sign", choices = [
+  "sign",
+  "negotiate",
+], required = true, hints = { part = "verdict" } }
+risk_summary = { type = "text", description = "The risks in two sentences", hints = { part = "summary" } }
+order_ref = { type = "text", description = "The order reference", hints = { intent = "identifier" } }
+
+[pipe.review_nda]
+type = "PipeLLM"
+description = "Review the NDA against the playbook"
+output = "NdaReview"
+prompt = """
+Review this NDA for $counterparty against the playbook. $request
+
+@nda
+
+@playbook
+"""
+
+[pipe.review_nda.inputs]
+nda          = { concept = "Text", hints = { role = "subject" } }
+counterparty = { concept = "Text", hints = { role = "context" } }
+request      = { concept = "Text", hints = { role = "guidance", intent = "question" } }
+playbook     = { concept = "Text", hints = { role = "reference" } }

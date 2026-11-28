@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_crossed_lengths"
+description = "A village notice whose headline lengths cross"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

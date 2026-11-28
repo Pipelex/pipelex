@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_field_unknown_unit"
+description = "A parcel card naming a unit the language does not list"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

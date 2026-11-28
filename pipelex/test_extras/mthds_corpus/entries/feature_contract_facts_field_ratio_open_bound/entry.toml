@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_ratio_open_bound"
+description = "An orchard's harvest card stating the share sold, above nothing and at most all of it"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]

@@ -18,6 +18,7 @@ from pipelex.pipe_run.delivery_executor import DeliveryExecutor, run_problem_of
 from pipelex.pipe_run.exceptions import DeliveryError
 from pipelex.pipe_run.located_failure import reported_failure_code
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+from pipelex.pipe_run.result_line import result_line_of_run
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of, report_run_usage
@@ -175,6 +176,10 @@ class PipeRun(PipeRunProtocol):
                 # output stays in-process, so stamping at every `PipeOutput(...)` site
                 # would be noise on ~17 constructors to serve one of them.
                 pipe_output.set_job_metadata(job_metadata=pipe_job.job_metadata)
+                # The run's own output takes its result line, once, here where the run ends with a value.
+                pipe_output.result_line = await result_line_of_run(
+                    result_line=pipe_job.pipe.result_line, pipe_output=pipe_output, pipe_code=pipe_job.pipe.code
+                )
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Observe-and-reraise: records the failure so the run's tail sees it, then re-raises the original error below.
                 execution_error = exc

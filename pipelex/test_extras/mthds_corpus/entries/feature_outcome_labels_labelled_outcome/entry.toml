@@ -1,0 +1,10 @@
+name = "feature_outcome_labels_labelled_outcome"
+description = "Routing a claim, with words for the detailed check"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.outcome_labels",
+]

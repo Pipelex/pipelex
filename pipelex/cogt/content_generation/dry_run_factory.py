@@ -12,7 +12,9 @@ from polyfactory.fields import Ignore, PostGenerated, Use
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
+from pipelex.cogt.content_generation.contract_fact_mocks import mock_provider
 from pipelex.config import get_config
+from pipelex.core.concepts.contract_fact_projection import contract_facts_of
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -214,7 +216,42 @@ class DryRunFactory:
         """
         if hasattr(field_info, "examples") and field_info.examples:
             return list(field_info.examples)
+        # A field that may hold nothing wraps its constrained type in a union, `Annotated[str, ...] | None`, so the
+        # examples and the format of its contract facts sit on the union's annotated arm, not on the field itself.
+        arm_infos = [
+            metadata
+            for arm in get_args(field_info.annotation)
+            if get_origin(arm) is typing.Annotated
+            for metadata in get_args(arm)[1:]
+            if isinstance(metadata, FieldInfo)
+        ]
+        for arm_info in arm_infos:
+            if arm_info.examples:
+                return list(arm_info.examples)
         return None
+
+    @classmethod
+    def _detect_contract_fact_providers(cls, *, object_class: type[BaseModel]) -> dict[str, Callable[[], Any]]:
+        """Providers for the fields whose contract facts polyfactory cannot honour alone (`contract_fact_mocks.mock_provider`).
+
+        The facts ride the constrained annotation's metadata (`ContractFactsMetadata`): on the field itself, or on the
+        annotated arm of the union a field that may hold nothing wraps it in.
+        """
+        providers: dict[str, Callable[[], Any]] = {}
+        for field_name, field_info in object_class.model_fields.items():
+            sites: list[tuple[Any, dict[str, Any] | None]] = [(field_info.annotation, contract_facts_of(metadata=field_info.metadata))]
+            for arm in get_args(field_info.annotation):
+                if get_origin(arm) is typing.Annotated:
+                    arm_args = get_args(arm)
+                    sites.append((arm_args[0], contract_facts_of(metadata=arm_args[1:])))
+            for annotation, facts in sites:
+                if facts is None:
+                    continue
+                provider = mock_provider(annotation=annotation, facts=facts)
+                if provider is not None:
+                    providers[field_name] = provider
+                    break
+        return providers
 
     @classmethod
     def _get_mock_format_from_field(cls, field_info: FieldInfo) -> MockFormat | None:
@@ -380,6 +417,8 @@ class DryRunFactory:
             "__allow_none_optionals__": False,
         }
         class_attrs.update(cls._file_url_providers(object_class=nested_class))
+        for field_name, provider in cls._detect_contract_fact_providers(object_class=nested_class).items():
+            class_attrs[field_name] = Use(provider)
 
         # Detect fields with examples and create providers
         fields_with_examples = cls._detect_examples_constraints(nested_class)  # type: ignore[arg-type]
@@ -518,6 +557,11 @@ class DryRunFactory:
         for field_name in detected_formats[MockFormat.DICT_SINGLE_EXTRACT_INPUT]:
             if field_name in object_class.model_fields:
                 class_attrs[field_name] = Use(cls.generate_dict_single_extract_input)
+
+        # Fields whose contract facts polyfactory cannot honour alone take a provider that does
+        for field_name, provider in cls._detect_contract_fact_providers(object_class=object_class).items():
+            if field_name not in class_attrs:
+                class_attrs[field_name] = Use(provider)
 
         # Detect fields with examples and create providers that pick from them
         fields_with_examples = cls._detect_examples_constraints(object_class)

@@ -1,0 +1,12 @@
+name = "invalid_contract_fact_slot_length_beside_options"
+description = "A note bounding the length of a slot that offers options"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.contract_fact_invalid",
+]
+
+expected_error = "contract_fact_invalid"

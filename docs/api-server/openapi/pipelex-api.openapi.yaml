@@ -2138,6 +2138,27 @@ components:
         fact: who produced it, why, and which upstream absence it chains to. Provenance is captured
 
         at the moment absence is produced, not reconstructed at failure time.'
+    Aggregate:
+      type: string
+      enum:
+      - sum
+      - average
+      title: Aggregate
+      description: 'How the values of a number-valued field combine across the records that hold it.
+
+
+        A consumer presenting several records together may show the sum or the average a field
+
+        declares, counted in the field''s effective unit, and never a total or an average of a field
+
+        that declares no `aggregate`.'
+    AggregateWord:
+      type: string
+      enum:
+      - sum
+      - average
+      title: AggregateWord
+      description: How the values of a number-valued field combine across the records that hold it.
     AliasMatch:
       properties:
         category:
@@ -2343,8 +2364,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -2409,8 +2435,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -2506,6 +2537,69 @@ components:
       - overwrite
       title: CellPolicy
       description: Which cells of a matched row an `update` may write. A null field writes nothing under either.
+    ChoiceOption:
+      properties:
+        value:
+          type: string
+          title: Value
+        label:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Description
+        tone:
+          anyOf:
+          - $ref: '#/components/schemas/OptionTone'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - value
+      title: ChoiceOption
+      description: 'One option of an `enum` node''s `options`: its value, and the words and tone the method gives it.
+
+
+        `value` is the option''s value exactly as `choices` lists it at the same position, so it may be
+
+        any string a `choices` list holds, the empty string included for a list written before option
+
+        tables existed. `label`, `description` and `tone` are each present only when the option declares
+
+        them, and a declared word is never empty. Only `value` matters to a payload; the rest is
+
+        presentation. Closed shape (`extra="forbid"`), absent never `null`.'
+    ChoiceOptionTable:
+      properties:
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        tone:
+          anyOf:
+          - $ref: '#/components/schemas/Tone'
+          - type: 'null'
+        value:
+          type: string
+          title: Value
+      additionalProperties: false
+      type: object
+      required:
+      - value
+      title: ChoiceOptionTable
+      description: 'An option of a `choices` list written as a table: its value, and the words for the people who read it.'
     CodegenRequest:
       properties:
         files:
@@ -2795,6 +2889,11 @@ components:
             type: object
           - type: 'null'
           title: Hints
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
       additionalProperties: false
       type: object
       required:
@@ -2802,6 +2901,66 @@ components:
       title: ConceptBlueprint
     ConceptStructureBlueprint:
       properties:
+        minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Minimum
+        maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Maximum
+        exclusive_minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Minimum
+        exclusive_maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Maximum
+        min_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Min Length
+        max_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Max Length
+        pattern:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pattern
+        format:
+          anyOf:
+          - $ref: '#/components/schemas/ValueFormat'
+          - type: 'null'
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/AggregateWord'
+          - type: 'null'
+        examples:
+          anyOf:
+          - items: {}
+            type: array
+          - type: 'null'
+          title: Examples
         description:
           type: string
           title: Description
@@ -2861,7 +3020,9 @@ components:
         choices:
           anyOf:
           - items:
-              type: string
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/ChoiceOptionTable'
             type: array
           - type: 'null'
           title: Choices
@@ -2890,7 +3051,16 @@ components:
 
         keys are strict, exactly like an input slot table''s; hint *content* stays lenient (unknown
 
-        hint keys warn and are preserved, per intent-hints.md).'
+        hint keys warn and are preserved, per intent-hints.md).
+
+
+        A field may state contract facts about its value (`ContractFactsBlueprint`). A field typed by a field type is judged
+
+        here, where its value class is known; a `concept` field''s value class depends on the concept it names, which a field
+
+        cannot resolve alone, so whether its facts apply is judged once the library''s concepts are known
+
+        (`pipelex.libraries.contract_fact_sites`), and only what holds whatever its class is judged here.'
     ConceptStructureBlueprintFieldType:
       type: string
       enum:
@@ -2969,6 +3139,30 @@ components:
       - nested
       title: ConstructFieldMethod
       description: Method used to compose a field value.
+    ContractFormat:
+      type: string
+      enum:
+      - email
+      - uri
+      - date-time
+      - uuid
+      - hostname
+      - ipv4
+      - ipv6
+      - time
+      title: ContractFormat
+      description: 'The `format` a text node may carry: the language''s formats, plus `time`.
+
+
+        The first seven are the closed set the language authors as a text field''s or slot''s `format`
+
+        contract fact, each the JSON Schema format of the same name. `time` is not a value an author
+
+        writes: the `time` field type and `native.Time` produce it, as a `text` node with
+
+        `format: "time"`. Since `9.2.0` a producer emits no other value, so a node carrying one fails
+
+        the parse.'
     CrateInvalidReport:
       properties:
         is_valid:
@@ -3040,8 +3234,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3110,8 +3309,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3344,8 +3548,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3410,8 +3619,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3554,8 +3768,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3575,6 +3794,13 @@ components:
             type: string
           type: array
           title: Choices
+        options:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ChoiceOption'
+            type: array
+          - type: 'null'
+          title: Options
         name:
           type: string
           title: Name
@@ -3626,8 +3852,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -3647,6 +3878,13 @@ components:
             type: string
           type: array
           title: Choices
+        options:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ChoiceOption'
+            type: array
+          - type: 'null'
+          title: Options
       additionalProperties: false
       type: object
       required:
@@ -4035,8 +4273,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -4108,8 +4351,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -4190,9 +4438,74 @@ components:
       title: ImgGenSetting
     InputSlotBlueprint:
       properties:
+        minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Minimum
+        maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Maximum
+        exclusive_minimum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Minimum
+        exclusive_maximum:
+          anyOf:
+          - type: integer
+          - type: number
+          - type: 'null'
+          title: Exclusive Maximum
+        min_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Min Length
+        max_length:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Max Length
+        pattern:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pattern
+        format:
+          anyOf:
+          - $ref: '#/components/schemas/ValueFormat'
+          - type: 'null'
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/AggregateWord'
+          - type: 'null'
+        examples:
+          anyOf:
+          - items: {}
+            type: array
+          - type: 'null'
+          title: Examples
         concept:
           type: string
           title: Concept
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
         hints:
           anyOf:
           - additionalProperties:
@@ -4200,25 +4513,50 @@ components:
             type: object
           - type: 'null'
           title: Hints
+        choices:
+          anyOf:
+          - items:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/ChoiceOptionTable'
+            type: array
+          - type: 'null'
+          title: Choices
       additionalProperties: false
       type: object
       required:
       - concept
       title: InputSlotBlueprint
-      description: 'The expanded input-slot form: `name = { concept = "…", hints = { … } }` (spec: intent-hints.md).
+      description: 'The expanded input-slot form: `name = { concept = "…", description = "…", hints = { … }, … }` (spec: mthds-format.md,
+
+        "Input slot declarations").
 
 
-        `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional
+        `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional presence marker).
+        Beside
 
-        presence marker). The form is deliberately closed (`extra="forbid"` implements the spec''s
+        it, a slot may say what it is for in this pipe (`description`), carry intent hints, and, on a slot holding a plain
+        value,
 
-        "unknown slot-table keys MUST be rejected") so future per-slot semantic keys land here without a
+        the contract facts (`ContractFactsBlueprint`) and `choices` a structure field takes, which apply to each item of a
+        plural
 
-        second syntax. A slot table carrying no hints collapses to its plain string at parse time (see
+        slot. The form is deliberately closed (`extra="forbid"` implements the spec''s "unknown slot-table keys MUST be
 
-        `PipeBlueprint.collapse_hint_free_slot_tables`), so a slot value that IS a table carries
+        rejected"). A slot table carrying none of these collapses to its plain string at parse time (see
 
-        non-empty hints — hint-free bundles produce byte-identical blueprints to the string form.'
+        `PipeBlueprint.collapse_plain_slot_tables`), so such bundles produce byte-identical blueprints to the string form.
+
+
+        What this blueprint judges alone: a description that is empty, `aggregate` (never on a slot), a text constraint or
+
+        `examples` beside `choices`, and facts that contradict each other. Whether a fact or `choices` applies to the slot''s
+        value
+
+        class depends on its concept, which a slot cannot resolve alone, so it is judged once the library''s concepts are
+        known
+
+        (`pipelex.libraries.contract_fact_sites`).'
     InvalidReport:
       properties:
         is_valid:
@@ -4522,8 +4860,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -4622,8 +4965,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5382,6 +5730,11 @@ components:
           - type: string
           - type: 'null'
           title: Description
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
         domain_code:
           anyOf:
           - type: string
@@ -5589,8 +5942,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5632,6 +5990,16 @@ components:
           - type: number
           - type: 'null'
           title: Exclusive Maximum
+        unit:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/Aggregate'
+          - type: 'null'
         name:
           type: string
           title: Name
@@ -5683,8 +6051,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5726,6 +6099,16 @@ components:
           - type: number
           - type: 'null'
           title: Exclusive Maximum
+        unit:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Unit
+        aggregate:
+          anyOf:
+          - $ref: '#/components/schemas/Aggregate'
+          - type: 'null'
       additionalProperties: false
       type: object
       required:
@@ -5773,8 +6156,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5870,8 +6258,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -5923,6 +6316,46 @@ components:
       - fields
       title: ObjectItem
       description: '`object` — a structured concept, recursing through its resolved payload fields.'
+    OptionTone:
+      type: string
+      enum:
+      - positive
+      - caution
+      - negative
+      - neutral
+      title: OptionTone
+      description: 'How a choice option reads to a person, never a colour; an option without a tone reads as `neutral`.
+
+
+        A consumer maps a tone to its own palette or icon, and never infers one from an option''s value
+
+        or label.'
+    OutcomeTable:
+      properties:
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        tone:
+          anyOf:
+          - $ref: '#/components/schemas/Tone'
+          - type: 'null'
+        pipe:
+          type: string
+          title: Pipe
+      additionalProperties: false
+      type: object
+      required:
+      - pipe
+      title: OutcomeTable
+      description: 'A condition''s outcome written as a table: its pipe reference (or special outcome), and the words for
+        people.'
     PipeBatchBlueprint:
       properties:
         source:
@@ -5955,6 +6388,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         branch_pipe_code:
           type: string
           title: Branch Pipe Code
@@ -6005,6 +6448,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         template:
           anyOf:
           - type: string
@@ -6053,6 +6506,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         expression_template:
           anyOf:
           - type: string
@@ -6065,7 +6528,29 @@ components:
           title: Expression
         outcomes:
           additionalProperties:
-            type: string
+            anyOf:
+            - type: string
+            - properties:
+                pipe:
+                  type: string
+                  minLength: 1
+                label:
+                  type: string
+                  minLength: 1
+                description:
+                  type: string
+                  minLength: 1
+                tone:
+                  type: string
+                  enum:
+                  - positive
+                  - caution
+                  - negative
+                  - neutral
+              additionalProperties: false
+              type: object
+              required:
+              - pipe
           type: object
           title: Outcomes
           x-schema-required: true
@@ -6073,6 +6558,7 @@ components:
           anyOf:
           - type: string
           - $ref: '#/components/schemas/SpecialOutcome'
+          - $ref: '#/components/schemas/OutcomeTable'
           title: Default Outcome
         add_alias_from_expression_to:
           anyOf:
@@ -6118,6 +6604,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         format:
           $ref: '#/components/schemas/DocGenFormat'
         model:
@@ -6257,6 +6753,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         model:
           anyOf:
           - $ref: '#/components/schemas/ExtractSetting'
@@ -6332,6 +6838,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         function_name:
           type: string
           pattern: ^[^.]+(\.[^.]+)+$
@@ -6583,6 +7099,16 @@ components:
           type: boolean
           title: Is Runnable
           description: '`not pending_signatures`, exactly as on `/validate`. No dry run backs it.'
+        examples:
+          items:
+            type: string
+          type: array
+          title: Examples
+          description: 'The example inputs the method''s manifest offers for its entry pipe (`default_pipe_ref`): the `examples`
+            of its `METHODS.toml`, each the tree path of a JSON file of flat inputs in stuff wire form, in the manifest''s
+            order. Listed only when the described pipe (`pipe_ref`) is that entry pipe, since they fill its inputs and no
+            other pipe''s. Empty when the manifest declares none, when the method has no manifest, when the request names
+            another pipe, or when a request naming its pipe sends a manifest that cannot be read.'
         files:
           additionalProperties:
             type: string
@@ -6647,6 +7173,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         prompt:
           type: string
           title: Prompt
@@ -6814,6 +7350,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         prompt:
           type: string
           title: Prompt
@@ -6916,6 +7462,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         model:
           anyOf:
           - $ref: '#/components/schemas/LLMSetting'
@@ -7098,6 +7654,11 @@ components:
           - type: string
           - type: 'null'
           title: Usage Assembly Error
+        result_line:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Line
       additionalProperties: false
       type: object
       title: PipeOutputWire
@@ -7141,6 +7702,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         branches:
           items:
             $ref: '#/components/schemas/SubPipeBlueprint'
@@ -7189,6 +7760,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         prompt:
           type: string
           title: Prompt
@@ -7272,6 +7853,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         steps:
           items:
             oneOf:
@@ -7308,6 +7899,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         signature_for:
           anyOf:
           - $ref: '#/components/schemas/PipeType'
@@ -7359,6 +7960,16 @@ components:
         output:
           type: string
           title: Output
+        activity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity
+        output_filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Output Filename
         model:
           anyOf:
           - $ref: '#/components/schemas/LLMSetting'
@@ -8417,8 +9028,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -8431,11 +9047,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -8445,9 +9063,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: prose
@@ -8503,8 +9120,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -8517,11 +9139,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -8531,9 +9155,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: prose
@@ -9075,8 +9698,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9089,11 +9717,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -9103,9 +9733,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: text
@@ -9169,8 +9798,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9183,11 +9817,13 @@ components:
         min_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Min Length
         max_length:
           anyOf:
           - type: integer
+            ge: 0
           - type: 'null'
           title: Max Length
         pattern:
@@ -9197,9 +9833,8 @@ components:
           title: Pattern
         format:
           anyOf:
-          - type: string
+          - $ref: '#/components/schemas/ContractFormat'
           - type: 'null'
-          title: Format
         kind:
           type: string
           const: text
@@ -9300,6 +9935,16 @@ components:
         ``nb_tokens_by_category`` keys) are open sets on the wire, typed as plain strings —
 
         runtime enum churn is non-breaking for clients.'
+    Tone:
+      type: string
+      enum:
+      - positive
+      - caution
+      - negative
+      - neutral
+      title: Tone
+      description: 'How a choice option or a condition''s outcome reads to a person. Never a colour: each consumer maps it
+        to its own palette.'
     TreeFileRead:
       properties:
         tree_path:
@@ -9386,8 +10031,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9452,8 +10102,13 @@ components:
           title: Default Value
         examples:
           anyOf:
-          - items: {}
+          - items:
+              anyOf:
+              - type: string
+              - type: integer
+              - type: number
             type: array
+            minItems: 1
           - type: 'null'
           title: Examples
         hints:
@@ -9864,6 +10519,18 @@ components:
         The ``pipe_ref`` key carries the namespaced ``pipe_ref`` (``domain.code``) — never the bare code.
 
         ``status`` is a ``DryRunStatus`` (a ``StrEnum``), so it serializes to its plain string value.'
+    ValueFormat:
+      type: string
+      enum:
+      - email
+      - uri
+      - date-time
+      - uuid
+      - hostname
+      - ipv4
+      - ipv6
+      title: ValueFormat
+      description: The closed set of `format` values, each the JSON Schema format of the same name.
     WaterfallMatch:
       properties:
         category:

@@ -367,6 +367,10 @@ def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) ->
             return CoreCode.MODEL_UNKNOWN
         case PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED:
             return CoreCode.METHOD_FUNCTION_INVALID
+        case PipeValidationErrorType.CONTRACT_FACT_INVALID:
+            return CoreCode.METHOD_CONTRACT_FACT_INVALID
+        case PipeValidationErrorType.CHOICE_OPTION_DUBIOUS:
+            return CoreCode.METHOD_CHOICE_OPTION_DUBIOUS
         case PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR | None:
             return CoreCode.METHOD_SCHEMA_VIOLATION
 
@@ -407,6 +411,8 @@ class PipeValidationError(PipelexError, ValueError):
             CoreCode.METHOD_PIPE_NOT_EXPORTED,
             CoreCode.METHOD_FUNCTION_INVALID,
             CoreCode.METHOD_WIRING_INVALID,
+            CoreCode.METHOD_CONTRACT_FACT_INVALID,
+            CoreCode.METHOD_CHOICE_OPTION_DUBIOUS,
             CoreCode.MODEL_UNKNOWN,
             CoreCode.MODEL_CAPABILITY_UNSUPPORTED,
             CoreCode.RUNTIME_UNEXPECTED,

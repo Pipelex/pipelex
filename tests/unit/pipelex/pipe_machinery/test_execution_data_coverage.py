@@ -52,7 +52,7 @@ def _discover_pipe_classes() -> list[type[PipeAbstract]]:
         cls
         for cls in seen
         if cls.__module__.startswith("pipelex.")
-        and not cls.__module__.endswith((".pipe_operator", ".pipe_controller", ".pipe_abstract"))
+        and not cls.__module__.endswith((".pipe_operator", ".pipe_controller", ".pipe_abstract", ".pipe_reading_stored_inputs"))
         and not cls.__module__.startswith("pipelex.pipe_signature.")
     ]
     return sorted(leaves, key=lambda c: c.__name__)

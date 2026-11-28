@@ -236,3 +236,9 @@ pipelex/tracing/dynamodb_event_log.py | dynamodb_item_size | TypeError | invaria
 pipelex/tracing/trace_events.py | _execution_data_omission.leave_out | TypeError | invariant
 pipelex/tracing/trace_events.py | _input_spec_omission.leave_out | TypeError | invariant
 pipelex/tracing/trace_events.py | _output_spec_omission.leave_out | TypeError | invariant
+pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/pipe_machinery/pipe_blueprint.py | PipeBlueprint.output_filename_variable_paths | ValueError | validator
+pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/core/concepts/choice_options.py | parse_outcome | ValueError | validator
+pipelex/core/concepts/contract_fact_projection.py | constrained_annotation.enforce | ValueError | validator
+pipelex/core/concepts/contract_fact_projection.py | constrained_annotation.enforce_format | ValueError | validator

@@ -1,0 +1,16 @@
+domain      = "facts_percent_unit"
+description = "A festival card whose share is a percentage"
+main_pipe   = "draft_card"
+
+[concept.Card]
+description = "A card a desk fills in"
+
+[concept.Card.structure]
+share = { type = "number", description = "The share", unit = "percent", maximum = 100 }
+
+[pipe.draft_card]
+type        = "PipeLLM"
+description = "Draft the card from the brief"
+inputs      = { brief = "Text" }
+output      = "Card"
+prompt      = "Draft the card from this brief: $brief"

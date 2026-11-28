@@ -1,0 +1,10 @@
+name = "feature_contract_facts_field_date_example"
+description = "A market-day card giving an example date"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.contract_facts",
+]
