@@ -170,11 +170,15 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("concept", mode="before")
     @classmethod
-    def validate_concept_keys(cls, concept: dict[str, ConceptBlueprint | str] | None) -> dict[str, ConceptBlueprint | str] | None:
+    def validate_concept_keys(cls, concept: Any) -> Any:
         if concept is None:
             return None
+        if not isinstance(concept, dict):
+            # Let the field type refuse a `concept` that is not a table, as an item of the verdict.
+            return concept
+        concept_table = cast("dict[str, Any]", concept)
         native_concept_codes = [native.value for native in NativeConceptCode.values_list()]
-        for concept_code in concept:
+        for concept_code in concept_table:
             if not is_concept_code_valid(concept_code=concept_code):
                 msg = f"Concept code '{concept_code}' is not a valid concept code"
                 raise ValueError(msg)
@@ -187,7 +191,7 @@ class PipelexBundleBlueprint(BaseModel):
                 # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
                 # blueprint categorizer recovers the offending code structurally for the fix planner.
                 raise NativeConceptRedeclarationError(msg, concept_code=concept_code)
-        return concept
+        return concept_table
 
     @field_validator("main_pipe", mode="before")
     @classmethod
@@ -242,8 +246,9 @@ class PipelexBundleBlueprint(BaseModel):
         candidates it orders from the pipes the error names.
         """
         if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
+            where = f"the bundle at source '{self.source}'" if self.source else "the bundle"
             msg = (
-                f"The main_pipe '{self.main_pipe}' names no pipe of the bundle at source '{self.source}' in domain '{self.domain}'. "
+                f"The main_pipe '{self.main_pipe}' names no pipe of {where} in domain '{self.domain}'. "
                 f"Its pipes: {', '.join(sorted(self.pipe or {})) or 'none'}."
             )
             defined_pipe_refs = sorted(f"{self.domain}.{pipe_code}" for pipe_code in self.pipe or {})

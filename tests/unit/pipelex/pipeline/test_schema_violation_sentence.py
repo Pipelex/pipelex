@@ -3,6 +3,8 @@
 Pure unit tests: the parser, the verdict translation and the problem items, with no Pipelex boot.
 """
 
+from typing import Any
+
 import pytest
 from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode
@@ -80,3 +82,32 @@ class TestSchemaViolationSentence:
         assert item.detail == f"The declaration at '{_SOURCE}' breaks a rule of the language (the bundle declares no pipe and no concept)."
         assert item.params is not None
         assert item.params.as_wire() == {"field_path": _SOURCE, "finding": "the bundle declares no pipe and no concept"}
+
+    @pytest.mark.parametrize(
+        ("mthds_content", "expected_finding"),
+        [
+            pytest.param(
+                'domain = "hello"\n[concept]\n"bad name" = "A concept whose code is not one"\n',
+                "Concept validation error at 'concept': Value error, Concept code 'bad name' is not a valid concept code",
+                id="invalid_concept_code",
+            ),
+            pytest.param(
+                'domain = "hello"\nconcept = 5\n',
+                "Concept validation error at 'concept': Input should be a valid dictionary",
+                id="concept_not_a_table",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("mthds_source", [_SOURCE, None])
+    def test_a_concept_declaration_item_names_its_key_path(self, mthds_content: str, expected_finding: str, mthds_source: str | None) -> None:
+        """A concept declaration that breaks a rule is named by its key path, never by its file, and a `concept` that is no table is a verdict."""
+        with pytest.raises(ValidateBundleError) as raised, translate_to_validate_bundle_error():
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=mthds_source)
+
+        [item] = _caller_items(verdict=raised.value)
+
+        assert item.code == CoreCode.METHOD_SCHEMA_VIOLATION
+        assert item.params is not None
+        params: dict[str, Any] = item.params.as_wire()
+        assert params == {"field_path": "concept", "finding": expected_finding}
+        assert item.detail == f"The declaration at 'concept' breaks a rule of the language ({expected_finding})."

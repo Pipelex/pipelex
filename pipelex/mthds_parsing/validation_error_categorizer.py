@@ -256,6 +256,8 @@ def _categorize_concept_validation_error(
         domain_code=domain,
         source=source,
         concept_code=concept_code,
+        # The declaration's key path, which names where the rule is broken in the item's sentence.
+        field_path=location_path or None,
         message=enriched_message,
     )
 
