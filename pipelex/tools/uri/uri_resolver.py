@@ -2,17 +2,15 @@ import urllib.parse
 from pathlib import Path
 
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.uri.data_url import is_data_url, parse_base64_data_url
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
     ResolvedLocalPath,
     ResolvedPipelexStorage,
     ResolvedUri,
+    UriKind,
 )
-
-# Base64 data URL markers
-BASE64_DATA_URL_PREFIX = "data:"
-BASE64_DATA_URL_MARKER = ";base64,"
 
 
 def extract_filename_from_uri(uri: str) -> str | None:
@@ -24,6 +22,9 @@ def extract_filename_from_uri(uri: str) -> str | None:
     Returns:
         The filename if the URI is a local file path, None otherwise.
     """
+    if is_data_url(uri=uri):
+        # A data URL names no file, whether or not it is one this runtime reads.
+        return None
     resolved = resolve_uri(uri)
     match resolved:
         case ResolvedLocalPath():
@@ -46,6 +47,9 @@ def describe_uri(uri: str) -> str:
     Returns:
         A human-readable description of the URI.
     """
+    if is_data_url(uri=uri):
+        # Described without being parsed, so describing a data URL this runtime does not read never fails.
+        return UriKind.BASE64_DATA_URL.desc
     resolved_uri = resolve_uri(uri)
     return resolved_uri.kind.desc
 
@@ -63,6 +67,8 @@ def is_relative_local_path(uri: str) -> bool:
     Returns:
         ``True`` if *uri* is a relative local path, ``False`` otherwise.
     """
+    if is_data_url(uri=uri):
+        return False
     resolved = resolve_uri(uri)
     if not isinstance(resolved, ResolvedLocalPath):
         return False
@@ -110,13 +116,17 @@ def resolve_uri(uri: str) -> ResolvedUri:
     - file:// URIs -> ResolvedLocalPath (converted to path)
     - Local paths -> ResolvedLocalPath
     - pipelex-storage:// URIs -> ResolvedPipelexStorage
-    - data:...;base64,... URLs -> ResolvedBase64DataUrl
+    - data:...;base64,... URLs -> ResolvedBase64DataUrl, the scheme in any ASCII case, read by
+      :func:`pipelex.tools.uri.data_url.parse_data_url`, whose header ends at its first comma
 
     Args:
         uri: The URI string to resolve.
 
     Returns:
         A ResolvedUri variant with the parsed URI information.
+
+    Raises:
+        DataUrlError: `uri` is a `data:` URL that is not a base64 one, or holds no comma ending its header.
 
     Example:
         >>> resolved_uri = resolve_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png")
@@ -131,9 +141,9 @@ def resolve_uri(uri: str) -> ResolvedUri:
         >>> resolved_uri.storage_uri
         'pipelex-storage://images/photo.png'
     """
-    # Check for base64 data URLs first (data:{mime};base64,{data})
-    if uri.startswith(BASE64_DATA_URL_PREFIX) and BASE64_DATA_URL_MARKER in uri:
-        return _resolve_base64_data_url(uri)
+    # Every data URL is read by the one parser, and only a base64 one resolves: no other reader of its bytes exists.
+    if is_data_url(uri=uri):
+        return _resolve_base64_data_url(uri=uri)
 
     # Check for pipelex storage URIs
     if uri.startswith(PIPELEX_STORAGE_SCHEME):
@@ -177,26 +187,22 @@ def _resolve_file_uri(uri: str) -> ResolvedLocalPath:
     )
 
 
-def _resolve_base64_data_url(uri: str) -> ResolvedBase64DataUrl:
-    """Parse a base64 data URL into its components.
+def _resolve_base64_data_url(*, uri: str) -> ResolvedBase64DataUrl:
+    """Read a base64 data URL into its declared media type and its payload.
 
     Args:
         uri: A data URL in the format data:{mime};base64,{data}
 
     Returns:
-        ResolvedBase64DataUrl with mime_type and base64_data.
+        ResolvedBase64DataUrl with the media type as the header declares it, parameters included, or `None` when it
+        declares none, and the base64 payload.
+
+    Raises:
+        DataUrlError: `uri` is not a base64 data URL.
     """
-    # Format: data:{mime_type};base64,{base64_data}
-    # Remove "data:" prefix
-    content = uri[len(BASE64_DATA_URL_PREFIX) :]
-
-    # Split on ;base64,
-    parts = content.split(BASE64_DATA_URL_MARKER, 1)
-    mime_type = parts[0]
-    base64_data = parts[1] if len(parts) > 1 else ""
-
+    parsed = parse_base64_data_url(uri=uri)
     return ResolvedBase64DataUrl(
         original=uri,
-        mime_type=mime_type,
-        base64_data=base64_data,
+        mime_type=parsed.media_type or None,
+        base64_data=parsed.payload,
     )

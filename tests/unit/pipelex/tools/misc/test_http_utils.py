@@ -31,6 +31,8 @@ class TestValidateUrlResourceExists:
         "url",
         [
             pytest.param("data:image/png;base64,abc123", id="data-url"),
+            pytest.param("DATA:image/png;base64,abc123", id="data-url-in-upper-case"),
+            pytest.param("Data:image/png;base64,abc123", id="data-url-in-mixed-case"),
             pytest.param("pipelex-storage://bucket/file.pdf", id="pipelex-storage"),
         ],
     )

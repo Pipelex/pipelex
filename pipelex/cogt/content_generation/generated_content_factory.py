@@ -20,7 +20,7 @@ from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
-from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, mime_type_to_extension
+from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, mime_type_to_extension, reported_media_type
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -114,7 +114,9 @@ class GeneratedContentFactory:
 
         What is dropped is everything that is not an image at all: the
         `application/octet-stream` of a store that never learned better, or the
-        `text/html` of an error page a server dressed as a 200.
+        `text/html` of an error page a server dressed as a 200. So is a type that is
+        not one media type, such as the `image/png, image/png` a repeated header joins
+        into, and a kept type is its bare `type/subtype`.
 
         The URL is one a provider's answer named, so a refusal or a failure to fetch it is the provider's:
         ``security.provider_url_refused`` for a destination the SSRF guard refuses, ``provider.response_invalid``
@@ -128,8 +130,9 @@ class GeneratedContentFactory:
         except RemoteFileFetchError as exc:
             exc.with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
             raise
-        if media_type and media_type.startswith("image/"):
-            return raw_bytes, media_type
+        image_type = reported_media_type(media_type=media_type)
+        if image_type and image_type.startswith("image/"):
+            return raw_bytes, image_type
         return raw_bytes, None
 
     async def make_document_content(

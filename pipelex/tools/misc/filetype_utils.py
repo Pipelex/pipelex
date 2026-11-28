@@ -1,6 +1,7 @@
 import base64
 import binascii
 import mimetypes
+import re
 from collections.abc import Collection
 from pathlib import Path
 from typing import Final
@@ -8,7 +9,8 @@ from typing import Final
 import filetype
 from pydantic import BaseModel
 
-from pipelex.tools.misc.exceptions import FileTypeError
+from pipelex.tools.misc.exceptions import DeclaredMediaTypeError, FileTypeError
+from pipelex.tools.uri.data_url import is_data_url, parse_data_url
 
 # Constant for unknown/undetectable file types
 UNKNOWN_FILE_TYPE = "unknown"
@@ -119,9 +121,10 @@ def detect_file_type_from_base64(base64_data: str | bytes) -> FileType:
     # Normalise to bytes holding only the Base-64 alphabet
     if isinstance(base64_data, bytes):
         base64_bytes = base64_data
-    else:  # str  →  handle optional data-URL header
-        if base64_data.lstrip().startswith("data:") and "," in base64_data:
-            base64_data = base64_data.split(",", 1)[1]
+    else:  # str  →  handle optional data-URL header, read by the one data URL parser
+        possible_data_url = base64_data.lstrip()
+        if is_data_url(uri=possible_data_url) and "," in possible_data_url:
+            base64_data = parse_data_url(uri=possible_data_url).payload
         base64_bytes = base64_data.encode("ascii")  # Base-64 is pure ASCII
 
     try:
@@ -266,6 +269,86 @@ def base_mime_type(*, mime_type: str) -> str:
     return mime_type.split(";", 1)[0].strip().lower()
 
 
+# An RFC 9110 token. The class is ASCII, so no other script's letters match.
+_MEDIA_TYPE_TOKEN: Final[str] = r"[!#$%&'*+.^_`|~0-9A-Za-z-]+"
+
+# A bare media type: two tokens joined by a slash.
+_BARE_MEDIA_TYPE: Final[re.Pattern[str]] = re.compile(rf"{_MEDIA_TYPE_TOKEN}/{_MEDIA_TYPE_TOKEN}")
+
+# The ASCII whitespace stripped around a declared media type.
+_ASCII_WHITESPACE: Final[str] = "\t\n\f\r "
+
+
+def _holds_control_character(*, text: str) -> bool:
+    return any(ord(character) < 0x20 or ord(character) == 0x7F for character in text)
+
+
+def is_single_media_type(*, media_type: str) -> bool:
+    """Whether `media_type` is one media type: a bare `type/subtype`, optionally followed by `;` parameters.
+
+    The same rule `declared_media_type` reads a declaration by, applied to the value whole: no comma and no control
+    character anywhere, ASCII whitespace around the value included, so no reader of the type, a browser included, can
+    read a second type out of it, and a `type/subtype` of two tokens before the first `;`. Parameters are not parsed
+    further, as a browser skips one it cannot parse, so a quoted `boundary="a;b"` passes. `text/html; charset=utf-8` is
+    one; `application/pdf;,text/plain` and `image/png,image/webp` are not.
+    """
+    if _holds_control_character(text=media_type):
+        return False
+    try:
+        return declared_media_type(media_type=media_type) is not None
+    except DeclaredMediaTypeError:
+        return False
+
+
+def declared_media_type(*, media_type: str | None) -> str | None:
+    """A declared media type reduced to its bare `type/subtype`, lowercased, its parameters dropped.
+
+    The one reading of a type a caller declares for a file, whether a data URL's header declares it or a content's
+    `mime_type` field: `text/plain;charset=utf-8` is `text/plain`, `Image/PNG` is `image/png`. Nothing downstream reads
+    a file's parameters, so they are dropped unread rather than kept: like a browser's reading of a type, which skips a
+    parameter it cannot parse, a parameter that is not `name=value`, such as `name=annual report.pdf`, does not refuse
+    the declaration. Only the comma and control-character check covers them, since a comma would end a type. The
+    storage gate, `is_single_media_type`, reads a type by the same rule.
+
+    Args:
+        media_type: The declared type, `None` when nothing was declared.
+
+    Returns:
+        The bare type, or `None` when nothing was declared or the declaration is blank.
+
+    Raises:
+        DeclaredMediaTypeError: The declaration holds a comma or a control character, or its part before the first `;`
+            is not a `type/subtype` of two tokens.
+    """
+    if media_type is None:
+        return None
+    stripped = media_type.strip(_ASCII_WHITESPACE)
+    if not stripped:
+        return None
+    if "," in stripped or _holds_control_character(text=stripped):
+        msg = "The declared media type is not one media type: it holds a comma or a control character"
+        raise DeclaredMediaTypeError(msg)
+    bare_type = stripped.split(";", 1)[0].strip(_ASCII_WHITESPACE)
+    if _BARE_MEDIA_TYPE.fullmatch(bare_type) is None:
+        msg = "The declared media type is not one media type: it must be <type>/<subtype>, optionally followed by ;parameters"
+        raise DeclaredMediaTypeError(msg)
+    return bare_type.lower()
+
+
+def reported_media_type(*, media_type: str | None) -> str | None:
+    """A type something outside the runtime reported for a file, as its bare `type/subtype`, `None` when it is not one.
+
+    For the types a provider's answer or a fetched response's `Content-Type` gives, which the runtime takes as they come
+    rather than refuses: `image/png;charset=binary` is `image/png`, and a type that is not one media type, such as the
+    `image/png, image/png` of a repeated header or a bare `image/`, reads as no type reported, so the file is typed by
+    what else is known about it rather than stored under that text.
+    """
+    try:
+        return declared_media_type(media_type=media_type)
+    except DeclaredMediaTypeError:
+        return None
+
+
 def format_key_from_mime_type(*, mime_type: str | None) -> str | None:
     """The format key a file of this MIME type has, which is what every format check compares.
 
@@ -352,6 +435,10 @@ def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None, fi
     Otherwise the format is unknown rather than a zip, so no check refuses a valid Office file for
     the order of its entries.
 
+    A declared or named type it returns is its base type, its parameters dropped (`base_mime_type`): this function does
+    not validate a declaration, which the input boundary does first (`declared_media_type`), but it never hands back a
+    type with parameters.
+
     Args:
         head: The file's leading bytes, `None` when it was not read.
         declared_mime_type: The type the caller declared, if any.
@@ -362,15 +449,17 @@ def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None, fi
     """
     sniffed = guess_file_type_from_bytes(raw_bytes=head) if head else None
     if sniffed is None:
-        return declared_mime_type
+        if declared_mime_type is None:
+            return None
+        return base_mime_type(mime_type=declared_mime_type) or None
     if sniffed.mime != _ZIP_MIME_TYPE:
         return sniffed.mime
     named_mime_type = _MIME_DB.guess_type(file_name, strict=True)[0] if file_name else None
-    candidate_mime_types = [mime_type for mime_type in (declared_mime_type, named_mime_type) if mime_type is not None]
+    candidate_mime_types = [base_mime_type(mime_type=mime_type) for mime_type in (declared_mime_type, named_mime_type) if mime_type is not None]
     for candidate_mime_type in candidate_mime_types:
-        if base_mime_type(mime_type=candidate_mime_type).startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES):
+        if candidate_mime_type.startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES):
             return candidate_mime_type
     for candidate_mime_type in candidate_mime_types:
-        if base_mime_type(mime_type=candidate_mime_type) == _ZIP_MIME_TYPE:
+        if candidate_mime_type == _ZIP_MIME_TYPE:
             return candidate_mime_type
     return None

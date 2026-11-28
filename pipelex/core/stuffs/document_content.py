@@ -8,7 +8,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import require_rich_for_rendering
-from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_uri
+from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
 
 if TYPE_CHECKING:
     from pipelex.tools.misc.pretty import PrettyPrintable
@@ -46,7 +46,7 @@ class DocumentContent(StuffContent):
     def short_desc(self) -> str:
         if self.title:
             return f"document: {self.title}"
-        url_desc = resolve_uri(self.url).kind.desc
+        url_desc = describe_uri(self.url)
         return f"{url_desc} of a document"
 
     @override

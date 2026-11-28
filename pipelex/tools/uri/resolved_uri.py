@@ -80,12 +80,14 @@ class ResolvedBase64DataUrl(ResolvedUriBase):
     """Resolved base64 data URL (data:{mime};base64,{data}).
 
     Attributes:
-        mime_type: The MIME type from the data URL (e.g., "image/png").
+        mime_type: The media type the data URL's header declares, as written, parameters included (e.g., "image/png",
+            "text/plain;charset=utf-8"), or `None` when it declares none. It is not validated here: the input boundary
+            reduces it to a bare type, or refuses it (`pipelex.tools.misc.filetype_utils.declared_media_type`).
         base64_data: The base64-encoded data (without the data URL prefix).
     """
 
     kind: UriKind = UriKind.BASE64_DATA_URL
-    mime_type: str
+    mime_type: str | None
     base64_data: str
 
 
