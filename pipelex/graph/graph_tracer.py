@@ -88,6 +88,7 @@ class _MutableNodeData:
         parent_node_id: str | None,
         input_specs: list[IOSpec] | None = None,
         description: str | None = None,
+        activity: str | None = None,
         domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
@@ -99,6 +100,7 @@ class _MutableNodeData:
         self.started_at = started_at
         self.parent_node_id = parent_node_id
         self.description = description
+        self.activity = activity
         self.domain_code = domain_code
         self.ended_at: datetime | None = None
         self.status: NodeStatus = NodeStatus.RUNNING
@@ -135,6 +137,7 @@ class _MutableNodeData:
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
             description=self.description,
+            activity=self.activity,
             domain_code=self.domain_code,
             status=self.status,
             skip_reason=self.skip_reason,
@@ -862,6 +865,7 @@ class GraphTracer(GraphTracerProtocol):
         pipe_data: dict[str, Any] | None = None,
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
+        activity: str | None = None,
         domain_code: str | None = None,
         step_count: int | None = None,
         branch_count: int | None = None,
@@ -897,6 +901,7 @@ class GraphTracer(GraphTracerProtocol):
             parent_node_id=trace_context.parent_node_id,
             input_specs=input_specs,
             description=description,
+            activity=activity,
             domain_code=domain_code,
         )
         self._nodes[node_id] = node_data
@@ -933,6 +938,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipe_type=pipe_type,
                     node_kind=node_kind,
                     description=description,
+                    activity=activity,
                     domain_code=domain_code,
                     input_specs=input_specs or [],
                     pipe_data=pipe_data or {},

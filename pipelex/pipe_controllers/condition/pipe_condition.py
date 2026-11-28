@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING, Any, Literal
 
 from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSite
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
+from pipelex.core.concepts.choice_options import PresentationWords
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
@@ -83,6 +84,10 @@ class PipeCondition(PipeController):
     expression_field: ConditionExpressionField
     outcome_map: ConditionOutcomeMap
     default_outcome: str | SpecialOutcome
+    # The words an outcome table gives people, keyed like `outcome_map` (spec: mthds-format.md, "Outcome Labels"): a run
+    # view shows the outcome taken by its label. Only outcomes written as tables have an entry.
+    outcome_words: dict[str, PresentationWords] = Field(default_factory=dict)
+    default_outcome_words: PresentationWords | None = None
     add_alias_from_expression_to: str | None = None
 
     @property
@@ -665,6 +670,15 @@ class PipeCondition(PipeController):
             "evaluated_expression": evaluated_expression,
             "selected_outcome": outcome,
         }
+        # The words of the outcome taken, when its table gives any: a run view shows its label, and its tone.
+        words = self.outcome_words.get(evaluated_expression) if evaluated_expression in self.outcome_map else self.default_outcome_words
+        if words is not None:
+            if words.label is not None:
+                execution_data_dict["selected_outcome_label"] = words.label
+            if words.description is not None:
+                execution_data_dict["selected_outcome_description"] = words.description
+            if words.tone is not None:
+                execution_data_dict["selected_outcome_tone"] = words.tone
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         trace_node = self._trace_node(job_metadata=job_metadata)
         if trace_node is None:

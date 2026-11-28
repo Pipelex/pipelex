@@ -5,7 +5,7 @@ from jinja2 import TemplateSyntaxError
 from pydantic import Field, WithJsonSchema, field_validator, model_validator
 from typing_extensions import override
 
-from pipelex.core.concepts.choice_options import OutcomeTable, OutcomeValue, outcome_pipe, parse_outcome
+from pipelex.core.concepts.choice_options import OutcomeTable, OutcomeValue, PresentationWords, outcome_pipe, parse_outcome
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import TEMPLATE_NESTING_ERRORS, TEMPLATE_NESTING_FAULT, Jinja2DetectVariablesError
@@ -86,6 +86,16 @@ class PipeConditionBlueprint(PipeBlueprint):
     def outcome_pipes(self) -> OutcomeMap:
         """Expression result -> pipe reference (or special outcome), whichever form each outcome was written in."""
         return {key: outcome_pipe(outcome=outcome) for key, outcome in self.outcomes.items()}
+
+    @property
+    def outcome_words(self) -> dict[str, PresentationWords]:
+        """Expression result -> the words its outcome table gives people, for each outcome written as a table."""
+        return {key: _words_of(outcome=outcome) for key, outcome in self.outcomes.items() if isinstance(outcome, OutcomeTable)}
+
+    @property
+    def default_outcome_words(self) -> PresentationWords | None:
+        """The words the default outcome's table gives people, or None when it is written as a pipe name."""
+        return _words_of(outcome=self.default_outcome) if isinstance(self.default_outcome, OutcomeTable) else None
 
     @property
     def default_outcome_pipe(self) -> str:
@@ -201,3 +211,8 @@ def describe_expression_parse_failure(*, error: Jinja2DetectVariablesError) -> s
             return f"does not parse at line {cause.lineno} of that expression"
         cause = cause.__cause__
     return "does not parse"
+
+
+def _words_of(*, outcome: OutcomeTable) -> PresentationWords:
+    """An outcome table's words, without the pipe it names."""
+    return PresentationWords(label=outcome.label, description=outcome.description, tone=outcome.tone)
