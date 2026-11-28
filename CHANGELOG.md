@@ -9,6 +9,7 @@
 ### Fixed
 
 - **Data URL inputs**: a data URL's declared media type is stored as its bare type, its header read up to its first comma, and a `data:` input that is not a base64 data URL, or a file input whose declared type is not one media type, is refused as `input.file_unreadable` naming the input, with `location.field` at its `url` or its `mime_type`. The `data:` scheme is recognised in any case wherever an input is read, and a fetched image whose `Content-Type` is not one media type is stored under the type known otherwise.
+- **A data URL a step produced is reported as unreadable**: a `data:` URL that is not a base64 data URL, or a declared media type that is not one media type, reports `input.file_unreadable` wherever it is read, in content a step produced too, where it failed as `runtime.unexpected`.
 
 ## [v0.120.0] - 2026-11-27
 
