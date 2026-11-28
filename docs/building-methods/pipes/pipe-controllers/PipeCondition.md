@@ -35,8 +35,8 @@ An expression that does not parse, whether written as `expression` or as `expres
 | `output`                       | string         | The output concept produced by the selected pipe.                                                | Yes                            |
 | `expression`                   | string         | A simple Jinja2 expression. `{{ ... }}` are automatically added. Good for simple variable access like `"my_var.category"`.                                | Yes (or `expression_template`)   |
 | `expression_template`            | string         | A full Jinja2 template string. Use this for more complex logic, like `{% if my_var.value > 10 %}high{% else %}low{% endif %}`.                           | Yes (or `expression`)          |
-| `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail`.                                  | Yes                            |
-| `default_outcome`            | string         | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`.                                                             | Yes                             |
+| `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail` — each a string or an [outcome table](#outcome-labels).                                  | Yes                            |
+| `default_outcome`            | string or table | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`, or an [outcome table](#outcome-labels).                                                             | Yes                             |
 | `add_alias_from_expression_to` | string         | An advanced feature. If provided, an alias named after the string result of the expression evaluation is added to the working memory, pointing to the existing entry named by this value (which must already be in the working memory).               | No                             |
 
 !!! important "Output Concept Matching"
@@ -212,6 +212,17 @@ default_outcome = "process_unknown"
 ```
 
 - Fallback pipe when no match is found
+
+### Outcome Labels
+
+An outcome, or the `default_outcome`, may be a table giving its route the words a person reads in a run's timeline: a `label`, a `description` and a `tone` (`positive`, `caution`, `negative` or `neutral`) beside the `pipe` it routes to.
+
+```toml
+outcomes = { high = { pipe = "detailed_check", label = "Detailed check", tone = "caution" }, low = "quick_note" }
+default_outcome = { pipe = "continue", label = "No check needed" }
+```
+
+A table must carry `pipe` and no key other than those three, and no two outcomes of one condition, the default included, share a label. A table carrying `pipe` alone is the same outcome as its string.
 
 ### Expression Aliasing
 ```toml

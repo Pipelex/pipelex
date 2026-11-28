@@ -118,7 +118,8 @@ Two more facts surface on the **valid** report (`pipelex validate`, the agent CL
 
     - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
     - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).
-    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent` — the intent-hints lints: a hint key this version of the standard does not define, an `intent` word outside the vocabulary, and a known word on a site it does not apply to. Hints are non-normative, so the entry is preserved and only named.
+    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`, `hint_unknown_role`, `hint_inapplicable_role`, `hint_unknown_part`, `hint_inapplicable_part`, `hint_duplicate_part` — the intent-hints lints: a hint key this version of the standard does not define, an `intent`, `role` or `part` word outside its vocabulary, a known word on a site it does not apply to, and a part held once per record that two fields claim. Hints are non-normative, so the entry is preserved and only named.
+    - `choice_option_dubious` — a list of plain `choices` that repeats a value or holds an empty one, which a person could not tell apart or pick.
 
 ## Best Practices
 

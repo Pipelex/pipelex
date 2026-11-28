@@ -58,11 +58,12 @@ Each field can specify:
 - **description**: Human-readable description
 - **required**: Whether the field must be present in the payload (defaults to `false`)
 - **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation. A defaulted field never holds nothing: a value that sets it to `null` is refused, so leave the key out to get the default
-- **choices**: For `enum`-like fields, a list of valid values
+- **choices**: For `enum`-like fields, a list of valid values, each a string or an option table — see [Choice Fields](#choice-fields-enums)
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
 - **concept_ref** and **item_concept_ref**: For `concept` fields (and `list` fields whose items are concepts), the concept being referenced
 - **hints**: Non-normative presentation intent for this field — see [Intent Hints](intent-hints.md)
+- **minimum**, **maximum**, **exclusive_minimum**, **exclusive_maximum**, **min_length**, **max_length**, **pattern**, **format**, **unit**, **aggregate** and **examples**: The field's contract facts — see [Contract Facts](#contract-facts)
 
 `item_type` and `value_type` take one of the field types above (`text`, `integer`, `number`, `boolean`, `date`, `datetime`, `time`, `list`, `dict`, `concept`) or `Any`, for values whose type is genuinely unspecified. Any other name is refused when the method loads, a concept's name included: a list of concepts is `item_type = "concept"` with its `item_concept_ref`.
 
@@ -72,9 +73,43 @@ A field may share its name with a Python type or with a name the generated class
 
 !!! warning "The key set is closed"
 
-    The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful constraint the language does not carry (`minimum = 0`, `unit = "kg"`), or a misspelled `hints` all fail the bundle instead of being dropped.
+    The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful key the language does not carry (`placeholder`, `step`), or a misspelled `hints` all fail the bundle instead of being dropped.
 
-    This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. If you need a numeric bound or another constraint, express it on a Python class instead — see [Python Classes](python-classes.md), whose pydantic `Field(...)` metadata is read as an authored fact. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
+    This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
+
+## Contract Facts
+
+A field may state facts about its value. The **constraints** refuse a value that breaks them: the runtime enforces them on every value of the field, the field's JSON Schema states them, and a dry run's mock values satisfy them. The **descriptions** never refuse a value: they tell a reader or a renderer what the value means.
+
+```toml
+[concept.Invoice.structure]
+reference = { type = "text", description = "The invoice reference", pattern = "^INV-[0-9]{6}$", examples = ["INV-000123"] }
+quantity = { type = "integer", description = "How many units", minimum = 1, maximum = 999 }
+share = { type = "number", description = "The discount", unit = "percent", exclusive_minimum = 0, maximum = 100 }
+amount = { type = "number", description = "The line amount", unit = "EUR", aggregate = "sum" }
+contact = { type = "text", description = "Who to write to", format = "email" }
+```
+
+| Fact | Kind | Applies to |
+|---|---|---|
+| `minimum`, `maximum`, `exclusive_minimum`, `exclusive_maximum` | constraint | number-valued fields (`integer`, `number`); a bound on an `integer` field is an integer |
+| `min_length`, `max_length` | constraint | text-valued fields, counted in characters |
+| `pattern` | constraint | text-valued fields: a regular expression searched in the value, as JSON Schema does, so anchor it with `^` and `$` to match the whole value |
+| `format` | constraint | text-valued fields: `email`, `uri`, `date-time`, `uuid`, `hostname`, `ipv4` or `ipv6` |
+| `unit` | description | number-valued fields: an ISO 4217-shaped currency code such as `EUR`, `percent`, or a unit of measure such as `m`, `kg` or `h` |
+| `aggregate` | description | number-valued fields: `sum` or `average`, how the values of a column of records combine |
+| `examples` | description | any value class (text, number, date, time): a list of values of the field, each satisfying its constraints |
+
+A list, a dict, a boolean and an enumeration field belong to no value class and take no fact. A `concept` field takes the value class of its concept: a field typed `Number` takes the number facts, one typed `Text` the text facts, and one typed by a structured concept none. A concept refining `Number` may state a `unit` itself, which its refinements inherit and a field may override:
+
+```toml
+[concept.Amount]
+description = "An amount of money"
+refines = "Number"
+unit = "EUR"
+```
+
+A fact that does not apply where it is written, two facts that contradict each other (an empty range, `minimum` beside `exclusive_minimum`, `min_length` above `max_length`), a pattern that does not compile, an unknown unit, format or aggregate, and an example or a default that breaks the field's constraints are all refused with the error type `contract_fact_invalid`, whose parameters name the `fact`, the `reason` and the `field_path`.
 
 ## All-Optional Structures and the `input_presence_vacuous` Lint
 
@@ -290,6 +325,19 @@ title = "Task title"
 priority = { choices = ["low", "medium", "high"], description = "Task priority level" }
 status = { choices = ["todo", "in_progress", "done"], description = "Current status", default_value = "todo" }
 ```
+
+An option may be a table giving its value the words a person reads in its place: a `label`, a `description` and a `tone`, one of `positive`, `caution`, `negative` and `neutral`. Plain strings and tables mix freely, and a table carrying `value` alone is the same option as its string:
+
+```toml
+[concept.Review.structure]
+decision = { description = "What to do with the contract", choices = [
+  { value = "sign", label = "Sign it", tone = "positive" },
+  { value = "negotiate", label = "Negotiate first", tone = "caution", description = "Some clauses need changes" },
+  "reject",
+] }
+```
+
+An option table needs a non-empty `value`, shares neither its value nor its label with another option, and carries no other key; a `choices` list needs at least one option. A list of plain strings that repeats a value or holds an empty one is accepted with a `choice_option_dubious` warning. An enumeration field takes no contract fact.
 
 ## Required Fields
 

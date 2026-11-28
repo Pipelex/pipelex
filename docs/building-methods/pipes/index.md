@@ -88,13 +88,28 @@ You can specify multiple inputs by using a list of concepts. For example, `input
 
     An input name is a plain `snake_case` identifier, matching `[a-z][a-z0-9_]*`, and it names one whole value of the concept its slot declares. A dotted key such as `"invoice.total" = "Number"` does not declare a field of `invoice`: it is refused as `invalid_input_name`, on every pipe. A pipe that needs one field of a value declares the value with its whole concept, `invoice = "Invoice"`, and reads the field through it in its template, as `$invoice.total`. `pipelex fix bundle` deletes a dotted key whose root is declared beside it, since that root already supplies the field, unless the key, declared after its root, carries another presence marker or multiplicity than the root, such as `"data.text" = "Text!"` after `data = "Text?"`: deleting that key would change what the pipe requires, so the fix names only what differs, the multiplicity, the presence marker or both, with the edit that carries it onto the root (here, replace `?` with `!` on `data`), and is left for you to apply.
 
-    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
+    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can say more about the value it takes:
 
     ```toml
-    inputs = { topic = { concept = "Text", hints = { intent = "prose" } } }
+    [pipe.review_nda.inputs]
+    nda = { concept = "Document", description = "The signed NDA to review", hints = { role = "subject" } }
+    budget = { concept = "Number", minimum = 0, unit = "EUR", examples = [5000] }
+    tier = { concept = "Text", choices = [{ value = "strategic", label = "Strategic" }, "tactical"] }
+    names = { concept = "Text[]", max_length = 80 }
     ```
 
-    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). The table is closed — `concept` and `hints` are the only keys it accepts, and anything else is a validation error. A slot table with no hints is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints, so reach for the expanded form only when you have hints to attach.
+    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). Beside it the table accepts:
+
+    - `hints`, the slot's [intent hints](../concepts/intent-hints.md), including its `role`;
+    - `description`, a non-empty sentence a form shows in place of the concept's description;
+    - the [contract facts](../concepts/inline-structures.md#contract-facts) of the slot's value, when its concept is text-, number-, date- or time-valued, never `aggregate`; on a plural slot they apply to each item;
+    - `choices`, on a text-valued slot only, as on a [choice field](../concepts/inline-structures.md#choice-fields-enums); beside `choices` a slot takes no length, `pattern`, `format` or `examples`.
+
+    Anything else is a validation error, and a fact on a slot whose concept holds no plain value, a structured concept for instance, is refused with the reason `not_value_slot`. A slot's constraints and options are enforced on the value a caller sends to the run's entry pipe, which is refused as `input.invalid` when it breaks one, and they are stated on the slot's input JSON Schema. A slot table carrying none of these keys is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints.
+
+*   **`activity`** (optional): A short phrase a person watching a run reads while the pipe works, such as `activity = "Reading the lease"`. It is one line, never empty, and a contract-only signature does not carry it.
+
+*   **`output_filename`** (optional): On an operator whose output is an `Image` or a `Document`, a Jinja2 template naming the file the pipe writes, such as `output_filename = "{{ counterparty }} - NDA review"`. It reads only declared inputs, counts as reading them, and must guard every optional input it names with `{% if %}`. A controller writes no file of its own, so it does not carry one.
 
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)

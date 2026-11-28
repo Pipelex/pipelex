@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Contract facts on fields, input slots and Number concepts**: a structure field or an expanded input slot may state `minimum`, `maximum`, `exclusive_minimum`, `exclusive_maximum`, `min_length`, `max_length`, `pattern`, `format`, `unit`, `aggregate` and `examples`, and a concept refining `Number` may state its `unit`, which its refinements inherit. A fact that does not apply where it is written, contradicts another or is broken by an example or a default is refused with the error type `contract_fact_invalid`, its `fact`, `reason` and `field_path` carried as parameters, under the code `method.schema_violation` until the pinned `mthds` release carries `method.contract_fact_invalid`.
+- **Constraints are enforced and stated wherever the value is**: a field's constraints become constraints of its generated structure class and of its JSON Schema, and the dry run's mocks satisfy them; a slot's facts and options are stated on the value property of its input JSON Schema, and a caller's value breaking them is refused at the run's entry pipe as `input.invalid`; the input-form descriptors state every fact their kind has a member for.
+- **Choice options with words**: a `choices` option may be a table `{ value, label, description, tone }`, the tone one of `positive`, `caution`, `negative` and `neutral`, and a table carrying `value` alone normalizes to its string. A table without a value, with an empty value, sharing its value or its label with another option, or a `choices` list with no option is refused; a plain option list that repeats a value or holds an empty one only warns, as `choice_option_dubious` with `field_path` and `reason`.
+- **An input slot's own description and options**: an expanded input slot may carry a `description`, which the input-form descriptor shows in place of the concept's, and a text-valued slot may carry `choices`, which make its descriptor an `enum`. Facts on a slot of no value class are refused with the reason `not_value_slot`, and beside `choices` a slot takes no length, pattern, format or examples.
+- **`activity`, `output_filename` and outcome tables**: a pipe may state its `activity`, one line naming what it is doing, never on a signature; an operator whose output is an Image or a Document may name its file with an `output_filename` template, which counts as reading the inputs it names and must guard every optional one; a `PipeCondition` outcome or its `default_outcome` may be a table `{ pipe, label, description, tone }`, each label unique within the condition.
+- **The `role` and `part` hints and six new intent words**: a slot's `hints` may name its `role` (`subject`, `context`, `guidance`, `reference`, `setting`), a field's its `part` (`title`, `summary`, `verdict`, `metric`, `body`, `evidence`, `detail`), and `intent` gains `code`, `identifier`, `question`, `photo`, `screenshot` and `scan`. The hint lints warn on an unknown or inapplicable role or part and on a part held once that two fields claim, and the descriptors carry the merged hints.
+
+### Changed
+
+- **An empty `choices` list is refused (Breaking)**: `choices = []` was accepted and now fails as `contract_fact_invalid`, since it offers no option.
+- **A pipe's unread-input check counts `output_filename`**: an input that only the file name reads is no longer reported as unused, and one that the file name reads without declaring it is reported as undeclared.
+
 ## [v0.121.0] - 2026-11-28
 
 ### Changed
