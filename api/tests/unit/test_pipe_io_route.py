@@ -59,7 +59,7 @@ ARTIFACT_FIELDS = ("pipe_io_contracts", "input_form", "output_form")
 REQUEST_SHAPE_CODE = "request.invalid"
 
 # Every field only the valid arm carries: the invalid arm is the crate verdict alone.
-VALID_ARM_ONLY_FIELDS = ("pipe_ref", "default_pipe_ref", *ARTIFACT_FIELDS, "pending_signatures", "is_runnable", "files")
+VALID_ARM_ONLY_FIELDS = ("pipe_ref", "default_pipe_ref", *ARTIFACT_FIELDS, "pending_signatures", "is_runnable", "examples", "files")
 
 
 def _build_client(*, as_operator: bool = False) -> TestClient:
@@ -332,6 +332,15 @@ class TestPipeIoRoute:
         body = _valid_arm(client, {"files": files})
         assert body["pipe_ref"] == "nomain.echo"
         assert body["default_pipe_ref"] == "nomain.echo"
+
+    def test_the_manifest_examples_are_listed_beside_the_entry_pipe(self):
+        """The manifest's `examples` are offered as written, and a method without a manifest offers none."""
+        client = _build_client()
+        manifest = STUB_METHOD_MANIFEST_NOMAIN_ENTRY.replace('main_pipe = "echo"\n', 'main_pipe = "echo"\nexamples = ["examples/hello.json"]\n')
+        example = '{"text": {"concept": "native.Text", "content": {"text": "hello"}}}'
+        files = {"METHODS.toml": manifest, "documents.mthds": NO_MAIN_PIPE_MTHDS, "examples/hello.json": example}
+        assert _valid_arm(client, {"files": files})["examples"] == ["examples/hello.json"]
+        assert _valid_arm(client, {"files": _files(VALID_MTHDS)})["examples"] == []
 
     @pytest.mark.parametrize("all_pipes", [False, True])
     def test_a_manifest_that_does_not_parse_refuses_only_a_request_naming_no_pipe(self, all_pipes: bool):

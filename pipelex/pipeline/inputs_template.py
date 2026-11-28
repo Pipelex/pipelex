@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from mthds.package.discovery import find_package_manifest
+from mthds.package.exceptions import ManifestError
+
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
@@ -112,9 +115,30 @@ async def build_inputs_for_pipe(
     # concept_comments is internal plumbing for the light-TOML emitter (stripped before the JSON
     # envelope is printed); it lets the agent-CLI TOML surface carry the same `# concept:` hints
     # the human `build inputs --format toml` does.
-    return {
+    result: dict[str, Any] = {
         "success": True,
         "pipe_ref": pipe_ref,
         "inputs": inputs_dict,
         "concept_comments": build_concept_comments(the_pipe.inputs),
     }
+    examples = manifest_examples_for(bundle_path=bundle_path, pipe_code=the_pipe.code)
+    if examples:
+        result["examples"] = examples
+    return result
+
+
+def manifest_examples_for(*, bundle_path: Path | None, pipe_code: str) -> list[str]:
+    """The example input files the manifest above `bundle_path` offers, when its `main_pipe` is `pipe_code`, else none.
+
+    Each is a tree path from the manifest's folder, as the manifest writes it (spec: manifest-format.md, "Example
+    Inputs"). A manifest that cannot be read offers none here: refusing it is the validation's, which reports why.
+    """
+    if bundle_path is None:
+        return []
+    try:
+        manifest = find_package_manifest(bundle_path)
+    except ManifestError:
+        return []
+    if manifest is None or manifest.main_pipe != pipe_code:
+        return []
+    return list(manifest.examples)

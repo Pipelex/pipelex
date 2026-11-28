@@ -121,6 +121,16 @@ class ResolvedMethod(NamedTuple):
         manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}", root="")
         return manifest.main_pipe if manifest is not None else None
 
+    @property
+    def manifest_examples(self) -> list[str]:
+        """The `examples` the method tree's `METHODS.toml` declares, tree paths of input files for its `main_pipe`.
+
+        Raises:
+            MethodEntryError: The manifest is not UTF-8 text, or not a valid manifest (a 422 in the input domain).
+        """
+        manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}", root="")
+        return list(manifest.examples) if manifest is not None else []
+
 
 def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ValidateBundleError:
     """The crate of a method written out, or the invalid verdict when it does not resolve."""
