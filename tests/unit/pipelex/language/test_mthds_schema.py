@@ -261,6 +261,35 @@ class TestMthdsSchemaGeneration:
         validator = _pipe_union_oneof_validator(schema)
         assert not validator.is_valid(table), f"A typeless non-contract table must be rejected: {table}"
 
+    @pytest.mark.parametrize(
+        "table",
+        [
+            pytest.param({"type": "PipeSequence", "description": "s", "output": "Image", "steps": [], "output_filename": "cover"}, id="sequence"),
+            pytest.param({"type": "PipeParallel", "description": "p", "output": "Image", "branches": [], "output_filename": "cover"}, id="parallel"),
+            pytest.param(
+                {"type": "PipeBatch", "description": "b", "output": "Image[]", "branch_pipe_code": "x", "output_filename": "cover"}, id="batch"
+            ),
+            pytest.param(
+                {"type": "PipeCondition", "description": "c", "output": "Image", "expression": "x", "outcomes": {}, "output_filename": "cover"},
+                id="condition",
+            ),
+        ],
+    )
+    def test_controller_with_output_filename_is_rejected(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
+        """A controller writes no file of its own, so the blueprint refuses `output_filename` on it, and so does its arm."""
+        validator = _pipe_union_oneof_validator(schema)
+        assert not validator.is_valid(table)
+        without_name = {key: value for key, value in table.items() if key != "output_filename"}
+        assert "output_filename" not in str([error.message for error in validator.iter_errors(without_name)])
+
+    def test_operator_arm_still_offers_output_filename(self, schema: dict[str, Any]) -> None:
+        """An operator that produces a file keeps `output_filename` on its arm."""
+        definitions = schema.get("definitions", schema.get("$defs", {}))
+        assert "output_filename" in definitions["PipeImgGenBlueprint"]["properties"]
+        for controller in ("PipeSequenceBlueprint", "PipeParallelBlueprint", "PipeBatchBlueprint", "PipeConditionBlueprint"):
+            assert "output_filename" not in definitions[controller]["properties"]
+            assert "activity" in definitions[controller]["properties"]
+
     def test_typoed_type_is_rejected(self, schema: dict[str, Any]) -> None:
         """A misspelled `type` matches no arm (not a concrete kind; the signature arm pins the tag)."""
         validator = _pipe_union_oneof_validator(schema)

@@ -14,6 +14,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, P
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_blueprint import PipeCategory
 from pipelex.pipe_machinery.validation import (
     INPUT_NAME_PATTERN,
     PARALLEL_BRANCH_BATCH_OVER_PATTERN,
@@ -45,6 +46,16 @@ _PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in
 # it entirely, so a contract-only table with no `type` matches it and an explicit `type = "PipeSignature"`
 # is rejected (extra property under the arm's `additionalProperties: false`).
 _SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
+
+# The controller arms, read from each member's `pipe_category` default so a new controller is covered too. A controller
+# writes no file of its own, so the blueprint refuses `output_filename` on it, and its arm does not offer the key.
+_CONTROLLER_DEFINITION_NAMES: frozenset[str] = frozenset(
+    member.__name__
+    for member in get_args(get_args(PipeBlueprintUnion)[0])
+    if isinstance(member.model_fields["pipe_category"].default, str) and PipeCategory(member.model_fields["pipe_category"].default).is_controller
+)
+
+_CONTROLLER_REFUSED_FIELDS: tuple[str, ...] = ("output_filename",)
 
 # The definition a PipeParallel branch takes: `SubPipeBlueprint`'s, with a `batch_over` that is never dotted
 # (`_constrain_batch_over`). No Python class carries the name, since steps and branches share one blueprint.
@@ -188,6 +199,11 @@ def _normalize_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any
                 properties.pop(field_name, None)
             _remove_from_required(def_schema, field_names={"type", *SIGNATURE_REFUSED_FIELDS})
             continue
+        if def_name in _CONTROLLER_DEFINITION_NAMES:
+            # `output_filename`, inherited from the base pipe blueprint, which a controller refuses (`validate_output_filename_site`).
+            for field_name in _CONTROLLER_REFUSED_FIELDS:
+                properties.pop(field_name, None)
+            _remove_from_required(def_schema, field_names=set(_CONTROLLER_REFUSED_FIELDS))
         if "type" not in properties:
             continue
         required = def_schema.setdefault("required", [])
