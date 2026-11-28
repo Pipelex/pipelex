@@ -2882,7 +2882,7 @@ components:
           title: Pattern
         format:
           anyOf:
-          - $ref: '#/components/schemas/pipelex__language__contract_facts__TextFormat'
+          - $ref: '#/components/schemas/ValueFormat'
           - type: 'null'
         unit:
           anyOf:
@@ -4341,7 +4341,7 @@ components:
           title: Pattern
         format:
           anyOf:
-          - $ref: '#/components/schemas/pipelex__language__contract_facts__TextFormat'
+          - $ref: '#/components/schemas/ValueFormat'
           - type: 'null'
         unit:
           anyOf:
@@ -9414,7 +9414,7 @@ components:
         tag_style:
           $ref: '#/components/schemas/TagStyle'
         text_format:
-          $ref: '#/components/schemas/pipelex__tools__templating__text_format__TextFormat'
+          $ref: '#/components/schemas/TextFormat'
           default: plain
       additionalProperties: false
       type: object
@@ -9508,6 +9508,14 @@ components:
       - name
       title: TextField
       description: '`text` at a named position — a top-level field or a structure field.'
+    TextFormat:
+      type: string
+      enum:
+      - plain
+      - markdown
+      - html
+      - json
+      title: TextFormat
     TextItem:
       properties:
         title:
@@ -10253,6 +10261,18 @@ components:
         The ``pipe_ref`` key carries the namespaced ``pipe_ref`` (``domain.code``) — never the bare code.
 
         ``status`` is a ``DryRunStatus`` (a ``StrEnum``), so it serializes to its plain string value.'
+    ValueFormat:
+      type: string
+      enum:
+      - email
+      - uri
+      - date-time
+      - uuid
+      - hostname
+      - ipv4
+      - ipv6
+      title: ValueFormat
+      description: The closed set of `format` values, each the JSON Schema format of the same name.
     WaterfallMatch:
       properties:
         category:
@@ -10300,23 +10320,3 @@ components:
       additionalProperties: false
       type: object
       title: WorkingMemory
-    pipelex__language__contract_facts__TextFormat:
-      type: string
-      enum:
-      - email
-      - uri
-      - date-time
-      - uuid
-      - hostname
-      - ipv4
-      - ipv6
-      title: TextFormat
-      description: The closed set of `format` values, each the JSON Schema format of the same name.
-    pipelex__tools__templating__text_format__TextFormat:
-      type: string
-      enum:
-      - plain
-      - markdown
-      - html
-      - json
-      title: TextFormat

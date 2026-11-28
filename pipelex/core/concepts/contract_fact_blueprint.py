@@ -21,7 +21,7 @@ from pipelex.language.contract_facts import (
     ContractFactFinding,
     ContractFactKey,
     ContractFactReason,
-    TextFormat,
+    ValueFormat,
     authored_facts,
     malformed_fact_message,
 )
@@ -58,7 +58,7 @@ class ContractFactsBlueprint(BaseModel):
     """The most characters a text-valued site holds, counted in Unicode code points."""
     pattern: str | None = None
     """A regular expression a text-valued site matches, anywhere unless anchored."""
-    format: TextFormat | None = Field(default=None, strict=False)
+    format: ValueFormat | None = Field(default=None, strict=False)
     """The format a text-valued site is well-formed in."""
     unit: str | None = None
     """What a number-valued site counts: an ISO 4217 currency code, `percent`, or a unit of measure."""
@@ -87,6 +87,6 @@ class ContractFactsBlueprint(BaseModel):
 
 def _plain(*, value: Any) -> Any:
     """A fact's value as plain data, a `StrEnum` member as its string."""
-    if isinstance(value, (TextFormat, Aggregate)):
+    if isinstance(value, (ValueFormat, Aggregate)):
         return str(value)
     return value

@@ -188,7 +188,7 @@ class FactSiteType(StrEnum):
                 return FactSiteType.TIME
 
 
-class TextFormat(StrEnum):
+class ValueFormat(StrEnum):
     """The closed set of `format` values, each the JSON Schema format of the same name."""
 
     EMAIL = "email"
@@ -280,33 +280,33 @@ _IPV4_PATTERN = re.compile(r"(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]
 _HOSTNAME_MAX_LENGTH = 253
 
 
-def format_sample(*, text_format: TextFormat) -> str:
+def format_sample(*, text_format: ValueFormat) -> str:
     """A well-formed text of a format, for a mock value that has to satisfy the format and has no authored example."""
     match text_format:
-        case TextFormat.EMAIL:
+        case ValueFormat.EMAIL:
             return "someone@example.com"
-        case TextFormat.URI:
+        case ValueFormat.URI:
             return "https://example.com/"
-        case TextFormat.DATE_TIME:
+        case ValueFormat.DATE_TIME:
             return "2026-01-01T09:00:00Z"
-        case TextFormat.UUID:
+        case ValueFormat.UUID:
             return "123e4567-e89b-42d3-a456-426614174000"
-        case TextFormat.HOSTNAME:
+        case ValueFormat.HOSTNAME:
             return "example.com"
-        case TextFormat.IPV4:
+        case ValueFormat.IPV4:
             return "192.0.2.1"
-        case TextFormat.IPV6:
+        case ValueFormat.IPV6:
             return "2001:db8::1"
 
 
-def text_matches_format(*, text: str, text_format: TextFormat) -> bool:
+def text_matches_format(*, text: str, text_format: ValueFormat) -> bool:
     """Whether a text is well-formed in a format. The runtime asserts every format, whatever a schema validator does by default."""
     match text_format:
-        case TextFormat.EMAIL:
+        case ValueFormat.EMAIL:
             return bool(_EMAIL_PATTERN.fullmatch(text))
-        case TextFormat.URI:
+        case ValueFormat.URI:
             return bool(_URI_PATTERN.fullmatch(text))
-        case TextFormat.DATE_TIME:
+        case ValueFormat.DATE_TIME:
             if not _DATE_TIME_PATTERN.fullmatch(text):
                 return False
             try:
@@ -314,18 +314,18 @@ def text_matches_format(*, text: str, text_format: TextFormat) -> bool:
             except ValueError:
                 return False
             return True
-        case TextFormat.UUID:
+        case ValueFormat.UUID:
             if not _UUID_PATTERN.fullmatch(text):
                 return False
             UUID(text)
             return True
-        case TextFormat.HOSTNAME:
+        case ValueFormat.HOSTNAME:
             if not text or len(text) > _HOSTNAME_MAX_LENGTH:
                 return False
             return all(_HOSTNAME_LABEL_PATTERN.fullmatch(label) for label in text.removesuffix(".").split("."))
-        case TextFormat.IPV4:
+        case ValueFormat.IPV4:
             return bool(_IPV4_PATTERN.fullmatch(text))
-        case TextFormat.IPV6:
+        case ValueFormat.IPV6:
             try:
                 ipaddress.IPv6Address(text)
             except ValueError:
@@ -375,8 +375,8 @@ def malformed_fact_message(*, key: ContractFactKey, value: Any) -> str | None:
             if compile_error is not None:
                 return f"'pattern' does not compile as a regular expression: {compile_error}"
         case ContractFactKey.FORMAT:
-            if value not in set(TextFormat):
-                return f"'format' must be one of {', '.join(TextFormat)}, got {value!r}"
+            if value not in set(ValueFormat):
+                return f"'format' must be one of {', '.join(ValueFormat)}, got {value!r}"
         case ContractFactKey.UNIT:
             if not isinstance(value, str) or not is_unit_identifier(unit=value):
                 return (
@@ -576,7 +576,7 @@ def constraint_break_message(*, value: Any, facts: Mapping[str, Any]) -> str | N
         if pattern is not None and pattern_compile_error(pattern=pattern) is None and not text_matches_pattern(text=value, pattern=pattern):
             return f"{value!r} does not match the pattern {pattern!r}"
         text_format = facts.get(ContractFactKey.FORMAT)
-        if text_format in set(TextFormat) and not text_matches_format(text=value, text_format=TextFormat(text_format)):
+        if text_format in set(ValueFormat) and not text_matches_format(text=value, text_format=ValueFormat(text_format)):
             return f"{value!r} is not well-formed as {text_format}"
     return None
 

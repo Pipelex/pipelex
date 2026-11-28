@@ -20,7 +20,7 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.language.contract_facts import TextFormat, format_sample
+from pipelex.language.contract_facts import ValueFormat, format_sample
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -233,8 +233,8 @@ class DryRunFactory:
             extra = candidate.json_schema_extra
             if isinstance(extra, dict):
                 text_format: Any = extra.get("format")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                if isinstance(text_format, str) and text_format in set(TextFormat):
-                    return [format_sample(text_format=TextFormat(text_format))]
+                if isinstance(text_format, str) and text_format in set(ValueFormat):
+                    return [format_sample(text_format=ValueFormat(text_format))]
         return None
 
     @classmethod

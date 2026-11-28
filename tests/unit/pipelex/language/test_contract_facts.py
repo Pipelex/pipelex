@@ -5,8 +5,8 @@ import pytest
 from pipelex.language.contract_facts import (
     ContractFactKey,
     ContractFactReason,
-    TextFormat,
     ValueClass,
+    ValueFormat,
     applicability_findings,
     constraint_break_message,
     contradiction_findings,
@@ -25,8 +25,8 @@ class TestContractFacts:
         """A currency is three uppercase letters, known or not; the units of measure are a closed list."""
         assert is_unit_identifier(unit=unit) is known
 
-    @pytest.mark.parametrize("text_format", list(TextFormat))
-    def test_every_format_sample_is_well_formed(self, text_format: TextFormat) -> None:
+    @pytest.mark.parametrize("text_format", list(ValueFormat))
+    def test_every_format_sample_is_well_formed(self, text_format: ValueFormat) -> None:
         """The dry run's sample of a format satisfies that format, so a mock never breaks its own field."""
         assert text_matches_format(text=format_sample(text_format=text_format), text_format=text_format)
 
