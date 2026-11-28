@@ -106,6 +106,19 @@ class TestStructureFieldHints:
         # The item is the text-valued site: the label intent flips ITS kind.
         assert tags.item.kind is FieldKind.TEXT
 
+    def test_prose_intent_on_time_field_rides_without_changing_kind(self):
+        """A `time` field is a text node with `format: "time"`, which is time-valued: the text intents do not apply to it."""
+        concepts: dict[str, ConceptBlueprint | str] = {
+            "docs.Slot": ConceptBlueprint(
+                description="a slot",
+                structure={"at": ConceptStructureBlueprint(description="the time", type=ConceptStructureBlueprintFieldType.TIME, hints={"intent": "prose"})},
+            )
+        }
+        slot = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="slot", concept_ref="docs.Slot")
+        at_field = fields_by_name(slot)["at"]
+        assert at_field.kind is FieldKind.TEXT
+        assert at_field.hints == {"intent": "prose"}
+
 
 class TestHintFreeByteIdentity:
     def test_hint_free_derivation_carries_no_hints_key(self):

@@ -922,10 +922,6 @@ def _with_slot_meaning(*, node: InputFormField, slot: InputSlotBlueprint) -> Inp
     return _with_contract_facts(node=node, facts=slot.contract_facts)
 
 
-TIME_TEXT_FORMAT = "time"
-"""The `format` a text node carries for a time of day, which the `time` field type and `native.Time` produce."""
-
-
 def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
 
@@ -942,7 +938,7 @@ def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
         case TextField() | ProseField():
             # A time-formatted text (`type = "time"`, `native.Time`) is time-valued; any other format (an email, a URI) is
             # a constraint on a text, which stays text-valued.
-            if node.format == TIME_TEXT_FORMAT:
+            if node.format is not None and node.format.is_time:
                 return HintSiteValueKind.TIME_VALUED
             return HintSiteValueKind.TEXT_VALUED
         case DateField():
