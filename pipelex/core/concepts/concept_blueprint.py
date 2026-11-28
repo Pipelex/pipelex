@@ -58,12 +58,22 @@ class ConceptBlueprint(BaseModel):
 
     @property
     def refines_number_or_unknown(self) -> bool:
-        """Whether the concept refines `native.Number`, or a declared concept whose class this blueprint cannot know."""
-        if self.structure is not None or not self.refines:
+        """Whether the concept refines `native.Number`, is backed by the native Number structure class (`NumberContent`), or
+        refines a declared concept whose class this blueprint cannot know. A class name maps by identity to its native, as
+        `pipelex.libraries.concept_value_kinds` judges it.
+        """
+        native_code: NativeConceptCode
+        if isinstance(self.structure, str):
+            class_native = next((code for code in NativeConceptCode if code.structure_class_name == self.structure), None)
+            if class_native is None:
+                return False
+            native_code = class_native
+        elif self.structure is not None or not self.refines:
             return False
-        if not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=self.refines):
+        elif not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=self.refines):
             return True
-        native_code = NativeConceptCode(QualifiedRef.parse(self.refines).local_code)
+        else:
+            native_code = NativeConceptCode(QualifiedRef.parse(self.refines).local_code)
         match native_code:
             case NativeConceptCode.NUMBER:
                 return True
