@@ -14,7 +14,9 @@ from pipelex.pipe_operators import produced_file_naming
 from pipelex.pipe_operators.produced_file_naming import input_naming_context, name_produced_files, prepare_naming_context
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
-from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageNotConfiguredError
+from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError, UriTextNotUtf8Error, UriTextTooLargeError
 
 
 def _image_stuff(*, name: str, url: str, filename: str | None = None) -> Stuff:
@@ -23,6 +25,10 @@ def _image_stuff(*, name: str, url: str, filename: str | None = None) -> Stuff:
 
 def _text_stuff(*, name: str, content: TextContent) -> Stuff:
     return StuffFactory.make_stuff(concept=get_native_concept(NativeConceptCode.TEXT), content=content, name=name)
+
+
+def _naming_job_metadata() -> JobMetadata:
+    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test-user", pipeline_run_id="run"))
 
 
 def _stored_text() -> TextContent:
@@ -142,3 +148,51 @@ class TestProducedFileNaming:
         assert loader.call_args.kwargs["read_paths"] == frozenset({"title"})
         assert isinstance(output.content, ImageContent)
         assert output.content.filename == ("abc.png" if load_fails else "Big title cover.png")
+
+    @pytest.mark.parametrize(
+        "read_failure",
+        [
+            UriTextTooLargeError("too large", limit=10, size=20, input_name="title"),
+            UriTextNotUtf8Error("not UTF-8", input_name="title"),
+            StorageNotConfiguredError("no storage"),
+            StorageFileNotFoundError("gone"),
+            RemoteFileFetchError("the server answered HTTP 503"),
+        ],
+        ids=["oversized", "not_utf8", "storage_not_configured", "stored_file_missing", "remote_fetch_failed"],
+    )
+    async def test_a_stored_input_that_cannot_be_read_leaves_the_runtime_name(self, mocker: MockerFixture, read_failure: Exception) -> None:
+        """Every documented way a stored text fails to read leaves the file its runtime name, with a warning, and the step goes on."""
+        title = _text_stuff(name="title", content=_stored_text())
+        memory = WorkingMemoryFactory.make_from_multiple_stuffs([title])
+        mocker.patch.object(produced_file_naming, "load_stored_values_read_from_memory", new=mocker.AsyncMock(side_effect=read_failure))
+
+        naming_context = await prepare_naming_context(
+            output_filename="{{ title }} cover",
+            working_memory=memory,
+            job_metadata=_naming_job_metadata(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_code="draw",
+        )
+        output = _image_stuff(name="cover", url="https://example.com/files/abc.png")
+        await name_produced_files(output_filename="{{ title }} cover", main_stuff=output, naming_context=naming_context, pipe_code="draw")
+
+        assert isinstance(output.content, ImageContent)
+        assert output.content.filename == "abc.png"
+
+    async def test_a_stored_input_whose_bytes_are_not_utf8_leaves_the_runtime_name(self) -> None:
+        """Read for real through the content generator's leaf: a text given as bytes that are not UTF-8 names nothing."""
+        title = _text_stuff(name="title", content=TextContent(url="data:text/plain;base64,//79", mime_type="text/plain", size=3, preview="?"))
+        memory = WorkingMemoryFactory.make_from_multiple_stuffs([title])
+
+        naming_context = await prepare_naming_context(
+            output_filename="{{ title }} cover",
+            working_memory=memory,
+            job_metadata=_naming_job_metadata(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_code="draw",
+        )
+        output = _image_stuff(name="cover", url="https://example.com/files/abc.png")
+        await name_produced_files(output_filename="{{ title }} cover", main_stuff=output, naming_context=naming_context, pipe_code="draw")
+
+        assert isinstance(output.content, ImageContent)
+        assert output.content.filename == "abc.png"

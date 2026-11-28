@@ -44,9 +44,28 @@ from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, mime_type_to_extension
 from pipelex.tools.misc.produced_file_name import build_produced_file_name
-from pipelex.tools.uri.exceptions import UriReadRefusedError
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageGcpError, StorageLocalError, StorageNotConfiguredError, StorageS3Error
+from pipelex.tools.uri.exceptions import UriReadRefusedError, UriTextNotUtf8Error, UriTextTooLargeError
 
 FileContent = ImageContent | DocumentContent
+
+# Every way loading a stored text a file name reads can fail, as the loader documents them (`load_text_from_any_uri`,
+# `load_bytes_from_any_uri`, `load_stored_value`): refused by the run's read scope, past the read cap, not UTF-8, not a
+# value of its kind, behind a storage that is not configured, missing or failing, or behind a fetch that failed. An SSRF
+# block and a storage key escaping its storage are not among them: those security refusals surface and fail the step.
+_STORED_TEXT_READ_FAILURES: tuple[type[Exception], ...] = (
+    UriReadRefusedError,
+    UriTextTooLargeError,
+    UriTextNotUtf8Error,
+    StoredValueUnreadableError,
+    StorageNotConfiguredError,
+    StorageFileNotFoundError,
+    StorageLocalError,
+    StorageS3Error,
+    StorageGcpError,
+    RemoteFileFetchError,
+)
 
 
 def runtime_file_name(*, content: FileContent, pipe_code: str) -> str:
@@ -81,8 +100,8 @@ async def prepare_naming_context(
 ) -> dict[str, Any]:
     """Load the stored values `output_filename` reads, then take the naming context, before the step writes its output.
 
-    A stored value that cannot be loaded is left unloaded, with a warning: the template reaching it then fails to render,
-    and the file keeps the runtime's name.
+    A stored value that cannot be loaded, for any of the reasons its loader documents (`_STORED_TEXT_READ_FAILURES`), is
+    left unloaded, with a warning: the template reaching it then fails to render, and the file keeps the runtime's name.
     """
     read_paths: frozenset[str]
     try:
@@ -95,7 +114,7 @@ async def prepare_naming_context(
             await load_stored_values_read_from_memory(
                 memory=working_memory, read_paths=read_paths, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params
             )
-        except (UriReadRefusedError, StoredValueUnreadableError) as exc:
+        except _STORED_TEXT_READ_FAILURES as exc:
             log.warning(
                 "A stored input a file name reads could not be loaded",
                 fields={"pipe_code": pipe_code, **error_fields(exc=exc)},
